@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, newIdempotencyKey } from '../../../../shared/widgets/dashboard/analytics-api';
 import { issueDetails } from '../shared/api-error-details';
 import {
@@ -17,6 +17,37 @@ import {
 import { FAKE_BRANCHES, FAKE_COMPANIES, FAKE_ME } from '../../../../shared/widgets/dashboard/fake/fake-org';
 import { DASHBOARD_STORE } from './dashboards.fake';
 import { LayoutSizeInvalidError, placementIdFromPath } from './layout-save';
+import { bindCrmHttpForTest, crmQueries } from '../../shared/crm-http';
+import { CrmHttpStub } from '../../shared/testing/crm-http-testing';
+import { dashboardRun } from './dashboard-page/dashboard-test-support';
+
+let fixtures: Record<string, unknown>;
+let stub: CrmHttpStub;
+let dispose: () => void;
+beforeEach(() => {
+  fixtures = Object.fromEntries(DASHBOARD_STORE.map(({ detail }) => [`/dashboards/${detail.id}`, structuredClone(detail)]));
+  stub = new CrmHttpStub(fixtures);
+  dispose = bindCrmHttpForTest(stub);
+});
+afterEach(() => { crmQueries().clear(); dispose(); vi.restoreAllMocks(); });
+
+function response(data: unknown): void {
+  vi.spyOn(stub, 'write').mockImplementationOnce(async (method, path, body, options) => {
+    const result = await CrmHttpStub.prototype.write.call(stub, method, path, body, options);
+    return { ...result, data };
+  });
+}
+
+function failure(status: number, code: string, details?: Record<string, string[]>): void {
+  vi.spyOn(stub, 'write').mockImplementationOnce(async (method, path, body, options) => {
+    await CrmHttpStub.prototype.write.call(stub, method, path, body, options);
+    throw ApiError.fromResponse(status, { errorCode: code, details });
+  });
+}
+
+function readFailure(status: number, details: Record<string, string[]>): void {
+  vi.spyOn(stub, 'read').mockRejectedValueOnce(ApiError.fromResponse(status, { errorCode: 'CRM_VALIDATION_FAILED', details }));
+}
 
 // Contract: crm-app src/crm/dashboards (dashboard-definitions.service.ts, dashboard-placement-version.service.ts,
 // dashboard-blueprint.service.ts, layout/layout-engine.service.ts).
@@ -50,7 +81,9 @@ describe('dashboard list and detail (backend shapes)', () => {
   });
 
   it('list rows carry the stored blueprintKey (string|null) and no detail-only blueprint fields; search is 1..120 characters', async () => {
+    fixtures['/dashboards'] = { items: DASHBOARD_STORE.map(({ detail: { templateVersionPolicy, blueprintRevision, ...summary } }) => summary), nextCursor: null };
     const page = await listDashboards({ limit: 100 });
+    expect(stub.recordedReads().at(-1)).toMatchObject({ path: '/dashboards', query: { limit: 100 } });
     for (const item of page.items) {
       expect(item).toHaveProperty('blueprintKey');
       const stored = DASHBOARD_STORE.find((d) => d.detail.id === item.id)!;
@@ -61,16 +94,19 @@ describe('dashboard list and detail (backend shapes)', () => {
     const name = page.items[0].name;
     const found = await listDashboards({ search: name.slice(0, 4).toUpperCase() });
     expect(found.items.some((item) => item.id === page.items[0].id)).toBe(true);
+    readFailure(400, { search: ['max_length'] });
     const tooLong = await rejection(listDashboards({ search: 'x'.repeat(121) }));
     expect([tooLong.status, tooLong.code, tooLong.details]).toEqual([400, 'CRM_VALIDATION_FAILED', { search: ['max_length'] }]);
+    readFailure(400, { search: ['min_length'] });
     const blank = await rejection(listDashboards({ search: '   ' }));
     expect(blank.details).toEqual({ search: ['min_length'] });
     expect(page.items[0]).not.toHaveProperty('blueprintRevision');
   });
 
-  it('navigation refuses `search` (list route only) and answers without it', async () => {
-    const refused = await rejection(getNavigation({ search: 'sales' } as unknown as NavigationQuery));
-    expect([refused.status, refused.code, refused.details]).toEqual([400, 'CRM_VALIDATION_FAILED', { search: ['whitelist_validation'] }]);
+  it('navigation omits `search` (list route only) and answers without it', async () => {
+    fixtures['/dashboards/navigation'] = { items: [{ id: ownedEditable().detail.id, name: 'Sales' }], nextCursor: null, activeDashboardId: null };
+    await getNavigation({ search: 'sales' } as unknown as NavigationQuery);
+    expect(stub.recordedReads().at(-1)?.query).not.toHaveProperty('search');
     const nav = await getNavigation();
     expect(nav.items.length).toBeGreaterThan(0);
   });
@@ -99,6 +135,9 @@ describe('layout size errors (string-array details)', () => {
     const target = items[0];
     target.w = 1;
     target.h = 1;
+    failure(422, 'CRM_DASHBOARD_LAYOUT_SIZE_INVALID', {
+      path: ['items.0.w', 'items.0.h'], code: ['min_width', 'min_height'], placementId: [target.placementId], minW: ['16'], minH: ['10'],
+    });
     const error = await rejection(
       saveLayout(detail.id, { revision: detail.revision, breakpointKey: 'desktop', items }, newIdempotencyKey()),
     );
@@ -149,27 +188,36 @@ describe('placement version policy (backend shapes)', () => {
   it('a pinned version above the active one is 404, FOLLOW_ACTIVE with a number is 422, an unchanged confirm is a no-op', async () => {
     const record = ownedEditable();
     const placementId = record.detail.placements[0].id;
+    const bindingFixture = { dashboardId: record.detail.id, placementId, widgetId: record.detail.placements[0].widgetId,
+      dashboardRevision: record.detail.revision, widgetRevision: 3, governanceRevision: 2,
+      versionPolicy: 'FOLLOW_ACTIVE', pinnedVersionNumber: null, activeVersionNumber: 2, selectedVersionNumber: 2,
+      placement: { x: 0, y: 0, w: 16, h: 10 } };
+    fixtures[`/dashboards/${record.detail.id}/placements/${placementId}/version-policy`] = bindingFixture;
     const binding = await getVersionBinding(record.detail.id, placementId);
     const base = {
       expectedDashboardRevision: binding.dashboardRevision,
       expectedWidgetRevision: binding.widgetRevision,
       expectedGovernanceRevision: binding.governanceRevision,
     };
+    failure(404, 'CRM_WIDGET_VERSION_NOT_FOUND');
     const missing = await rejection(
       previewVersionPolicy(record.detail.id, placementId, { ...base, versionPolicy: 'PINNED', pinnedVersionNumber: 999 }),
     );
     expect([missing.status, missing.code]).toEqual([404, 'CRM_WIDGET_VERSION_NOT_FOUND']);
+    failure(422, 'CRM_DASHBOARD_PLACEMENT_VERSION_INVALID');
     const invalid = await rejection(
       previewVersionPolicy(record.detail.id, placementId, { ...base, versionPolicy: 'FOLLOW_ACTIVE', pinnedVersionNumber: 1 }),
     );
     expect([invalid.status, invalid.code]).toEqual([422, 'CRM_DASHBOARD_PLACEMENT_VERSION_INVALID']);
 
+    response({ current: bindingFixture, proposed: { ...bindingFixture, changed: false, layoutChanged: false, visualizationType: 'METRIC_CARD' } });
     const same = await previewVersionPolicy(record.detail.id, placementId, {
       ...base,
       versionPolicy: binding.versionPolicy,
       pinnedVersionNumber: binding.pinnedVersionNumber,
     });
     expect(same.proposed.changed).toBe(false);
+    response({ ...bindingFixture, changed: false });
     const result = await setVersionPolicy(record.detail.id, placementId, {
       ...base,
       versionPolicy: binding.versionPolicy,
@@ -184,6 +232,7 @@ describe('placement version policy (backend shapes)', () => {
 
 describe('blueprints (backend shapes)', () => {
   it('keys follow the blueprint key pattern, targets are numbers, and a replayed adoption answers created: false', async () => {
+    fixtures['/dashboards/blueprints'] = { items: [{ key: 'sales-overview', definitionRevision: 1, branchSelectionRequired: false, targets: [{ widgetName: 'Sales', target: 100 }] }] };
     const { items } = await listBlueprints();
     for (const bp of items) {
       expect(bp.key).toMatch(/^[a-z][a-z0-9-]{0,79}$/);
@@ -191,10 +240,15 @@ describe('blueprints (backend shapes)', () => {
     }
     const bp = items.find((item) => !item.branchSelectionRequired)!;
     const body = { definitionRevision: bp.definitionRevision, name: `Adopted ${bp.key}`, ...(bp.targets.length ? { confirmTargets: true as const } : {}) };
+    const adoptedId = ownedEditable().detail.id;
+    response({ dashboardId: adoptedId, definitionRevision: 1, created: true });
     const first = await adoptBlueprint(bp.key, body, newIdempotencyKey());
+    expect(stub.recordedWrites().at(-1)).toMatchObject({ method: 'PUT', path: `/dashboards/blueprints/${bp.key}/adoption`, body });
     expect(first.created).toBe(true);
+    response({ ...first, created: false });
     const replay = await adoptBlueprint(bp.key, body, newIdempotencyKey());
     expect(replay).toEqual({ ...first, created: false });
+    fixtures[`/dashboards/${adoptedId}`] = { ...ownedEditable().detail, blueprintKey: bp.key, sourceTemplateKey: null };
     const adopted = await getDashboard(first.dashboardId);
     expect(adopted).toMatchObject({ blueprintKey: bp.key, sourceTemplateKey: null });
   });
@@ -206,6 +260,11 @@ describe('run organization scope (engine/dashboard-organization-scope.ts)', () =
   const [cairo, alex, giza] = FAKE_BRANCHES.map((b) => b.id);
 
   it('lists the readable companies and branches (company then branch order) and echoes list filters only when sent', async () => {
+    const fixture = dashboardRun();
+    fixture.organizationScope.companies = FAKE_COMPANIES.map((company) => ({ id: company.id, name: company.name.en }));
+    fixture.organizationScope.branches = FAKE_BRANCHES.map((branch) => ({ ...branch, name: branch.name.en, companyName: FAKE_COMPANIES.find((company) => company.id === branch.companyId)!.name.en }));
+    fixture.organizationScope.branches.sort((a, b) => `${a.companyName}|${a.name}`.localeCompare(`${b.companyName}|${b.name}`));
+    response(fixture);
     const run = await runDashboard(owned());
     const org = run.organizationScope;
     expect([org.companyId, org.branchId, org.partialAccess]).toEqual([null, null, false]);
@@ -216,20 +275,25 @@ describe('run organization scope (engine/dashboard-organization-scope.ts)', () =
     const order = org.branches.map((b) => `${b.companyName}|${b.name}`);
     expect(order).toEqual([...order].sort((a, b) => a.localeCompare(b)));
 
+    response({ ...fixture, organizationScope: { ...fixture.organizationScope, branchIds: [cairo, giza].sort() } });
     const filtered = await runDashboard(owned(), { filters: { branchIds: [giza, cairo] } });
+    expect(stub.recordedWrites().at(-1)).toMatchObject({ path: `/dashboards/${owned()}/run`, body: { filters: { branchIds: [giza, cairo] }, includePopulationOptions: true } });
     expect(filtered.organizationScope.branchIds).toEqual([cairo, giza].sort());
     expect(filtered.organizationScope.branches).toHaveLength(FAKE_BRANCHES.length);
   });
 
   it('a shared dashboard narrows the options and reports partialAccess', async () => {
+    response({ ...dashboardRun(), organizationScope: { companyId: null, branchId: null, companies: FAKE_COMPANIES, branches: FAKE_BRANCHES.slice(0, 2), partialAccess: true } });
     const org = (await runDashboard(shared())).organizationScope;
     expect(org.partialAccess).toBe(true);
     expect(org.branches.map((b) => b.id).sort()).toEqual([cairo, alex].sort());
   });
 
   it('a company or branch outside the readable lists answers 403 CRM_SCOPED_PERMISSION_DENIED', async () => {
+    failure(403, 'CRM_SCOPED_PERMISSION_DENIED');
     const branch = await rejection(runDashboard(shared(), { filters: { branchIds: [giza] } }));
     expect([branch.status, branch.code]).toEqual([403, 'CRM_SCOPED_PERMISSION_DENIED']);
+    failure(403, 'CRM_SCOPED_PERMISSION_DENIED');
     const company = await rejection(runDashboard(owned(), { filters: { companyId: '01934b10-0000-7000-8000-0000000000ff' } }));
     expect([company.status, company.code]).toEqual([403, 'CRM_SCOPED_PERMISSION_DENIED']);
   });
@@ -241,6 +305,7 @@ describe('run organization scope (engine/dashboard-organization-scope.ts)', () =
       { companyIds: [] },
       { branchIds: ['not-a-uuid'] },
     ]) {
+      failure(422, 'CRM_DASHBOARD_FILTER_INVALID');
       const error = await rejection(runDashboard(owned(), { filters }));
       expect([error.status, error.code]).toEqual([422, 'CRM_DASHBOARD_FILTER_INVALID']);
     }

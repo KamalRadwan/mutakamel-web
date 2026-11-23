@@ -20,6 +20,9 @@ import { tablerStarFill } from '@ng-icons/tabler-icons/fill';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { LanguageState } from '../../../../../core/i18n/language';
 import { Badge } from '../../../../../shared/ui/badge/badge';
+import { RouterLink } from '@angular/router';
+import { Button } from '../../../../../shared/ui/button/button';
+import { can } from '../../../../../shared/widgets/dashboard/analytics-permissions';
 import {
   REPORT_DOMAIN_META,
   ReportCatalogueItem,
@@ -31,7 +34,7 @@ import {
 
 @Component({
   selector: 'app-report-card',
-  imports: [NgIcon, TranslocoPipe, Badge],
+  imports: [NgIcon, TranslocoPipe, Badge, Button, RouterLink],
   providers: [
     provideIcons({
       tablerTrendingUp,
@@ -59,6 +62,8 @@ export class ReportCard {
 
   readonly report = input.required<ReportCatalogueItem>();
   readonly togglingFavourite = input(false);
+  readonly readOnly = input(false);
+  protected readonly canViewReadiness = computed(() => can('crm.analytics.readiness.view'));
 
   readonly open = output<ReportCatalogueItem>();
   readonly toggleFavourite = output<ReportCatalogueItem>();
@@ -72,7 +77,7 @@ export class ReportCard {
   protected onCardClick(event: MouseEvent): void {
     if (this.disabled()) return;
     const target = event.target as HTMLElement | null;
-    if (target?.closest('button')) return;
+    if (target?.closest('button, a')) return;
     this.open.emit(this.report());
   }
 
@@ -86,7 +91,7 @@ export class ReportCard {
 
   protected onStarClick(event: MouseEvent): void {
     event.stopPropagation();
-    if (this.disabled() || this.togglingFavourite()) return;
+    if (this.disabled() || this.readOnly() || this.togglingFavourite()) return;
     this.toggleFavourite.emit(this.report());
   }
 }

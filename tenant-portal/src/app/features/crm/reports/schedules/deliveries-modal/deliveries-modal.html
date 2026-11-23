@@ -8,11 +8,12 @@
   [closeLabel]="'analytics.common.close' | transloco"
   (closed)="onModalClosed()"
 >
-  @if (loadError()) {
+  @if (loadError(); as kind) {
     <ui-full-state
-      kind="load-failure"
-      [title]="'analytics.common.loadFailed' | transloco"
-      [actionLabel]="'analytics.common.retry' | transloco"
+      [kind]="kind"
+      [title]="(kind === 'forbidden' ? 'repSchedules.forbiddenTitle' : kind === 'not-found' ? 'analytics.error.CRM_SUBSCRIPTION_NOT_FOUND' : 'analytics.common.loadFailed') | transloco"
+      [text]="loadText()"
+      [actionLabel]="kind === 'load-failure' ? ('analytics.common.retry' | transloco) : ''"
       (action)="reload()"
     />
   } @else {

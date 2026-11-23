@@ -1,11 +1,17 @@
-import { Component, DestroyRef, computed, effect, inject, signal, untracked } from '@angular/core';
+import { Component, DestroyRef, Injector, computed, effect, inject, runInInjectionContext, signal, untracked } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { LanguageState } from '../../../../../core/i18n/language';
 import { Notify } from '../../../../../core/notify/notify';
+import { TenantScopeState } from '../../../../../core/scope/tenant-scope';
+import { hasTenantWidePermission } from '../../../../../core/auth/tenant-wide-permission';
 import { Badge, type BadgeTone } from '../../../../../shared/ui/badge/badge';
+import { Button } from '../../../../../shared/ui/button/button';
+import { Field } from '../../../../../shared/ui/field/field';
+import { Dropdown, type DropdownOption } from '../../../../../shared/ui/dropdown/dropdown';
+import { listActiveCoreCurrencyCodes } from '../../../../../shared/lookups/core-currencies';
 import { Breadcrumbs, type Crumb } from '../../../../../shared/ui/breadcrumbs/breadcrumbs';
 import {
   DASH,
@@ -24,15 +30,14 @@ import {
   ApiError,
   errorCodeOf,
   isAbortError,
-  queueRun,
-  retryWhenBusy,
 } from '../../../../../shared/widgets/dashboard/analytics-api';
 import type { RuntimeFilters } from '../../../../../shared/widgets/dashboard/analytics.model';
-import { FAKE_BRANCHES } from '../../../../../shared/widgets/dashboard/fake/fake-org';
+import { can } from '../../../../../shared/widgets/dashboard/analytics-permissions';
 import { errorKey } from '../../../../../shared/widgets/dashboard/panel-state';
 import { drilldown, getDashboard } from '../dashboards.api';
-import type { DrillRecord } from '../dashboards.model';
+import type { DashboardDetail, DrillRecord } from '../dashboards.model';
 import { decodeRuntimeFilters } from '../records-link';
+import { dashboardReadError } from '../dashboard-page/dashboard-read-error';
 
 const PAGE_LIMIT = 25;
 const FALLBACK_COLUMNS: readonly (keyof DrillRecord)[] = [
@@ -65,6 +70,7 @@ interface ErrorStateModel {
   titleKey: string;
   textKey: string;
   retryable: boolean;
+  message?: string;
 }
 
 function parsePageParam(raw: string | null): number {
@@ -75,7 +81,7 @@ function parsePageParam(raw: string | null): number {
 
 @Component({
   selector: 'app-records-page',
-  imports: [TranslocoPipe, Badge, Breadcrumbs, DataCell, DataTable, FullState, Pagination],
+  imports: [TranslocoPipe, Badge, Breadcrumbs, Button, Field, Dropdown, DataCell, DataTable, FullState, Pagination],
   providers: [
     provideTranslocoScope(
       { scope: 'crm-dash-filters', alias: 'dashFilters' },
@@ -89,6 +95,8 @@ export class RecordsPage {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly notify = inject(Notify);
+  private readonly tenantScope = inject(TenantScopeState);
+  private readonly injector = inject(Injector);
   private readonly language = inject(LanguageState).current;
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
@@ -104,15 +112,32 @@ export class RecordsPage {
   protected readonly requestedPage = computed(() =>
     parsePageParam(this.queryParamMap()?.get('page') ?? null),
   );
-  protected readonly filters = computed<RuntimeFilters>(() =>
-    decodeRuntimeFilters(this.rawFilters()),
-  );
+  protected readonly filters = computed<RuntimeFilters>(() => {
+    const filters = decodeRuntimeFilters(this.rawFilters());
+    const currencyCode = this.queryParamMap()?.get('currency');
+    return currencyCode && /^[A-Z]{3}$/.test(currencyCode) ? { ...filters, currencyCode } : filters;
+  });
 
   protected readonly dashboardName = signal<string | null>(null);
+  private readonly dashboardDetail = signal<DashboardDetail | null>(null);
+  protected readonly needsCurrency = signal(false);
+  private readonly currencyCodes = signal<string[]>([]);
+  private readonly currencyLookupFailed = signal(false);
+  protected readonly currencyOptions = computed<DropdownOption<string>[]>(() => {
+    const detail = this.dashboardDetail();
+    const ownCurrency = detail?.placements.find((p) => p.widgetId === this.widgetId())?.widget.querySpec.filters?.currencyCode
+      ?? detail?.defaultFilters.currencyCode;
+    const codes = [...new Set([...this.currencyCodes(), ...(ownCurrency ? [ownCurrency] : [])])];
+    return codes.map((value) => ({ value, label: value }));
+  });
+  protected readonly currencyHint = computed(() => {
+    this.i18n();
+    return this.transloco.translate(this.currencyLookupFailed() || this.currencyOptions().length === 0
+      ? 'dashFilters.currencyUnavailable' : 'dashFilters.currencyHint');
+  });
+  protected readonly canViewReadiness = can('crm.analytics.readiness.view');
   protected readonly records = signal<DrillRecord[]>([]);
   protected readonly loading = signal(false);
-  /** A drill-down call was refused (429) and waits to retry: shown as a status line above the table. */
-  protected readonly retrying = signal(false);
   protected readonly errorState = signal<ErrorStateModel | null>(null);
   protected readonly currentPage = signal(1);
   protected readonly pageSize = PAGE_LIMIT;
@@ -184,11 +209,8 @@ export class RecordsPage {
           ? [f.branchId]
           : [];
     if (branchIds.length > 0) {
-      const branchMap = new Map(
-        FAKE_BRANCHES.map((b) => [b.id, lang === 'ar' ? b.name.ar : b.name.en]),
-      );
       const sep = lang === 'ar' ? '، ' : ', ';
-      const branchNames = branchIds.map((id) => branchMap.get(id) ?? id).join(sep);
+      const branchNames = branchIds.join(sep);
       chips.push(`${scopeText} · ${branchNames}`);
     } else {
       chips.push(scopeText);
@@ -203,6 +225,7 @@ export class RecordsPage {
     if (series) {
       chips.push(this.transloco.translate('dashFilters.seriesChip', { series }));
     }
+    if (f.currencyCode) chips.push(f.currencyCode);
 
     return chips;
   });
@@ -258,41 +281,19 @@ export class RecordsPage {
 
     effect(() => {
       const id = this.dashboardId();
-      if (!id || id === this.lastDashboardId) return;
-      this.lastDashboardId = id;
-      untracked(() => {
-        this.dashboardName.set(null);
-        void getDashboard(id)
-          .then((detail) => {
-            if (this.dashboardId() === id) {
-              this.dashboardName.set(detail.name);
-            }
-          })
-          .catch(() => {
-            // Keep fallback dashboard label in breadcrumbs if metadata fails.
-          });
-      });
-    });
-
-    effect(() => {
-      const id = this.dashboardId();
       const widget = this.widgetId();
       const point = this.pointKey();
       const series = this.seriesKey();
-      const rawF = this.rawFilters();
+      const filters = this.filters();
       const targetPage = this.requestedPage();
-      const lang = this.language();
       this.reloadToken();
-
-      const signature = `${id}|${widget}|${point}|${series}|${rawF}|${lang}`;
+      const signature = JSON.stringify([id, widget, point, series, filters]);
       untracked(() => {
         if (signature !== this.lastQuerySignature) {
           this.lastQuerySignature = signature;
-          this.cursorStack = new Map<number, string | null>([[1, null]]);
-          this.exactTotal.set(null);
-          this.highestKnownTotal.set(0);
+          this.resetCursors();
         }
-        void this.loadPage(id, widget, point, series, this.filters(), targetPage);
+        void this.loadPage(id, widget, point, series, filters, targetPage);
       });
     });
   }
@@ -311,12 +312,24 @@ export class RecordsPage {
       void this.router.navigate(['/crm/leads', record.id]);
       return;
     }
+    if (record.entityType?.toUpperCase() === 'OPPORTUNITY' && record.id) {
+      void this.router.navigate(['/crm/opportunities', record.id]);
+      return;
+    }
+    if (['CUSTOMER', 'CUSTOMER_PROFILE'].includes(record.entityType?.toUpperCase() ?? '') && record.id) {
+      void this.router.navigate(['/crm/customers', record.id]);
+      return;
+    }
     this.notify.info(this.transloco.translate('dashFilters.notAvailableYet'));
   }
 
   protected onErrorAction(): void {
     const err = this.errorState();
     if (!err) return;
+    if (err.kind === 'provisioning' && this.canViewReadiness) {
+      void this.router.navigate(['/crm/settings/data-readiness']);
+      return;
+    }
     if (err.retryable) {
       this.reloadToken.update((v) => v + 1);
       return;
@@ -341,7 +354,7 @@ export class RecordsPage {
 
   protected formatRecordMoney(record: DrillRecord): string {
     if (record.amount === undefined || record.amount === null) return DASH;
-    return formatMoney(record.amount, record.currencyCode ?? 'EGP');
+    return record.currencyCode ? formatMoney(record.amount, record.currencyCode) : DASH;
   }
 
   protected formatRecordValue(record: DrillRecord): string {
@@ -354,177 +367,109 @@ export class RecordsPage {
     return formatDate(iso, this.language());
   }
 
+  private resetCursors(): void {
+    this.cursorStack = new Map([[1, null]]);
+    this.exactTotal.set(null);
+    this.highestKnownTotal.set(0);
+  }
+
+  protected onCurrencyChange(currency: string | null): void {
+    if (!currency || !this.currencyOptions().some((option) => option.value === currency)) return;
+    void this.router.navigate([], {
+      relativeTo: this.route, queryParams: { currency, page: null }, queryParamsHandling: 'merge',
+    });
+  }
+
+  protected onRefresh(): void {
+    this.reloadToken.update((value) => value + 1);
+  }
+
   private async loadPage(
-    dashboardId: string,
-    widgetId: string,
-    pointKey: string,
-    seriesKey: string,
-    filters: RuntimeFilters,
-    targetPage: number,
+    dashboardId: string, widgetId: string, pointKey: string, seriesKey: string,
+    filters: RuntimeFilters, targetPage: number,
   ): Promise<void> {
     const seq = ++this.loadSeq;
     this.loadAbort.abort();
     this.loadAbort = new AbortController();
     const signal = this.loadAbort.signal;
-    const busyOptions = {
-      signal,
-      onRetry: () => {
-        if (seq === this.loadSeq) this.retrying.set(true);
-      },
-    };
     this.errorState.set(null);
-    this.retrying.set(false);
-
-    if (!dashboardId || !widgetId) {
-      this.records.set([]);
-      this.loading.set(false);
-      this.errorState.set({
-        kind: 'not-found',
-        titleKey: 'dashFilters.notFoundTitle',
-        textKey: errorKey('CRM_DASHBOARD_DRILLDOWN_WIDGET_NOT_FOUND'),
-        retryable: false,
-      });
-      return;
-    }
-
+    this.needsCurrency.set(false);
     this.loading.set(true);
-
+    this.records.set([]);
     try {
-      let pageToFetch = targetPage;
-      if (!this.cursorStack.has(pageToFetch)) {
-        const cachedPages = Array.from(this.cursorStack.keys()).sort((a, b) => a - b);
-        let cursorPage = cachedPages[cachedPages.length - 1] ?? 1;
-
-        while (cursorPage < targetPage) {
-          const cursor = this.cursorStack.get(cursorPage) ?? null;
-          const stepRes = await retryWhenBusy(
-            () =>
-              queueRun(
-                () =>
-                  drilldown(
-                    dashboardId,
-                    widgetId,
-                    {
-                      pointKey,
-                      ...(seriesKey ? { seriesKey } : {}),
-                      cursor,
-                      limit: PAGE_LIMIT,
-                      filters,
-                    },
-                    signal,
-                  ),
-                signal,
-              ),
-            busyOptions,
-          );
-          if (seq !== this.loadSeq) return;
-          this.retrying.set(false);
-
-          if (stepRes.pageInfo.hasMore && stepRes.pageInfo.nextCursor) {
-            this.cursorStack.set(cursorPage + 1, stepRes.pageInfo.nextCursor);
-            this.highestKnownTotal.update((prev) =>
-              Math.max(prev, cursorPage * PAGE_LIMIT + 1),
-            );
-            cursorPage++;
-          } else {
-            this.exactTotal.set((cursorPage - 1) * PAGE_LIMIT + stepRes.records.length);
-            this.records.set(stepRes.records);
-            this.currentPage.set(cursorPage);
-            this.loading.set(false);
-            if (cursorPage !== targetPage) {
-              void this.router.navigate([], {
-                relativeTo: this.route,
-                queryParams: { page: cursorPage <= 1 ? null : String(cursorPage) },
-                queryParamsHandling: 'merge',
-                replaceUrl: true,
-              });
-            }
-            return;
+      if (!can('crm.dashboards.read')) throw new ApiError(403, 'CRM_SCOPED_PERMISSION_DENIED');
+      if (!dashboardId || !widgetId) throw new ApiError(404, 'CRM_DASHBOARD_DRILLDOWN_WIDGET_NOT_FOUND');
+      if (!this.cursorStack.has(targetPage)) {
+        await this.router.navigate([], {
+          relativeTo: this.route, queryParams: { page: null }, queryParamsHandling: 'merge', replaceUrl: true,
+        });
+        return;
+      }
+      if (this.lastDashboardId !== dashboardId) {
+        const detail = await getDashboard(dashboardId);
+        if (seq !== this.loadSeq) return;
+        this.lastDashboardId = dashboardId;
+        this.dashboardDetail.set(detail);
+        this.dashboardName.set(detail.name);
+      }
+      const placement = this.dashboardDetail()?.placements.find((item) => item.widgetId === widgetId);
+      const selection = pointKey || (placement?.widget.querySpec.dimension ? '' : 'value');
+      if (!selection) throw new ApiError(422, 'CRM_DASHBOARD_DRILLDOWN_SELECTION_INVALID');
+      const result = await drilldown(dashboardId, widgetId, {
+        pointKey: selection, ...(seriesKey ? { seriesKey } : {}),
+        cursor: this.cursorStack.get(targetPage), limit: PAGE_LIMIT, filters,
+      }, signal);
+      if (seq !== this.loadSeq) return;
+      if (result.pageInfo.hasMore && result.pageInfo.nextCursor) {
+        this.cursorStack.set(targetPage + 1, result.pageInfo.nextCursor);
+        this.exactTotal.set(null);
+        this.highestKnownTotal.update((previous) => Math.max(previous, targetPage * PAGE_LIMIT + 1));
+      } else {
+        this.exactTotal.set((targetPage - 1) * PAGE_LIMIT + result.records.length);
+      }
+      this.records.set(result.records);
+      this.currentPage.set(targetPage);
+    } catch (error) {
+      if (isAbortError(error) || seq !== this.loadSeq) return;
+      const code = errorCodeOf(error);
+      if (code === 'CRM_DASHBOARD_DRILLDOWN_CURSOR_INVALID' && this.cursorStack.get(targetPage)) {
+        this.resetCursors();
+        this.currentPage.set(1);
+        void this.router.navigate([], {
+          relativeTo: this.route, queryParams: { page: null }, queryParamsHandling: 'merge', replaceUrl: true,
+        });
+        return;
+      }
+      if (code === 'CRM_DASHBOARD_DRILLDOWN_CURRENCY_REQUIRED') {
+        this.needsCurrency.set(true);
+        this.currencyLookupFailed.set(false);
+        if (hasTenantWidePermission(this.tenantScope.me(), 'currencies.currency.read')) {
+          try {
+            const codes = await runInInjectionContext(this.injector, () => listActiveCoreCurrencyCodes());
+            if (seq !== this.loadSeq) return;
+            this.currencyCodes.set(codes);
+          } catch {
+            if (seq !== this.loadSeq) return;
+            this.currencyLookupFailed.set(true);
           }
         }
-        pageToFetch = cursorPage;
+        return;
       }
-
-      const cursor = this.cursorStack.get(pageToFetch) ?? null;
-      const result = await retryWhenBusy(
-        () =>
-          queueRun(
-            () =>
-              drilldown(
-                dashboardId,
-                widgetId,
-                {
-                  pointKey,
-                  ...(seriesKey ? { seriesKey } : {}),
-                  cursor,
-                  limit: PAGE_LIMIT,
-                  filters,
-                },
-                signal,
-              ),
-            signal,
-          ),
-        busyOptions,
-      );
-      if (seq !== this.loadSeq) return;
-      this.retrying.set(false);
-
-      if (result.pageInfo.hasMore && result.pageInfo.nextCursor) {
-        this.cursorStack.set(pageToFetch + 1, result.pageInfo.nextCursor);
-        this.exactTotal.set(null);
-        this.highestKnownTotal.update((prev) => Math.max(prev, pageToFetch * PAGE_LIMIT + 1));
-      } else {
-        this.exactTotal.set((pageToFetch - 1) * PAGE_LIMIT + result.records.length);
-      }
-
-      this.records.set(result.records);
-      this.currentPage.set(pageToFetch);
-      this.loading.set(false);
-    } catch (error: unknown) {
-      if (isAbortError(error) || seq !== this.loadSeq) return;
-      this.retrying.set(false);
-      this.loading.set(false);
-      this.records.set([]);
       this.errorState.set(this.mapError(error));
+    } finally {
+      if (seq === this.loadSeq) this.loading.set(false);
     }
   }
 
   private mapError(error: unknown): ErrorStateModel {
-    const code = errorCodeOf(error);
-    const status = error instanceof ApiError ? error.status : 0;
-
-    if (status === 403 || code === 'CRM_DASHBOARD_DRILLDOWN_SOURCE_ACCESS_DENIED') {
-      return {
-        kind: 'forbidden',
-        titleKey: 'dashFilters.accessDeniedTitle',
-        textKey: errorKey(code ?? 'CRM_DASHBOARD_DRILLDOWN_SOURCE_ACCESS_DENIED'),
-        retryable: false,
-      };
-    }
-
-    if (status === 404) {
-      return {
-        kind: 'not-found',
-        titleKey: 'dashFilters.notFoundTitle',
-        textKey: errorKey(code),
-        retryable: false,
-      };
-    }
-
-    if (status === 422 || (code && code.startsWith('CRM_DASHBOARD_DRILLDOWN_'))) {
-      return {
-        kind: 'load-failure',
-        titleKey: 'dashFilters.drillUnavailableTitle',
-        textKey: errorKey(code),
-        retryable: false,
-      };
-    }
-
+    const state = dashboardReadError(error, this.transloco, 'dashFilters');
     return {
-      kind: 'load-failure',
-      titleKey: 'analytics.common.loadFailed',
-      textKey: errorKey(code),
-      retryable: true,
+      kind: state.kind,
+      titleKey: state.kind === 'forbidden' ? 'dashFilters.accessDeniedTitle'
+        : state.kind === 'not-found' ? 'dashFilters.notFoundTitle'
+        : state.kind === 'provisioning' ? 'dashFilters.provisioningTitle' : 'analytics.common.loadFailed',
+      textKey: errorKey(state.code), message: state.message,
+      retryable: state.kind === 'load-failure' && !(error instanceof ApiError && error.status === 422),
     };
   }
 }

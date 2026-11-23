@@ -3,7 +3,11 @@ import { ApiError, newIdempotencyKey } from '../analytics-api';
 import { bindAnalyticsPermissions } from '../analytics-permissions';
 import { ANALYTICS_PERMISSIONS_FIXTURE } from '../analytics-permissions.fixture';
 import { errorText } from '../panel-state';
-import { cancelExport, createExport, downloadExport, getExport, listExports, pdfAvailable, toExportPeriod } from './exports.api';
+import { pdfAvailable, toExportPeriod } from './exports.api';
+import {
+  fakeCancelExport as cancelExport, fakeCreateExport as createExport, fakeDownloadExport as downloadExport,
+  fakeGetExport as getExport, fakeListExports as listExports,
+} from './exports.fake';
 import type { CreateExportRequest } from './exports.model';
 
 beforeEach(() => bindAnalyticsPermissions(() => ANALYTICS_PERMISSIONS_FIXTURE));

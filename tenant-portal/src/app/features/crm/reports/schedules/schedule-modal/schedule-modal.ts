@@ -8,6 +8,7 @@ import {
   inject,
   input,
   output,
+  runInInjectionContext,
   signal,
   viewChild,
 } from '@angular/core';
@@ -19,7 +20,12 @@ import { LanguageState } from '../../../../../core/i18n/language';
 import { Notify } from '../../../../../core/notify/notify';
 import { Button } from '../../../../../shared/ui/button/button';
 import { Checkbox } from '../../../../../shared/ui/checkbox/checkbox';
-import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
+import { ConflictDialog } from '../../../../../shared/ui/conflict-dialog/conflict-dialog';
+import { fieldErrorsOf, isRetryableWriteError } from '../../../../../core/api/api-errors';
+import { TenantScopeState } from '../../../../../core/scope/tenant-scope';
+import { settingsTimeZone } from '../../../settings/shared/settings-time-zone';
+import { reportWriteError } from '../report-errors';
+import { OrgApi, type OrgUser } from '../../../../../shared/widgets/dashboard/org.api';
 import { DateField } from '../../../../../shared/ui/date-time/date-field';
 import { TimeField } from '../../../../../shared/ui/date-time/time-field';
 import { Dropdown, type DropdownOption } from '../../../../../shared/ui/dropdown/dropdown';
@@ -29,12 +35,12 @@ import { rectInPage, viewport } from '../../../../../shared/ui/overlay/zoom';
 import { Segmented, type SegmentedOption } from '../../../../../shared/ui/segmented/segmented';
 import { UnsavedDialog } from '../../../../../shared/ui/unsaved-dialog/unsaved-dialog';
 import { ApiError, errorCodeOf, newIdempotencyKey } from '../../../../../shared/widgets/dashboard/analytics-api';
-import { FAKE_ME, FAKE_PEOPLE, type FakePerson } from '../../../../../shared/widgets/dashboard/fake/fake-org';
 import { errorKey, reasonKey } from '../../../../../shared/widgets/dashboard/panel-state';
 import {
   createSubscription,
   getSubscription,
   listScheduleTargets,
+  listSubscriptions,
   updateSubscription,
 } from '../schedules.api';
 import { format } from 'date-fns';
@@ -56,7 +62,7 @@ const MAX_NAME_LENGTH = 120;
 const MAX_RECIPIENTS = 50;
 const DEFAULT_TTL_HOURS = 168;
 const DEFAULT_TIME = '09:00';
-const DEFAULT_TIME_ZONE = 'Africa/Cairo';
+const DEFAULT_TIME_ZONE = 'UTC';
 const TIME_ZONES = [
   'Africa/Cairo',
   'Asia/Riyadh',
@@ -212,7 +218,7 @@ function draftsEqual(a: ScheduleDraft, b: ScheduleDraft): boolean {
     TranslocoPipe,
     Button,
     Checkbox,
-    ConfirmDialog,
+    ConflictDialog,
     DateField,
     Dropdown,
     Field,
@@ -241,22 +247,29 @@ export class ScheduleModal {
 
   private readonly modal = viewChild.required<Modal>('modal');
   private readonly unsavedDialog = viewChild.required<UnsavedDialog>('unsavedDialog');
-  private readonly conflictDialog = viewChild.required<ConfirmDialog>('conflictDialog');
+  protected readonly conflictOpen = signal(false);
+  protected readonly readOnly = signal(false);
+  protected readonly editable = computed(() => this.canManage() && !this.readOnly());
+  private readonly scope = inject(TenantScopeState);
+  private readonly org = inject(OrgApi);
+  private defaultTimeZone = DEFAULT_TIME_ZONE;
+  private createAttempt: { bodyJson: string; key: string } | null = null;
   private readonly recipientsAnchor = viewChild<ElementRef<HTMLElement>>('recipientsAnchor');
   private readonly recipientInput = viewChild<ElementRef<HTMLInputElement>>('recipientInput');
   private readonly recipientListRef = viewChild<ElementRef<HTMLElement>>('recipientList');
 
   readonly canManage = input(true);
   readonly saved = output<Subscription>();
+  readonly accessLost = output<void>();
   readonly reloaded = output<Subscription>();
   readonly deletedRemotely = output<void>();
   readonly deleteRequested = output<Subscription>();
 
   protected readonly maxNameLength = MAX_NAME_LENGTH;
   protected readonly maxRecipients = MAX_RECIPIENTS;
-  protected readonly pdfEnabled = false;
+  protected readonly pdfEnabled = signal(false);
   protected readonly attachmentFormatOptions: readonly SubscriptionAttachmentFormat[] = ['CSV', 'XLSX', 'PDF'];
-  protected readonly people = FAKE_PEOPLE;
+  protected readonly people = signal<readonly OrgUser[]>([]);
   /** Dashboards and reports of the target picker, read again each time the modal opens. */
   protected readonly targets = signal<ScheduleTargets>(EMPTY_SCHEDULE_TARGETS);
   private targetsSeq = 0;
@@ -274,7 +287,7 @@ export class ScheduleModal {
   protected readonly timeZone = signal<string>(DEFAULT_TIME_ZONE);
   protected readonly startsOn = signal<string | null>(null);
   protected readonly endsOn = signal<string | null>(null);
-  protected readonly recipientUserIds = signal<string[]>([FAKE_ME.id]);
+  protected readonly recipientUserIds = signal<string[]>([]);
   protected readonly attachmentFormats = signal<SubscriptionAttachmentFormat[]>([]);
   protected readonly linkTtlHoursText = signal(String(DEFAULT_TTL_HOURS));
   protected readonly locale = signal<'ar' | 'en'>('en');
@@ -293,6 +306,7 @@ export class ScheduleModal {
   private allowClose = false;
   private confirmingDiscard = false;
   private recipientSeq = 0;
+  private peopleSeq = 0;
 
   protected readonly isEdit = computed(() => this.editingSubscription() !== null);
   protected readonly nameCount = computed(() => [...this.name()].length);
@@ -371,9 +385,9 @@ export class ScheduleModal {
 
   protected readonly timeZoneOptions = computed<DropdownOption<string>[]>(() => {
     this.i18n();
-    return TIME_ZONES.map((tz) => ({
+    return [...new Set([this.timeZone(), ...TIME_ZONES])].map((tz) => ({
       value: tz,
-      label: this.transloco.translate(`repSchedules.timeZones.${tz}`),
+      label: (TIME_ZONES as readonly string[]).includes(tz) ? this.transloco.translate(`repSchedules.timeZones.${tz}`) : tz,
     }));
   });
 
@@ -385,12 +399,11 @@ export class ScheduleModal {
     ];
   });
 
-  protected readonly peopleById = new Map<string, FakePerson>(FAKE_PEOPLE.map((p) => [p.id, p]));
+  protected readonly peopleById = computed(() => new Map(this.people().map((p) => [p.id, p])));
 
-  protected readonly selectedRecipients = computed<FakePerson[]>(() =>
+  protected readonly selectedRecipients = computed<OrgUser[]>(() =>
     this.recipientUserIds()
-      .map((id) => this.peopleById.get(id))
-      .filter((person): person is FakePerson => person !== undefined),
+      .map((id) => this.peopleById().get(id) ?? { id, name: id, nameAr: id, email: '', teamId: '', branchId: '' }),
   );
 
   protected readonly selectedRecipientSet = computed(() => new Set(this.recipientUserIds()));
@@ -398,8 +411,8 @@ export class ScheduleModal {
 
   protected readonly filteredPeople = computed(() => {
     const q = this.recipientQuery().trim().toLowerCase();
-    if (!q) return FAKE_PEOPLE;
-    return FAKE_PEOPLE.filter(
+    if (!q) return this.people();
+    return this.people().filter(
       (person) =>
         person.name.toLowerCase().includes(q) ||
         person.nameAr.toLowerCase().includes(q) ||
@@ -415,7 +428,7 @@ export class ScheduleModal {
   });
 
   protected readonly activeRecipientOptionId = computed(() => {
-    if (!this.recipientOpen() || !this.canManage()) return null;
+    if (!this.recipientOpen() || !this.editable()) return null;
     const idx = this.safeRecipientIndex();
     return idx >= 0 ? this.recipientOptionId(idx) : null;
   });
@@ -464,6 +477,13 @@ export class ScheduleModal {
   }));
 
   constructor() {
+    void runInInjectionContext(this.injector, () => settingsTimeZone()).then((zone) => {
+      if (zone) this.defaultTimeZone = zone;
+      if (zone && this.timeZone() === DEFAULT_TIME_ZONE && !this.isEdit()) {
+        this.timeZone.set(zone);
+        this.baseline.update((draft) => ({ ...draft, timeZone: zone }));
+      }
+    }).catch(() => {});
     const onScroll = (event: Event) => {
       if (!this.recipientOpen()) return;
       const target = event.target;
@@ -476,7 +496,10 @@ export class ScheduleModal {
   }
 
   openCreate(prefill?: { dashboardId?: string | null; reportKey?: string | null }): void {
+    this.readOnly.set(false);
+    this.createAttempt = null;
     void this.refreshTargets();
+    void this.refreshRecipients();
     this.editingSubscription.set(null);
     const defaults = this.createDefaultDraft(prefill);
     this.baseline.set(defaults);
@@ -489,7 +512,10 @@ export class ScheduleModal {
   }
 
   openEdit(sub: Subscription): void {
+    this.readOnly.set(false);
+    this.createAttempt = null;
     void this.refreshTargets();
+    void this.refreshRecipients();
     this.editingSubscription.set(sub);
     const draft = this.draftFromSubscription(sub);
     this.baseline.set(draft);
@@ -502,6 +528,7 @@ export class ScheduleModal {
   }
 
   close(): void {
+    this.peopleSeq++;
     this.closeRecipientMenu();
     this.allowClose = true;
     this.modal().close();
@@ -518,7 +545,7 @@ export class ScheduleModal {
   }
 
   protected requestClose(): void {
-    if (!this.canManage() || !this.dirty()) {
+    if (!this.editable() || !this.dirty()) {
       this.close();
       return;
     }
@@ -531,7 +558,7 @@ export class ScheduleModal {
       this.modal().open();
       return;
     }
-    if (!this.allowClose && this.canManage() && this.dirty()) {
+    if (!this.allowClose && this.editable() && this.dirty()) {
       this.modal().open();
       void this.confirmDiscardAndClose();
       return;
@@ -541,7 +568,7 @@ export class ScheduleModal {
     this.resetValidation();
   }
 
-  protected personName(person: FakePerson): string {
+  protected personName(person: OrgUser): string {
     return this.language() === 'ar' ? person.nameAr : person.name;
   }
 
@@ -563,13 +590,13 @@ export class ScheduleModal {
   }
 
   protected onNameInput(event: Event): void {
-    if (!this.canManage()) return;
+    if (!this.editable()) return;
     this.name.set((event.target as HTMLInputElement).value);
     this.clearServerFieldError('name');
   }
 
   protected onTargetTypeChange(value: string | null): void {
-    if (!this.canManage() || (value !== 'DASHBOARD' && value !== 'REPORT')) return;
+    if (!this.editable() || (value !== 'DASHBOARD' && value !== 'REPORT')) return;
     if (value === this.targetType()) return;
     this.targetType.set(value);
     this.targetId.set(this.firstPickableTarget(value));
@@ -599,19 +626,19 @@ export class ScheduleModal {
   }
 
   protected onTimeChange(nextTime: string | null): void {
-    if (!this.canManage() || !nextTime) return;
+    if (!this.editable() || !nextTime) return;
     this.time.set(nextTime);
     this.clearServerFieldError('scheduleMinute');
   }
 
   protected clearEndsOn(): void {
-    if (!this.canManage()) return;
+    if (!this.editable()) return;
     this.endsOn.set(null);
     this.clearServerFieldError('endsOn');
   }
 
   protected onTtlInput(event: Event): void {
-    if (!this.canManage()) return;
+    if (!this.editable()) return;
     this.linkTtlHoursText.set((event.target as HTMLInputElement).value);
     this.clearServerFieldError('linkTtlHours');
   }
@@ -626,8 +653,8 @@ export class ScheduleModal {
   }
 
   protected toggleFormat(format: SubscriptionAttachmentFormat, checked: boolean): void {
-    if (!this.canManage()) return;
-    if (format === 'PDF' && !this.pdfEnabled) return;
+    if (!this.editable()) return;
+    if (format === 'PDF' && !this.pdfEnabled()) return;
     this.attachmentFormats.update((current) => {
       const next = checked ? [...current.filter((item) => item !== format), format] : current.filter((item) => item !== format);
       return next;
@@ -645,13 +672,13 @@ export class ScheduleModal {
   }
 
   protected onRecipientFieldClick(): void {
-    if (!this.canManage()) return;
+    if (!this.editable()) return;
     this.recipientInput()?.nativeElement.focus();
     this.openRecipientMenu();
   }
 
   protected onRecipientInput(event: Event): void {
-    if (!this.canManage() || this.atMaxRecipients()) return;
+    if (!this.editable() || this.atMaxRecipients()) return;
     this.recipientQuery.set((event.target as HTMLInputElement).value);
     this.recipientActiveIndex.set(0);
     if (!this.recipientOpen()) {
@@ -662,7 +689,7 @@ export class ScheduleModal {
   }
 
   protected onRecipientKeydown(event: KeyboardEvent): void {
-    if (!this.canManage()) return;
+    if (!this.editable()) return;
     const list = this.filteredPeople();
 
     switch (event.key) {
@@ -717,7 +744,7 @@ export class ScheduleModal {
   }
 
   protected toggleRecipient(id: string): void {
-    if (!this.canManage()) return;
+    if (!this.editable()) return;
     if (this.isRecipientSelected(id)) {
       this.recipientUserIds.update((ids) => ids.filter((item) => item !== id));
     } else if (!this.atMaxRecipients()) {
@@ -735,7 +762,7 @@ export class ScheduleModal {
   }
 
   protected removeRecipient(id: string): void {
-    if (!this.canManage()) return;
+    if (!this.editable()) return;
     this.recipientUserIds.update((ids) => ids.filter((item) => item !== id));
     this.clearServerFieldError('recipientUserIds');
     if (this.recipientOpen()) this.scheduleRecipientPlace();
@@ -757,7 +784,7 @@ export class ScheduleModal {
   }
 
   protected async save(): Promise<boolean> {
-    if (this.saving() || !this.canManage()) return false;
+    if (this.saving() || !this.editable()) return false;
     this.closeRecipientMenu();
     this.submitAttempted.set(true);
     this.serverErrors.set({});
@@ -789,12 +816,17 @@ export class ScheduleModal {
       locale: this.locale(),
     };
 
+    const createBody = { ...fields, ...(this.targetType() === 'DASHBOARD'
+      ? { dashboardId: this.targetId() } : { reportKey: this.targetId() }) } as CreateSubscription;
+    const bodyJson = JSON.stringify(createBody);
+    if (!base && this.createAttempt?.bodyJson !== bodyJson) {
+      this.createAttempt = { bodyJson, key: newIdempotencyKey() };
+    }
     this.saving.set(true);
     try {
       let result: Subscription;
       if (!base) {
-        const target = this.targetType() === 'DASHBOARD' ? { dashboardId: this.targetId() } : { reportKey: this.targetId() };
-        result = await createSubscription({ ...fields, ...target } as CreateSubscription, newIdempotencyKey());
+        result = await createSubscription(createBody, this.createAttempt!.key);
         this.notify.success(this.transloco.translate('repSchedules.toasts.created'));
       } else {
         result = await updateSubscription(base.id, { ...fields, revision: this.currentRevision() });
@@ -804,6 +836,7 @@ export class ScheduleModal {
       this.close();
       return true;
     } catch (error) {
+      if (!isRetryableWriteError(error) && !(error instanceof ApiError && error.status === 401)) this.createAttempt = null;
       await this.handleSaveError(error, base);
       return false;
     } finally {
@@ -813,29 +846,16 @@ export class ScheduleModal {
 
   private async handleSaveError(error: unknown, base: Subscription | null): Promise<void> {
     const code = errorCodeOf(error);
-    if (error instanceof ApiError && error.status === 409 && code === 'CRM_SUBSCRIPTION_REVISION_STALE' && base) {
-      const reload = await this.conflictDialog().open();
-      try {
-        const latest = await getSubscription(base.id);
-        this.editingSubscription.set(latest);
-        this.currentRevision.set(latest.revision);
-        if (reload) {
-          const freshDraft = this.draftFromSubscription(latest);
-          this.baseline.set(freshDraft);
-          this.applyDraft(freshDraft);
-          this.resetValidation();
-        }
-        this.reloaded.emit(latest);
-      } catch (fetchErr) {
-        if (errorCodeOf(fetchErr) === 'CRM_SUBSCRIPTION_NOT_FOUND') {
-          this.notify.error(this.transloco.translate(errorKey('CRM_SUBSCRIPTION_NOT_FOUND')));
-          this.deletedRemotely.emit();
-          this.close();
-          return;
-        }
-        this.notify.error(this.transloco.translate(errorKey(errorCodeOf(fetchErr))));
-      }
+    if (error instanceof ApiError && error.status === 409 && /_(STALE|CONFLICT)$/.test(code ?? '') && base) {
+      this.conflictOpen.set(true);
       return;
+    }
+    const state = reportWriteError(error, this.transloco, 'repSchedules');
+    if (state.readOnly || state.reloadRequired) this.readOnly.set(true);
+    if (state.readOnly) this.accessLost.emit();
+    if (state.reloadRequired) {
+      if (base) await this.resolveConflict(false);
+      else await this.refreshTargets();
     }
 
     if (code === 'CRM_SUBSCRIPTION_NOT_FOUND') {
@@ -850,11 +870,13 @@ export class ScheduleModal {
     const message =
       code === 'CRM_EXPORT_FORMAT_INVALID' && isPdfRendererUnavailable(error)
         ? this.transloco.translate(reasonKey('PDF_RENDERER_UNAVAILABLE'))
-        : this.transloco.translate(errorKey(code));
+        : state.message;
     const mapped: FieldErrors = {};
     let unmapped = false;
     if (error instanceof ApiError && code === 'CRM_VALIDATION_FAILED') {
-      for (const dtoField of Object.keys(error.details ?? {})) {
+      const fields = Object.keys(fieldErrorsOf(error));
+      unmapped = fields.length === 0;
+      for (const dtoField of fields) {
         const field = DETAIL_FIELDS[dtoField];
         if (field) mapped[field] = message;
         else unmapped = true;
@@ -874,6 +896,40 @@ export class ScheduleModal {
     }
     if (unmapped) {
       this.notify.error(message);
+    }
+  }
+
+  protected async resolveConflict(reload: boolean): Promise<void> {
+    const id = this.editingSubscription()?.id;
+    if (!id) return;
+    try {
+      const latest = await getSubscription(id);
+      this.editingSubscription.set(latest);
+      this.currentRevision.set(latest.revision);
+      if (reload) {
+        const draft = this.draftFromSubscription(latest);
+        this.baseline.set(draft);
+        this.applyDraft(draft);
+        this.resetValidation();
+      }
+      this.reloaded.emit(latest);
+    } catch (error) {
+      this.notify.error(this.transloco.translate(errorKey(errorCodeOf(error))));
+    }
+  }
+
+  private async refreshRecipients(): Promise<void> {
+    const seq = ++this.peopleSeq;
+    try {
+      const people = await this.org.listUsers();
+      if (seq !== this.peopleSeq) return;
+      this.people.set(people);
+      const ids = this.recipientUserIds().filter((id) => !this.peopleById().has(id));
+      const missing = await Promise.all(ids.map((id) => this.org.getUser(id)));
+      if (seq !== this.peopleSeq) return;
+      this.people.update((people) => [...people, ...missing.filter((user): user is OrgUser => user !== null)]);
+    } catch (error) {
+      this.notify.error(this.transloco.translate(errorKey(errorCodeOf(error))));
     }
   }
 
@@ -910,10 +966,10 @@ export class ScheduleModal {
       scheduleWeekday: 0,
       scheduleMonthDay: 1,
       time: DEFAULT_TIME,
-      timeZone: DEFAULT_TIME_ZONE,
+      timeZone: this.defaultTimeZone,
       startsOn: format(new Date(), 'yyyy-MM-dd'),
       endsOn: null,
-      recipientUserIds: [FAKE_ME.id],
+      recipientUserIds: this.scope.me()?.id ? [this.scope.me()!.id] : [],
       attachmentFormats: [],
       linkTtlHoursText: String(DEFAULT_TTL_HOURS),
       locale: this.language(),
@@ -969,8 +1025,9 @@ export class ScheduleModal {
   private async refreshTargets(): Promise<void> {
     const seq = ++this.targetsSeq;
     try {
-      const targets = await listScheduleTargets();
+      const [targets, page] = await Promise.all([listScheduleTargets(), listSubscriptions(null, 1)]);
       if (seq !== this.targetsSeq) return;
+      this.pdfEnabled.set(page.capabilities.formats.some((entry) => entry.format === 'PDF' && entry.available));
       this.targets.set(targets);
       if (this.isEdit() || this.targetId()) return;
       const id = this.firstPickableTarget(this.targetType());
@@ -1001,7 +1058,7 @@ export class ScheduleModal {
   }
 
   private openRecipientMenu(): void {
-    if (this.recipientOpen() || !this.canManage() || this.atMaxRecipients()) return;
+    if (this.recipientOpen() || !this.editable() || this.atMaxRecipients()) return;
     const anchor = this.recipientsAnchor()?.nativeElement;
     if (!anchor) return;
     const rect = rectInPage(anchor);

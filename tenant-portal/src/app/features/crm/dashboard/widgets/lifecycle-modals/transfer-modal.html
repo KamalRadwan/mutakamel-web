@@ -9,6 +9,10 @@
   (closed)="onClosed()"
 >
   <div class="flex flex-col gap-10">
+    @if (readFailure(); as failure) {
+      <ui-full-state [kind]="failure.kind" [title]="'analytics.common.loadFailed' | transloco"
+        [text]="failureText()" [actionLabel]="failureAction() ? (failureAction()! | transloco) : ''" (action)="retryRead()" />
+    } @else {
     <ui-field
       size="bare"
       [label]="'widgets.transferModal.newOwner' | transloco"
@@ -37,7 +41,7 @@
             ownerError() ? uid + '-owner-hint ' + uid + '-owner-error' : uid + '-owner-hint'
           "
           [attr.aria-invalid]="ownerError() ? 'true' : null"
-          [disabled]="submitting()"
+          [disabled]="submitting() || readOnly()"
           (click)="toggleOwnerMenu()"
         >
           <span class="min-w-0 truncate">
@@ -189,7 +193,7 @@
         class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder disabled:cursor-not-allowed disabled:text-text-placeholder"
         [value]="reason()"
         [placeholder]="'widgets.transferModal.reasonPlaceholder' | transloco"
-        [disabled]="submitting()"
+        [disabled]="submitting() || readOnly()"
         (input)="onReasonInput($event)"
         (blur)="onReasonBlur()"
       ></textarea>
@@ -203,11 +207,12 @@
       [required]="true"
     >
       <div class="flex min-h-field items-center">
-        <ui-checkbox [(checked)]="acknowledged">
+        <ui-checkbox [(checked)]="acknowledged" [disabled]="submitting() || readOnly()">
           {{ 'widgets.transferModal.acknowledge' | transloco }}
         </ui-checkbox>
       </div>
     </ui-field>
+    }
   </div>
 
   <ng-container modal-footer>
@@ -219,3 +224,9 @@
     </button>
   </ng-container>
 </ui-modal>
+<ui-conflict-dialog
+  [(open)]="conflictOpen"
+  [recordLabel]="widget()?.name ?? null"
+  (reload)="resolveConflict(false)"
+  (keepEditing)="resolveConflict(true)"
+/>

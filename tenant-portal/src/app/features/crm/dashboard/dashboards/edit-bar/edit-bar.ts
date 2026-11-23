@@ -10,7 +10,7 @@ let nextKeyboardHintSeq = 0;
 @Component({
   selector: 'app-edit-bar',
   imports: [NgIcon, TranslocoPipe, Button],
-  providers: [
+  viewProviders: [
     provideTranslocoScope({ scope: 'crm-dash-edit', alias: 'dashEdit' }),
     provideIcons({ tablerArrowBackUp, tablerKeyboard }),
   ],
@@ -24,6 +24,7 @@ export class EditBar {
   readonly dirty = input(false);
   readonly canUndo = input(false);
   readonly saving = input(false);
+  readonly readOnly = input(false);
   readonly selectedName = input<string | null>(null);
   readonly selectedSize = input<{ w: number; h: number } | null>(null);
   readonly sizeError = input<string | null>(null);

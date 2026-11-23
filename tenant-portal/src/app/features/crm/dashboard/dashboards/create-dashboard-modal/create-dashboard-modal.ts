@@ -12,6 +12,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
+  tablerAlertTriangle,
   tablerLayoutDashboard,
   tablerPlus,
   tablerTarget,
@@ -25,9 +26,15 @@ import { formatMoneyNumber } from '../../../../../shared/ui/money/money-format';
 import { Dropdown, DropdownOption } from '../../../../../shared/ui/dropdown/dropdown';
 import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
-import { ApiError, errorCodeOf, newIdempotencyKey } from '../../../../../shared/widgets/dashboard/analytics-api';
-import { FAKE_BRANCHES } from '../../../../../shared/widgets/dashboard/fake/fake-org';
-import { errorKey } from '../../../../../shared/widgets/dashboard/panel-state';
+import { ApiError, errorCodeOf } from '../../../../../shared/widgets/dashboard/analytics-api';
+import { TenantScopeState } from '../../../../../core/scope/tenant-scope';
+import { fieldErrorsOf, isValidationError } from '../../../../../core/api/api-errors';
+import { can } from '../../../../../shared/widgets/dashboard/analytics-permissions';
+import { OrgApi, type OrgBranch } from '../../../../../shared/widgets/dashboard/org.api';
+import { FullState } from '../../../../../shared/ui/full-state/full-state';
+import { ConflictDialog } from '../../../../../shared/ui/conflict-dialog/conflict-dialog';
+import { RouterLink } from '@angular/router';
+import { libraryFailure, libraryWriteIntent, keepLibraryWriteIntent, type LibraryWriteIntent } from '../dashboards-page/library-write';
 import { adoptBlueprint, createDashboard, listBlueprints } from '../dashboards.api';
 import type { BlueprintItem } from '../dashboards.model';
 import { selectScopeTranslation } from '../../../../../shared/widgets/dashboard/scope-translation';
@@ -44,13 +51,13 @@ const DESCRIPTION_MAX = 500;
 
 @Component({
   selector: 'app-create-dashboard-modal',
-  imports: [NgIcon, TranslocoPipe, Button, Field, Modal, Dropdown],
+  imports: [NgIcon, TranslocoPipe, Button, Field, Modal, Dropdown, FullState, ConflictDialog, RouterLink],
   providers: [
     provideTranslocoScope(
       { scope: 'crm-dash-library', alias: 'dashLibrary' },
       { scope: 'analytics', alias: 'analytics' },
     ),
-    provideIcons({ tablerPlus, tablerLayoutDashboard, tablerTemplate, tablerTarget }),
+    provideIcons({ tablerPlus, tablerLayoutDashboard, tablerTemplate, tablerTarget, tablerAlertTriangle }),
   ],
   templateUrl: './create-dashboard-modal.html',
   host: { class: 'contents' },
@@ -58,6 +65,8 @@ const DESCRIPTION_MAX = 500;
 export class CreateDashboardModal {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly notify = inject(Notify);
+  private readonly scope = inject(TenantScopeState);
+  private readonly org = inject(OrgApi);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly libraryScope = toSignal(selectScopeTranslation(this.transloco, 'crm-dash-library', 'dashLibrary'));
@@ -65,6 +74,7 @@ export class CreateDashboardModal {
 
   private readonly createModal = viewChild.required<Modal>('createModal');
   private readonly targetsModal = viewChild.required<Modal>('targetsModal');
+  private readonly ownerLimitModal = viewChild.required<Modal>('ownerLimitModal');
   private readonly sourceTiles = viewChildren<ElementRef<HTMLButtonElement>>('sourceTile');
 
   readonly lastCreatedKind = signal<'blank' | 'blueprint' | null>(null);
@@ -72,13 +82,24 @@ export class CreateDashboardModal {
   private createResolver: ((id: string | null) => void) | null = null;
   private targetsResolver: ((confirmed: boolean) => void) | null = null;
   private loadSeq = 0;
+  private pendingWrite: LibraryWriteIntent | null = null;
+  protected readonly canCreate = can('crm.dashboards.create');
+  protected readonly canUseTemplates = this.canCreate && can('crm.widgets.create');
+  protected readonly canViewReadiness = can('crm.analytics.readiness.view');
+  protected readonly readOnly = signal(false);
+  protected readonly reloadRequired = signal(false);
+  protected readonly conflictOpen = signal(false);
+  protected readonly branches = signal<readonly OrgBranch[]>([]);
+  protected readonly branchError = signal<string | null>(null);
+  protected readonly blueprintsFailure = signal<ReturnType<typeof libraryFailure> | null>(null);
+  protected readonly ownerLimitMessage = signal('');
 
   protected readonly nameMax = NAME_MAX;
   protected readonly descriptionMax = DESCRIPTION_MAX;
   protected readonly name = signal('');
   protected readonly description = signal('');
   protected readonly selectedSource = signal<string | null>(null);
-  protected readonly selectedBranchId = signal<string>(FAKE_BRANCHES[0]?.id ?? '');
+  protected readonly selectedBranchId = signal<string>('');
   protected readonly blueprints = signal<BlueprintItem[]>([]);
   protected readonly loadingBlueprints = signal(false);
   protected readonly submitting = signal(false);
@@ -98,7 +119,7 @@ export class CreateDashboardModal {
       widgetCount: 0,
       blueprint: null,
     };
-    const available = this.blueprints()
+    const available = (this.canUseTemplates ? this.blueprints() : [])
       .filter((bp) => bp.adoption.state !== 'ADOPTED')
       .map<StartOption>((bp) => ({
         key: bp.key,
@@ -116,11 +137,18 @@ export class CreateDashboardModal {
   });
 
   protected readonly branchOptions = computed<DropdownOption<string>[]>(() => {
+    this.i18n();
+    this.libraryScope();
     const lang = this.language();
-    return FAKE_BRANCHES.map((branch) => ({
+    const options = this.branches().map((branch) => ({
       value: branch.id,
       label: lang === 'ar' ? branch.name.ar : branch.name.en,
     }));
+    const current = this.scope.selection()?.branchId;
+    if (current && !options.some((option) => option.value === current)) {
+      options.unshift({ value: current, label: this.transloco.translate('dashLibrary.currentBranch') });
+    }
+    return options;
   });
 
   protected readonly sourceDescribedBy = computed(() =>
@@ -129,12 +157,16 @@ export class CreateDashboardModal {
 
   protected readonly canSubmit = computed(() => {
     const trimmedName = this.name().trim();
-    const descLen = this.description().trim().length;
-    return trimmedName.length >= 1 && trimmedName.length <= NAME_MAX && descLen <= DESCRIPTION_MAX;
+    const descLen = this.selectedBlueprint() ? 0 : this.description().trim().length;
+    return this.canCreate && !this.readOnly() && !this.reloadRequired() && !this.conflictOpen()
+      && trimmedName.length >= 1 && trimmedName.length <= NAME_MAX && descLen <= DESCRIPTION_MAX
+      && (!this.selectedSource() || this.selectedBlueprint() !== null && this.selectedBlueprint()?.adoption.state !== 'ADOPTED')
+      && (!this.selectedBlueprint()?.branchSelectionRequired || this.branchOptions().some((b) => b.value === this.selectedBranchId()));
   });
 
   constructor() {
     inject(DestroyRef).onDestroy(() => {
+      this.loadSeq++;
       this.settleTargets(false);
       this.settleCreate(null);
     });
@@ -143,9 +175,11 @@ export class CreateDashboardModal {
   open(): Promise<string | null> {
     this.settleTargets(false);
     this.settleCreate(null);
+    if (!this.canCreate) return Promise.resolve(null);
     this.resetForm();
     this.createModal().open();
     void this.loadBlueprints();
+    void this.loadBranches();
     return new Promise<string | null>((resolve) => {
       this.createResolver = resolve;
     });
@@ -162,8 +196,16 @@ export class CreateDashboardModal {
   }
 
   protected selectSource(key: string | null): void {
+    if (this.submitting() || this.readOnly() || key && !this.canUseTemplates) return;
     this.selectedSource.set(key);
     this.sourceError.set(null);
+    this.branchError.set(null);
+    this.descriptionError.set(null);
+  }
+
+  protected onBranchChange(value: string): void {
+    this.selectedBranchId.set(value);
+    this.branchError.set(null);
   }
 
   protected onSourceKeydown(event: KeyboardEvent, index: number): void {
@@ -226,61 +268,50 @@ export class CreateDashboardModal {
   }
 
   protected async submit(): Promise<void> {
-    if (this.submitting() || !this.validateForm()) return;
-
-    const trimmedName = this.name().trim();
-    const trimmedDesc = this.description().trim();
+    if (this.submitting() || this.pendingTargetsBlueprint() || !this.canSubmit() || !this.validateForm()) return;
     const bp = this.selectedBlueprint();
+    if (bp?.targets.length && !await this.requestTargetConfirmation(bp)) return;
 
-    if (!bp) {
-      this.submitting.set(true);
-      try {
-        const created = await createDashboard(
-          { name: trimmedName, description: trimmedDesc || null },
-          newIdempotencyKey(),
-        );
-        this.lastCreatedKind.set('blank');
-        this.notify.success(this.transloco.translate('dashLibrary.toast.created'));
-        this.settleCreate(created.id);
-        this.createModal().close();
-      } catch (error) {
-        this.handleSubmitError(error);
-      } finally {
-        this.submitting.set(false);
-      }
-      return;
-    }
-
-    if (bp.targets.length > 0) {
-      const confirmed = await this.requestTargetConfirmation(bp);
-      if (!confirmed) return;
-    }
-
+    const adoptionBody = bp ? {
+      definitionRevision: bp.definitionRevision,
+      name: this.name().trim(),
+      ...(bp.branchSelectionRequired ? { branchId: this.selectedBranchId() } : {}),
+      ...(bp.targets.length ? { confirmTargets: true as const } : {}),
+    } : null;
+    const createBody = { name: this.name().trim(), description: this.description().trim() || null };
+    this.pendingWrite = libraryWriteIntent({ blueprintKey: bp?.key ?? null, body: adoptionBody ?? createBody }, this.pendingWrite);
     this.submitting.set(true);
     try {
-      const result = await adoptBlueprint(
-        bp.key,
-        {
-          definitionRevision: bp.definitionRevision,
-          name: trimmedName,
-          ...(bp.branchSelectionRequired ? { branchId: this.selectedBranchId() } : {}),
-          ...(bp.targets.length > 0 ? { confirmTargets: true as const } : {}),
-        },
-        newIdempotencyKey(),
-      );
-      this.lastCreatedKind.set('blueprint');
-      this.notify.success(this.transloco.translate('dashLibrary.toast.adopted'));
-      this.settleCreate(result.dashboardId);
+      const result = bp && adoptionBody
+        ? await adoptBlueprint(bp.key, adoptionBody, this.pendingWrite.key)
+        : await createDashboard(createBody, this.pendingWrite.key);
+      this.pendingWrite = null;
+      this.lastCreatedKind.set(bp ? 'blueprint' : 'blank');
+      this.notify.success(this.transloco.translate(bp ? 'dashLibrary.toast.adopted' : 'dashLibrary.toast.created'));
+      this.settleCreate('dashboardId' in result ? result.dashboardId : result.id);
       this.createModal().close();
     } catch (error) {
-      const code = errorCodeOf(error);
-      if (code === 'CRM_DASHBOARD_BLUEPRINT_REVISION_CHANGED') {
-        void this.loadBlueprints();
-      }
+      if (!keepLibraryWriteIntent(error)) this.pendingWrite = null;
       this.handleSubmitError(error);
     } finally {
       this.submitting.set(false);
     }
+  }
+
+  protected async reloadAfterConflict(keepChanges: boolean): Promise<void> {
+    this.conflictOpen.set(false);
+    if (!keepChanges) this.resetForm();
+    this.pendingWrite = null;
+    await this.loadBlueprints();
+  }
+
+  protected async reloadPicker(): Promise<void> {
+    const reset = this.reloadRequired();
+    await this.loadBlueprints();
+    await this.loadBranches();
+    if (this.blueprintsFailure()) return;
+    if (reset) this.resetForm();
+    this.reloadRequired.set(false);
   }
 
   private validateForm(): boolean {
@@ -297,7 +328,7 @@ export class CreateDashboardModal {
       this.nameError.set(null);
     }
 
-    if (this.description().trim().length > DESCRIPTION_MAX) {
+    if (!this.selectedBlueprint() && this.description().trim().length > DESCRIPTION_MAX) {
       this.descriptionError.set(this.transloco.translate('dashLibrary.createModal.descriptionTooLong'));
       valid = false;
     } else {
@@ -309,51 +340,40 @@ export class CreateDashboardModal {
 
   private handleSubmitError(error: unknown): void {
     const code = errorCodeOf(error);
-    if (error instanceof ApiError) {
-      if (error.status === 409 || code === 'CRM_DASHBOARD_NAME_CONFLICT') {
-        this.nameError.set(this.translateError(code));
-        return;
-      }
-      if (error.status === 400 && error.details) {
-        if (this.applyBadRequestDetails(error.details)) {
-          return;
-        }
-      }
+    const failure = libraryFailure(this.transloco, error, true);
+    if (failure.readOnly) this.readOnly.set(true);
+    if (failure.reloadRequired) this.reloadRequired.set(true);
+    if (code === 'CRM_DASHBOARD_NAME_CONFLICT') {
+      this.nameError.set(failure.message);
+      return;
     }
-    this.notify.error(this.translateError(code));
-  }
-
-  private applyBadRequestDetails(details: Record<string, unknown>): boolean {
-    let applied = false;
-    const rawFields = details['fields'];
-    const fields =
-      rawFields && typeof rawFields === 'object' ? (rawFields as Record<string, unknown>) : null;
-
-    const nameMsg = readFieldDetail(details['name']) ?? readFieldDetail(fields?.['name']);
-    if (nameMsg) {
-      this.nameError.set(nameMsg);
-      applied = true;
+    if (code === 'CRM_DASHBOARD_OWNER_LIMIT') {
+      this.ownerLimitMessage.set(failure.message);
+      this.ownerLimitModal().open();
+      return;
     }
-
-    const descMsg = readFieldDetail(details['description']) ?? readFieldDetail(fields?.['description']);
-    if (descMsg) {
-      this.descriptionError.set(descMsg);
-      applied = true;
+    if (code === 'CRM_DASHBOARD_BLUEPRINT_REVISION_CHANGED' || error instanceof ApiError && error.status === 409
+      && /_(STALE|CONFLICT)$/.test(error.code)) {
+      this.conflictOpen.set(true);
+      return;
     }
-
-    const fieldName = details['field'];
-    const msg = readFieldDetail(details['message']);
-    if (!applied && typeof fieldName === 'string' && msg) {
-      if (fieldName === 'name') {
-        this.nameError.set(msg);
-        applied = true;
-      } else if (fieldName === 'description') {
-        this.descriptionError.set(msg);
-        applied = true;
-      }
+    if (failure.kind === 'provisioning') {
+      this.blueprintsFailure.set(failure);
+      return;
     }
-
-    return applied;
+    if (isValidationError(error)) {
+      const fields = fieldErrorsOf(error);
+      this.nameError.set(fields['name']?.[0] ?? null);
+      this.descriptionError.set(fields['description']?.[0] ?? null);
+      this.branchError.set(fields['branchId']?.[0] ?? null);
+      this.sourceError.set(fields['definitionRevision']?.[0] ?? fields['templateKey']?.[0] ?? null);
+      if (Object.keys(fields).some((key) => ['name', 'description', 'branchId', 'definitionRevision', 'templateKey'].includes(key))) return;
+    }
+    if (code === 'CRM_DASHBOARD_BLUEPRINT_BRANCH_REQUIRED') {
+      this.branchError.set(this.transloco.translate('dashLibrary.branchRequired'));
+      return;
+    }
+    this.notify.error(failure.message, failure.correlationId ?? '');
   }
 
   private requestTargetConfirmation(blueprint: BlueprintItem): Promise<boolean> {
@@ -367,21 +387,24 @@ export class CreateDashboardModal {
 
   private async loadBlueprints(): Promise<void> {
     const seq = ++this.loadSeq;
+    if (!this.canUseTemplates) {
+      this.loadingBlueprints.set(false);
+      return;
+    }
     this.loadingBlueprints.set(true);
+    this.blueprintsFailure.set(null);
     try {
-      const res = await listBlueprints();
+      const res = await listBlueprints(this.scope.selection()?.branchId ?? undefined);
       if (seq !== this.loadSeq) return;
       this.blueprints.set(res.items);
       const selected = this.selectedSource();
-      if (
-        selected !== null &&
-        !res.items.some((bp) => bp.key === selected && bp.adoption.state !== 'ADOPTED')
-      ) {
-        this.selectedSource.set(null);
+      if (selected !== null && !res.items.some((bp) => bp.key === selected && bp.adoption.state !== 'ADOPTED')) {
+        this.sourceError.set(this.transloco.translate('dashLibrary.createModal.sourceUnavailable'));
       }
-    } catch {
+    } catch (error) {
       if (seq !== this.loadSeq) return;
       this.blueprints.set([]);
+      this.blueprintsFailure.set(libraryFailure(this.transloco, error));
     } finally {
       if (seq === this.loadSeq) {
         this.loadingBlueprints.set(false);
@@ -389,11 +412,29 @@ export class CreateDashboardModal {
     }
   }
 
+  private async loadBranches(): Promise<void> {
+    const seq = this.loadSeq;
+    try {
+      const branches = await this.org.listGrantedBranches();
+      if (seq !== this.loadSeq) return;
+      this.branches.set(branches);
+      if (!this.selectedBranchId()) this.selectedBranchId.set(this.branchOptions()[0]?.value ?? '');
+    } catch (error) {
+      if (seq === this.loadSeq) this.notify.error(libraryFailure(this.transloco, error).message);
+    }
+  }
+
   private resetForm(): void {
     this.name.set('');
     this.description.set('');
     this.selectedSource.set(null);
-    this.selectedBranchId.set(FAKE_BRANCHES[0]?.id ?? '');
+    this.selectedBranchId.set(this.scope.selection()?.branchId ?? '');
+    this.lastCreatedKind.set(null);
+    this.pendingWrite = null;
+    this.readOnly.set(false);
+    this.reloadRequired.set(false);
+    this.branchError.set(null);
+    this.blueprintsFailure.set(null);
     this.nameError.set(null);
     this.descriptionError.set(null);
     this.sourceError.set(null);
@@ -417,14 +458,4 @@ export class CreateDashboardModal {
   private isRtl(): boolean {
     return getComputedStyle(this.host.nativeElement).direction === 'rtl';
   }
-
-  private translateError(code: string | null): string {
-    return this.transloco.translate(errorKey(code));
-  }
-}
-
-function readFieldDetail(value: unknown): string | null {
-  if (typeof value === 'string' && value.trim()) return value;
-  if (Array.isArray(value) && typeof value[0] === 'string' && value[0].trim()) return value[0];
-  return null;
 }

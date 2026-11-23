@@ -1,3 +1,4 @@
+import { Router } from '@angular/router';
 import {
   Component,
   DestroyRef,
@@ -27,7 +28,11 @@ import { Notify } from '../../../../../core/notify/notify';
 import { Badge } from '../../../../../shared/ui/badge/badge';
 import { Button } from '../../../../../shared/ui/button/button';
 import { Checkbox } from '../../../../../shared/ui/checkbox/checkbox';
-import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
+import { ConflictDialog } from '../../../../../shared/ui/conflict-dialog/conflict-dialog';
+import { FullState } from '../../../../../shared/ui/full-state/full-state';
+import { ApiError, fieldErrorsOf } from '../../../../../core/api/api-errors';
+import { newIdempotencyKey } from '../../../../../core/api/idempotency';
+import { alertErrorText, alertWriteLocked, alertReadKind } from '../alerts-error';
 import { TimeField } from '../../../../../shared/ui/date-time/time-field';
 import { Dropdown, type DropdownOption } from '../../../../../shared/ui/dropdown/dropdown';
 import { Field } from '../../../../../shared/ui/field/field';
@@ -36,15 +41,17 @@ import { rectInPage, viewport } from '../../../../../shared/ui/overlay/zoom';
 import { Segmented, type SegmentedOption } from '../../../../../shared/ui/segmented/segmented';
 import { Switch } from '../../../../../shared/ui/switch/switch';
 import { UnsavedDialog } from '../../../../../shared/ui/unsaved-dialog/unsaved-dialog';
-import { errorCodeOf, newIdempotencyKey } from '../../../../../shared/widgets/dashboard/analytics-api';
-import { errorDetailField } from '../../shared/api-error-details';
+import { errorCodeOf } from '../../../../../shared/widgets/dashboard/analytics-api';
 import type { CatalogMetric } from '../../../../../shared/widgets/dashboard/analytics.model';
-import { scopeLevels } from '../../../../../shared/widgets/dashboard/analytics-permissions';
-import { errorKey } from '../../../../../shared/widgets/dashboard/panel-state';
+import { can, scopeLevels } from '../../../../../shared/widgets/dashboard/analytics-permissions';
+import { errorKey, reasonKey } from '../../../../../shared/widgets/dashboard/panel-state';
 import {
   createAlert,
   getAlert,
-  PUBLISHED_WIDGET_OPTIONS,
+  listPublishedWidgetOptions,
+  listAlertWidgetVersions,
+  resetAlertWriteConflicts,
+  testAlert,
   updateAlert,
 } from '../alerts.api';
 import {
@@ -57,6 +64,7 @@ import {
   MAX_RECIPIENTS_COUNT,
   MAX_THRESHOLD_ABS,
   minutesToTime24,
+  formatAlertAmount,
   time24ToMinutes,
   type AlertChannel,
   type AlertComparator,
@@ -71,6 +79,8 @@ import {
   type AlertWidgetVersionPolicy,
   type CreateAlertRule,
   type UpdateAlertRule,
+  type PublishedWidgetOption,
+  type TestAlertResult,
 } from '../alerts.model';
 import { OrgApi, type OrgBranch, type OrgUser } from '../../../../../shared/widgets/dashboard/org.api';
 
@@ -148,9 +158,9 @@ function createEmptyDraft(defaultMetricKey: string, companyCurrency = ''): Alert
     name: '',
     sourceKind: 'METRIC',
     metricKey: defaultMetricKey,
-    widgetId: PUBLISHED_WIDGET_OPTIONS[0]?.id ?? '',
+    widgetId: '',
     widgetVersionPolicy: 'FOLLOW_ACTIVE',
-    widgetVersionNumber: PUBLISHED_WIDGET_OPTIONS[0]?.activeVersionNumber ?? 1,
+    widgetVersionNumber: 1,
     conditionKind: 'THRESHOLD',
     comparator: 'LT',
     thresholdText: '',
@@ -177,14 +187,14 @@ function createEmptyDraft(defaultMetricKey: string, companyCurrency = ''): Alert
 
 function draftFromRule(rule: AlertRule, companyCurrency = ''): AlertFormDraft {
   const quietEnabled = rule.quietStartMinute !== null && rule.quietStartMinute !== undefined && rule.quietEndMinute !== null && rule.quietEndMinute !== undefined;
-  const widget = PUBLISHED_WIDGET_OPTIONS.find((w) => w.id === rule.widgetId) ?? PUBLISHED_WIDGET_OPTIONS[0];
+
   return {
     name: rule.name ?? '',
     sourceKind: rule.sourceKind ?? 'METRIC',
     metricKey: rule.metricKey ?? '',
-    widgetId: rule.widgetId ?? widget?.id ?? '',
+    widgetId: rule.widgetId ?? '',
     widgetVersionPolicy: rule.widgetVersionPolicy ?? 'FOLLOW_ACTIVE',
-    widgetVersionNumber: rule.widgetVersionNumber ?? widget?.activeVersionNumber ?? 1,
+    widgetVersionNumber: rule.widgetVersionNumber ?? 1,
     conditionKind: rule.conditionKind ?? 'THRESHOLD',
     comparator: rule.comparator ?? 'LT',
     thresholdText: rule.threshold ?? '',
@@ -217,7 +227,8 @@ function draftFromRule(rule: AlertRule, companyCurrency = ''): AlertFormDraft {
     Badge,
     Button,
     Checkbox,
-    ConfirmDialog,
+    ConflictDialog,
+    FullState,
     Dropdown,
     Field,
     Modal,
@@ -242,6 +253,9 @@ function draftFromRule(rule: AlertRule, companyCurrency = ''): AlertFormDraft {
   },
 })
 export class AlertModal {
+  private readonly router = inject(Router);
+  protected readonly canReadiness = can('crm.analytics.readiness.view');
+  protected openReadiness(): void { void this.router.navigateByUrl('/crm/settings/data-readiness'); }
   private readonly org = inject(OrgApi);
   private static nextId = 0;
   protected readonly uid = `alert-modal-${++AlertModal.nextId}`;
@@ -257,7 +271,19 @@ export class AlertModal {
 
   private readonly modal = viewChild.required<Modal>('modal');
   private readonly unsavedDialog = viewChild.required<UnsavedDialog>('unsavedDialog');
-  private readonly conflictDialog = viewChild.required<ConfirmDialog>('conflictDialog');
+  protected readonly conflictOpen = signal(false);
+  protected readonly writeLocked = signal(false);
+  readonly readOnly = input(false);
+  protected readonly locked = computed(() => this.readOnly() || this.writeLocked());
+  protected readonly recordFailure = signal<unknown>(null);
+  protected readonly failureKind = computed(() => alertReadKind(this.recordFailure()));
+  protected readonly failureText = computed(() => alertErrorText(this.transloco, this.recordFailure()));
+  protected readonly testing = signal(false);
+  protected readonly testResult = signal<TestAlertResult | null>(null);
+  protected readonly widgetChoices = signal<PublishedWidgetOption[]>([]);
+  private widgetLoadSeq = 0;
+  private createBodyJson = '';
+  readonly lockedChanged = output<boolean>();
   private readonly metricTrigger = viewChild<ElementRef<HTMLButtonElement>>('metricTrigger');
   private readonly branchesTrigger = viewChild<ElementRef<HTMLElement>>('branchesTrigger');
   private readonly peopleTrigger = viewChild<ElementRef<HTMLElement>>('peopleTrigger');
@@ -271,8 +297,8 @@ export class AlertModal {
   readonly deleteRequested = output<AlertRule>();
 
   protected readonly maxNameLength = MAX_ALERT_NAME_LENGTH;
-  protected readonly branches = this.org.branches;
-  protected readonly people = this.org.users;
+  protected readonly branches = computed(() => this.org.branches);
+  protected readonly people = computed(() => this.org.users);
 
   protected readonly editingRule = signal<AlertRule | null>(null);
   protected readonly baselineDraft = signal<AlertFormDraft>(createEmptyDraft('crm.leads.conversion.rate'));
@@ -313,8 +339,8 @@ export class AlertModal {
 
   protected readonly filteredPeople = computed(() => {
     const q = this.peopleQuery().trim().toLowerCase();
-    if (!q) return this.people;
-    return this.people.filter(
+    if (!q) return this.people();
+    return this.people().filter(
       (p) =>
         p.name.toLowerCase().includes(q) ||
         p.nameAr.toLowerCase().includes(q) ||
@@ -323,7 +349,7 @@ export class AlertModal {
   });
 
   protected readonly selectedWidget = computed(
-    () => PUBLISHED_WIDGET_OPTIONS.find((w) => w.id === this.draft().widgetId) ?? null,
+    () => this.widgetChoices().find((w) => w.id === this.draft().widgetId) ?? null,
   );
 
   protected readonly effectiveMetricKey = computed(() => {
@@ -381,7 +407,7 @@ export class AlertModal {
 
   protected readonly widgetOptions = computed<DropdownOption<string>[]>(() => {
     const lang = this.language();
-    return PUBLISHED_WIDGET_OPTIONS.map((w) => ({
+    return this.widgetChoices().map((w) => ({
       value: w.id,
       label: lang === 'ar' ? w.name.ar : w.name.en,
     }));
@@ -485,12 +511,12 @@ export class AlertModal {
 
   protected readonly selectedBranches = computed(() => {
     const ids = new Set(this.draft().branchIds);
-    return this.branches.filter((b) => ids.has(b.id));
+    return this.branches().filter((b) => ids.has(b.id));
   });
 
   protected readonly selectedPeople = computed(() => {
     const ids = new Set(this.draft().recipientUserIds);
-    return this.people.filter((p) => ids.has(p.id));
+    return this.people().filter((p) => ids.has(p.id));
   });
 
   protected readonly validationErrors = computed<Partial<Record<AlertErrorField, string>>>(() => {
@@ -600,8 +626,10 @@ export class AlertModal {
     this.baselineDraft.set(structuredClone(initial));
     this.draft.set(structuredClone(initial));
     this.createIdemKey = newIdempotencyKey();
+    this.createBodyJson = '';
     this.resetTransientState();
     this.modal().open();
+    void this.loadWidgetOptions();
   }
 
   openEdit(rule: AlertRule): void {
@@ -611,6 +639,7 @@ export class AlertModal {
     this.draft.set(structuredClone(initial));
     this.resetTransientState();
     this.modal().open();
+    void this.loadWidgetOptions();
   }
 
   close(): void {
@@ -644,6 +673,8 @@ export class AlertModal {
   }
 
   protected patchDraft(patch: Partial<AlertFormDraft>, clearField?: AlertErrorField): void {
+    if (this.locked()) return;
+    this.testResult.set(null);
     this.draft.update((d) => ({ ...d, ...patch }));
     if (clearField) {
       this.clearServerError(clearField);
@@ -659,7 +690,8 @@ export class AlertModal {
   }
 
   protected onWidgetChange(widgetId: string): void {
-    const widget = PUBLISHED_WIDGET_OPTIONS.find((w) => w.id === widgetId);
+    void this.loadWidgetVersions(widgetId);
+    const widget = this.widgetChoices().find((w) => w.id === widgetId);
     this.patchDraft(
       {
         widgetId,
@@ -820,7 +852,7 @@ export class AlertModal {
   }
 
   protected async save(): Promise<boolean> {
-    if (this.saving()) return false;
+    if (this.saving() || this.locked() || this.recordFailure()) return false;
     this.closePopover();
     this.submitAttempted.set(true);
     this.serverErrors.set({});
@@ -879,6 +911,11 @@ export class AlertModal {
     try {
       const existing = this.editingRule();
       if (!existing) {
+        const bodyJson = JSON.stringify(payload);
+        if (bodyJson !== this.createBodyJson) {
+          this.createBodyJson = bodyJson;
+          this.createIdemKey = newIdempotencyKey();
+        }
         const created = await createAlert(payload, this.createIdemKey);
         this.notify.success(this.transloco.translate('alerts.toasts.created'));
         this.saved.emit(created);
@@ -905,31 +942,18 @@ export class AlertModal {
 
   private async handleSaveError(error: unknown): Promise<void> {
     const code = errorCodeOf(error);
-    if (code === 'CRM_ALERT_REVISION_STALE') {
-      // Cancel and Esc both resolve to false. Neither may overwrite the other
-      // user's change, so only the revision is refreshed and the draft is kept.
-      const reload = await this.conflictDialog().open();
-      const current = this.editingRule();
-      if (!current) return;
-      try {
-        const fresh = await getAlert(current.id);
-        this.editingRule.set(fresh);
-        if (reload) {
-          const next = draftFromRule(fresh, this.companyCurrency());
-          this.baselineDraft.set(structuredClone(next));
-          this.draft.set(structuredClone(next));
-          this.submitAttempted.set(false);
-          this.serverErrors.set({});
-        }
-        this.reloaded.emit(fresh);
-      } catch (reloadErr) {
-        this.notify.error(this.transloco.translate(errorKey(errorCodeOf(reloadErr))));
-      }
+    if (!(error instanceof ApiError) || ![0, 401].includes(error.status) && error.status < 500 && code !== 'GW.IDEM.IN_FLIGHT') this.createBodyJson = '';
+    if (code?.endsWith('_STALE') || code?.endsWith('_CONFLICT')) {
+      this.conflictOpen.set(true);
       return;
     }
-
-    // Only DTO (ValidationPipe) errors name a field: details { field: [reason] }. Business 422s carry none.
-    const detailField = errorDetailField(error) as AlertErrorField | null;
+    if (alertWriteLocked(error)) {
+      this.writeLocked.set(true);
+      this.lockedChanged.emit(true);
+    }
+    if (code === 'CRM_ALERT_NOT_FOUND') this.recordFailure.set(error);
+    const fields = fieldErrorsOf(error);
+    const detailField = Object.keys(fields)[0] as AlertErrorField | undefined;
 
     if (code === 'CRM_ALERT_UNIT_MISMATCH') {
       this.serverErrors.set({ valueUnit: this.transloco.translate(errorKey(code)) });
@@ -946,11 +970,11 @@ export class AlertModal {
       return;
     }
     if (code === 'CRM_VALIDATION_FAILED' && detailField) {
-      this.serverErrors.set({ [detailField]: this.transloco.translate(errorKey(code)) });
+      this.serverErrors.set(Object.fromEntries(Object.keys(fields).map((field) => [field, this.transloco.translate(errorKey(code))])));
       return;
     }
 
-    this.notify.error(this.transloco.translate(errorKey(code)));
+    this.notify.error(alertErrorText(this.transloco, error));
   }
 
   private async promptUnsavedAndClose(): Promise<void> {
@@ -968,7 +992,95 @@ export class AlertModal {
     }
   }
 
+  protected async resolveConflict(reload: boolean): Promise<void> {
+    const current = this.editingRule();
+    if (!current || this.saving()) return;
+    this.saving.set(true);
+    try {
+      const fresh = await getAlert(current.id);
+      this.editingRule.set(reload ? fresh : { ...current, revision: fresh.revision });
+      if (reload) {
+        const next = draftFromRule(fresh, this.companyCurrency());
+        this.baselineDraft.set(structuredClone(next));
+        this.draft.set(structuredClone(next));
+        this.submitAttempted.set(false);
+        this.serverErrors.set({});
+      }
+      this.reloaded.emit(fresh);
+    } catch (error) {
+      this.recordFailure.set(error);
+      this.notify.error(alertErrorText(this.transloco, error));
+    } finally {
+      this.saving.set(false);
+    }
+  }
+
+  protected async reloadRecord(): Promise<void> {
+    resetAlertWriteConflicts();
+    this.writeLocked.set(false);
+    this.lockedChanged.emit(false);
+    this.recordFailure.set(null);
+    if (this.editingRule()) await this.resolveConflict(true);
+    else await this.loadWidgetOptions();
+  }
+
+  protected async runTest(): Promise<void> {
+    const rule = this.editingRule();
+    if (!rule || this.testing() || this.saving() || this.dirty()) return;
+    this.testing.set(true);
+    this.testResult.set(null);
+    try {
+      const result = await testAlert(rule.id);
+      if (this.editingId() === rule.id) this.testResult.set(result);
+    } catch (error) {
+      this.notify.error(alertErrorText(this.transloco, error));
+    } finally {
+      this.testing.set(false);
+    }
+  }
+
+  protected readonly testResultText = computed(() => {
+    this.i18n();
+    const result = this.testResult();
+    if (!result) return '';
+    if (result.value === null) return this.transloco.translate('alerts.toasts.testUnavailable', { reason: this.transloco.translate(reasonKey(result.reasonCode ?? null)) });
+    const key = result.met ? result.wouldNotify ? 'testMetNotify' : 'testMetSuppressed' : 'testNotMet';
+    const rule = this.editingRule();
+    const value = formatAlertAmount(result.value, rule?.valueUnit, rule?.currencyCode, this.language(), rule?.conditionKind);
+    return this.transloco.translate(`alerts.toasts.${key}`, { value });
+  });
+
+  private async loadWidgetOptions(): Promise<void> {
+    const seq = ++this.widgetLoadSeq;
+    void Promise.all([this.org.listGrantedBranches(), this.org.listUsers()]).catch((error: unknown) => this.notify.error(alertErrorText(this.transloco, error)));
+    try {
+      const choices = await listPublishedWidgetOptions();
+      if (seq !== this.widgetLoadSeq) return;
+      this.widgetChoices.set(choices);
+      if (choices.some((choice) => choice.id === this.draft().widgetId)) void this.loadWidgetVersions(this.draft().widgetId);
+    } catch (error) {
+      if (seq === this.widgetLoadSeq) {
+        if (alertReadKind(error) === 'provisioning') this.recordFailure.set(error);
+        else this.notify.error(alertErrorText(this.transloco, error));
+      }
+    }
+  }
+
+  private async loadWidgetVersions(id: string): Promise<void> {
+    try {
+      const versions = await listAlertWidgetVersions(id);
+      this.widgetChoices.update((choices) => choices.map((choice) => choice.id === id ? { ...choice, versions } : choice));
+    } catch (error) {
+      this.notify.error(alertErrorText(this.transloco, error));
+    }
+  }
+
   private resetTransientState(): void {
+    this.conflictOpen.set(false);
+    this.recordFailure.set(null);
+    this.testResult.set(null);
+    this.widgetLoadSeq++;
+
     this.submitAttempted.set(false);
     this.serverErrors.set({});
     this.saving.set(false);

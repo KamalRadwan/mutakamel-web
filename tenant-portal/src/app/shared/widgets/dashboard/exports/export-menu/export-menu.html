@@ -6,14 +6,19 @@
     [variant]="primary() ? 'primary' : 'secondary'"
     [size]="small() ? 'small' : 'default'"
     [loading]="submitting()"
+    [disabled]="readOnly()"
+    [attr.aria-describedby]="hintId"
+    [attr.title]="'exportMenu.hints.export' | transloco"
     aria-haspopup="menu"
     [attr.aria-expanded]="open()"
     (click)="toggle()"
   >
     <ng-icon name="tablerFileExport" [size]="iconSize()" aria-hidden="true" />
     <span>{{ 'exportMenu.export' | transloco }}</span>
+    <ng-icon name="tablerExclamationCircle" size="14" aria-hidden="true" />
     <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
   </button>
+  <span class="sr-only" [id]="hintId">{{ 'exportMenu.hints.export' | transloco }}</span>
 
   @if (open()) {
     <div
@@ -25,6 +30,16 @@
       [style.inset-inline-end.px]="place().end"
       [attr.aria-label]="'exportMenu.export' | transloco"
     >
+      @if (loadError()) {
+        <ui-full-state
+          [kind]="forbidden() ? 'forbidden' : 'load-failure'"
+          [title]="(forbidden() ? 'exportMenu.forbidden' : 'exportMenu.loadFailed') | transloco"
+          [text]="correlationId() || ''"
+          [actionLabel]="'exportMenu.refresh' | transloco"
+          [busy]="loading()"
+          (action)="refresh()"
+        />
+      }
       @for (option of options; track option.format) {
         @let disabled = isFormatDisabled(option.format);
         <button
@@ -38,7 +53,8 @@
               : 'cursor-pointer hover:bg-row-hover'
           "
           [attr.aria-disabled]="disabled ? 'true' : null"
-          [attr.title]="disabled ? ('exportMenu.pdfNotAvailable' | transloco) : null"
+          [attr.aria-describedby]="hintId + '-' + option.format"
+          [attr.title]="(option.format === 'PDF' && !pdfEnabled() ? pdfReason() : 'exportMenu.hints.' + option.format) | transloco"
           (click)="choose(option.format)"
         >
           <span
@@ -53,8 +69,28 @@
           >
             {{ option.labelKey | transloco }}
           </span>
+          <ng-icon name="tablerExclamationCircle" size="14" aria-hidden="true" />
+          <span class="sr-only" [id]="hintId + '-' + option.format">{{ (option.format === 'PDF' && !pdfEnabled() ? pdfReason() : 'exportMenu.hints.' + option.format) | transloco }}</span>
         </button>
       }
+      <button
+        #rowBtn
+        type="button"
+        role="menuitem"
+        class="flex h-menu-item w-full items-center gap-8 rounded-6 px-8 text-start text-12 font-medium text-text outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed"
+        [disabled]="loading()"
+        [attr.aria-busy]="loading()"
+        [attr.aria-describedby]="hintId + '-refresh'"
+        [attr.title]="'exportMenu.hints.refresh' | transloco"
+        (click)="refresh()"
+      >
+        <span class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-blue text-on-icon">
+          <ng-icon name="tablerRefresh" size="14" [class.animate-spin]="loading()" aria-hidden="true" />
+        </span>
+        <span class="min-w-0 flex-1">{{ 'exportMenu.refresh' | transloco }}</span>
+        <ng-icon name="tablerExclamationCircle" size="14" aria-hidden="true" />
+      </button>
+      <span class="sr-only" [id]="hintId + '-refresh'">{{ 'exportMenu.hints.refresh' | transloco }}</span>
     </div>
   }
 }

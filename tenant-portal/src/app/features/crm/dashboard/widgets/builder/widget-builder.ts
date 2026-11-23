@@ -13,6 +13,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
+import { Router } from '@angular/router';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerDeviceFloppy, tablerRefresh } from '@ng-icons/tabler-icons';
@@ -32,6 +33,8 @@ import { StepPresentation } from './step-presentation/step-presentation';
 import { StepReview } from './step-review/step-review';
 import { StepScope } from './step-scope/step-scope';
 import { selectScopeTranslation } from '../../../../../shared/widgets/dashboard/scope-translation';
+import { UsageTab } from '../widget-page/usage-tab/usage-tab';
+import { RequestModal } from '../../access/request-modal/request-modal';
 
 const FOCUSABLE_SELECTOR =
   'input:not([disabled]):not([readonly]), textarea:not([disabled]), select:not([disabled]), button:not([disabled]):not([tabindex="-1"]), [tabindex="0"]';
@@ -52,13 +55,18 @@ const FOCUSABLE_SELECTOR =
     StepCompare,
     StepPresentation,
     StepReview,
+    UsageTab,
+    RequestModal,
+  ],
+  viewProviders: [
+    provideTranslocoScope(
+      { scope: 'crm-widget-builder', alias: 'builder' },
+      { scope: 'crm-widget-page', alias: 'widgetPage' },
+      { scope: 'analytics', alias: 'analytics' },
+    ),
   ],
   providers: [
     BuilderState,
-    provideTranslocoScope(
-      { scope: 'crm-widget-builder', alias: 'builder' },
-      { scope: 'analytics', alias: 'analytics' },
-    ),
     provideIcons({ tablerDeviceFloppy, tablerRefresh }),
   ],
   templateUrl: './widget-builder.html',
@@ -68,10 +76,12 @@ export class WidgetBuilder {
   protected readonly state = inject(BuilderState);
   private readonly transloco = inject(TranslocoService);
   private readonly injector = inject(Injector);
+  private readonly router = inject(Router);
   private readonly i18n = translationEvents(this.transloco);
   private readonly builderScope = toSignal(selectScopeTranslation(this.transloco, 'crm-widget-builder', 'builder'));
 
   private readonly formPane = viewChild<ElementRef<HTMLElement>>('formPane');
+  private readonly requestModal = viewChild(RequestModal);
 
   readonly widgetId = input<string | null>(null);
   readonly saved = output<string>();
@@ -83,9 +93,8 @@ export class WidgetBuilder {
   protected readonly conflictOpen = signal(false);
   private conflictSettle: ((choice: ConflictChoice) => void) | null = null;
 
-  protected readonly canSave = computed(() =>
-    this.state.isEditing() ? can('crm.widgets.update') : can('crm.widgets.create'),
-  );
+  protected readonly canSave = this.state.canSave;
+  protected readonly canOpenReadiness = computed(() => can('crm.analytics.readiness.view'));
 
   protected readonly isFirstStep = computed(() => this.state.step() === STEP_ORDER[0]);
 
@@ -141,6 +150,8 @@ export class WidgetBuilder {
         return this.transloco.translate('builder.loadError.notFoundTitle');
       case 'forbidden':
         return this.transloco.translate('builder.loadError.forbiddenTitle');
+      case 'provisioning':
+        return this.transloco.translate('builder.loadError.provisioningTitle');
       default:
         return this.transloco.translate('builder.loadError.failedTitle');
     }
@@ -149,6 +160,9 @@ export class WidgetBuilder {
   protected readonly fullStateText = computed(() => {
     this.i18n();
     this.builderScope();
+    const failure = this.state.readFailure();
+    if (failure) return failure.message + (failure.correlationId
+      ? ' ' + this.transloco.translate('builder.requests.correlation', { id: failure.correlationId }) : '');
     switch (this.state.loadError()) {
       case 'not-found':
         return this.transloco.translate('builder.loadError.notFoundText');
@@ -269,6 +283,14 @@ export class WidgetBuilder {
   }
 
   protected retryLoad(): void {
+    if (this.state.loadError() === 'provisioning' && this.canOpenReadiness()) {
+      void this.router.navigateByUrl('/crm/settings/data-readiness');
+      return;
+    }
+    if (this.state.readFailure()?.requestAccess && this.widgetId()) {
+      this.requestModal()?.open('WIDGET', this.widgetId()!);
+      return;
+    }
     void this.state.reload();
   }
 

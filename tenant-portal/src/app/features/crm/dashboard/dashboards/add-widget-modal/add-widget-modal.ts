@@ -1,4 +1,17 @@
-import { Component, DestroyRef, ElementRef, computed, inject, signal, viewChild, viewChildren } from '@angular/core';
+import { Router } from '@angular/router';
+import { can } from '../../../../../shared/widgets/dashboard/analytics-permissions';
+import { dashboardWriteError } from '../../shared/write-state';
+import { FullState } from '../../../../../shared/ui/full-state/full-state';
+import {
+  Component,
+  DestroyRef,
+  ElementRef,
+  computed,
+  inject,
+  signal,
+  viewChild,
+  viewChildren,
+} from '@angular/core';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
@@ -31,8 +44,8 @@ let nextAddModalId = 0;
 
 @Component({
   selector: 'app-add-widget-modal',
-  imports: [NgIcon, TranslocoPipe, Badge, Button, Field, Modal, Segmented],
-  providers: [
+  imports: [FullState, NgIcon, TranslocoPipe, Badge, Button, Field, Modal, Segmented],
+  viewProviders: [
     provideTranslocoScope(
       { scope: 'crm-dash-edit', alias: 'dashEdit' },
       { scope: 'analytics', alias: 'analytics' },
@@ -44,6 +57,8 @@ let nextAddModalId = 0;
 export class AddWidgetModal {
   private readonly destroyRef = inject(DestroyRef);
   private readonly notify = inject(Notify);
+  private readonly router = inject(Router);
+  protected readonly canViewReadiness = can('crm.analytics.readiness.view');
   private readonly transloco = inject(TranslocoService);
   private readonly language = inject(LanguageState).current;
   private readonly i18n = translationEvents(this.transloco);
@@ -60,6 +75,7 @@ export class AddWidgetModal {
   protected readonly nextCursor = signal<string | null>(null);
   protected readonly loading = signal(false);
   protected readonly loadingMore = signal(false);
+  protected readonly loadFailure = signal<ReturnType<typeof dashboardWriteError> | null>(null);
   protected readonly loadFailed = signal(false);
   protected readonly submitting = signal(false);
   protected readonly usedIds = signal<ReadonlySet<string>>(new Set());
@@ -116,7 +132,11 @@ export class AddWidgetModal {
     });
   }
 
-  open(dashboardId: string, revision: number, usedWidgetIds: string[]): Promise<AddedWidgetResult | null> {
+  open(
+    dashboardId: string,
+    revision: number,
+    usedWidgetIds: string[],
+  ): Promise<AddedWidgetResult | null> {
     void revision;
     this.settle(null);
     this.clearSearchTimer();
@@ -128,6 +148,7 @@ export class AddWidgetModal {
     this.selectedId.set(null);
     this.versionMode.set('FOLLOW_ACTIVE');
     this.loadFailed.set(false);
+    this.loadFailure.set(null);
     this.submitting.set(false);
 
     this.modal().open();
@@ -149,6 +170,12 @@ export class AddWidgetModal {
     }, 250);
   }
 
+  protected onReadAction(): void {
+    if (this.loadFailure()?.kind === 'provisioning' && this.canViewReadiness) {
+      this.modal().close();
+      void this.router.navigate(['/crm/settings/data-readiness']);
+    } else this.retryLoad();
+  }
   protected retryLoad(): void {
     void this.loadWidgets(true);
   }
@@ -207,11 +234,13 @@ export class AddWidgetModal {
 
     const maxWidgets = this.catalog?.grid.maxWidgets ?? 20;
     if (this.usedIds().size >= maxWidgets) {
-      this.notify.error(this.transloco.translate(errorKey('CRM_DASHBOARD_WIDGET_LIMIT_EXCEEDED')));
+      this.notify.error(this.transloco.translate(errorKey('CRM_DASHBOARD_WIDGET_LIMIT')));
       return;
     }
 
-    const vizDefault = this.catalog?.visualizations.find((v) => v.key === widget.visualizationType)?.defaultSize;
+    const vizDefault = this.catalog?.visualizations.find(
+      (v) => v.key === widget.visualizationType,
+    )?.defaultSize;
     this.settle({
       widget,
       versionMode: this.versionMode(),
@@ -248,6 +277,7 @@ export class AddWidgetModal {
       this.loading.set(true);
       this.loadingMore.set(false);
       this.loadFailed.set(false);
+      this.loadFailure.set(null);
     } else {
       this.loadingMore.set(true);
     }
@@ -263,7 +293,10 @@ export class AddWidgetModal {
       if (reset) {
         this.items.set(page.items);
         const currentSelected = this.selectedId();
-        if (currentSelected && !page.items.some((item) => item.id === currentSelected && !this.usedIds().has(item.id))) {
+        if (
+          currentSelected &&
+          !page.items.some((item) => item.id === currentSelected && !this.usedIds().has(item.id))
+        ) {
           this.selectedId.set(null);
           this.versionMode.set('FOLLOW_ACTIVE');
         }
@@ -285,8 +318,8 @@ export class AddWidgetModal {
       if (seq !== this.requestSeq) return;
       if (reset) {
         this.loadFailed.set(true);
-      }
-      this.notify.error(this.transloco.translate(errorKey(errorCodeOf(error))));
+        this.loadFailure.set(dashboardWriteError(this.transloco, error, 'dashEdit', false));
+      } else this.notify.error(this.transloco.translate(errorKey(errorCodeOf(error))));
     } finally {
       if (seq === this.requestSeq) {
         this.loading.set(false);

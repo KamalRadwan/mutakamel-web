@@ -15,11 +15,16 @@ import {
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { LanguageState } from '../../../../../core/i18n/language';
 import { Notify } from '../../../../../core/notify/notify';
+import { fieldErrorsOf, isValidationError } from '../../../../../core/api/api-errors';
+import { TenantScopeState } from '../../../../../core/scope/tenant-scope';
 import type { ActionItem } from '../../../../../shared/ui/actions-menu/actions-menu';
 import { Badge } from '../../../../../shared/ui/badge/badge';
 import type { EntityRef, Visualization, WidgetExecution } from '../../../../../shared/ui/chart/chart.model';
 import { DASH, formatDate, formatMoney, formatNumber, formatRateN, formatShortDate } from '../../../../../shared/ui/chart/chart-format';
 import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
+import { ConflictDialog } from '../../../../../shared/ui/conflict-dialog/conflict-dialog';
+import { ConflictChoice } from '../../shared/conflict-choice';
+import { dashboardWriteError, writeIntent, retainWriteIntent, type WriteIntent } from '../../shared/write-state';
 import { FullState } from '../../../../../shared/ui/full-state/full-state';
 import { UnsavedDialog } from '../../../../../shared/ui/unsaved-dialog/unsaved-dialog';
 import { WidgetFrame } from '../../../../../shared/ui/widget-frame/widget-frame';
@@ -33,7 +38,6 @@ import type {
   DashboardRun,
   DatasetComparisonDetails,
   PanelCoverage,
-  PanelOutcome,
   RuntimeFilters,
   UnavailablePlacement,
 } from '../../../../../shared/widgets/dashboard/analytics.model';
@@ -42,11 +46,8 @@ import {
   errorCodeOf,
   newIdempotencyKey,
   isAbortError,
-  queueRun,
-  retryWhenBusy,
 } from '../../../../../shared/widgets/dashboard/analytics-api';
 import { can, scopeLevels } from '../../../../../shared/widgets/dashboard/analytics-permissions';
-import { FAKE_BRANCHES, FAKE_ME, FAKE_TEAMS } from '../../../../../shared/widgets/dashboard/fake/fake-org';
 import { DashboardGrid, type GridItem } from '../../../../../shared/widgets/dashboard/dashboard-grid/dashboard-grid';
 import { governedTargetParts } from '../../../../../shared/widgets/dashboard/governed-target';
 import {
@@ -94,6 +95,7 @@ import { ExplainModal } from '../explain-modal/explain-modal';
 import { LayoutEditor } from '../layout-editor';
 import {
   LayoutSizeInvalidError,
+  LayoutSaveSession,
   isLayoutSizeInvalid,
   saveLayoutResolving,
   type PendingAdd,
@@ -102,8 +104,11 @@ import { recordsLink } from '../records-link';
 import { VersionPolicyModal } from '../version-policy-modal/version-policy-modal';
 import { WhyNumbersModal } from '../why-numbers-modal/why-numbers-modal';
 import { selectScopeTranslation } from '../../../../../shared/widgets/dashboard/scope-translation';
+import { settingsTimeZone } from '../../../settings/shared/settings-time-zone';
+import { RequestModal } from '../../access/request-modal/request-modal';
+import { dashboardReadError } from './dashboard-read-error';
 
-type PageLoadStatus = 'loading' | 'ready' | 'not-found' | 'no-dashboards' | 'forbidden' | 'load-failure';
+type PageLoadStatus = 'loading' | 'ready' | 'not-found' | 'no-dashboards' | 'forbidden' | 'load-failure' | 'provisioning';
 
 const GRID_COLUMNS = 48;
 const UNAVAIL_COLS_PER_ROW = 3;
@@ -120,6 +125,7 @@ const UNAVAIL_H = 37;
     WidgetFrame,
     WidgetState,
     ConfirmDialog,
+    ConflictDialog,
     UnsavedDialog,
     DashboardGrid,
     WidgetBody,
@@ -133,6 +139,7 @@ const UNAVAIL_H = 37;
     ExplainModal,
     ShareModal,
     CreateDashboardModal,
+    RequestModal,
   ],
   providers: [
     provideTranslocoScope(
@@ -162,6 +169,9 @@ export class DashboardPage {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly notify = inject(Notify);
+  private readonly tenantScope = inject(TenantScopeState);
+  private readonly timeZoneReady = settingsTimeZone().catch(() => null);
+  protected readonly timeZone = signal<string | null>(null);
   private readonly transloco = inject(TranslocoService);
   private readonly language = inject(LanguageState).current;
   private readonly i18n = translationEvents(this.transloco);
@@ -177,9 +187,13 @@ export class DashboardPage {
   private readonly addWidgetModal = viewChild(AddWidgetModal);
   private readonly versionPolicyModal = viewChild(VersionPolicyModal);
   private readonly shareModal = viewChild(ShareModal);
+  private readonly requestModal = viewChild(RequestModal);
   private readonly createModal = viewChild(CreateDashboardModal);
   private readonly deleteConfirm = viewChild.required<ConfirmDialog>('deleteConfirm');
-  private readonly conflictConfirm = viewChild.required<ConfirmDialog>('conflictConfirm');
+  protected readonly layoutConflict = new ConflictChoice();
+  private layoutSaveSession = new LayoutSaveSession();
+  protected readonly writeReadOnly = signal(false);
+  private duplicateIntent: WriteIntent | null = null;
   private readonly unsavedDialog = viewChild.required(UnsavedDialog);
 
   protected readonly editor = new LayoutEditor([]);
@@ -206,6 +220,34 @@ export class DashboardPage {
   protected readonly editDirty = computed(() => this.editor.dirty() || this.removedUnavailable().length > 0);
 
   protected readonly pageStatus = signal<PageLoadStatus>('loading');
+  protected readonly readFailure = signal<unknown | null>(null);
+  protected readonly filterFailure = signal<unknown | null>(null);
+  protected readonly readError = computed(() => {
+    this.i18n();
+    return this.readFailure() ? dashboardReadError(this.readFailure(), this.transloco, 'dashPage') : null;
+  });
+  protected readonly filterError = computed(() => {
+    this.i18n();
+    if (Object.keys(this.filterFieldErrors()).length > 0) return null;
+    return this.filterFailure() ? dashboardReadError(this.filterFailure(), this.transloco, 'dashPage').message : null;
+  });
+  protected readonly filterFieldErrors = computed<Record<string, string>>(() => {
+    this.i18n();
+    const fields = Object.keys(fieldErrorsOf(this.filterFailure()));
+    const messages: Record<string, string> = {};
+    for (const path of fields) {
+      const key = path.replace(/^filters\./, '').split('.')[0];
+      const control = key.startsWith('date') ? 'period' : key === 'compare' ? 'compare'
+        : key.startsWith('branch') ? 'branches' : key === 'teamIds' ? 'teams'
+        : key.startsWith('owner') ? 'scope' : null;
+      if (control) messages[control] = dashboardReadError(this.filterFailure(), this.transloco, 'dashPage').message;
+    }
+    return messages;
+  });
+  protected readonly canViewReadiness = can('crm.analytics.readiness.view');
+  protected readonly canRequestAccess = computed(() =>
+    this.readError()?.code === 'CRM_DASHBOARD_DEFINITION_ACCESS_DENIED' && !!(this.detail()?.id ?? this.routeParams()?.get('id')),
+  );
   protected readonly detail = signal<DashboardDetail | null>(null);
   protected readonly catalog = signal<Catalog | null>(null);
   protected readonly scopeInspector = signal<ScopeInspector | null>(null);
@@ -246,7 +288,7 @@ export class DashboardPage {
   private runSeq = 0;
   private initializedLang: string | null = null;
   private destroyed = false;
-  /** Aborted when a newer run starts or the page is destroyed: queued and retrying calls stop at once. */
+  /** Ignore the previous response when a newer action starts or the page closes. */
   private runAbort = new AbortController();
 
   protected readonly canCreate = can('crm.dashboards.create');
@@ -254,7 +296,7 @@ export class DashboardPage {
   protected readonly canCustomize = computed(() => {
     const d = this.detail();
     return Boolean(
-      d && d.kind === 'DASHBOARD' && d.blueprintKey && d.accessLevel === 'VIEW' && can('crm.dashboards.create'),
+      d && !this.writeReadOnly() && d.kind === 'DASHBOARD' && d.blueprintKey && d.accessLevel === 'VIEW' && can('crm.dashboards.create') && can('crm.widgets.create'),
     );
   });
 
@@ -262,6 +304,7 @@ export class DashboardPage {
     const d = this.detail();
     return Boolean(
       d &&
+        !this.writeReadOnly() &&
         !d.isLayoutLocked &&
         (d.accessLevel === 'OWNER' || d.accessLevel === 'MANAGE' || d.accessLevel === 'EDIT') &&
         can('crm.dashboards.update'),
@@ -281,49 +324,26 @@ export class DashboardPage {
   });
 
   protected readonly branchOptions = computed<FilterOptionItem[]>(() => {
-    const lang = this.language();
     const org = this.lastRun()?.organizationScope;
-    if (org) {
-      if (org.branches.length <= 1) return [];
-      const manyCompanies = org.companies.length > 1;
-      return org.branches.map((b) => ({ id: b.id, name: manyCompanies ? `${b.companyName} · ${b.name}` : b.name }));
-    }
-    const insp = this.scopeInspector();
-    if (!insp) return [];
-    const allowed =
-      insp.branches === 'ALL'
-        ? FAKE_BRANCHES
-        : FAKE_BRANCHES.filter((b) => insp.branches.includes(b.id));
-    if (allowed.length <= 1) return [];
-    return allowed.map((b) => ({
+    if (!org || org.branches.length <= 1) return [];
+    return org.branches.map((b) => ({
       id: b.id,
-      name: lang === 'ar' ? b.name.ar : b.name.en,
+      name: org.companies.length > 1 ? `${b.companyName} · ${b.name}` : b.name,
     }));
   });
 
   protected readonly partialAccess = computed(() => this.lastRun()?.organizationScope.partialAccess ?? false);
 
-  protected readonly teamOptions = computed<FilterOptionItem[]>(() => {
-    const lang = this.language();
-    const runTeams = this.lastRun()?.populationScope?.teams;
-    if (runTeams && runTeams.length > 0) {
-      return runTeams.map((t) => ({ id: t.id, name: t.name }));
-    }
-    const insp = this.scopeInspector();
-    const allowedBranches =
-      !insp || insp.branches === 'ALL' ? null : new Set(insp.branches);
-    return FAKE_TEAMS.filter((t) => (allowedBranches ? allowedBranches.has(t.branchId) : true)).map(
-      (t) => ({
-        id: t.id,
-        name: lang === 'ar' ? t.name.ar : t.name.en,
-      }),
-    );
-  });
+  protected readonly teamOptions = computed<FilterOptionItem[]>(() =>
+    (this.lastRun()?.populationScope?.teams ?? []).map((t) => ({ id: t.id, name: t.name })),
+  );
 
   protected readonly runtimeFilters = computed<RuntimeFilters>(() =>
     toRuntimeFilters(
       this.filterValue(),
       this.teamOptions().map((t) => t.id),
+      this.tenantScope.me()?.id,
+      this.detail()?.defaultFilters,
     ),
   );
 
@@ -488,7 +508,7 @@ export class DashboardPage {
     const result: Record<string, boolean> = {};
     for (const p of this.allPlacements()) {
       const widgetAccess =
-        accessMap[p.widgetId] ?? (p.widget.ownerUserId === FAKE_ME.id ? 'OWNER' : 'VIEW');
+        accessMap[p.widgetId] ?? (p.widget.ownerUserId === this.tenantScope.me()?.id ? 'OWNER' : 'VIEW');
       result[p.id] = hasWidgetRead && (widgetAccess === 'OWNER' || widgetAccess === 'EDIT');
     }
     return result;
@@ -625,7 +645,7 @@ export class DashboardPage {
       const metric = cat?.metrics.find((m) => m.key === metricKey);
       const isReady = view?.status === 'READY' || view?.status === 'PARTIAL';
 
-      if (!editing && metric?.drilldown && view?.status !== 'DENIED') {
+      if (!editing && metric?.drilldown && !p.widget.querySpec.dimension && view?.status !== 'DENIED') {
         items.push({
           id: 'viewData',
           title: this.transloco.translate('dashboardWidgets.menu.viewData'),
@@ -711,6 +731,7 @@ export class DashboardPage {
 
   constructor() {
     inject(DestroyRef).onDestroy(() => {
+      this.layoutConflict.choose(false);
       this.destroyed = true;
       this.loadSeq++;
       this.runSeq++;
@@ -739,8 +760,6 @@ export class DashboardPage {
         this.switcherRefresh.update((v) => v + 1);
         if (!this.editing() || !this.editDirty()) {
           void this.refreshLocalizedDetail(current.id);
-        } else {
-          void this.runAllWidgets(current, this.runtimeFilters(), false);
         }
       });
     });
@@ -794,32 +813,18 @@ export class DashboardPage {
   }
 
   protected onFiltersChange(next: DashboardFilterValue): void {
-    const before = this.runtimeFilters() as unknown as Record<string, unknown>;
+    const before = this.runtimeFilters();
     this.filterValue.set(next);
     const after = this.runtimeFilters();
     const current = this.detail();
-    if (!current) return;
+    if (!current || JSON.stringify(before) === JSON.stringify(after)) return;
+    void this.runAllWidgets(current, after, false);
+  }
 
-    const afterRecord = after as unknown as Record<string, unknown>;
-    const changed = new Set<string>();
-    for (const key of new Set([...Object.keys(before), ...Object.keys(afterRecord)])) {
-      if (JSON.stringify(before[key] ?? null) !== JSON.stringify(afterRecord[key] ?? null)) changed.add(key);
-    }
-    if (changed.size === 0) return;
-
-    // Rerun only the widgets that use a changed filter (the others reported it as ignored).
-    const views = this.panelViews();
-    const affected = current.placements.filter((p) => {
-      const ignored = views[p.widgetId]?.execution?.meta.ignoredFilters;
-      return views[p.widgetId]?.status === 'loading' || !ignored || [...changed].some((key) => !ignored.includes(key));
-    });
-    const seq = ++this.runSeq;
-    const nextViews = { ...views };
-    for (const p of affected) nextViews[p.widgetId] = LOADING_VIEW;
-    this.panelViews.set(nextViews);
-    for (const p of affected) {
-      void this.runSingleWidget(current.id, p.widgetId, false, seq, after);
-    }
+  protected onForbiddenAction(): void {
+    const id = this.detail()?.id ?? this.routeParams()?.get('id');
+    if (this.canRequestAccess() && id) this.requestModal()?.open('DASHBOARD', id);
+    else this.goHome();
   }
 
   protected onOpenWhy(): void {
@@ -839,7 +844,8 @@ export class DashboardPage {
     if (!current || !this.canCustomize() || this.headerBusy()) return;
     this.headerBusy.set(true);
     try {
-      const copy = await duplicateDashboard(current.id, null, newIdempotencyKey());
+      const copy = await duplicateDashboard(current.id, null, (this.duplicateIntent = writeIntent({ id: current.id, name: null }, this.duplicateIntent)).key);
+      this.duplicateIntent = null;
       this.notify.success(this.transloco.translate('dashPage.copied'));
       const omitted = copy.duplication?.omittedUnavailableWidgetCount ?? 0;
       if (omitted > 0) {
@@ -852,7 +858,8 @@ export class DashboardPage {
         queryParams: { edit: '1' },
       });
     } catch (error) {
-      this.notify.error(this.transloco.translate(errorKey(errorCodeOf(error))));
+      if (!retainWriteIntent(error)) this.duplicateIntent = null;
+      this.showWriteError(error);
     } finally {
       this.headerBusy.set(false);
     }
@@ -886,7 +893,7 @@ export class DashboardPage {
   protected async onAddWidget(): Promise<void> {
     const current = this.detail();
     const modal = this.addWidgetModal();
-    if (!current || !modal || !this.editing()) return;
+    if (!current || !modal || !this.editing() || this.writeReadOnly()) return;
 
     const usedIds = this.shownPlacements().map((p) => p.widgetId);
     const added = await modal.open(current.id, current.revision, usedIds);
@@ -932,7 +939,7 @@ export class DashboardPage {
   }
 
   protected onGridLayoutChange(items: GridItem[]): void {
-    if (!this.editing()) return;
+    if (!this.editing() || this.writeReadOnly()) return;
     const realIds = new Set(this.allPlacements().map((p) => p.id));
     const realItems = items.filter((item) => realIds.has(item.id));
     const prevItems = this.editor.items();
@@ -943,7 +950,7 @@ export class DashboardPage {
   }
 
   protected onSaveUndo(): void {
-    if (!this.editing() || this.savingLayout()) return;
+    if (!this.editing() || this.savingLayout() || this.writeReadOnly()) return;
     this.layoutSizeError.set(null);
     this.editor.undo();
   }
@@ -963,17 +970,23 @@ export class DashboardPage {
     ];
 
     this.layoutSizeError.set(null);
+    if (this.writeReadOnly()) return false;
     this.savingLayout.set(true);
     try {
       const res = await saveLayoutResolving(
         current.id,
         current.revision,
         this.editor.payload(),
-        this.conflictConfirm(),
+        this.layoutConflict,
         { removedPlacementIds, adds },
+        this.layoutSaveSession,
       );
-      if (!res) return false;
+      if (!res || this.destroyed) return false;
 
+      if ('conflict' in res) {
+        this.detail.update((detail) => detail ? { ...detail, revision: res.revision } : detail);
+        return false;
+      }
       if ('reload' in res) {
         this.resetLocalEdits();
         this.editing.set(false);
@@ -1011,15 +1024,22 @@ export class DashboardPage {
         await this.handleLayoutSizeInvalid(current.id, sizeError);
         return false;
       }
-      this.notify.error(this.transloco.translate(errorKey(errorCodeOf(error))));
-      if (adds.length > 0 || removedPlacementIds.length > 0) {
-        // Some structural calls may already have been applied, so the local revision is no longer trustworthy.
-        this.resetLocalEdits();
-        this.editing.set(false);
-        this.selectedId.set(null);
-        this.layoutSizeError.set(null);
-        await this.loadDashboardRoute(current.id);
+      const code = errorCodeOf(error);
+      if (isValidationError(error)) {
+        const path = Object.keys(fieldErrorsOf(error))[0] ?? '';
+        const index = /^items\.(\d+)/.exec(path)?.[1];
+        const item = index === undefined ? null : this.editor.items()[Number(index)];
+        if (item) this.selectedId.set(item.id);
+        this.layoutSizeError.set({ fallbackKey: 'dashEdit.layoutValidation' });
+        return false;
       }
+      if (code && [
+        'CRM_DASHBOARD_LAYOUT_OVERLAP', 'CRM_DASHBOARD_LAYOUT_LOCKED', 'CRM_DASHBOARD_PLACEMENT_LAYOUT_LIMIT',
+        'CRM_DASHBOARD_LAYOUT_SIZE_INVALID', 'CRM_DASHBOARD_LAYOUT_POSITION_INVALID', 'CRM_DASHBOARD_BREAKPOINT_UNKNOWN',
+        'CRM_DASHBOARD_PLACEMENT_LIMIT', 'CRM_DASHBOARD_WIDGET_LIMIT',
+      ].includes(code)) {
+        this.layoutSizeError.set({ fallbackKey: `dashEdit.errors.${code}` });
+      } else this.showWriteError(error);
       return false;
     } finally {
       this.savingLayout.set(false);
@@ -1045,6 +1065,7 @@ export class DashboardPage {
   }
 
   private resetLocalEdits(): void {
+    this.layoutSaveSession = new LayoutSaveSession();
     this.localAdds.set([]);
     this.removedUnavailable.set([]);
     this.layoutSizeError.set(null);
@@ -1052,7 +1073,8 @@ export class DashboardPage {
 
   protected async onHeaderMenu(actionId: string): Promise<void> {
     const current = this.detail();
-    if (!current) return;
+    if (!current || this.writeReadOnly()) return;
+    if (actionId === 'share' && !can('crm.dashboards.share')) return;
 
     switch (actionId) {
       case 'duplicate':
@@ -1111,7 +1133,7 @@ export class DashboardPage {
       case 'explain': {
         const view = this.panelViews()[placement.widgetId];
         if (!view?.receiptId) return;
-        const target = recordsLink(
+        const target = placement.widget.querySpec.dimension ? null : recordsLink(
           current.id,
           placement.widgetId,
           placement.widget.name,
@@ -1138,7 +1160,7 @@ export class DashboardPage {
   /** Removal is local until Save, so it can be undone. */
   protected onRemovePlacement(placementId: string): void {
     const current = this.detail();
-    if (!current || !this.editing()) return;
+    if (!current || !this.editing() || this.writeReadOnly()) return;
 
     const isLayoutItem = this.editor.items().some((item) => item.id === placementId);
     const isUnavail = current.unavailablePlacements.some((u) => u.id === placementId);
@@ -1160,7 +1182,8 @@ export class DashboardPage {
   }
 
   protected onOpenReadiness(source: string): void {
-    void this.router.navigate(['/crm/settings/data-readiness'], { queryParams: { source } });
+    if (source) void this.router.navigate(['/crm/settings/data-readiness'], { queryParams: { source } });
+    else void this.router.navigate(['/crm/settings/data-readiness']);
   }
 
   protected onRetryWidget(widgetId: string): void {
@@ -1248,7 +1271,7 @@ export class DashboardPage {
     this.crossFilters.set(next);
     void this.runAllWidgets(current, this.runtimeFilters(), false);
     this.crossFilterChange =
-      current.placements.length > 0 ? { previous, seq: this.runSeq, pending: current.placements.length } : null;
+      current.placements.length > 0 ? { previous, seq: this.runSeq, pending: 1 } : null;
   }
 
   /** A widget of run `seq` finished without 422: once the whole change run has, the new selection stands. */
@@ -1270,8 +1293,15 @@ export class DashboardPage {
     if (change === null || change.seq !== seq || !current || current.id !== dashboardId) return false;
     this.crossFilterChange = null;
     this.crossFilters.set(change.previous);
-    this.notify.error(this.transloco.translate('analytics.error.CRM_DASHBOARD_FILTER_INVALID'));
-    void this.runAllWidgets(current, this.runtimeFilters(), false);
+    const previous = this.lastRun();
+    if (previous) {
+      this.panelViews.set(Object.fromEntries(current.placements.map(({ widgetId }) => {
+        const execution = previous.widgets[widgetId];
+        return [widgetId, execution
+          ? viewFromRun(execution, previous.panels.find((p) => p.panelKey === widgetId), previous.budget)
+          : { ...LOADING_VIEW, status: 'ERROR' as const }];
+      })));
+    }
     return true;
   }
 
@@ -1366,6 +1396,10 @@ export class DashboardPage {
   }
 
   private async loadDashboardRoute(routeId: string | null): Promise<void> {
+    this.runSeq++;
+    this.runAbort.abort();
+    this.readFailure.set(null);
+    this.filterFailure.set(null);
     if (!can('crm.dashboards.read')) {
       this.pageStatus.set('forbidden');
       this.detail.set(null);
@@ -1397,7 +1431,7 @@ export class DashboardPage {
         ? await getDashboard(routeId)
         : await this.resolveDefaultDashboard();
 
-      const cat = await catPromise;
+      const [cat, timeZone] = await Promise.all([catPromise, this.timeZoneReady]);
       if (seq !== this.loadSeq || this.destroyed) return;
 
       if (cat) {
@@ -1410,30 +1444,22 @@ export class DashboardPage {
       }
 
       this.detail.set(loadedDetail);
-      this.filterValue.set(defaultFilterValue(loadedDetail.defaultFilters));
+      this.timeZone.set(timeZone);
+      this.filterValue.set(defaultFilterValue(loadedDetail.defaultFilters, timeZone));
       this.editor.reset(this.viewGridItems());
       this.pageStatus.set('ready');
 
       const wantsEdit = this.route.snapshot.queryParamMap.get('edit') === '1';
       if (wantsEdit && this.canEdit()) {
         this.editing.set(true);
+        void this.loadAuxiliary(loadedDetail.id, seq);
       }
 
-      void this.loadAuxiliary(loadedDetail.id, seq);
       void this.runAllWidgets(loadedDetail, this.runtimeFilters(), false);
     } catch (error) {
       if (seq !== this.loadSeq || this.destroyed) return;
-      if (error instanceof ApiError) {
-        if (error.status === 403) {
-          this.pageStatus.set('forbidden');
-          return;
-        }
-        if (error.status === 404) {
-          this.pageStatus.set('not-found');
-          return;
-        }
-      }
-      this.pageStatus.set('load-failure');
+      this.readFailure.set(error);
+      this.pageStatus.set(dashboardReadError(error, this.transloco, 'dashPage').kind);
     }
   }
 
@@ -1484,7 +1510,6 @@ export class DashboardPage {
       if (!this.editing()) {
         this.editor.reset(this.viewGridItems());
       }
-      void this.runAllWidgets(fresh, this.runtimeFilters(), false);
     } catch {
       // Keep existing detail on transient refresh error.
     }
@@ -1526,129 +1551,79 @@ export class DashboardPage {
     }
   }
 
-  private async runAllWidgets(
-    detail: DashboardDetail,
-    filters: RuntimeFilters,
-    refresh: boolean,
-  ): Promise<void> {
+  private async runAllWidgets(detail: DashboardDetail, filters: RuntimeFilters, refresh: boolean): Promise<void> {
     const seq = ++this.runSeq;
     this.runAbort.abort();
     this.runAbort = new AbortController();
-    const initialViews: Record<string, PanelView> = {};
-    for (const p of detail.placements) {
-      initialViews[p.widgetId] = LOADING_VIEW;
-    }
-    this.panelViews.set(initialViews);
-    this.lastRun.set(null);
-
+    this.pageStatus.set('ready');
+    this.readFailure.set(null);
+    this.filterFailure.set(null);
+    this.panelViews.set(Object.fromEntries(detail.placements.map((p) => [p.widgetId, LOADING_VIEW])));
     if (detail.placements.length === 0) {
       this.latestGeneratedAt.set(detail.updatedAt);
       return;
     }
-
-    for (const placement of detail.placements) {
-      void this.runSingleWidget(detail.id, placement.widgetId, refresh, seq, filters);
-    }
+    await this.requestRun(detail, filters, refresh, seq);
   }
 
   private async runSingleWidget(
-    dashboardId: string,
-    widgetId: string,
-    refresh: boolean,
-    seq: number,
-    explicitFilters?: RuntimeFilters,
+    dashboardId: string, widgetId: string, refresh: boolean, seq: number, explicitFilters?: RuntimeFilters,
   ): Promise<void> {
-    const filters = explicitFilters ?? this.runtimeFilters();
-    const wireCrossFilters: CrossFilter[] = this.crossFilters().map(({ placementId, field, values }) => ({
-      placementId,
-      field,
-      values,
-    }));
+    const detail = this.detail();
+    if (!detail || detail.id !== dashboardId) return;
+    await this.requestRun(detail, explicitFilters ?? this.runtimeFilters(), refresh, seq, [widgetId]);
+  }
+
+  private async requestRun(
+    detail: DashboardDetail, filters: RuntimeFilters, refresh: boolean, seq: number, widgetIds?: string[],
+  ): Promise<void> {
+    const crossFilters: CrossFilter[] = this.crossFilters().map(({ placementId, field, values }) => ({ placementId, field, values }));
     try {
-      // One user may have 3 runs in flight: widgets wait in the shared queue; a refused call (429) still retries
-      // while the panel shows "retrying"; a newer run or leaving the page aborts both.
-      const signal = this.runAbort.signal;
-      const run = await retryWhenBusy(
-        () =>
-          queueRun(
-            () =>
-              runDashboard(dashboardId, {
-                filters,
-                ...(wireCrossFilters.length > 0 ? { crossFilters: wireCrossFilters } : {}),
-                widgetIds: [widgetId],
-                refresh,
-              }, signal),
-            signal,
-          ),
-        {
-          signal,
-          onRetry: () => {
-            if (seq !== this.runSeq || this.destroyed) return;
-            this.panelViews.update((map) => ({ ...map, [widgetId]: { ...LOADING_VIEW, retrying: true } }));
-          },
-        },
-      );
-      if (seq !== this.runSeq || this.detail()?.id !== dashboardId || this.destroyed) return;
+      const run = await runDashboard(detail.id, {
+        filters, crossFilters, refresh, ...(widgetIds ? { widgetIds } : {}),
+      }, this.runAbort.signal);
+      if (seq !== this.runSeq || this.detail()?.id !== detail.id || this.destroyed) return;
       this.settleCrossFilterChange(seq);
-
-      const exec: WidgetExecution | undefined = run.widgets[widgetId];
-      const outcome: PanelOutcome | undefined =
-        run.panels.find((p) => p.panelKey === widgetId) ?? run.panels[0];
-
-      const view = exec
-        ? viewFromRun(exec, outcome, run.budget)
-        : ({ ...LOADING_VIEW, status: 'ERROR' } as PanelView);
-
-      this.panelViews.update((map) => ({
-        ...map,
-        [widgetId]: view,
-      }));
-
-      this.latestGeneratedAt.update((prev) =>
-        !prev || run.generatedAt > prev ? run.generatedAt : prev,
-      );
-
-      this.lastRun.update((prev) => {
-        if (!prev) return run;
-        const nextPanels = prev.panels.filter((p) => p.panelKey !== widgetId);
-        if (outcome) nextPanels.push(outcome);
-        return {
-          ...prev,
-          revision: run.revision,
-          filters: run.filters,
-          generatedAt: run.generatedAt > prev.generatedAt ? run.generatedAt : prev.generatedAt,
-          populationScope: run.populationScope ?? prev.populationScope,
-          organizationScope: run.organizationScope,
-          budget: run.budget ?? prev.budget,
-          widgets: {
-            ...prev.widgets,
-            ...run.widgets,
-          },
-          panels: nextPanels,
-        };
-      });
+      const views: Record<string, PanelView> = widgetIds ? { ...this.panelViews() } : {};
+      for (const widgetId of widgetIds ?? detail.placements.map((p) => p.widgetId)) {
+        const execution = run.widgets[widgetId];
+        const outcome = run.panels.find((p) => p.panelKey === widgetId);
+        views[widgetId] = execution ? viewFromRun(execution, outcome, run.budget)
+          : { ...LOADING_VIEW, status: 'ERROR' };
+      }
+      this.panelViews.set(views);
+      this.latestGeneratedAt.set(run.generatedAt);
+      const previous = this.lastRun();
+      this.lastRun.set(widgetIds && previous ? {
+        ...run,
+        widgets: { ...previous.widgets, ...run.widgets },
+        panels: [...previous.panels.filter((p) => !widgetIds.includes(p.panelKey)), ...run.panels],
+      } : run);
     } catch (error) {
-      if (isAbortError(error) || seq !== this.runSeq || this.detail()?.id !== dashboardId || this.destroyed) return;
-      if (errorCodeOf(error) === 'CRM_DASHBOARD_FILTER_INVALID' && this.revertInvalidCrossFilters(dashboardId, seq)) {
-        return;
+      if (isAbortError(error) || seq !== this.runSeq || this.detail()?.id !== detail.id || this.destroyed) return;
+      const code = errorCodeOf(error);
+      if (isValidationError(error) || code === 'CRM_DASHBOARD_FILTER_INVALID' || code === 'CRM_DASHBOARD_DATE_RANGE_EXCEEDED') {
+        this.filterFailure.set(error);
+        if (this.revertInvalidCrossFilters(detail.id, seq)) return;
+      } else {
+        this.readFailure.set(error);
+        this.pageStatus.set(dashboardReadError(error, this.transloco, 'dashPage').kind);
       }
       this.settleCrossFilterChange(seq);
-      this.panelViews.update((map) => ({
-        ...map,
-        [widgetId]: {
-          ...LOADING_VIEW,
-          status: 'ERROR',
-          reasonCode: errorCodeOf(error),
-        },
-      }));
+      this.panelViews.update((views) => ({ ...views, ...Object.fromEntries(
+        (widgetIds ?? detail.placements.map((p) => p.widgetId)).map((id) => [id, {
+          ...LOADING_VIEW, status: 'ERROR' as const, reasonCode: code,
+        }]),
+      ) }));
     }
   }
 
   private async duplicateCurrent(current: DashboardDetail): Promise<void> {
-    if (this.headerBusy()) return;
+    if (this.headerBusy() || this.writeReadOnly() || !can('crm.dashboards.create') || !can('crm.widgets.create')) return;
     this.headerBusy.set(true);
     try {
-      const copy = await duplicateDashboard(current.id, null, newIdempotencyKey());
+      const copy = await duplicateDashboard(current.id, null, (this.duplicateIntent = writeIntent({ id: current.id, name: null }, this.duplicateIntent)).key);
+      this.duplicateIntent = null;
       this.notify.success(this.transloco.translate('dashPage.copied'));
       const omitted = copy.duplication?.omittedUnavailableWidgetCount ?? 0;
       if (omitted > 0) {
@@ -1659,7 +1634,8 @@ export class DashboardPage {
       this.switcherRefresh.update((v) => v + 1);
       await this.router.navigate(['/crm/dashboard/dashboards', copy.id]);
     } catch (error) {
-      this.notify.error(this.transloco.translate(errorKey(errorCodeOf(error))));
+      if (!retainWriteIntent(error)) this.duplicateIntent = null;
+      this.showWriteError(error);
     } finally {
       this.headerBusy.set(false);
     }
@@ -1730,7 +1706,7 @@ export class DashboardPage {
   }
 
   private async deleteCurrent(current: DashboardDetail): Promise<void> {
-    if (current.accessLevel !== 'OWNER' || !can('crm.dashboards.delete')) return;
+    if (this.writeReadOnly() || current.accessLevel !== 'OWNER' || !can('crm.dashboards.delete')) return;
     const confirmed = await this.deleteConfirm().open();
     if (!confirmed) return;
 
@@ -1741,12 +1717,17 @@ export class DashboardPage {
       this.switcherRefresh.update((v) => v + 1);
       await this.router.navigate(['/crm/dashboard/home']);
     } catch (error) {
-      this.notify.error(this.transloco.translate(errorKey(errorCodeOf(error))));
+      this.showWriteError(error);
     } finally {
       this.headerBusy.set(false);
     }
   }
 
+  private showWriteError(error: unknown): void {
+    const failure = dashboardWriteError(this.transloco, error, 'dashEdit');
+    this.writeReadOnly.set(this.writeReadOnly() || failure.readOnly || failure.reloadRequired);
+    this.notify.error(failure.message);
+  }
   private async handleLayoutSizeInvalid(
     dashboardId: string,
     error: LayoutSizeInvalidError,
@@ -1769,6 +1750,7 @@ export class DashboardPage {
         const fresh = await getDashboard(dashboardId);
         if (this.detail()?.id !== dashboardId || !this.editing() || this.destroyed) return;
         this.detail.set(fresh);
+        this.layoutSaveSession.revision = fresh.revision;
         this.editor.reset(this.viewGridItems());
         this.editor.apply(remappedItems);
         for (const realId of Object.values(addedMap)) {
@@ -1812,12 +1794,11 @@ export class DashboardPage {
       return;
     }
 
-    this.layoutSizeError.set(null);
-    const message =
+    this.layoutSizeError.set(
       minW !== null && minH !== null
-        ? this.transloco.translate('dashEdit.sizeTooSmall', { w: minW, h: minH })
-        : this.transloco.translate('analytics.error.CRM_DASHBOARD_LAYOUT_SIZE_INVALID');
-    this.notify.error(message);
+        ? { minW, minH }
+        : { fallbackKey: 'dashEdit.errors.CRM_DASHBOARD_LAYOUT_SIZE_INVALID' },
+    );
   }
 
   private coverageParts(

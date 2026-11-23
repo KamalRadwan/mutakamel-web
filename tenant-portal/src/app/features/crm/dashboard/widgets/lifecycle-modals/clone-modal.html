@@ -24,7 +24,7 @@
         maxlength="120"
         class="w-full min-w-0 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder disabled:cursor-not-allowed disabled:text-text-placeholder"
         [value]="name()"
-        [disabled]="submitting()"
+        [disabled]="submitting() || readOnly()"
         (input)="onNameInput($event)"
         (blur)="onNameBlur()"
       />

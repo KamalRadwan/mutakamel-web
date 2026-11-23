@@ -11,8 +11,9 @@ import { DASH, formatDateTime, formatNumber } from '../../../../../shared/ui/cha
 import { DataCell, DataTable, type DataColumn } from '../../../../../shared/ui/data-table/data-table';
 import { FullState } from '../../../../../shared/ui/full-state/full-state';
 import { Modal } from '../../../../../shared/ui/modal/modal';
-import { errorCodeOf } from '../../../../../shared/widgets/dashboard/analytics-api';
-import { FAKE_PEOPLE } from '../../../../../shared/widgets/dashboard/fake/fake-org';
+import { reportCorrelation } from '../report-errors';
+import { ApiError, errorCodeOf } from '../../../../../shared/widgets/dashboard/analytics-api';
+import { OrgApi } from '../../../../../shared/widgets/dashboard/org.api';
 import { errorKey } from '../../../../../shared/widgets/dashboard/panel-state';
 import { listDeliveries } from '../schedules.api';
 import type { Delivery, DeliverySkipReason, DeliveryStatus, Subscription } from '../schedules.model';
@@ -50,7 +51,8 @@ export class DeliveriesModal {
   protected readonly language = inject(LanguageState).current;
 
   private readonly modal = viewChild.required<Modal>('modal');
-  private readonly peopleById = new Map(FAKE_PEOPLE.map((person) => [person.id, person]));
+  private readonly org = inject(OrgApi);
+  private readonly people = signal(new Map<string, { name: string; nameAr: string }>());
 
   protected readonly subscription = signal<Subscription | null>(null);
   protected readonly deliveries = signal<Delivery[]>([]);
@@ -58,7 +60,8 @@ export class DeliveriesModal {
   protected readonly hasMore = signal(false);
   protected readonly loading = signal(false);
   protected readonly loadingMore = signal(false);
-  protected readonly loadError = signal(false);
+  protected readonly loadError = signal<'forbidden' | 'not-found' | 'load-failure' | null>(null);
+  protected readonly loadText = signal('');
 
   protected readonly columns = computed<DataColumn[]>(() => {
     this.i18n();
@@ -84,11 +87,12 @@ export class DeliveriesModal {
   private loadSeq = 0;
 
   open(sub: Subscription): void {
+    this.people.set(new Map());
     this.subscription.set(sub);
     this.deliveries.set([]);
     this.nextCursor.set(null);
     this.hasMore.set(false);
-    this.loadError.set(false);
+    this.loadError.set(null);
     this.modal().open();
     void this.load();
   }
@@ -114,6 +118,7 @@ export class DeliveriesModal {
       const seen = new Set(this.deliveries().map((item) => item.id));
       const appended = page.items.filter((item) => !seen.has(item.id));
       this.deliveries.update((list) => [...list, ...appended]);
+      void this.loadRecipients(appended);
       this.nextCursor.set(page.pageInfo.nextCursor);
       this.hasMore.set(page.pageInfo.hasMore);
     } catch (error) {
@@ -123,9 +128,17 @@ export class DeliveriesModal {
     }
   }
 
+  private async loadRecipients(rows: Delivery[]): Promise<void> {
+    const seq = this.loadSeq;
+    const ids = [...new Set(rows.map((row) => row.recipientUserId))].filter((id) => !this.people().has(id));
+    const users = await Promise.all(ids.map((id) => this.org.getUser(id).catch(() => null)));
+    if (seq !== this.loadSeq) return;
+    this.people.update((current) => new Map([...current, ...users.flatMap((user) => user ? [[user.id, user] as const] : [])]));
+  }
+
   protected recipientName(userId: string): string {
-    const person = this.peopleById.get(userId);
-    if (!person) return DASH;
+    const person = this.people().get(userId);
+    if (!person) return userId;
     return this.language() === 'ar' ? person.nameAr : person.name;
   }
 
@@ -169,16 +182,19 @@ export class DeliveriesModal {
     if (!sub) return;
     const seq = ++this.loadSeq;
     this.loading.set(true);
-    this.loadError.set(false);
+    this.loadError.set(null);
     try {
       const page = await listDeliveries(sub.id, null, PAGE_SIZE);
       if (seq !== this.loadSeq) return;
       this.deliveries.set(page.items);
+      void this.loadRecipients(page.items);
       this.nextCursor.set(page.pageInfo.nextCursor);
       this.hasMore.set(page.pageInfo.hasMore);
-    } catch {
+    } catch (error) {
       if (seq !== this.loadSeq) return;
-      this.loadError.set(true);
+      this.loadText.set(reportCorrelation(error, this.transloco, 'repSchedules'));
+      this.loadError.set(error instanceof ApiError && error.status === 403 ? 'forbidden'
+        : error instanceof ApiError && error.status === 404 ? 'not-found' : 'load-failure');
     } finally {
       if (seq === this.loadSeq) {
         this.loading.set(false);

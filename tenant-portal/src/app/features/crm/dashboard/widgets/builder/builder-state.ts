@@ -8,14 +8,12 @@ import type {
   QuerySpec,
   Visualization,
 } from '../../../../../shared/widgets/dashboard/analytics.model';
-import { getCatalog } from '../../../../../shared/widgets/dashboard/analytics.api';
+import { getWidgetCatalog } from '../../../../../shared/widgets/dashboard/analytics.api';
 import {
   ApiError,
   errorCodeOf,
   isConcurrencyError,
   newIdempotencyKey,
-  queueRun,
-  retryWhenBusy,
 } from '../../../../../shared/widgets/dashboard/analytics-api';
 import { can } from '../../../../../shared/widgets/dashboard/analytics-permissions';
 import {
@@ -36,7 +34,10 @@ import {
   previewWidget,
   saveDraft as saveWidgetDraft,
 } from '../widgets.api';
-import type { DraftState, WidgetBody } from '../widgets.model';
+import type { DraftState, WidgetBody, WidgetDetail } from '../widgets.model';
+import { fieldErrorsOf, isRetryableWriteError, isValidationError } from '../../../../../core/api/api-errors';
+import type { FullStateKind } from '../../../../../shared/ui/full-state/full-state';
+import { widgetConflict, widgetErrorMessage, widgetNeedsReload, widgetReadFailure, widgetWriteReadOnly, type WidgetReadFailure } from './builder-errors';
 import { detailIssues } from '../../shared/api-error-details';
 import {
   STEP_ORDER,
@@ -108,13 +109,13 @@ function stableDraftSnapshot(draft: BuilderDraft): string {
 
 function mapDetailFieldToStep(rawPath: string): { step: StepId; field: string } {
   const path = rawPath.replace(/^querySpec\./, '');
-  if (path === 'source') return { step: 'data', field: 'source' };
+  if (path === 'engine' || path === 'source') return { step: 'data', field: 'source' };
   const calcMatch = path.match(/^(series\.\d+\.calculation)(?:\..*)?$/);
   if (calcMatch) {
     return { step: 'metrics', field: calcMatch[1] };
   }
   if (
-    path === 'series' ||
+    path === 'series' || path.startsWith('series.') ||
     /^series\.\d+\.metricKey$/.test(path) ||
     path === 'dimension' ||
     path.startsWith('dimension.') ||
@@ -156,9 +157,15 @@ function mapDetailFieldToStep(rawPath: string): { step: StepId; field: string } 
   return { step: 'review', field: path };
 }
 
-/** Returns null for a code with no known field, so the caller shows it as a form-level banner. */
+/** Unknown action errors stay in toasts; only field-owned codes are attached to a step. */
 function mapCodeToTarget(code: string): { step: StepId; field: string } | null {
   switch (code) {
+    case 'CRM_WIDGET_ENGINE_INVALID':
+      return { step: 'data', field: 'source' };
+    case 'CRM_WIDGET_DRAFT_INVALID':
+    case 'CRM_WIDGET_PUBLISH_INVALID':
+      return { step: 'review', field: 'changeSummary' };
+    case 'CRM_WIDGET_UNAVAILABLE':
     case 'CRM_WIDGET_METRIC_INVALID':
       return { step: 'metrics', field: 'series.0.metricKey' };
     case 'CRM_WIDGET_SERIES_INVALID':
@@ -210,12 +217,18 @@ export class BuilderState {
   private readonly _draftState = signal<DraftState | null>(null);
   private readonly _loading = signal(false);
   private readonly _saving = signal(false);
-  private readonly _loadError = signal<'not-found' | 'forbidden' | 'load-failure' | null>(null);
+  private readonly _loadError = signal<FullStateKind | null>(null);
   private readonly _visited = signal<ReadonlySet<StepId>>(new Set<StepId>(['data']));
   private readonly _lastServerErrorStep = signal<StepId | null>(null);
   private readonly _formError = signal<string | null>(null);
 
-  private previewController: AbortController | null = null;
+  private readonly _widget = signal<WidgetDetail | null>(null);
+  private readonly _readFailure = signal<WidgetReadFailure | null>(null);
+  private readonly _previewFailure = signal<WidgetReadFailure | null>(null);
+  private readonly _writeReadOnly = signal(false);
+  private readonly _reloadRequired = signal(false);
+  private createAction: { bodyJson: string; key: string } | null = null;
+  private previewSeq = 0;
   private previewTimer: ReturnType<typeof setTimeout> | null = null;
   private lastAutoPreviewSignature = '';
   private loadSeq = 0;
@@ -235,12 +248,30 @@ export class BuilderState {
   readonly draftState: Signal<DraftState | null> = this._draftState.asReadonly();
   readonly loading: Signal<boolean> = this._loading.asReadonly();
   readonly saving: Signal<boolean> = this._saving.asReadonly();
-  readonly loadError: Signal<'not-found' | 'forbidden' | 'load-failure' | null> =
+  readonly loadError: Signal<FullStateKind | null> =
     this._loadError.asReadonly();
   readonly visited: Signal<ReadonlySet<StepId>> = this._visited.asReadonly();
-  /** Message for a server error with no known field; shown as a banner above the form. */
+  /** Kept for callers; action failures are displayed by Notify, never in the form body. */
   readonly formError: Signal<string | null> = this._formError.asReadonly();
   readonly lastServerErrorStep: Signal<StepId | null> = this._lastServerErrorStep.asReadonly();
+
+  readonly widget = this._widget.asReadonly();
+  readonly readFailure = this._readFailure.asReadonly();
+  readonly previewFailure = this._previewFailure.asReadonly();
+  readonly reloadRequired = this._reloadRequired.asReadonly();
+  private readonly hasEditAccess = computed(() => {
+    const widget = this._widget();
+    return !widget || (widget.status !== 'ARCHIVED' &&
+      (widget.accessLevel === 'OWNER' || widget.accessLevel === 'EDIT'));
+  });
+  readonly canSave = computed(() => {
+    if (this._writeReadOnly() || this._reloadRequired()) return false;
+    if (!this._widgetId()) return can('crm.widgets.create');
+    return can('crm.widgets.update') && this.hasEditAccess();
+  });
+  readonly canPublish = computed(() => !this._writeReadOnly() && !this._reloadRequired() &&
+    this.hasEditAccess() && can('crm.widgets.publish') && (this.canSave() || !!this._draftState()?.draft));
+  readonly readOnly = computed(() => !this.canSave());
 
   readonly isEditing: Signal<boolean> = computed(() => this._widgetId() !== null);
 
@@ -253,7 +284,7 @@ export class BuilderState {
     const state = this._draftState();
     const cat = this._catalog();
     const current = this._draft();
-    if (!id || !state?.draft || this.dirty() || !can('crm.widgets.publish')) {
+    if (!id || !state?.draft || this.dirty() || !this.canPublish()) {
       return false;
     }
     return STEP_ORDER.every((s) => validateStepWithZod(s, current, cat).length === 0);
@@ -296,12 +327,13 @@ export class BuilderState {
     effect(() => {
       const sig = this.autoPreviewSignature();
       if (!sig) {
+        this.invalidatePreviewRequest();
         if (this.previewTimer) {
           clearTimeout(this.previewTimer);
           this.previewTimer = null;
         }
         if (this._draft().querySpec.series.length === 0) {
-          this.abortPreviewRequest();
+          this.invalidatePreviewRequest();
           this._preview.set(EMPTY_VIEW);
           this.lastAutoPreviewSignature = '';
         }
@@ -309,6 +341,7 @@ export class BuilderState {
       }
 
       if (sig === this.lastAutoPreviewSignature) return;
+      this.invalidatePreviewRequest();
       if (this.previewTimer) clearTimeout(this.previewTimer);
       this.previewTimer = setTimeout(() => {
         this.previewTimer = null;
@@ -319,7 +352,7 @@ export class BuilderState {
 
     this.destroyRef.onDestroy(() => {
       if (this.previewTimer) clearTimeout(this.previewTimer);
-      this.abortPreviewRequest();
+      this.invalidatePreviewRequest();
     });
   }
 
@@ -342,20 +375,27 @@ export class BuilderState {
 
   async load(widgetId: string | null, opts?: { keepStep?: boolean }): Promise<void> {
     const seq = ++this.loadSeq;
-    this.abortPreviewRequest();
+    this.invalidatePreviewRequest();
     if (this.previewTimer) {
       clearTimeout(this.previewTimer);
       this.previewTimer = null;
     }
 
     this._loading.set(true);
+    if (this._widgetId() !== widgetId) this._widget.set(null);
+    this._widgetId.set(widgetId);
+    this._writeReadOnly.set(false);
+    this._reloadRequired.set(false);
+    this.createAction = null;
+    this._readFailure.set(null);
+    this._previewFailure.set(null);
     this._loadError.set(null);
     this._errors.set({});
     this._lastServerErrorStep.set(null);
     this._formError.set(null);
 
     try {
-      const catalog = this._catalog() ?? (await getCatalog());
+      const catalog = this._catalog() ?? (await getWidgetCatalog());
       if (seq !== this.loadSeq) return;
       this._catalog.set(catalog);
       if (this._branches().length === 0 || this._pipelines().length === 0) {
@@ -378,7 +418,13 @@ export class BuilderState {
         return;
       }
 
-      const ds = await getDraft(widgetId);
+      const detail = await getWidget(widgetId);
+      if (seq !== this.loadSeq) return;
+      this._widget.set(detail);
+      const ds: DraftState = this.canSave() ? await getDraft(widgetId) : {
+        widgetId, widgetRevision: detail.revision, governanceRevision: detail.governanceRevision,
+        activeVersionNumber: detail.versionNumber, draft: null,
+      };
       if (seq !== this.loadSeq) return;
 
       let draftName = ds.draft?.name ?? '';
@@ -399,8 +445,6 @@ export class BuilderState {
       const internalNotes = ds.draft?.internalNotes ?? '';
 
       if (!ds.draft) {
-        const detail = await getWidget(widgetId);
-        if (seq !== this.loadSeq) return;
         draftName = detail.name;
         draftViz = detail.visualizationType;
         if (detail.querySpec) querySpec = structuredClone(detail.querySpec);
@@ -479,17 +523,9 @@ export class BuilderState {
       }
     } catch (error) {
       if (seq !== this.loadSeq) return;
-      if (error instanceof ApiError) {
-        if (error.status === 404) {
-          this._loadError.set('not-found');
-        } else if (error.status === 403) {
-          this._loadError.set('forbidden');
-        } else {
-          this._loadError.set('load-failure');
-        }
-      } else {
-        this._loadError.set('load-failure');
-      }
+      const failure = widgetReadFailure(error, this.transloco, 'builder');
+      this._readFailure.set(failure);
+      this._loadError.set(failure.kind);
     } finally {
       if (seq === this.loadSeq) {
         this._loading.set(false);
@@ -509,13 +545,13 @@ export class BuilderState {
     const id = this._widgetId();
     if (!id) return;
     try {
+      const detail = await getWidget(id);
+      if (this._widgetId() !== id) return;
+      this._widget.set(detail);
+      if (!this.canSave()) return;
       const latest = await getDraft(id);
       if (this._widgetId() !== id) return;
-      const current = this._draftState();
-      this._draftState.set({
-        ...latest,
-        draft: current?.draft ?? latest.draft,
-      });
+      this._draftState.set(latest);
     } catch {
       // Keep the previous revisions; a stale one is reported by the next save as a normal 409.
     }
@@ -649,14 +685,15 @@ export class BuilderState {
   }
 
   setServerErrors(code: string, details?: Record<string, string[]>): void {
-    const msg = this.translateServerError(code);
+    const msg = widgetErrorMessage(new ApiError(422, code, details), this.transloco, 'builder');
     const nextErrors: Partial<Record<StepId, Record<string, string>>> = {};
     let primaryStep: StepId | null = null;
     this._formError.set(null);
 
     // Business 422s send parallel `path`/`code` arrays; DTO 400s send `{ field: [reason] }`.
     const issuePaths = detailIssues(details).map((issue) => issue.path).filter((path) => path.length > 0);
-    const fieldKeys = issuePaths.length > 0 ? issuePaths : Object.keys(details ?? {});
+    const fieldKeys = issuePaths.length > 0 ? issuePaths : Object.keys(details ?? {})
+      .filter((key) => !['_', 'path', 'code', 'max', 'limit'].includes(key));
     if (fieldKeys.length > 0) {
       for (const rawKey of fieldKeys) {
         const mapped = mapDetailFieldToStep(rawKey);
@@ -672,7 +709,7 @@ export class BuilderState {
         primaryStep = mapped.step;
         nextErrors[mapped.step] = { [mapped.field]: msg };
       } else {
-        this._formError.set(msg);
+        this.notify.error(msg);
       }
     }
 
@@ -693,17 +730,18 @@ export class BuilderState {
       clearTimeout(this.previewTimer);
       this.previewTimer = null;
     }
-    this.abortPreviewRequest();
+    this.invalidatePreviewRequest();
 
     const current = this._draft();
     const cat = this._catalog();
     if (current.querySpec.series.length === 0) {
+      this._previewFailure.set(null);
       this._preview.set(EMPTY_VIEW);
       return;
     }
 
-    const controller = new AbortController();
-    this.previewController = controller;
+    const seq = this.previewSeq;
+    this._previewFailure.set(null);
     this._preview.set(LOADING_VIEW);
 
     const viz = defaultVisualizationForDraft(current, cat);
@@ -721,53 +759,34 @@ export class BuilderState {
     const querySpecCopy = structuredClone(current.querySpec);
     const displaySpecCopy = structuredClone(current.displaySpec);
 
-    // The preview waits in the shared run queue; a 429 shows "retrying" and a newer preview aborts it.
-    void retryWhenBusy(
-      () =>
-        queueRun(
-          () =>
-            previewWidget(
-              {
-                name: fallbackName,
-                visualizationType: viz,
-                querySpec: querySpecCopy,
-                displaySpec: displaySpecCopy,
-                filters: querySpecCopy.filters,
-                refresh: true,
-              },
-              controller.signal,
-            ),
-          controller.signal,
-        ),
-      {
-        signal: controller.signal,
-        onRetry: () => {
-          if (this.previewController === controller) this._preview.set({ ...LOADING_VIEW, retrying: true });
-        },
-      },
-    )
+    void previewWidget({
+      name: fallbackName,
+      visualizationType: viz,
+      querySpec: querySpecCopy,
+      displaySpec: displaySpecCopy,
+      filters: querySpecCopy.filters,
+      refresh: true,
+    })
       .then((exec) => {
-        if (controller.signal.aborted || this.previewController !== controller) return;
+        if (seq !== this.previewSeq) return;
         this._preview.set(viewFromRun(exec, exec.panels?.[0]));
       })
       .catch((error: unknown) => {
-        if (controller.signal.aborted || this.previewController !== controller) return;
-        if (error instanceof DOMException && error.name === 'AbortError') return;
+        if (seq !== this.previewSeq) return;
 
         const code = errorCodeOf(error);
         if (
           error instanceof ApiError &&
-          (error.status === 422 || (code && code.startsWith('CRM_WIDGET_')))
+          (error.status === 422 || isValidationError(error))
         ) {
-          this.setServerErrors(
-            error.code,
-            error.details as Record<string, string[]> | undefined,
-          );
+          this.applyValidationError(error);
         }
         const busy = isConcurrencyError(error);
+        if (!(error instanceof ApiError) || ![400, 422].includes(error.status)) {
+          this._previewFailure.set(widgetReadFailure(error, this.transloco, 'builder'));
+        }
         this._preview.set({
-          // 429 after the retries ran out: the busy state ("too many reports are running", with Retry), never an
-          // error or an unavailable metric. The widget body shows busy for ERROR + RUN_CONCURRENCY_CODE.
+          // Heavy reads are retried only by the user's next change or Refresh.
           status: busy ? 'ERROR' : 'UNAVAILABLE',
           execution: null,
           reasonCode: busy ? RUN_CONCURRENCY_CODE : (code ?? 'METRIC_EXECUTION_FAILED'),
@@ -781,7 +800,7 @@ export class BuilderState {
   }
 
   async saveDraft(): Promise<boolean> {
-    if (this._saving()) return false;
+    if (this._saving() || !this.canSave()) return false;
     this._saving.set(true);
 
     try {
@@ -790,7 +809,10 @@ export class BuilderState {
       const sentSnapshot = stableDraftSnapshot(this._draft());
 
       if (!id) {
-        const created = await createWidget(body, newIdempotencyKey());
+        const bodyJson = JSON.stringify(body);
+        if (this.createAction?.bodyJson !== bodyJson) this.createAction = { bodyJson, key: newIdempotencyKey() };
+        const created = await createWidget(body, this.createAction.key);
+        this.createAction = null;
         this.applySavedState(created, sentSnapshot);
         this.notify.success(this.transloco.translate('builder.toasts.draftSaved'));
         this.onCreatedCallback?.(created.widgetId);
@@ -798,7 +820,8 @@ export class BuilderState {
       }
 
       const currentDs = this._draftState();
-      const expectedWidgetRevision = currentDs?.widgetRevision ?? 1;
+      if (!currentDs) return false;
+      const expectedWidgetRevision = currentDs.widgetRevision;
       const expectedDraftId = currentDs?.draft?.draftId ?? null;
       const expectedDraftRevision = currentDs?.draft?.revision ?? 0;
 
@@ -813,31 +836,20 @@ export class BuilderState {
         this.notify.success(this.transloco.translate('builder.toasts.draftSaved'));
         return true;
       } catch (error) {
-        const code = errorCodeOf(error);
-        if (
-          error instanceof ApiError &&
-          error.status === 409 &&
-          (code === 'CRM_WIDGET_DRAFT_CONFLICT' ||
-            code === 'CRM_WIDGET_REVISION_CONFLICT' ||
-            code === 'CRM_WIDGET_DRAFT_BASE_CONFLICT')
-        ) {
+        if (widgetConflict(error)) {
           return await this.handleDraftConflict(id);
         }
         throw error;
       }
     } catch (error) {
-      const code = errorCodeOf(error);
-      if (error instanceof ApiError && error.status === 422) {
-        this.setServerErrors(
-          error.code,
-          error.details as Record<string, string[]> | undefined,
-        );
-        const errStep = this._lastServerErrorStep();
-        if (errStep) this.goToStep(errStep);
-        this.notify.error(this.translateServerError(error.code));
+      if (!isRetryableWriteError(error) && !(error instanceof ApiError && error.status === 401)) this.createAction = null;
+      if (widgetWriteReadOnly(error)) this.lockReadOnly();
+      if (widgetNeedsReload(error)) this._reloadRequired.set(true);
+      if (error instanceof ApiError && (error.status === 422 || isValidationError(error))) {
+        this.applyValidationError(error);
         return false;
       }
-      this.notify.error(this.translateServerError(code));
+      this.notify.error(widgetErrorMessage(error, this.transloco, 'builder', true));
       return false;
     } finally {
       this._saving.set(false);
@@ -848,7 +860,7 @@ export class BuilderState {
     const choice: ConflictChoice = this.conflictResolver ? await this.conflictResolver() : 'reload';
     if (choice === 'reload') {
       await this.load(id, { keepStep: true });
-      this.notify.info(this.transloco.translate('builder.toasts.conflictReloaded'));
+      if (!this.loadError()) this.notify.info(this.transloco.translate('builder.toasts.conflictReloaded'));
       return false;
     }
 
@@ -868,6 +880,7 @@ export class BuilderState {
 
   private buildWidgetBody(): WidgetBody {
     const current = this._draft();
+    const saved = JSON.parse(this._savedSnapshot()) as BuilderDraft;
     const cat = this._catalog();
     const firstKey = current.querySpec.series[0]?.metricKey;
     const firstMetric = firstKey ? cat?.metrics.find((m) => m.key === firstKey) : undefined;
@@ -890,9 +903,10 @@ export class BuilderState {
         ...structuredClone(current.displaySpec),
         title: resolvedName,
       },
-      description: current.description.trim() || null,
-      changeSummary: current.changeSummary?.trim() || null,
-      internalNotes: current.internalNotes?.trim() || null,
+      // Published detail omits notes. Omission keeps server values; only an edited field may clear them.
+      ...(current.description !== saved.description ? { description: current.description.trim() || null } : {}),
+      ...(current.changeSummary !== saved.changeSummary ? { changeSummary: current.changeSummary?.trim() || null } : {}),
+      ...(current.internalNotes !== saved.internalNotes ? { internalNotes: current.internalNotes?.trim() || null } : {}),
     };
   }
 
@@ -903,6 +917,29 @@ export class BuilderState {
     // running. The name, title and chart type that Save falls back to are not written back into
     // it, so they stay open for the user to choose.
     this._savedSnapshot.set(sentSnapshot);
+    if (!this._widget()) void this.refreshWidgetUsage();
+  }
+
+  lockReadOnly(): void {
+    this._writeReadOnly.set(true);
+  }
+
+  applyValidationError(error: ApiError): void {
+    this.setServerErrors(error.code, isValidationError(error) ? fieldErrorsOf(error)
+      : error.details as Record<string, string[]> | undefined);
+    const step = this._lastServerErrorStep();
+    if (step) this.goToStep(step);
+  }
+
+  private async refreshWidgetUsage(): Promise<void> {
+    const id = this._widgetId();
+    if (!id) return;
+    try {
+      const detail = await getWidget(id);
+      if (id === this._widgetId()) this._widget.set(detail);
+    } catch (error) {
+      this.notify.error(widgetErrorMessage(error, this.transloco, 'builder'));
+    }
   }
 
   private revalidateTouched(): void {
@@ -921,10 +958,7 @@ export class BuilderState {
     return this.transloco.translate(errorKey(code));
   }
 
-  private abortPreviewRequest(): void {
-    if (this.previewController) {
-      this.previewController.abort();
-      this.previewController = null;
-    }
+  private invalidatePreviewRequest(): void {
+    this.previewSeq++;
   }
 }

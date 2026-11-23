@@ -14,7 +14,8 @@
       size="bare"
       [for]="uid + '-period'"
       [label]="'dashFilters.period' | transloco"
-      [hint]="'dashFilters.periodHint' | transloco"
+      [hint]="periodHint()"
+      [error]="fieldErrors()['period'] ?? error()"
     >
       <ui-date-range
         [id]="uid + '-period'"
@@ -22,7 +23,7 @@
         [ariaLabel]="'dashFilters.period' | transloco"
         [months]="1"
         [withTime]="false"
-        [today]="fakeNow"
+        [today]="today()"
         [value]="value().period"
         (valueChange)="onPeriodChange($event)"
       />
@@ -33,6 +34,7 @@
       [for]="uid + '-compare'"
       [label]="'dashFilters.compare' | transloco"
       [hint]="'dashFilters.compareHint' | transloco"
+      [error]="fieldErrors()['compare'] ?? null"
     >
       <ui-dropdown
         class="w-full"
@@ -52,6 +54,7 @@
         [for]="uid + '-scope'"
         [label]="'dashFilters.scope' | transloco"
         [hint]="'dashFilters.scopeHint' | transloco"
+        [error]="fieldErrors()['scope'] ?? null"
       >
         <ui-dropdown
           class="w-full"
@@ -73,6 +76,7 @@
         [for]="uid + '-teams'"
         [label]="'dashFilters.teams' | transloco"
         [hint]="'dashFilters.teamsHint' | transloco"
+        [error]="fieldErrors()['teams'] ?? null"
       >
         <div class="relative min-w-0">
           <div #teamsBox [class]="multiBoxClasses('teams')" (click)="openPicker('teams')">
@@ -160,6 +164,7 @@
         [for]="uid + '-branches'"
         [label]="'dashFilters.branches' | transloco"
         [hint]="'dashFilters.branchesHint' | transloco"
+        [error]="fieldErrors()['branches'] ?? null"
       >
         <div class="relative min-w-0">
           <div #branchesBox [class]="multiBoxClasses('branches')" (click)="openPicker('branches')">

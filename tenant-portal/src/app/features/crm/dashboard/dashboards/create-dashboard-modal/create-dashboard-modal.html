@@ -26,6 +26,7 @@
         class="h-full min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
         [placeholder]="'dashLibrary.createModal.namePlaceholder' | transloco"
         [value]="name()"
+        [readOnly]="readOnly() || submitting()"
         (input)="onNameInput(nameInput.value)"
       />
     </ui-field>
@@ -34,7 +35,7 @@
       for="create-dash-desc"
       size="multiline"
       [label]="'dashLibrary.createModal.descriptionLabel' | transloco"
-      [hint]="'dashLibrary.createModal.descriptionHint' | transloco"
+      [hint]="(selectedBlueprint() ? 'dashLibrary.createModal.blueprintDescriptionHint' : 'dashLibrary.createModal.descriptionHint') | transloco"
       [count]="description().length"
       [max]="descriptionMax"
       [error]="descriptionError()"
@@ -47,6 +48,7 @@
         class="min-h-0 w-full flex-1 resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
         [placeholder]="'dashLibrary.createModal.descriptionPlaceholder' | transloco"
         [value]="description()"
+        [readOnly]="readOnly() || submitting() || selectedBlueprint() !== null"
         (input)="onDescriptionInput(descInput.value)"
       ></textarea>
     </ui-field>
@@ -79,6 +81,7 @@
             "
             [attr.aria-checked]="isSelected"
             [tabIndex]="isSelected ? 0 : -1"
+            [disabled]="readOnly() || submitting() || reloadRequired()"
             (click)="selectSource(option.key)"
             (keydown)="onSourceKeydown($event, idx)"
           >
@@ -98,6 +101,20 @@
           </button>
         }
       </div>
+      @if (blueprintsFailure(); as failure) {
+        <div class="flex flex-col items-center gap-8">
+          <ui-full-state
+            [kind]="failure.kind"
+            [title]="(failure.kind === 'provisioning' ? 'dashLibrary.provisioningTitle' : 'dashLibrary.templatesFailedTitle') | transloco"
+            [text]="failure.message + (failure.correlationId ? ('dashLibrary.correlation' | transloco: { id: failure.correlationId }) : '')"
+            [actionLabel]="'analytics.common.retry' | transloco"
+            (action)="reloadPicker()"
+          />
+          @if (failure.kind === 'provisioning' && canViewReadiness) {
+            <a uiButton variant="secondary" routerLink="/crm/settings/data-readiness">{{ 'dashLibrary.readiness' | transloco }}</a>
+          }
+        </div>
+      }
     </ui-field>
 
     @if (selectedBlueprint()?.branchSelectionRequired) {
@@ -106,16 +123,19 @@
         [bare]="true"
         [label]="'dashLibrary.branchLabel' | transloco"
         [hint]="'dashLibrary.branchHint' | transloco"
+        [required]="true"
+        [error]="branchError()"
       >
         <ui-dropdown
           class="w-full"
           id="create-dash-branch"
-          describedBy="create-dash-branch-hint"
+          [describedBy]="branchError() ? 'create-dash-branch-hint create-dash-branch-error' : 'create-dash-branch-hint'"
           size="field"
           [label]="'dashLibrary.branchLabel' | transloco"
           [options]="branchOptions()"
           [value]="selectedBranchId()"
-          (valueChange)="selectedBranchId.set($event)"
+          [disabled]="readOnly() || submitting() || reloadRequired()"
+          (valueChange)="onBranchChange($event)"
         />
       </ui-field>
     }
@@ -127,7 +147,7 @@
       uiButton
       variant="primary"
       [loading]="submitting()"
-      [disabled]="!canSubmit() || submitting()"
+      [disabled]="!canSubmit() || submitting() || pendingTargetsBlueprint() !== null"
       (click)="submit()"
     >
       {{ 'dashLibrary.createModal.create' | transloco }}
@@ -141,8 +161,32 @@
     >
       {{ 'dashLibrary.createModal.cancel' | transloco }}
     </button>
+    @if (reloadRequired()) {
+      <button type="button" uiButton variant="secondary" (click)="reloadPicker()">{{ 'dashLibrary.reload' | transloco }}</button>
+    }
   </div>
 </ui-modal>
+
+<ui-modal
+  #ownerLimitModal
+  size="alert"
+  icon="tablerAlertTriangle"
+  tile="bg-icon-orange"
+  [title]="'dashLibrary.ownerLimitTitle' | transloco"
+  [closeLabel]="'analytics.common.close' | transloco"
+>
+  <p class="text-12 leading-18 text-text">{{ ownerLimitMessage() }}</p>
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    <button type="button" uiButton (click)="ownerLimitModal.close()">{{ 'analytics.common.close' | transloco }}</button>
+  </div>
+</ui-modal>
+
+<ui-conflict-dialog
+  [(open)]="conflictOpen"
+  [recordLabel]="name()"
+  (reload)="reloadAfterConflict(false)"
+  (keepEditing)="reloadAfterConflict(true)"
+/>
 
 <ui-modal
   #targetsModal

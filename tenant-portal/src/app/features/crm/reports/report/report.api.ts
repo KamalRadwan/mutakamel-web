@@ -1,15 +1,12 @@
-import { fakeDelay, fakeDelayFor, raceAbort, withRunSlot } from '../../../../shared/widgets/dashboard/analytics-api';
+import { raceAbort } from '../../../../shared/widgets/dashboard/analytics-api';
+import { newIdempotencyKey } from '../../../../core/api/idempotency';
+import { crmHttp, crmQueries } from '../../shared/crm-http';
+import { getCatalog } from '../../../../shared/widgets/dashboard/analytics.api';
 import { listLeadSources } from '../../settings/lead-sources/lead-sources.api';
 import { listPipelinesForRead } from '../../settings/pipelines/pipelines.api';
 import { listActiveCoreCurrencyCodes } from '../../../../shared/lookups/core-currencies';
-import {
-  buildFakeManifest,
-  buildFakePanelRows,
-  catalogDefaultHeight,
-  executeFakePinPanel,
-  listFakeDashboards,
-} from './report.fake';
-import type { Visualization } from '../../../../shared/widgets/dashboard/analytics.model';
+import { tenantWide } from '../../settings/shared/settings-access';
+import type { Catalog, Visualization } from '../../../../shared/widgets/dashboard/analytics.model';
 import type {
   DashboardListPage,
   DashboardListRow,
@@ -25,18 +22,24 @@ import type {
 
 // GET /api/v1/crm/dashboards/reports/:reportKey/manifest
 export async function getManifest(reportKey: string): Promise<PanelManifest> {
-  await fakeDelay();
-  return structuredClone(buildFakeManifest(reportKey, {}, false));
+  const manifest = await crmQueries().fetchQuery<PanelManifest>({
+    queryKey: ['crm-analytics', 'reports', reportKey, 'manifest'],
+    queryFn: () => crmHttp().read(`/dashboards/reports/${encodeURIComponent(reportKey)}/manifest`),
+    staleTime: 0,
+  });
+  // Layout fallback sizes come from the real catalogue; its failure must not block the report.
+  await getCatalog().catch(() => undefined);
+  return manifest;
 }
 
 // POST /api/v1/crm/dashboards/reports/:reportKey (200)
 export function runReport(reportKey: string, body: ReportRunRequest, signal?: AbortSignal): Promise<PanelManifest> {
-  return withRunSlot(() =>
-    raceAbort(async () => {
-      await fakeDelayFor('run', `${reportKey}:${JSON.stringify(body.panelKeys ?? [])}`);
-      return structuredClone(buildFakeManifest(reportKey, body, true));
-    }, signal),
-  );
+  return raceAbort(() => crmQueries().fetchQuery<PanelManifest>({
+    queryKey: ['crm-analytics', 'reports', reportKey, 'run', body],
+    queryFn: async () => (await crmHttp().write<PanelManifest>('POST',
+      `/dashboards/reports/${encodeURIComponent(reportKey)}`, body, { key: newIdempotencyKey() })).data,
+    staleTime: 0,
+  }), signal);
 }
 
 // POST /api/v1/crm/dashboards/reports/:reportKey/panels/:panelKey/rows (200)
@@ -46,12 +49,13 @@ export function getPanelRows(
   body: PanelRowsRequest = {},
   signal?: AbortSignal,
 ): Promise<PanelRowsPage> {
-  return withRunSlot(() =>
-    raceAbort(async () => {
-      await fakeDelay();
-      return structuredClone(buildFakePanelRows(reportKey, panelKey, body));
-    }, signal),
-  );
+  return raceAbort(() => crmQueries().fetchQuery<PanelRowsPage>({
+    queryKey: ['crm-analytics', 'reports', reportKey, 'rows', panelKey, body],
+    queryFn: async () => (await crmHttp().write<PanelRowsPage>('POST',
+      `/dashboards/reports/${encodeURIComponent(reportKey)}/panels/${encodeURIComponent(panelKey)}/rows`,
+      body, { key: newIdempotencyKey() })).data,
+    staleTime: 0,
+  }), signal);
 }
 
 // POST /api/v1/crm/dashboards/reports/:reportKey/panels/:panelKey/pin (201, header x-idempotency-key)
@@ -61,14 +65,22 @@ export async function pinPanel(
   body: PinPanelRequest,
   key: string,
 ): Promise<PinPanelResponse> {
-  await fakeDelay();
-  return structuredClone(executeFakePinPanel(reportKey, panelKey, body, key));
+  const queries = crmQueries();
+  await queries.cancelQueries({ queryKey: ['crm-analytics'] });
+  const result = await crmHttp().write<PinPanelResponse>('POST',
+    `/dashboards/reports/${encodeURIComponent(reportKey)}/panels/${encodeURIComponent(panelKey)}/pin`,
+    body, { key, ifMatch: String(body.revision) });
+  await queries.invalidateQueries({ queryKey: ['crm-analytics'] });
+  return result.data;
 }
 
 // GET /api/v1/crm/dashboards?kind=DASHBOARD&cursor: cursor rows `{ items, nextCursor }`, each with the caller's accessLevel.
 export async function listDashboards(cursor: string | null = null): Promise<DashboardListPage> {
-  await fakeDelay();
-  return structuredClone(listFakeDashboards(cursor));
+  return crmQueries().fetchQuery({
+    queryKey: ['crm-analytics', 'reports', 'pin-targets', cursor],
+    queryFn: () => crmHttp().read('/dashboards', { kind: 'DASHBOARD', cursor }),
+    staleTime: 0,
+  });
 }
 
 /** Every dashboard row the caller can see, read page by page by cursor. */
@@ -95,7 +107,8 @@ export async function listPinTargets(): Promise<PinTarget[]> {
 
 /** Default catalogue height of a visualization, used only when a panel's manifest carries no layout. */
 export function defaultPanelHeight(kind: Visualization): number {
-  return catalogDefaultHeight(kind);
+  const catalog = crmQueries().getQueryData<Catalog>(['crm-analytics', 'catalog', 'dashboards']);
+  return catalog?.visualizations.find((entry) => entry.key === kind)?.defaultSize.h ?? 46;
 }
 
 /**
@@ -108,7 +121,7 @@ export async function loadReportFilterLookups(): Promise<ReportFilterLookups> {
   const [pipelines, sources, currencies] = await Promise.allSettled([
     listPipelinesForRead(),
     listLeadSources(),
-    listActiveCoreCurrencyCodes(),
+    tenantWide('currencies.currency.read') ? listActiveCoreCurrencyCodes() : Promise.resolve([]),
   ]);
   return {
     pipelines:

@@ -13,6 +13,9 @@ import {
   formatDateTime,
   formatNumber,
 } from '../../../../../shared/ui/chart/chart-format';
+import { ConflictDialog } from '../../../../../shared/ui/conflict-dialog/conflict-dialog';
+import { can } from '../../../../../shared/widgets/dashboard/analytics-permissions';
+import { reportCorrelation, reportWriteError } from '../../schedules/report-errors';
 import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { DataCell, DataTable, type DataColumn } from '../../../../../shared/ui/data-table/data-table';
 import { FullState } from '../../../../../shared/ui/full-state/full-state';
@@ -21,6 +24,7 @@ import { errorKey } from '../../../../../shared/widgets/dashboard/panel-state';
 import {
   cancelExport,
   downloadExport,
+  getExport,
   listExports,
   resolveExportSource,
 } from '../../../../../shared/widgets/dashboard/exports/exports.api';
@@ -31,7 +35,6 @@ import type {
   ExportStatus,
 } from '../../../../../shared/widgets/dashboard/exports/exports.model';
 
-const POLL_INTERVAL_MS = 3000;
 const PAGE_SIZE = 20;
 
 const KNOWN_FAILURE_CODES = new Set<string>([
@@ -70,7 +73,7 @@ function formatBytes(bytes: number | null): string {
 
 @Component({
   selector: 'app-exports-page',
-  imports: [NgIcon, TranslocoPipe, Badge, Button, ConfirmDialog, DataTable, DataCell, FullState],
+  imports: [NgIcon, TranslocoPipe, Badge, Button, ConflictDialog, ConfirmDialog, DataTable, DataCell, FullState],
   providers: [
     provideTranslocoScope(
       { scope: 'crm-rep-exports', alias: 'repExports' },
@@ -91,6 +94,11 @@ export class ExportsPage {
 
   private readonly cancelDialog = viewChild.required<ConfirmDialog>('cancelDialog');
 
+  protected readonly canExport = can('crm.exports.create');
+  protected readonly readOnly = signal(false);
+  protected readonly conflictOpen = signal(false);
+  protected readonly conflictRecord = signal<Export | null>(null);
+  protected readonly loadText = signal('');
   protected readonly exports = signal<Export[]>([]);
   protected readonly nextCursor = signal<string | null>(null);
   protected readonly hasMore = signal(false);
@@ -137,18 +145,17 @@ export class ExportsPage {
 
   private destroyed = false;
   private loadSeq = 0;
-  private pollTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     this.destroyRef.onDestroy(() => {
       this.destroyed = true;
-      this.clearPoll();
     });
     void this.load();
   }
 
   protected async load(): Promise<void> {
-    this.clearPoll();
+    if (!this.canExport) { this.loadError.set('forbidden'); return; }
+    this.readOnly.set(false);
     const seq = ++this.loadSeq;
     this.loading.set(true);
     this.loadError.set(null);
@@ -158,11 +165,11 @@ export class ExportsPage {
       this.applyFirstPage(page);
     } catch (error) {
       if (this.destroyed || seq !== this.loadSeq) return;
+      this.loadText.set(reportCorrelation(error, this.transloco, 'repExports'));
       this.loadError.set(error instanceof ApiError && error.status === 403 ? 'forbidden' : 'load-failure');
     } finally {
       if (!this.destroyed && seq === this.loadSeq) {
         this.loading.set(false);
-        this.schedulePollIfActive();
       }
     }
   }
@@ -181,7 +188,6 @@ export class ExportsPage {
       this.nextCursor.set(page.pageInfo.nextCursor);
       this.hasMore.set(page.pageInfo.hasMore);
       this.capabilities.set(page.capabilities);
-      this.schedulePollIfActive();
     } catch (error) {
       if (!this.destroyed) {
         this.notify.error(this.transloco.translate(errorKey(errorCodeOf(error))));
@@ -225,7 +231,7 @@ export class ExportsPage {
   }
 
   protected async download(row: Export): Promise<void> {
-    if (row.status !== 'SUCCEEDED' || this.downloadingId() === row.id) return;
+    if (!this.canExport || row.status !== 'SUCCEEDED' || this.downloadingId() === row.id) return;
     this.downloadingId.set(row.id);
     try {
       const blob = await downloadExport(row.id);
@@ -234,9 +240,7 @@ export class ExportsPage {
       try {
         const link = document.createElement('a');
         link.href = url;
-        // Phase 5: the backend sends the real name in Content-Disposition
-        // (`<reportKey|dashboard-xxxxxxxx>_<from>_<to>.<ext>`); use it instead of this fake-data fallback.
-        link.download = `export-${row.id}.${row.format.toLowerCase()}`;
+        link.download = blob instanceof File ? blob.name : `export-${row.id}.${row.format.toLowerCase()}`;
         document.body.appendChild(link);
         link.click();
         link.remove();
@@ -258,7 +262,7 @@ export class ExportsPage {
   }
 
   protected async requestCancel(row: Export): Promise<void> {
-    if ((row.status !== 'QUEUED' && row.status !== 'RUNNING') || this.cancellingId()) return;
+    if (!this.canExport || this.readOnly() || (row.status !== 'QUEUED' && row.status !== 'RUNNING') || this.cancellingId()) return;
     const confirmed = await this.cancelDialog().open();
     if (!confirmed || this.destroyed) return;
 
@@ -268,12 +272,16 @@ export class ExportsPage {
       if (this.destroyed) return;
       this.exports.update((list) => list.map((item) => (item.id === updated.id ? updated : item)));
       this.notify.success(this.transloco.translate('repExports.cancelledToast'));
-      this.schedulePollIfActive();
     } catch (error) {
       if (this.destroyed) return;
       const code = errorCodeOf(error);
-      this.notify.error(this.transloco.translate(errorKey(code)));
-      if (code === 'CRM_EXPORT_REVISION_STALE' || code === 'CRM_EXPORT_NOT_CANCELLABLE') {
+      const state = reportWriteError(error, this.transloco, 'repExports');
+      if (state.readOnly) this.readOnly.set(true);
+      if (state.conflict) {
+        this.conflictRecord.set(row);
+        this.conflictOpen.set(true);
+      } else this.notify.error(state.message);
+      if (state.reloadRequired || code === 'CRM_EXPORT_NOT_CANCELLABLE') {
         void this.refreshSilently();
       }
     } finally {
@@ -290,27 +298,15 @@ export class ExportsPage {
     this.capabilities.set(page.capabilities);
   }
 
-  private schedulePollIfActive(): void {
-    this.clearPoll();
-    if (this.destroyed || this.loadError()) return;
-    const hasActive = this.exports().some((row) => row.status === 'QUEUED' || row.status === 'RUNNING');
-    if (!hasActive) return;
-    this.pollTimer = setTimeout(() => {
-      void this.poll();
-    }, POLL_INTERVAL_MS);
-  }
-
-  private clearPoll(): void {
-    if (this.pollTimer !== null) {
-      clearTimeout(this.pollTimer);
-      this.pollTimer = null;
+  protected async resolveConflict(): Promise<void> {
+    const row = this.conflictRecord();
+    if (!row) return;
+    try {
+      const latest = await getExport(row.id);
+      this.exports.update((rows) => rows.map((item) => item.id === latest.id ? latest : item));
+    } catch (error) {
+      this.notify.error(this.transloco.translate(errorKey(errorCodeOf(error))));
     }
-  }
-
-  private async poll(): Promise<void> {
-    this.pollTimer = null;
-    if (this.destroyed || this.loading()) return;
-    await this.refreshSilently();
   }
 
   private async refreshSilently(): Promise<void> {
@@ -321,11 +317,7 @@ export class ExportsPage {
       if (this.destroyed || seq !== this.loadSeq) return;
       this.applyFirstPage(page);
     } catch {
-      // Keep current list on background poll errors; next tick retries while active rows remain.
-    } finally {
-      if (!this.destroyed) {
-        this.schedulePollIfActive();
-      }
+      this.notify.error(this.transloco.translate('analytics.common.loadFailed'));
     }
   }
 }

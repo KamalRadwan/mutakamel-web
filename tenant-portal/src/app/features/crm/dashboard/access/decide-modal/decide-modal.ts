@@ -1,20 +1,19 @@
+import { accessMessage, accessMismatch, accessReadOnly, accessValidation } from '../access-errors';
+import { ConflictDialog } from '../../../../../shared/ui/conflict-dialog/conflict-dialog';
+import { can } from '../../../../../shared/widgets/dashboard/analytics-permissions';
 import { Component, computed, inject, output, signal, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
-import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
+import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   tablerClipboardCheck,
-  tablerLayoutDashboard,
-  tablerPuzzle,
   tablerX,
 } from '@ng-icons/tabler-icons';
 import { addDays } from 'date-fns';
 import { LanguageState } from '../../../../../core/i18n/language';
 import { Notify } from '../../../../../core/notify/notify';
-import { Badge } from '../../../../../shared/ui/badge/badge';
 import { Button } from '../../../../../shared/ui/button/button';
 import { formatDate } from '../../../../../shared/ui/chart/chart-format';
-import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { DateField } from '../../../../../shared/ui/date-time/date-field';
 import { Dropdown, DropdownOption } from '../../../../../shared/ui/dropdown/dropdown';
 import { Field } from '../../../../../shared/ui/field/field';
@@ -24,7 +23,6 @@ import {
   errorCodeOf,
 } from '../../../../../shared/widgets/dashboard/analytics-api';
 import { errorDetailField } from '../../shared/api-error-details';
-import { errorKey } from '../../../../../shared/widgets/dashboard/panel-state';
 import {
   decideAccessRequest,
   getAccessRequest,
@@ -46,20 +44,18 @@ function formatIsoDay(date: Date): string {
   imports: [
     NgIcon,
     TranslocoPipe,
-    Badge,
     Button,
-    ConfirmDialog,
+    ConflictDialog,
     DateField,
     Dropdown,
     Field,
     Modal,
     Segmented,
   ],
+  viewProviders: [provideTranslocoScope({ scope: 'crm-access', alias: 'access' }, { scope: 'analytics', alias: 'analytics' })],
   providers: [
     provideIcons({
       tablerClipboardCheck,
-      tablerLayoutDashboard,
-      tablerPuzzle,
       tablerX,
     }),
   ],
@@ -71,7 +67,9 @@ export class DecideModal {
   protected readonly uid = `access-decide-${++DecideModal.nextId}`;
 
   private readonly modal = viewChild.required(Modal);
-  private readonly conflictDialog = viewChild.required<ConfirmDialog>('conflictDialog');
+  protected readonly conflictOpen = signal(false);
+  protected readonly readOnly = signal(false);
+  readonly readOnlyChange = output<boolean>();
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
@@ -96,8 +94,8 @@ export class DecideModal {
     this.i18n();
     this.language();
     return [
-      { value: 'APPROVED', label: this.transloco.translate('access.decide.approve') },
-      { value: 'REJECTED', label: this.transloco.translate('access.decide.reject') },
+      { value: 'APPROVED', disabled: this.readOnly(), label: this.transloco.translate('access.decide.approve') },
+      { value: 'REJECTED', disabled: this.readOnly(), label: this.transloco.translate('access.decide.reject') },
     ];
   });
 
@@ -154,6 +152,7 @@ export class DecideModal {
   protected readonly expiresError = computed<string | null>(() => this.serverExpiresError());
 
   open(request: AccessRequest): void {
+    if (!can('crm.dashboards.share')) return;
     this.request.set(request);
     this.decision.set('APPROVED');
     this.grantedLevel.set(request.requestedLevel);
@@ -193,6 +192,7 @@ export class DecideModal {
   }
 
   protected clearExpires(): void {
+    if (this.readOnly()) return;
     this.grantedExpiresAt.set(null);
     this.serverExpiresError.set(null);
   }
@@ -204,7 +204,7 @@ export class DecideModal {
 
   protected async submit(): Promise<void> {
     const req = this.request();
-    if (!req || this.submitting()) return;
+    if (!req || req.status !== 'PENDING' || this.submitting() || this.readOnly() || !can('crm.dashboards.share')) return;
 
     this.submitted.set(true);
     this.clearServerErrors();
@@ -241,38 +241,26 @@ export class DecideModal {
   }
 
   private async handleSubmitError(error: unknown, current: AccessRequest): Promise<void> {
+    if (accessReadOnly(error) || accessMismatch(error)) {
+      this.readOnly.set(true);
+      this.readOnlyChange.emit(true);
+    }
     const code = errorCodeOf(error);
     if (code === 'CRM_ACCESS_REQUEST_EXPIRED') {
-      this.notify.warning(this.transloco.translate(errorKey(code)));
+      this.notify.warning(accessMessage(this.transloco, error));
       this.close();
       this.decided.emit(null);
       return;
     }
 
-    if (code === 'CRM_ACCESS_REQUEST_REVISION_STALE') {
-      // Esc and Cancel resolve to false: keep the user's input, refresh only the revision.
-      const reload = await this.conflictDialog().open();
-      try {
-        const fresh = await getAccessRequest(current.id);
-        if (fresh.status !== 'PENDING') {
-          this.notify.warning(this.transloco.translate(errorKey(code)));
-          this.close();
-          this.decided.emit(null);
-          return;
-        }
-        this.request.set(fresh);
-        if (reload) this.grantedLevel.set(fresh.requestedLevel);
-        this.decided.emit(fresh);
-      } catch {
-        this.notify.error(this.transloco.translate(errorKey(null)));
-        this.close();
-        this.decided.emit(null);
-      }
+    if (error instanceof Error && code && /_(STALE|CONFLICT)$/.test(code)) {
+      this.conflictOpen.set(true);
       return;
     }
 
+    if (accessValidation(this.transloco, error, { grantedLevel: this.serverGrantedError, grantedExpiresAt: this.serverExpiresError, note: this.serverNoteError })) return;
     const field = errorDetailField(error);
-    const message = this.transloco.translate(errorKey(code));
+    const message = accessMessage(this.transloco, error);
 
     if (field === 'note' || code === 'CRM_ACCESS_REQUEST_NOTE_REQUIRED') {
       this.serverNoteError.set(message);
@@ -288,6 +276,19 @@ export class DecideModal {
     }
 
     this.notify.error(message);
+  }
+
+  protected async resolveConflict(reload: boolean): Promise<void> {
+    this.conflictOpen.set(false);
+    const current = this.request();
+    if (!current) return;
+    try {
+      const fresh = await getAccessRequest(current.id);
+      if (reload) this.open(fresh);
+      else this.request.set({ ...current, revision: fresh.revision, status: fresh.status });
+      if (fresh.status !== 'PENDING') this.readOnly.set(true);
+      this.decided.emit(fresh);
+    } catch (error) { this.notify.error(accessMessage(this.transloco, error)); }
   }
 
   private clearServerErrors(): void {

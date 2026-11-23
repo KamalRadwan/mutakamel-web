@@ -31,7 +31,7 @@ interface SwitcherPlace {
 @Component({
   selector: 'app-dashboard-switcher',
   imports: [RouterLink, NgIcon, TranslocoPipe, Button, Badge],
-  providers: [
+  viewProviders: [
     provideTranslocoScope({ scope: 'crm-dash-page', alias: 'dashPage' }),
     provideIcons({ tablerChevronDown, tablerSearch, tablerCheck, tablerStarFill }),
   ],

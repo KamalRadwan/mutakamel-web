@@ -5,6 +5,9 @@
     <h1 class="min-w-0 truncate text-16 leading-24 font-medium text-text">
       {{ 'dashFilters.recordsBehind' | transloco: { title: widgetTitle() } }}
     </h1>
+    <button uiButton variant="secondary" [disabled]="loading()" (click)="onRefresh()">
+      {{ 'dashFilters.refresh' | transloco }}
+    </button>
 
     @if (filterChips().length > 0) {
       <div class="flex flex-wrap items-center gap-6">
@@ -20,18 +23,30 @@
   <ui-full-state
     [kind]="err.kind"
     [title]="err.titleKey | transloco"
-    [text]="err.textKey | transloco"
-    [actionLabel]="(err.retryable ? 'analytics.common.retry' : 'dashFilters.backToDashboard') | transloco"
+    [text]="err.message ?? (err.textKey | transloco)"
+    [actionLabel]="(err.kind === 'provisioning' && canViewReadiness ? 'dashFilters.openReadiness' : err.retryable ? 'analytics.common.retry' : 'dashFilters.backToDashboard') | transloco"
     (action)="onErrorAction()"
   />
+} @else if (needsCurrency()) {
+  <ui-field
+    for="drill-currency"
+    [label]="'dashFilters.currency' | transloco"
+    [hint]="currencyHint()"
+    [error]="'analytics.error.CRM_DASHBOARD_DRILLDOWN_CURRENCY_REQUIRED' | transloco"
+  >
+    <ui-dropdown
+      id="drill-currency"
+      size="field"
+      [label]="'dashFilters.currency' | transloco"
+      describedBy="drill-currency-hint drill-currency-error"
+      [options]="currencyOptions()"
+      [disabled]="loading() || currencyOptions().length === 0"
+      [value]="null"
+      (valueChange)="onCurrencyChange($event)"
+    />
+  </ui-field>
 } @else {
   <div class="flex min-h-0 flex-1 flex-col gap-8">
-    <!-- Always rendered so the live region persists; out of the layout (sr-only) while it is empty. -->
-    <p role="status" class="text-12 leading-16 text-text-muted" [class.sr-only]="!retrying()">
-      @if (retrying()) {
-        {{ 'analytics.common.retrying' | transloco }}
-      }
-    </p>
     <ui-data-table
       [columns]="columns()"
       [rows]="records()"

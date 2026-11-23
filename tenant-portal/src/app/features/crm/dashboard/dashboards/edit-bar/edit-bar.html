@@ -11,7 +11,7 @@
     size="small"
     class="shrink-0"
     [loading]="saving()"
-    [disabled]="!dirty() || saving()"
+    [disabled]="readOnly() || !dirty() || saving()"
     (click)="save.emit()"
   >
     {{ 'dashEdit.saveLayout' | transloco }}
@@ -23,7 +23,7 @@
     variant="secondary"
     size="small"
     class="shrink-0"
-    [disabled]="!canUndo() || saving()"
+    [disabled]="readOnly() || !canUndo() || saving()"
     (click)="undo.emit()"
   >
     <ng-icon name="tablerArrowBackUp" size="14" class="rtl:-scale-x-100" aria-hidden="true" />

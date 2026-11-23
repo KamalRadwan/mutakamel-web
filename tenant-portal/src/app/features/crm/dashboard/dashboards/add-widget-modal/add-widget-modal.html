@@ -34,12 +34,17 @@
         <span class="sr-only" role="status">{{ 'dashEdit.loading' | transloco }}</span>
       </div>
     } @else if (loadFailed()) {
-      <div class="flex flex-col items-center justify-center gap-8 py-8 text-center">
-        <p class="text-12 leading-18 text-text-muted">{{ 'analytics.common.loadFailed' | transloco }}</p>
-        <button type="button" uiButton variant="secondary" size="small" (click)="retryLoad()">
-          {{ 'analytics.common.retry' | transloco }}
-        </button>
-      </div>
+      <ui-full-state
+        [kind]="loadFailure()?.kind ?? 'load-failure'"
+        [title]="'dashEdit.loadFailed' | transloco"
+        [text]="loadFailure()?.message ?? ''"
+        [actionLabel]="
+          loadFailure()?.kind === 'provisioning' && canViewReadiness
+            ? ('dashEdit.openReadiness' | transloco)
+            : ('analytics.common.retry' | transloco)
+        "
+        (action)="onReadAction()"
+      />
     } @else if (items().length === 0) {
       <div class="flex items-center justify-center py-8 text-12 leading-18 text-text-muted">
         {{ 'analytics.common.noResults' | transloco }}
@@ -80,7 +85,9 @@
             </span>
 
             <span class="flex min-w-0 flex-1 flex-col">
-              <span class="truncate text-12 leading-16 font-medium" dir="auto">{{ widget.name }}</span>
+              <span class="truncate text-12 leading-16 font-medium" dir="auto">{{
+                widget.name
+              }}</span>
               <span class="truncate text-11 leading-16 text-text-muted">
                 {{ 'analytics.visualization.' + widget.visualizationType | transloco }}
               </span>
@@ -95,7 +102,12 @@
             @if (used) {
               <ui-badge tone="tag">{{ 'dashEdit.added' | transloco }}</ui-badge>
             } @else if (selected) {
-              <ng-icon name="tablerCheck" size="14" class="shrink-0 text-brand-text" aria-hidden="true" />
+              <ng-icon
+                name="tablerCheck"
+                size="14"
+                class="shrink-0 text-brand-text"
+                aria-hidden="true"
+              />
             }
           </button>
         }
@@ -148,13 +160,7 @@
       {{ 'dashEdit.add' | transloco }}
     </button>
 
-    <button
-      type="button"
-      uiButton
-      variant="secondary"
-      [disabled]="submitting()"
-      (click)="cancel()"
-    >
+    <button type="button" uiButton variant="secondary" [disabled]="submitting()" (click)="cancel()">
       {{ 'dashEdit.cancel' | transloco }}
     </button>
   </div>

@@ -12,12 +12,12 @@ import {
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
+  tablerAlertTriangle,
   tablerCopy,
   tablerEye,
-  tablerFilter,
   tablerLayoutDashboard,
   tablerLayoutGrid,
   tablerPlus,
@@ -47,9 +47,13 @@ import { FullState } from '../../../../../shared/ui/full-state/full-state';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { TabItem, Tabs, tabButtonId, tabPanelId } from '../../../../../shared/ui/tabs/tabs';
 import { ViewOption, ViewSwitcher } from '../../../../../shared/ui/view-switcher/view-switcher';
-import { ApiError, errorCodeOf, newIdempotencyKey } from '../../../../../shared/widgets/dashboard/analytics-api';
+import { ApiError, errorCodeOf } from '../../../../../shared/widgets/dashboard/analytics-api';
 import { can, scopeLevels } from '../../../../../shared/widgets/dashboard/analytics-permissions';
-import { FAKE_BRANCHES } from '../../../../../shared/widgets/dashboard/fake/fake-org';
+import { TenantScopeState } from '../../../../../core/scope/tenant-scope';
+import { newIdempotencyKey } from '../../../../../core/api/idempotency';
+import { OrgApi, type OrgBranch } from '../../../../../shared/widgets/dashboard/org.api';
+import { ConflictDialog } from '../../../../../shared/ui/conflict-dialog/conflict-dialog';
+import { libraryFailure, libraryWriteIntent, keepLibraryWriteIntent, type LibraryWriteIntent } from './library-write';
 import { errorKey } from '../../../../../shared/widgets/dashboard/panel-state';
 import { ShareApi, ShareModal } from '../../shared/share-modal/share-modal';
 import { CreateDashboardModal } from '../create-dashboard-modal/create-dashboard-modal';
@@ -75,9 +79,8 @@ import { selectScopeTranslation } from '../../../../../shared/widgets/dashboard/
 
 type LibraryTab = 'all' | 'mine' | 'shared' | 'templates';
 type LibraryView = 'table' | 'cards';
-type KindFilter = 'ALL' | 'DASHBOARD' | 'REPORT';
 
-const PAGE_LIMIT = 20;
+const PAGE_LIMIT = 50;
 
 @Component({
   selector: 'app-dashboards-page',
@@ -86,8 +89,10 @@ const PAGE_LIMIT = 20;
     TranslocoPipe,
     Button,
     Badge,
-    Dropdown,
     ViewSwitcher,
+    Dropdown,
+    RouterLink,
+    ConflictDialog,
     Tabs,
     DataTable,
     DataCell,
@@ -106,13 +111,13 @@ const PAGE_LIMIT = 20;
       { scope: 'analytics', alias: 'analytics' },
     ),
     provideIcons({
+      tablerAlertTriangle,
       tablerPlus,
       tablerSearch,
       tablerX,
       tablerStar,
       tablerStarFill,
-      tablerFilter,
-      tablerLayoutGrid,
+          tablerLayoutGrid,
       tablerTable,
       tablerLayoutDashboard,
       tablerUsers,
@@ -131,6 +136,8 @@ export class DashboardsPage {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly notify = inject(Notify);
+  private readonly scope = inject(TenantScopeState);
+  private readonly org = inject(OrgApi);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly libraryScope = toSignal(selectScopeTranslation(this.transloco, 'crm-dash-library', 'dashLibrary'));
@@ -141,6 +148,7 @@ export class DashboardsPage {
   private readonly shareModal = viewChild.required(ShareModal);
   private readonly confirmDeleteDialog = viewChild.required<ConfirmDialog>('deleteConfirm');
   private readonly targetsModal = viewChild.required<Modal>('targetsModal');
+  private readonly ownerLimitModal = viewChild.required<Modal>('ownerLimitModal');
 
   protected readonly tabButtonId = tabButtonId;
   protected readonly tabPanelId = tabPanelId;
@@ -149,6 +157,16 @@ export class DashboardsPage {
 
   protected readonly canRead = can('crm.dashboards.read');
   protected readonly canCreate = can('crm.dashboards.create');
+  protected readonly canUseTemplates = this.canCreate && can('crm.widgets.create');
+  protected readonly canViewReadiness = can('crm.analytics.readiness.view');
+  protected readonly readOnly = signal(false);
+  protected readonly reloadRequired = signal(false);
+  protected readonly activeWrite = signal<string | null>(null);
+  protected readonly conflictOpen = signal(false);
+  protected readonly ownerLimitMessage = signal('');
+  protected readonly branchError = signal<string | null>(null);
+  protected readonly branches = signal<readonly OrgBranch[]>([]);
+  private readonly pendingWrites = new Map<string, LibraryWriteIntent>();
   protected readonly canShare = can('crm.dashboards.share');
   protected readonly canDelete = can('crm.dashboards.delete');
 
@@ -156,7 +174,6 @@ export class DashboardsPage {
   private blueprintsLoadSeq = 0;
   private sharingDashboardId: string | null = null;
   private readonly detailRequested = new Set<string>();
-  private readonly shareCountRequested = new Set<string>();
 
   protected readonly activeTab = linkedSignal<string | null, LibraryTab>({
     source: () => this.queryParams()?.get('tab') ?? null,
@@ -176,7 +193,6 @@ export class DashboardsPage {
 
   protected readonly searchQuery = signal('');
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
-  protected readonly kindFilter = signal<KindFilter>('ALL');
   protected readonly favoritesOnly = signal(false);
   protected readonly tableSort = signal<DataSort | null>(null);
 
@@ -184,11 +200,11 @@ export class DashboardsPage {
   protected readonly nextCursor = signal<string | null>(null);
   protected readonly loadingDashboards = signal(true);
   protected readonly loadingMore = signal(false);
-  protected readonly dashboardsError = signal<'forbidden' | 'load-failure' | null>(null);
+  protected readonly dashboardsError = signal<ReturnType<typeof libraryFailure> | null>(null);
 
   protected readonly blueprints = signal<BlueprintItem[]>([]);
   protected readonly loadingBlueprints = signal(true);
-  protected readonly blueprintsError = signal<'forbidden' | 'load-failure' | null>(null);
+  protected readonly blueprintsError = signal<ReturnType<typeof libraryFailure> | null>(null);
 
   protected readonly detailCache = signal<Record<string, DashboardDetail>>({});
   protected readonly shareCounts = signal<Record<string, number | 'unavailable'>>({});
@@ -196,17 +212,7 @@ export class DashboardsPage {
   protected readonly deletingName = signal('');
   protected readonly adoptingKey = signal<string | null>(null);
   protected readonly pendingTemplate = signal<BlueprintItem | null>(null);
-  protected readonly templateBranchId = signal<string>(FAKE_BRANCHES[0]?.id ?? '');
-
-  protected readonly kindOptions = computed<DropdownOption<KindFilter>[]>(() => {
-    this.i18n();
-    this.libraryScope();
-    return [
-      { value: 'ALL', label: this.transloco.translate('dashLibrary.kind.all') },
-      { value: 'DASHBOARD', label: this.transloco.translate('dashLibrary.kind.dashboards') },
-      { value: 'REPORT', label: this.transloco.translate('dashLibrary.kind.reportTemplates') },
-    ];
-  });
+  protected readonly templateBranchId = signal<string>('');
 
   protected readonly viewOptions = computed<ViewOption[]>(() => {
     this.i18n();
@@ -218,34 +224,23 @@ export class DashboardsPage {
   });
 
   protected readonly branchOptions = computed<DropdownOption<string>[]>(() => {
+    this.i18n();
+    this.libraryScope();
     const lang = this.language();
-    return FAKE_BRANCHES.map((branch) => ({
+    const options = this.branches().map((branch) => ({
       value: branch.id,
       label: lang === 'ar' ? branch.name.ar : branch.name.en,
     }));
-  });
-
-  private readonly kindFilteredDashboards = computed<DashboardSummary[]>(() => {
-    const kind = this.activeTab() === 'all' ? this.kindFilter() : 'ALL';
-    const list = this.dashboards();
-    return kind === 'ALL' ? list : list.filter((item) => item.kind === kind);
-  });
-
-  private readonly searchMatchedDashboards = computed<DashboardSummary[]>(() => {
-    const q = this.searchQuery().trim().toLowerCase();
-    const list = this.kindFilteredDashboards();
-    if (!q) return list;
-    return list.filter((item) => {
-      const name = item.name.toLowerCase();
-      const desc = (item.description ?? '').toLowerCase();
-      const owner = (item.ownerName ?? '').toLowerCase();
-      return name.includes(q) || desc.includes(q) || owner.includes(q);
-    });
+    const current = this.scope.selection()?.branchId;
+    if (current && !options.some((option) => option.value === current)) {
+      options.unshift({ value: current, label: this.transloco.translate('dashLibrary.currentBranch') });
+    }
+    return options;
   });
 
   private readonly filteredDashboards = computed<DashboardSummary[]>(() => {
     const favOnly = this.favoritesOnly();
-    const list = this.searchMatchedDashboards();
+    const list = this.dashboards();
     return favOnly ? list.filter((item) => item.isFavorite) : list;
   });
 
@@ -275,57 +270,35 @@ export class DashboardsPage {
     });
   });
 
-  protected readonly favouriteCount = computed<number>(() => {
-    return this.searchMatchedDashboards().filter(
-      (item) => (item.accessLevel === 'OWNER' || item.isShared) && item.isFavorite,
-    ).length;
-  });
-
-  /** Tab counters come from the unfiltered list: search, kind and favourites filters never change them. */
-  private readonly tabCounts = computed(() => {
-    const list = this.dashboards();
-    return {
-      all: list.length,
-      mine: list.filter((item) => item.kind === 'DASHBOARD' && item.accessLevel === 'OWNER').length,
-      shared: list.filter((item) => item.kind === 'DASHBOARD' && item.accessLevel !== 'OWNER' && item.isShared).length,
-      templates: this.blueprints().length,
-    };
-  });
-
   protected readonly tabs = computed<TabItem[]>(() => {
     this.i18n();
     this.libraryScope();
-    const counts = this.tabCounts();
     return [
       {
         id: 'all',
         label: this.transloco.translate('dashLibrary.tabs.all'),
         icon: 'tablerLayoutDashboard',
         color: 'text-icon-violet',
-        count: counts.all,
       },
       {
         id: 'mine',
         label: this.transloco.translate('dashLibrary.tabs.mine'),
         icon: 'tablerLayoutDashboard',
         color: 'text-icon-navy',
-        count: counts.mine,
       },
       {
         id: 'shared',
         label: this.transloco.translate('dashLibrary.tabs.shared'),
         icon: 'tablerUsers',
         color: 'text-icon-blue',
-        count: counts.shared,
       },
       {
         id: 'templates',
         label: this.transloco.translate('dashLibrary.tabs.templates'),
         icon: 'tablerTemplate',
         color: 'text-icon-teal',
-        count: counts.templates,
       },
-    ];
+    ].filter((tab) => tab.id !== 'templates' || this.canUseTemplates);
   });
 
   protected readonly visibleDashboards = computed<DashboardSummary[]>(() => {
@@ -399,7 +372,6 @@ export class DashboardsPage {
   protected readonly hasActiveFilters = computed(
     () =>
       this.searchQuery().trim().length > 0 ||
-      (this.activeTab() === 'all' && this.kindFilter() !== 'ALL') ||
       this.favoritesOnly(),
   );
 
@@ -431,17 +403,8 @@ export class DashboardsPage {
     if (this.canRead) {
       void this.loadDashboards(true);
       void this.loadBlueprints();
+      if (this.canUseTemplates) void this.loadBranches();
     }
-
-    effect(() => {
-      const tab = this.activeTab();
-      if (tab !== 'all' && untracked(() => this.kindFilter()) !== 'ALL') {
-        untracked(() => {
-          this.kindFilter.set('ALL');
-          void this.loadDashboards(true);
-        });
-      }
-    });
 
     effect(() => {
       if (!this.canRead || destroyed) return;
@@ -456,31 +419,12 @@ export class DashboardsPage {
       }
     });
 
-    effect(() => {
-      if (!this.canRead || destroyed) return;
-      if (this.activeTab() === 'templates') return;
-      const items = this.visibleDashboards();
-      const counts = untracked(() => this.shareCounts());
-      const missingIds = items
-        .filter((item) => item.isShared && counts[item.id] === undefined && !this.shareCountRequested.has(item.id))
-        .map((item) => item.id);
-      if (missingIds.length > 0) {
-        untracked(() => this.fetchShareCounts(missingIds));
-      }
-    });
   }
 
   protected setTab(next: string): void {
     if (next !== 'all' && next !== 'mine' && next !== 'shared' && next !== 'templates') return;
     if (next === this.activeTab()) return;
-    const shouldResetKind = next !== 'all' && this.kindFilter() !== 'ALL';
-    if (shouldResetKind) {
-      this.kindFilter.set('ALL');
-    }
     this.activeTab.set(next);
-    if (shouldResetKind) {
-      void this.loadDashboards(true);
-    }
     void this.router.navigate([], {
       relativeTo: this.route,
       queryParams: { tab: next === 'mine' ? null : next },
@@ -499,12 +443,6 @@ export class DashboardsPage {
     });
   }
 
-  protected onKindChange(next: KindFilter): void {
-    if (this.activeTab() !== 'all' || next === this.kindFilter()) return;
-    this.kindFilter.set(next);
-    void this.loadDashboards(true);
-  }
-
   protected toggleFavourites(): void {
     this.favoritesOnly.update((on) => !on);
   }
@@ -521,14 +459,18 @@ export class DashboardsPage {
 
   private scheduleSearchReload(delay: number): void {
     if (this.searchTimer) clearTimeout(this.searchTimer);
+    this.dashboardsLoadSeq++;
+    this.loadingMore.set(false);
+    this.loadingDashboards.set(true);
+    this.dashboardsError.set(null);
     this.searchTimer = setTimeout(() => {
       this.searchTimer = null;
-      void this.loadDashboards(false);
+      void this.loadDashboards(true);
     }, delay);
   }
 
   protected async openCreate(): Promise<void> {
-    if (!this.canCreate) return;
+    if (!this.canCreate || this.readOnly() || this.reloadRequired()) return;
     const modal = this.createModal();
     const createdId = await modal.open();
     if (!createdId) return;
@@ -552,11 +494,12 @@ export class DashboardsPage {
   }
 
   protected async useBlueprint(bp: BlueprintItem): Promise<void> {
-    if (!this.canCreate || this.adoptingKey()) return;
+    if (!this.canUseTemplates || this.readOnly() || this.reloadRequired() || this.adoptingKey()) return;
 
     if (bp.targets.length > 0 || bp.branchSelectionRequired) {
       this.pendingTemplate.set(bp);
-      this.templateBranchId.set(FAKE_BRANCHES[0]?.id ?? '');
+      this.branchError.set(null);
+      this.templateBranchId.set(this.scope.selection()?.branchId ?? this.branchOptions()[0]?.value ?? '');
       this.targetsModal().open();
       return;
     }
@@ -568,6 +511,10 @@ export class DashboardsPage {
     const bp = this.pendingTemplate();
     if (!bp || this.adoptingKey()) return;
     const branchId = bp.branchSelectionRequired ? this.templateBranchId() : undefined;
+    if (bp.branchSelectionRequired && !this.branchOptions().some((b) => b.value === branchId)) {
+      this.branchError.set(this.transloco.translate('dashLibrary.branchRequired'));
+      return;
+    }
     const adopted = await this.performAdopt(bp, branchId);
     if (adopted) {
       this.pendingTemplate.set(null);
@@ -591,21 +538,17 @@ export class DashboardsPage {
   }
 
   protected async toggleFavorite(item: DashboardSummary): Promise<void> {
-    const nextFav = !item.isFavorite;
-    try {
-      const updated = await setFavoriteDashboard(item.id, nextFav, newIdempotencyKey());
-      this.patchDashboard(updated);
-      this.notify.success(
-        this.transloco.translate(
-          updated.isFavorite ? 'dashLibrary.toast.favourited' : 'dashLibrary.toast.unfavourited',
-        ),
-      );
-    } catch (error) {
-      this.notify.error(this.translateError(errorCodeOf(error)));
-    }
+    const updated = await this.writeAction(`favorite:${item.id}`, { id: item.id, favorite: !item.isFavorite },
+      (key) => setFavoriteDashboard(item.id, !item.isFavorite, key));
+    if (!updated) return;
+    this.patchDashboard(updated);
+    this.notify.success(this.transloco.translate(
+      updated.isFavorite ? 'dashLibrary.toast.favourited' : 'dashLibrary.toast.unfavourited',
+    ));
   }
 
   protected onAction(item: DashboardSummary, selection: ActionSelection): void {
+    if (selection.id !== 'open' && (this.readOnly() || this.reloadRequired() || this.activeWrite())) return;
     switch (selection.id) {
       case 'open':
         this.openDashboard(item);
@@ -647,11 +590,10 @@ export class DashboardsPage {
     if (!cursor || this.loadingMore() || this.loadingDashboards()) return;
 
     const seq = this.dashboardsLoadSeq;
-    const kind = this.activeTab() === 'all' ? this.kindFilter() : 'ALL';
     this.loadingMore.set(true);
     try {
       const page = await listDashboards({
-        ...(kind !== 'ALL' ? { kind } : {}),
+        kind: 'DASHBOARD',
         ...(this.searchQuery().trim() ? { search: this.searchQuery().trim() } : {}),
         cursor,
         limit: PAGE_LIMIT,
@@ -665,7 +607,8 @@ export class DashboardsPage {
       this.nextCursor.set(page.nextCursor);
     } catch (error) {
       if (seq !== this.dashboardsLoadSeq) return;
-      this.notify.error(this.translateError(errorCodeOf(error)));
+      const failure = libraryFailure(this.transloco, error);
+      this.notify.error(failure.message, failure.correlationId ?? '');
     } finally {
       if (seq === this.dashboardsLoadSeq) {
         this.loadingMore.set(false);
@@ -683,6 +626,10 @@ export class DashboardsPage {
 
   protected goHome(): void {
     void this.router.navigate(['/workspace/home']);
+  }
+
+  protected requestAccess(): void {
+    void this.router.navigate(['/crm/dashboard/access']);
   }
 
   protected asDashboard(row: unknown): DashboardSummary {
@@ -720,14 +667,14 @@ export class DashboardsPage {
 
   private async loadDashboards(reset: boolean): Promise<void> {
     const seq = ++this.dashboardsLoadSeq;
-    const kind = this.activeTab() === 'all' ? this.kindFilter() : 'ALL';
-    if (reset) {
-      this.loadingDashboards.set(true);
-      this.dashboardsError.set(null);
-    }
+    if (!this.canRead) return;
+    this.loadingDashboards.set(true);
+    this.loadingMore.set(false);
+    this.dashboardsError.set(null);
+    if (reset) this.nextCursor.set(null);
     try {
       const page = await listDashboards({
-        ...(kind !== 'ALL' ? { kind } : {}),
+        kind: 'DASHBOARD',
         ...(this.searchQuery().trim() ? { search: this.searchQuery().trim() } : {}),
         limit: PAGE_LIMIT,
       });
@@ -738,7 +685,7 @@ export class DashboardsPage {
       if (seq !== this.dashboardsLoadSeq) return;
       this.dashboards.set([]);
       this.nextCursor.set(null);
-      this.dashboardsError.set(error instanceof ApiError && error.status === 403 ? 'forbidden' : 'load-failure');
+      this.dashboardsError.set(libraryFailure(this.transloco, error));
     } finally {
       if (seq === this.dashboardsLoadSeq) {
         this.loadingDashboards.set(false);
@@ -748,16 +695,21 @@ export class DashboardsPage {
 
   private async loadBlueprints(): Promise<void> {
     const seq = ++this.blueprintsLoadSeq;
+    if (!this.canUseTemplates) {
+      this.loadingBlueprints.set(false);
+      this.blueprintsError.set(libraryFailure(this.transloco, new ApiError(403, 'CRM_DASHBOARD_DEFINITION_ACCESS_DENIED')));
+      return;
+    }
     this.loadingBlueprints.set(true);
     this.blueprintsError.set(null);
     try {
-      const res = await listBlueprints();
+      const res = await listBlueprints(this.scope.selection()?.branchId ?? undefined);
       if (seq !== this.blueprintsLoadSeq) return;
       this.blueprints.set(res.items);
     } catch (error) {
       if (seq !== this.blueprintsLoadSeq) return;
       this.blueprints.set([]);
-      this.blueprintsError.set(error instanceof ApiError && error.status === 403 ? 'forbidden' : 'load-failure');
+      this.blueprintsError.set(libraryFailure(this.transloco, error));
     } finally {
       if (seq === this.blueprintsLoadSeq) {
         this.loadingBlueprints.set(false);
@@ -778,16 +730,62 @@ export class DashboardsPage {
     }
   }
 
-  private fetchShareCounts(ids: readonly string[]): void {
-    for (const id of ids) {
-      this.shareCountRequested.add(id);
-      void listDashboardShares(id)
-        .then((shares) => {
-          this.shareCounts.update((cache) => ({ ...cache, [id]: shares.length }));
-        })
-        .catch(() => {
-          this.shareCounts.update((cache) => ({ ...cache, [id]: 'unavailable' }));
-        });
+  private async loadBranches(): Promise<void> {
+    try {
+      this.branches.set(await this.org.listGrantedBranches());
+    } catch (error) {
+      this.notify.error(libraryFailure(this.transloco, error).message);
+    }
+  }
+
+  protected async reloadLibrary(): Promise<void> {
+    await Promise.all([this.loadDashboards(true), this.loadBlueprints()]);
+    if (this.dashboardsError() || this.canUseTemplates && this.blueprintsError()) return;
+    this.pendingWrites.clear();
+    this.reloadRequired.set(false);
+  }
+
+  protected async reloadAfterConflict(keepChanges: boolean): Promise<void> {
+    this.conflictOpen.set(false);
+    const selectedKey = this.pendingTemplate()?.key;
+    await this.loadBlueprints();
+    if (keepChanges && selectedKey) {
+      this.pendingTemplate.set(this.blueprints().find((bp) => bp.key === selectedKey) ?? null);
+    } else {
+      this.pendingTemplate.set(null);
+      this.targetsModal().close();
+    }
+  }
+
+  private async writeAction<T>(action: string, body: unknown, write: (key: string) => Promise<T>): Promise<T | null> {
+    if (this.readOnly() || this.reloadRequired() || this.activeWrite() || this.conflictOpen()) return null;
+    const intent = libraryWriteIntent(body, this.pendingWrites.get(action));
+    this.pendingWrites.set(action, intent);
+    this.activeWrite.set(action);
+    try {
+      const result = await write(intent.key);
+      this.pendingWrites.delete(action);
+      return result;
+    } catch (error) {
+      if (!keepLibraryWriteIntent(error)) this.pendingWrites.delete(action);
+      const failure = libraryFailure(this.transloco, error, true);
+      if (failure.readOnly) this.readOnly.set(true);
+      if (failure.reloadRequired) this.reloadRequired.set(true);
+      if (errorCodeOf(error) === 'CRM_DASHBOARD_BLUEPRINT_REVISION_CHANGED'
+        || error instanceof ApiError && error.status === 409 && error.code !== 'CRM_DASHBOARD_NAME_CONFLICT'
+        && /_(STALE|CONFLICT)$/.test(error.code)) {
+        this.conflictOpen.set(true);
+      } else if (errorCodeOf(error) === 'CRM_DASHBOARD_OWNER_LIMIT') {
+        this.ownerLimitMessage.set(failure.message);
+        this.ownerLimitModal().open();
+      } else if (failure.kind === 'provisioning') {
+        this.blueprintsError.set(failure);
+      } else {
+        this.notify.error(failure.message, failure.correlationId ?? '');
+      }
+      return null;
+    } finally {
+      this.activeWrite.set(null);
     }
   }
 
@@ -820,19 +818,11 @@ export class DashboardsPage {
   }
 
   private async setAsDefault(item: DashboardSummary): Promise<void> {
-    try {
-      const updated = await setDefaultDashboard(item.id, newIdempotencyKey());
-      this.dashboards.update((list) =>
-        list.map((row) =>
-          row.id === updated.id
-            ? { ...row, ...this.summaryFromDetail(updated), isDefault: true }
-            : { ...row, isDefault: false },
-        ),
-      );
-      this.notify.success(this.transloco.translate('dashLibrary.toast.defaultSet'));
-    } catch (error) {
-      this.notify.error(this.translateError(errorCodeOf(error)));
-    }
+    const updated = await this.writeAction(`default:${item.id}`, { id: item.id }, (key) => setDefaultDashboard(item.id, key));
+    if (!updated) return;
+    this.dashboards.update((list) => list.map((row) => row.id === updated.id
+      ? { ...row, ...this.summaryFromDetail(updated), isDefault: true } : { ...row, isDefault: false }));
+    this.notify.success(this.transloco.translate('dashLibrary.toast.defaultSet'));
   }
 
   private async removeItem(item: DashboardSummary): Promise<void> {
@@ -861,30 +851,20 @@ export class DashboardsPage {
   }
 
   private async performAdopt(bp: BlueprintItem, branchId: string | undefined): Promise<boolean> {
+    if (!this.canUseTemplates) return false;
+    const body = {
+      definitionRevision: bp.definitionRevision,
+      ...(branchId ? { branchId } : {}),
+      ...(bp.targets.length ? { confirmTargets: true as const } : {}),
+    };
     this.adoptingKey.set(bp.key);
-    try {
-      const res = await adoptBlueprint(
-        bp.key,
-        {
-          definitionRevision: bp.definitionRevision,
-          ...(branchId ? { branchId } : {}),
-          ...(bp.targets.length > 0 ? { confirmTargets: true as const } : {}),
-        },
-        newIdempotencyKey(),
-      );
-      this.notify.success(this.transloco.translate('dashLibrary.toast.adopted'));
-      await this.router.navigate(['/crm/dashboard/dashboards', res.dashboardId]);
-      return true;
-    } catch (error) {
-      const code = errorCodeOf(error);
-      if (code === 'CRM_DASHBOARD_BLUEPRINT_REVISION_CHANGED') {
-        void this.loadBlueprints();
-      }
-      this.notify.error(this.translateError(code));
-      return false;
-    } finally {
-      this.adoptingKey.set(null);
-    }
+    this.pendingTemplate.set(bp);
+    const res = await this.writeAction(`adopt:${bp.key}`, body, (key) => adoptBlueprint(bp.key, body, key));
+    this.adoptingKey.set(null);
+    if (!res) return false;
+    this.notify.success(this.transloco.translate('dashLibrary.toast.adopted'));
+    await this.router.navigate(['/crm/dashboard/dashboards', res.dashboardId]);
+    return true;
   }
 
   private patchDashboard(detail: DashboardDetail): void {
@@ -927,7 +907,7 @@ export class DashboardsPage {
       },
     ];
 
-    if (this.canCreate) {
+    if (this.canUseTemplates) {
       items.push({
         id: 'duplicate',
         title: this.transloco.translate('dashLibrary.menu.duplicate'),
@@ -973,7 +953,7 @@ export class DashboardsPage {
       });
     }
 
-    return items;
+    return items.map((item) => item.id === 'open' ? item : { ...item, disabled: item.disabled || this.readOnly() || this.reloadRequired() || this.activeWrite() !== null });
   }
 
   private translateError(code: string | null): string {

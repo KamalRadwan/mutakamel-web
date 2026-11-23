@@ -1,3 +1,7 @@
+import { newIdempotencyKey } from '../../../../../core/api/idempotency';
+import { accessCanRetry, accessMessage, accessMismatch, accessReadOnly, accessValidation } from '../access-errors';
+import { ConflictDialog } from '../../../../../shared/ui/conflict-dialog/conflict-dialog';
+import { can } from '../../../../../shared/widgets/dashboard/analytics-permissions';
 import {
   Component,
   DestroyRef,
@@ -11,19 +15,16 @@ import {
   viewChild,
 } from '@angular/core';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
-import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
+import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   tablerCheck,
   tablerChevronDown,
-  tablerLayoutDashboard,
-  tablerPuzzle,
   tablerSearch,
   tablerUserShare,
 } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../../core/i18n/language';
 import { Notify } from '../../../../../core/notify/notify';
-import { Badge, BadgeTone } from '../../../../../shared/ui/badge/badge';
 import { Button } from '../../../../../shared/ui/button/button';
 import { formatDate } from '../../../../../shared/ui/chart/chart-format';
 import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
@@ -32,21 +33,18 @@ import { Modal } from '../../../../../shared/ui/modal/modal';
 import { rectInPage, viewport } from '../../../../../shared/ui/overlay/zoom';
 import {
   errorCodeOf,
-  newIdempotencyKey,
 } from '../../../../../shared/widgets/dashboard/analytics-api';
 import { errorDetailField } from '../../shared/api-error-details';
-import { errorKey } from '../../../../../shared/widgets/dashboard/panel-state';
 import {
   cancelOwnerReview,
   executeOwnerTransfer,
   getOwnerReview,
-  isPersonInactive,
-  listActiveOwners,
+  listReviewTargets,
   personName,
   proposeOwner,
   resourceLabel,
 } from '../access.api';
-import type { AccessPerson, OwnerReview, OwnerReviewStatus } from '../access.model';
+import type { AccessPerson, OwnerReview } from '../access.model';
 
 interface MenuPlace {
   top: number;
@@ -64,12 +62,11 @@ function personInitials(name: string): string {
 
 @Component({
   selector: 'app-review-modal',
-  imports: [NgIcon, TranslocoPipe, Badge, Button, ConfirmDialog, Field, Modal],
+  imports: [NgIcon, TranslocoPipe, Button, ConfirmDialog, ConflictDialog, Field, Modal],
+  viewProviders: [provideTranslocoScope({ scope: 'crm-access', alias: 'access' }, { scope: 'analytics', alias: 'analytics' })],
   providers: [
     provideIcons({
       tablerUserShare,
-      tablerLayoutDashboard,
-      tablerPuzzle,
       tablerChevronDown,
       tablerCheck,
       tablerSearch,
@@ -94,7 +91,9 @@ export class ReviewModal {
 
   private readonly modal = viewChild.required(Modal);
   private readonly cancelConfirm = viewChild.required<ConfirmDialog>('cancelConfirm');
-  private readonly conflictDialog = viewChild.required<ConfirmDialog>('conflictDialog');
+  protected readonly conflictOpen = signal(false);
+  protected readonly readOnly = signal(false);
+  readonly readOnlyChange = output<boolean>();
   private readonly ownerTrigger = viewChild<ElementRef<HTMLButtonElement>>('ownerTrigger');
   private readonly ownerPanel = viewChild<ElementRef<HTMLElement>>('ownerPanel');
   private readonly ownerSearchInput = viewChild<ElementRef<HTMLInputElement>>('ownerSearchInput');
@@ -141,11 +140,6 @@ export class ReviewModal {
     return rev ? personName(rev.ownerUserId, this.language()) : '—';
   });
 
-  protected readonly currentOwnerInactive = computed(() => {
-    const rev = this.review();
-    return rev ? isPersonInactive(rev.ownerUserId) : false;
-  });
-
   protected readonly openedText = computed(() => {
     const rev = this.review();
     return rev ? formatDate(rev.openedAt, this.language()) : '—';
@@ -166,6 +160,12 @@ export class ReviewModal {
       date: rev.proposedAt ? formatDate(rev.proposedAt, lang) : '',
       reason: rev.proposalReason ?? '',
     };
+  });
+
+  protected readonly proposalText = computed(() => {
+    const proposal = this.currentProposalSummary();
+    return proposal ? [proposal.name, proposal.date, proposal.reason].filter(Boolean).join(' · ')
+      : this.transloco.translate('access.review.noProposal');
   });
 
   protected readonly selectedOwner = computed<AccessPerson | null>(() => {
@@ -203,7 +203,7 @@ export class ReviewModal {
     if (trimmed.length > 500) {
       return this.transloco.translate('access.errors.maxLength', { max: 500 });
     }
-    if (this.submitted() && this.isTransferAction() && trimmed.length === 0) {
+    if (this.submitted() && trimmed.length === 0) {
       return this.transloco.translate('access.errors.reasonRequired');
     }
     return null;
@@ -233,6 +233,7 @@ export class ReviewModal {
   }
 
   open(review: OwnerReview): void {
+    if (!can('crm.widgets.transfer_ownership')) return;
     this.review.set(review);
     this.selectedOwnerId.set(review.proposedOwnerUserId ?? '');
     this.reason.set(review.proposalReason ?? '');
@@ -262,20 +263,6 @@ export class ReviewModal {
     this.cancelling.set(false);
     this.submitted.set(false);
     this.clearServerErrors();
-  }
-
-  protected statusTone(status: OwnerReviewStatus): BadgeTone {
-    switch (status) {
-      case 'OPEN':
-        return 'warning';
-      case 'TRANSFERRED':
-      case 'OWNER_REACTIVATED':
-        return 'success';
-      case 'LAPSED':
-      case 'CANCELLED':
-      default:
-        return 'none';
-    }
   }
 
   protected personDisplayName(person: AccessPerson): string {
@@ -378,14 +365,14 @@ export class ReviewModal {
 
   protected async submitPrimary(): Promise<void> {
     const rev = this.review();
-    if (!rev || rev.status !== 'OPEN' || this.submitting() || this.cancelling()) return;
+    if (!rev || rev.status !== 'OPEN' || this.submitting() || this.cancelling() || this.readOnly() || !can('crm.widgets.transfer_ownership')) return;
 
     this.submitted.set(true);
     this.clearServerErrors();
 
     const ownerId = this.selectedOwnerId();
     const trimmedReason = this.reason().trim();
-    if (!ownerId || trimmedReason.length > 500) return;
+    if (!ownerId || !trimmedReason || trimmedReason.length > 500) return;
 
     if (this.isTransferAction()) {
       if (trimmedReason.length === 0) return;
@@ -397,7 +384,7 @@ export class ReviewModal {
 
   protected async confirmCancelReview(): Promise<void> {
     const rev = this.review();
-    if (!rev || rev.status !== 'OPEN' || this.submitting() || this.cancelling()) return;
+    if (!rev || rev.status !== 'OPEN' || this.submitting() || this.cancelling() || this.readOnly() || !can('crm.widgets.transfer_ownership')) return;
 
     const confirmed = await this.cancelConfirm().open();
     if (!confirmed) return;
@@ -458,43 +445,32 @@ export class ReviewModal {
   }
 
   private async handleActionError(error: unknown, current: OwnerReview): Promise<void> {
+    if (!accessCanRetry(error)) {
+      this.transferIdemKey = null;
+      this.transferIdemFingerprint = null;
+    }
+    if (accessReadOnly(error) || accessMismatch(error)) {
+      this.readOnly.set(true);
+      this.readOnlyChange.emit(true);
+    }
     const code = errorCodeOf(error);
     if (code === 'CRM_OWNER_REVIEW_NOT_OPEN') {
-      this.notify.warning(this.transloco.translate(errorKey(code)));
+      this.notify.warning(accessMessage(this.transloco, error));
       this.close();
       this.updated.emit(null);
       return;
     }
 
-    if (code === 'CRM_OWNER_REVIEW_REVISION_STALE') {
-      // Esc and Cancel resolve to false: keep the user's input, refresh only the revision.
-      const reload = await this.conflictDialog().open();
-      try {
-        const fresh = await getOwnerReview(current.id);
-        this.review.set(fresh);
-        if (reload) {
-          this.selectedOwnerId.set(fresh.proposedOwnerUserId ?? '');
-          this.reason.set(fresh.proposalReason ?? '');
-          this.submitted.set(false);
-        }
-        this.updated.emit(fresh);
-        if (fresh.status !== 'OPEN') {
-          this.notify.warning(this.transloco.translate(errorKey('CRM_OWNER_REVIEW_NOT_OPEN')));
-          this.close();
-        }
-      } catch (refreshError) {
-        // 404 CRM_OWNER_REVIEW_NOT_FOUND (deleted meanwhile) has its own text; anything else is generic.
-        this.notify.error(this.transloco.translate(errorKey(errorCodeOf(refreshError))));
-        this.close();
-        this.updated.emit(null);
-      }
+    if (code && /_(STALE|CONFLICT)$/.test(code)) {
+      this.conflictOpen.set(true);
       return;
     }
 
+    if (accessValidation(this.transloco, error, { proposedOwnerUserId: this.serverOwnerError, reason: this.serverReasonError })) return;
     const field = errorDetailField(error);
-    const message = this.transloco.translate(errorKey(code));
+    const message = accessMessage(this.transloco, error);
 
-    if (field === 'proposedOwnerUserId' || code === 'CRM_OWNER_REVIEW_PROPOSED_OWNER_INVALID') {
+    if (field === 'proposedOwnerUserId' || ['CRM_OWNER_REVIEW_PROPOSED_OWNER_INVALID', 'CRM_OWNERSHIP_TARGET_INACTIVE', 'CRM_WIDGET_TRANSFER_TARGET_INELIGIBLE'].includes(code ?? '')) {
       this.serverOwnerError.set(message);
       return;
     }
@@ -510,17 +486,41 @@ export class ReviewModal {
     const seq = ++this.ownersSeq;
     this.ownersLoading.set(true);
     try {
-      const list = await listActiveOwners();
+      const review = this.review();
+      if (!review) return;
+      if (review.resourceType === 'DASHBOARD') {
+        this.owners.set([]);
+        this.notify.warning(this.transloco.translate('access.errors.ownerTargetsUnavailable'));
+        return;
+      }
+      const list = await listReviewTargets(review.resourceId);
       if (seq !== this.ownersSeq) return;
       this.owners.set(list);
-    } catch {
+    } catch (error) {
       if (seq !== this.ownersSeq) return;
       this.owners.set([]);
+      this.notify.error(accessMessage(this.transloco, error));
     } finally {
       if (seq === this.ownersSeq) {
         this.ownersLoading.set(false);
       }
     }
+  }
+
+  protected async resolveConflict(reload: boolean): Promise<void> {
+    this.conflictOpen.set(false);
+    const current = this.review();
+    if (!current) return;
+    try {
+      const fresh = await getOwnerReview(current.id);
+      this.review.set(reload ? fresh : { ...current, revision: fresh.revision, status: fresh.status });
+      if (reload) {
+        this.selectedOwnerId.set(fresh.proposedOwnerUserId ?? '');
+        this.reason.set(fresh.proposalReason ?? '');
+      }
+      if (fresh.status !== 'OPEN') this.readOnly.set(true);
+      this.updated.emit(fresh);
+    } catch (error) { this.notify.error(accessMessage(this.transloco, error)); }
   }
 
   private clearServerErrors(): void {

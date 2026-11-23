@@ -53,13 +53,7 @@ import type {
   DatePreset,
   RuntimeFilters,
 } from '../../../../../shared/widgets/dashboard/analytics.model';
-import { FAKE_NOW } from '../../../../../shared/widgets/dashboard/analytics-api';
 import { scopeLevels } from '../../../../../shared/widgets/dashboard/analytics-permissions';
-import {
-  FAKE_ME,
-  FAKE_PEOPLE,
-  FAKE_TEAMS,
-} from '../../../../../shared/widgets/dashboard/fake/fake-org';
 
 export interface DashboardFilterValue {
   period: DateRangeValue | null;
@@ -99,10 +93,11 @@ const COMPACT_WIDTH_PX = 1280;
 const WIDE_COLS_MIN_PX = 1024;
 const TWO_COLS_MIN_PX = 640;
 
-function defaultFakeTeamIds(): string[] {
-  const me = FAKE_PEOPLE.find((person) => person.id === FAKE_ME.id);
-  if (!me) return [];
-  return FAKE_TEAMS.filter((team) => team.branchId === me.branchId).map((team) => team.id);
+function todayInZone(timeZone: string | null): Date {
+  const civilDate = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timeZone ?? 'UTC', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date());
+  return parseLocalDate(civilDate)!;
 }
 
 function normalizeMatch(value: string): string {
@@ -113,8 +108,9 @@ function dateRangeFromPreset(
   preset: DatePreset | undefined,
   dateFrom: string | undefined,
   dateTo: string | undefined,
+  timeZone: string | null,
 ): DateRangeValue {
-  const today = parseLocalDate(FAKE_NOW) ?? new Date(2026, 10, 21);
+  const today = todayInZone(timeZone);
 
   switch (preset) {
     case 'TODAY':
@@ -192,10 +188,16 @@ function dateRangeFromPreset(
 export function toRuntimeFilters(
   v: DashboardFilterValue,
   userTeamIds?: readonly string[],
+  userId?: string,
+  defaults: DefaultDashboardFilters = {},
 ): RuntimeFilters {
   const filters: RuntimeFilters = {
+    ...defaults,
     compare: v.compare,
   };
+  delete filters.dateFrom;
+  delete filters.dateTo;
+  delete filters.branchId;
 
   if (v.period) {
     const mappedPreset = v.period.preset ? DS_PRESET_MAP[v.period.preset] : undefined;
@@ -209,14 +211,14 @@ export function toRuntimeFilters(
   }
 
   if (v.scope === 'own') {
-    filters.ownerUserIds = [FAKE_ME.id];
+    if (userId) filters.ownerUserIds = [userId];
   } else if (v.scope === 'team') {
     const resolvedTeams =
       v.teamIds.length > 0
         ? [...v.teamIds]
         : userTeamIds && userTeamIds.length > 0
           ? [...userTeamIds]
-          : defaultFakeTeamIds();
+          : [];
     if (resolvedTeams.length > 0) {
       filters.teamIds = resolvedTeams;
     }
@@ -229,7 +231,7 @@ export function toRuntimeFilters(
   return filters;
 }
 
-export function defaultFilterValue(defaults: DefaultDashboardFilters): DashboardFilterValue {
+export function defaultFilterValue(defaults: DefaultDashboardFilters, timeZone: string | null = null): DashboardFilterValue {
   const levels = scopeLevels();
   const widestScope: 'own' | 'team' | 'all' = levels.includes('all')
     ? 'all'
@@ -238,7 +240,7 @@ export function defaultFilterValue(defaults: DefaultDashboardFilters): Dashboard
       : 'own';
 
   return {
-    period: dateRangeFromPreset(defaults.datePreset, defaults.dateFrom, defaults.dateTo),
+    period: dateRangeFromPreset(defaults.datePreset, defaults.dateFrom, defaults.dateTo, timeZone),
     compare: defaults.compare ?? 'NONE',
     scope: widestScope,
     teamIds: [],
@@ -249,13 +251,13 @@ export function defaultFilterValue(defaults: DefaultDashboardFilters): Dashboard
 @Component({
   selector: 'app-dashboard-filters',
   imports: [NgIcon, TranslocoPipe, Button, DateRange, Dropdown, Field],
-  providers: [
+  viewProviders: [
     provideTranslocoScope(
       { scope: 'crm-dash-filters', alias: 'dashFilters' },
       { scope: 'analytics', alias: 'analytics' },
     ),
-    provideIcons({ tablerCheck, tablerHelpCircle, tablerUser, tablerX }),
   ],
+  providers: [provideIcons({ tablerCheck, tablerHelpCircle, tablerUser, tablerX })],
   templateUrl: './dashboard-filters.html',
   host: {
     class: 'block min-w-0',
@@ -288,9 +290,18 @@ export class DashboardFilters {
   readonly showTeams = input(false);
   /** The viewer reads only part of the dashboard's branches (run organizationScope.partialAccess). */
   readonly partialAccess = input(false);
+  readonly error = input<string | null>(null);
+  readonly fieldErrors = input<Readonly<Record<string, string>>>({});
+  readonly timeZone = input<string | null>(null);
   readonly openWhy = output<void>();
 
-  protected readonly fakeNow = FAKE_NOW;
+  protected readonly today = computed(() => formatLocalDateTime(todayInZone(this.timeZone()), DEFAULT_FROM_TIME));
+  protected readonly periodHint = computed(() => {
+    this.i18n();
+    return `${this.transloco.translate('dashFilters.periodHint')} ${this.timeZone()
+      ? this.transloco.translate('dashFilters.datesInZone', { zone: this.timeZone() })
+      : this.transloco.translate('dashFilters.datesInUtc')}`;
+  });
   protected readonly containerWidth = signal(COMPACT_WIDTH_PX);
   protected readonly compact = computed(() => this.containerWidth() >= COMPACT_WIDTH_PX);
   protected readonly gridColsClass = computed(() => {

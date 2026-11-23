@@ -167,7 +167,7 @@
               [label]="periodPartLabel(part)"
               [for]="periodFieldId(d, part)"
               [hint]="periodPartHint(part)"
-              [error]="part === 'to' ? periodError() : null"
+              [error]="periodPartError(part)"
             >
               <ui-date-field
                 class="min-w-0 flex-1"
@@ -177,7 +177,7 @@
                 [todayLabel]="dateLabel('today')"
                 [prevMonthLabel]="dateLabel('prevMonth')"
                 [nextMonthLabel]="dateLabel('nextMonth')"
-                [invalid]="part === 'to' && !!periodError()"
+                [invalid]="!!periodPartError(part)"
                 [value]="part === 'from' ? periodWindow().from : periodWindow().to"
                 (valueChange)="onPeriodPartChange(part, $event)"
               />

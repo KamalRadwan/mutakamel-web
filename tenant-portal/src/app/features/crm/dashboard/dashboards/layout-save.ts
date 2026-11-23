@@ -1,5 +1,4 @@
-import type { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
-import { ApiError, newIdempotencyKey } from '../../../../shared/widgets/dashboard/analytics-api';
+import { ApiError } from '../../../../shared/widgets/dashboard/analytics-api';
 import {
   addPlacement,
   getDashboard,
@@ -11,6 +10,7 @@ import {
 } from './dashboards.api';
 import type { DashboardDetail } from './dashboards.model';
 import { detailInt, detailIssues, detailString } from '../shared/api-error-details';
+import { retainWriteIntent, writeIntent, type WriteIntent } from '../shared/write-state';
 
 export interface SaveLayoutItem {
   placementId: string;
@@ -35,7 +35,11 @@ export interface SaveEditPlan {
   adds: PendingAdd[];
 }
 
-export type SaveLayoutResult = { detail: DashboardDetail & { adjusted: boolean } } | { reload: true } | null;
+export type SaveLayoutResult =
+  | { detail: DashboardDetail & { adjusted: boolean } }
+  | { reload: true }
+  | { conflict: true; revision: number }
+  | null;
 
 export interface LayoutSizeInvalidDetails {
   placementId: string | null;
@@ -58,7 +62,10 @@ export function isLayoutSizeInvalid(error: unknown): error is ApiError {
 }
 
 /** The placement a body-relative `items.<n>.<field>` path points at in the items that were sent, or null. */
-export function placementIdFromPath(source: unknown, sent: readonly { placementId: string }[]): string | null {
+export function placementIdFromPath(
+  source: unknown,
+  sent: readonly { placementId: string }[],
+): string | null {
   for (const { path } of detailIssues(source)) {
     const match = /^items\.(\d+)(?:\.|$)/.exec(path);
     const item = match ? sent[Number(match[1])] : undefined;
@@ -78,7 +85,7 @@ export class LayoutSizeInvalidError extends ApiError {
   constructor(source: ApiError, applied: AppliedStructuralEdits, knownPlacementId?: string | null) {
     // { path: ['items.3.w', 'items.3.h'], code: ['min_width', 'min_height'], placementId: ['…'], minW: ['16'], minH: ['10'] }
     const placementId = knownPlacementId ?? detailString(source, 'placementId');
-    super(source.status, source.code, source.details);
+    super(source.status, source.code, source.details, { correlationId: source.correlationId });
     this.sizeDetails = {
       placementId,
       minW: detailInt(source, 'minW'),
@@ -104,11 +111,17 @@ function isStaleConflict(error: unknown): boolean {
   return (
     error instanceof ApiError &&
     error.status === 409 &&
-    (error.code === 'CRM_DASHBOARD_REVISION_CONFLICT' || error.code === 'CRM_DASHBOARD_LAYOUT_STALE')
+    (error.code === 'CRM_DASHBOARD_REVISION_CONFLICT' ||
+      error.code === 'CRM_DASHBOARD_LAYOUT_STALE' ||
+      error.code === 'CRM_DASHBOARD_PLACEMENT_VERSION_STALE')
   );
 }
 
-async function pinAdded(dashboardId: string, placementId: string, versionNumber: number): Promise<void> {
+async function pinAdded(
+  dashboardId: string,
+  placementId: string,
+  versionNumber: number,
+): Promise<void> {
   const binding = await getVersionBinding(dashboardId, placementId);
   const body = {
     versionPolicy: 'PINNED' as const,
@@ -125,97 +138,103 @@ async function pinAdded(dashboardId: string, placementId: string, versionNumber:
   });
 }
 
-/**
- * Saves a dashboard layout, using a fresh UUIDv7 idempotency key per attempt and resolving 409 conflicts.
- * The removals and additions made in edit mode are sent here, never before Save.
- */
+export class LayoutSaveSession {
+  readonly removed = new Set<string>();
+  readonly added = new Map<string, string>();
+  readonly pinned = new Set<string>();
+  readonly pendingPins = new Map<string, number>();
+  readonly intents = new Map<string, WriteIntent>();
+  revision: number | null = null;
+}
+
+/** Structural calls are remembered across a failed Save so retry never recreates an applied placement. */
 export async function saveLayoutResolving(
   id: string,
   revision: number,
   items: SaveLayoutItem[],
-  confirm: ConfirmDialog,
+  confirm: { open(): Promise<boolean> },
   plan: SaveEditPlan = { removedPlacementIds: [], adds: [] },
+  session = new LayoutSaveSession(),
 ): Promise<SaveLayoutResult> {
-  let currentRevision = revision;
-  const appliedRemovedIds: string[] = [];
-  const idMap = new Map<string, string>();
+  session.revision ??= revision;
   const snapshotApplied = (): AppliedStructuralEdits => ({
-    removedPlacementIds: [...appliedRemovedIds],
-    addedIdMap: Object.fromEntries(idMap),
-    revision: currentRevision,
+    removedPlacementIds: [...session.removed],
+    addedIdMap: Object.fromEntries(session.added),
+    revision: session.revision!,
   });
-
-  for (const placementId of plan.removedPlacementIds) {
-    currentRevision = (await removePlacement(id, placementId)).dashboardRevision;
-    appliedRemovedIds.push(placementId);
-  }
-  for (const add of plan.adds) {
-    const box = items.find((item) => item.placementId === add.tempId);
+  const keyed = async <T>(
+    action: string,
+    body: unknown,
+    run: (key: string) => Promise<T>,
+  ): Promise<T> => {
+    const intent = writeIntent(body, session.intents.get(action));
+    session.intents.set(action, intent);
     try {
-      const added = await addPlacement(
-        id,
-        { widgetId: add.widgetId, ...(box ? { x: box.x, y: box.y, w: box.w, h: box.h } : {}) },
-        newIdempotencyKey(),
-      );
-      idMap.set(add.tempId, added.id);
-      currentRevision = added.dashboardRevision;
+      return await run(intent.key);
     } catch (error) {
-      if (isLayoutSizeInvalid(error)) {
-        throw new LayoutSizeInvalidError(error, snapshotApplied(), add.tempId);
-      }
+      if (!retainWriteIntent(error)) session.intents.delete(action);
       throw error;
     }
-  }
-
-  // A layout save names the box by `placementId`, else by its `items.<n>` path in the body that was sent.
-  const sizeErrorOf = (error: ApiError, sent: readonly SaveLayoutItem[]) =>
-    new LayoutSizeInvalidError(error, snapshotApplied(), detailString(error, 'placementId') ?? placementIdFromPath(error, sent));
-
-  const mapped = items.map((item) => ({ ...item, placementId: idMap.get(item.placementId) ?? item.placementId }));
-  const finish = async (
-    saved: DashboardDetail & { adjusted: boolean },
-  ): Promise<{ detail: DashboardDetail & { adjusted: boolean } }> => {
-    const pins = plan.adds.filter((add) => add.pinnedVersionNumber !== null && idMap.has(add.tempId));
-    if (pins.length === 0) return { detail: saved };
-    for (const add of pins) {
+  };
+  let sent = items;
+  try {
+    for (const placementId of plan.removedPlacementIds) {
+      if (session.removed.has(placementId)) continue;
+      session.revision = (await removePlacement(id, placementId)).dashboardRevision;
+      session.removed.add(placementId);
+      session.pendingPins.delete(placementId);
+    }
+    for (const add of plan.adds) {
+      if (session.added.has(add.tempId)) continue;
+      const box = items.find((item) => item.placementId === add.tempId);
+      const body = {
+        widgetId: add.widgetId,
+        ...(box ? { x: box.x, y: box.y, w: box.w, h: box.h } : {}),
+      };
       try {
-        await pinAdded(id, idMap.get(add.tempId)!, add.pinnedVersionNumber!);
-      } catch {
-        // The widget stays on "follow the active version"; the dashboard still shows it.
+        const added = await keyed(`add:${add.tempId}`, body, (key) => addPlacement(id, body, key));
+        session.added.set(add.tempId, added.id);
+        if (add.pinnedVersionNumber !== null)
+          session.pendingPins.set(added.id, add.pinnedVersionNumber);
+        session.revision = added.dashboardRevision;
+      } catch (error) {
+        if (isLayoutSizeInvalid(error))
+          throw new LayoutSizeInvalidError(error, snapshotApplied(), add.tempId);
+        throw error;
       }
     }
-    return { detail: { ...(await getDashboard(id)), adjusted: saved.adjusted } };
-  };
-
-  try {
-    const detail = await saveLayout(id, { revision: currentRevision, breakpointKey: 'desktop', items: mapped }, newIdempotencyKey());
-    return await finish(detail);
+    sent = items.map((item) => ({
+      ...item,
+      placementId: session.added.get(item.placementId) ?? item.placementId,
+    }));
+    const body = { revision: session.revision, breakpointKey: 'desktop' as const, items: sent };
+    const saved = await keyed('layout', body, (key) => saveLayout(id, body, key));
+    session.revision = saved.revision;
+    for (const [placementId, versionNumber] of session.pendingPins) {
+      if (session.pinned.has(placementId)) continue;
+      await pinAdded(id, placementId, versionNumber);
+      session.pinned.add(placementId);
+    }
+    return {
+      detail: session.pinned.size
+        ? { ...(await getDashboard(id)), adjusted: saved.adjusted }
+        : saved,
+    };
   } catch (error) {
+    if (error instanceof LayoutSizeInvalidError) throw error;
     if (isLayoutSizeInvalid(error)) {
-      throw sizeErrorOf(error, mapped);
+      throw new LayoutSizeInvalidError(
+        error,
+        snapshotApplied(),
+        detailString(error, 'placementId') ?? placementIdFromPath(error, sent),
+      );
     }
     if (!isStaleConflict(error)) throw error;
-  }
-
-  const keepMine = await confirm.open();
-  if (!keepMine) return { reload: true };
-
-  const latest = await getDashboard(id);
-  currentRevision = latest.revision;
-  const known = new Set(latest.placements.map((placement) => placement.id));
-  const retryItems = mapped.filter((item) => known.has(item.placementId));
-  try {
-    const detail = await saveLayout(
-      id,
-      { revision: latest.revision, breakpointKey: 'desktop', items: retryItems },
-      newIdempotencyKey(),
-    );
-    return await finish(detail);
-  } catch (error) {
-    if (isLayoutSizeInvalid(error)) {
-      throw sizeErrorOf(error, retryItems);
-    }
-    if (isStaleConflict(error)) return { reload: true };
-    throw error;
+    if (!(await confirm.open())) return { reload: true };
+    const latest = await getDashboard(id);
+    session.revision = latest.revision;
+    // Keep the canvas and pending edits. A second Save is a new action with the re-read revision.
+    session.intents.delete('layout');
+    return { conflict: true, revision: latest.revision };
   }
 }

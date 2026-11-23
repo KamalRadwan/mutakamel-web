@@ -7,7 +7,13 @@ import { ApiError } from '../../../core/api/api-errors';
  */
 export { ApiError };
 
-export const FAKE_NOW = '2026-11-21T09:00:00.000Z';
+/** Current instant; date-range providers can wrap it in a Date. */
+export function analyticsNow(): string {
+  return new Date().toISOString();
+}
+
+/** @deprecated Compatibility snapshot for still-fake callers; live reads use analyticsNow(). */
+export const FAKE_NOW = analyticsNow();
 
 export const FAKE_FAIL = { nextCall: false };
 

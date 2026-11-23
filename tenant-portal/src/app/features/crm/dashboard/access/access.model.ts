@@ -132,9 +132,3 @@ export interface AccessPerson {
   email: string;
   active: boolean;
 }
-
-export interface AccessTabCounts {
-  mine: number;
-  inbox: number;
-  reviews: number;
-}

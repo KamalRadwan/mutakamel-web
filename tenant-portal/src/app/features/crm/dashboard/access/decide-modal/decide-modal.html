@@ -11,69 +11,28 @@
   @if (request(); as req) {
     <div class="flex flex-col gap-10">
       <div class="grid grid-cols-2 gap-x-10 gap-y-8 rounded-10 border border-border bg-surface-muted p-8">
-        <ui-field
-          size="bare"
-          [label]="'access.fields.requester' | transloco"
-          [hint]="'access.fields.requesterHint' | transloco"
-        >
-          <span class="truncate text-12 leading-18 font-medium text-text">{{ requesterLabel() }}</span>
+        <ui-field [label]="'access.fields.requester' | transloco" [for]="uid + '-detail-requester'" [hint]="'access.fields.requesterHint' | transloco">
+          <input [id]="uid + '-detail-requester'" class="w-full bg-transparent text-12 text-text outline-none" [value]="requesterLabel()" readonly />
         </ui-field>
 
-        <ui-field
-          size="bare"
-          [label]="'access.fields.resource' | transloco"
-          [hint]="'access.fields.resourceHint' | transloco"
-        >
-          <div class="flex min-w-0 items-center gap-6">
-            <span
-              class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
-              [class]="req.resourceType === 'DASHBOARD' ? 'bg-icon-navy' : 'bg-icon-violet'"
-              aria-hidden="true"
-            >
-              <ng-icon
-                [name]="req.resourceType === 'DASHBOARD' ? 'tablerLayoutDashboard' : 'tablerPuzzle'"
-                size="14"
-              />
-            </span>
-            <span class="truncate text-12 leading-18 font-medium text-text">{{ resourceLabel() }}</span>
-          </div>
+        <ui-field [label]="'access.fields.resource' | transloco" [for]="uid + '-detail-resource'" [hint]="'access.fields.resourceHint' | transloco">
+          <input [id]="uid + '-detail-resource'" class="w-full bg-transparent text-12 text-text outline-none" [value]="resourceLabel()" readonly />
         </ui-field>
 
-        <ui-field
-          size="bare"
-          [label]="'access.fields.requestedLevel' | transloco"
-          [hint]="'access.fields.requestedLevelHint' | transloco"
-        >
-          <div class="flex items-center">
-            <ui-badge tone="tag">{{ 'access.level.' + req.requestedLevel | transloco }}</ui-badge>
-          </div>
+        <ui-field [label]="'access.fields.requestedLevel' | transloco" [for]="uid + '-detail-requestedLevel'" [hint]="'access.fields.requestedLevelHint' | transloco">
+          <input [id]="uid + '-detail-requestedLevel'" class="w-full bg-transparent text-12 text-text outline-none" [value]="'access.level.' + req.requestedLevel | transloco" readonly />
         </ui-field>
 
-        <ui-field
-          size="bare"
-          [label]="'access.fields.heldNow' | transloco"
-          [hint]="'access.fields.heldNowHint' | transloco"
-        >
-          <div class="flex items-center">
-            <ui-badge tone="tag">{{ 'analytics.access.' + req.heldLevelAtRequest | transloco }}</ui-badge>
-          </div>
+        <ui-field [label]="'access.fields.heldNow' | transloco" [for]="uid + '-detail-heldNow'" [hint]="'access.fields.heldNowHint' | transloco">
+          <input [id]="uid + '-detail-heldNow'" class="w-full bg-transparent text-12 text-text outline-none" [value]="'analytics.access.' + req.heldLevelAtRequest | transloco" readonly />
         </ui-field>
 
-        <ui-field
-          size="bare"
-          [label]="'access.fields.waitingUntil' | transloco"
-          [hint]="'access.fields.waitingUntilHint' | transloco"
-        >
-          <span class="text-12 leading-18 text-text">{{ waitingUntilText() }}</span>
+        <ui-field [label]="'access.fields.waitingUntil' | transloco" [for]="uid + '-detail-waitingUntil'" [hint]="'access.fields.waitingUntilHint' | transloco">
+          <input [id]="uid + '-detail-waitingUntil'" class="w-full bg-transparent text-12 text-text outline-none" [value]="waitingUntilText()" readonly />
         </ui-field>
 
-        <ui-field
-          size="bare"
-          class="col-span-2"
-          [label]="'access.fields.purpose' | transloco"
-          [hint]="'access.fields.purposeHint' | transloco"
-        >
-          <p class="text-12 leading-18 text-text break-words">{{ req.purpose }}</p>
+        <ui-field size="multiline" class="col-span-2" [label]="'access.fields.purpose' | transloco" [for]="uid + '-detail-purpose'" [hint]="'access.fields.purposeHint' | transloco">
+          <textarea [id]="uid + '-detail-purpose'" rows="3" class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none" [value]="req.purpose" readonly></textarea>
         </ui-field>
       </div>
 
@@ -114,7 +73,7 @@
               [label]="'access.decide.grantedLevel' | transloco"
               [describedBy]="uid + '-granted-level-hint'"
               [options]="grantedLevelOptions()"
-              [value]="grantedLevel()"
+              [disabled]="readOnly()" [value]="grantedLevel()"
               (valueChange)="onGrantedLevelChange($event)"
             />
           </ui-field>
@@ -142,7 +101,7 @@
                 [prevMonthLabel]="'access.date.prevMonth' | transloco"
                 [nextMonthLabel]="'access.date.nextMonth' | transloco"
                 [invalid]="!!expiresError()"
-                [value]="grantedExpiresAt()"
+                [disabled]="readOnly()" [value]="grantedExpiresAt()"
                 (valueChange)="onExpiresChange($event)"
               />
               @if (grantedExpiresAt()) {
@@ -175,7 +134,7 @@
             [id]="uid + '-note'"
             rows="3"
             class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
-            [value]="note()"
+            [readOnly]="readOnly()" [value]="note()"
             [placeholder]="'access.decide.notePlaceholder' | transloco"
             [attr.aria-invalid]="noteError() ? 'true' : null"
             (input)="onNoteInput($event)"
@@ -187,11 +146,11 @@
 
   <ng-container modal-footer>
     @if (decision() === 'APPROVED') {
-      <button type="button" uiButton variant="primary" [loading]="submitting()" (click)="submit()">
+      <button type="button" uiButton variant="primary" [loading]="submitting()" [disabled]="readOnly()" (click)="submit()">
         {{ 'access.decide.approve' | transloco }}
       </button>
     } @else {
-      <button type="button" uiButton variant="secondary" [loading]="submitting()" (click)="submit()">
+      <button type="button" uiButton variant="secondary" [loading]="submitting()" [disabled]="readOnly()" (click)="submit()">
         {{ 'access.decide.reject' | transloco }}
       </button>
     }
@@ -201,11 +160,4 @@
   </ng-container>
 </ui-modal>
 
-<ui-confirm-dialog
-  #conflictDialog
-  tone="warning"
-  [title]="'analytics.common.conflictTitle' | transloco"
-  [text]="'analytics.common.conflictText' | transloco"
-  [confirmLabel]="'analytics.common.reload' | transloco"
-  [cancelLabel]="'analytics.common.keepMine' | transloco"
-/>
+<ui-conflict-dialog [(open)]="conflictOpen" (reload)="resolveConflict(true)" (keepEditing)="resolveConflict(false)" />

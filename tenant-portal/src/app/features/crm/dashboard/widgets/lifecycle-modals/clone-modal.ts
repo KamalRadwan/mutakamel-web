@@ -1,4 +1,4 @@
-import { Component, DestroyRef, computed, inject, signal, viewChild } from '@angular/core';
+import { Component, DestroyRef, computed, inject, output, signal, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
@@ -8,9 +8,11 @@ import { Notify } from '../../../../../core/notify/notify';
 import { Button } from '../../../../../shared/ui/button/button';
 import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
-import { errorCodeOf, newIdempotencyKey } from '../../../../../shared/widgets/dashboard/analytics-api';
-import { errorKey } from '../../../../../shared/widgets/dashboard/panel-state';
-import { cloneWidget } from '../widgets.api';
+import { ApiError, fieldErrorsOf, isRetryableWriteError } from '../../../../../core/api/api-errors';
+import { newIdempotencyKey } from '../../../../../core/api/idempotency';
+import { can } from '../../../../../shared/widgets/dashboard/analytics-permissions';
+import { cloneWidget, getWidget } from '../widgets.api';
+import { widgetErrorMessage, widgetNeedsReload, widgetWriteReadOnly } from '../builder/builder-errors';
 import type { WidgetSummary } from '../widgets.model';
 
 const MAX_NAME_LEN = 120;
@@ -22,6 +24,7 @@ const MAX_NAME_LEN = 120;
     provideTranslocoScope(
       { scope: 'crm-widgets', alias: 'widgets' },
       { scope: 'analytics', alias: 'analytics' },
+      { scope: 'crm-widget-page', alias: 'widgetPage' },
     ),
     provideIcons({ tablerCopy }),
   ],
@@ -29,6 +32,7 @@ const MAX_NAME_LEN = 120;
   host: { class: 'contents' },
 })
 export class CloneModal {
+  readonly becameReadOnly = output<void>();
   private static nextId = 0;
   protected readonly uid = `widget-clone-${++CloneModal.nextId}`;
 
@@ -43,6 +47,9 @@ export class CloneModal {
   protected readonly touched = signal(false);
   protected readonly submitAttempted = signal(false);
   protected readonly submitting = signal(false);
+  protected readonly readOnly = signal(false);
+  private readonly serverNameError = signal(false);
+  private cloneIntent: { name: string; key: string } | null = null;
 
   private openSeq = 0;
   private resolver: ((cloned: boolean) => void) | null = null;
@@ -51,6 +58,7 @@ export class CloneModal {
   protected readonly nameError = computed<string | null>(() => {
     this.i18n();
     const trimmed = this.name().trim();
+    if (this.serverNameError()) return this.transloco.translate('analytics.error.CRM_VALIDATION_FAILED');
     if (trimmed.length > MAX_NAME_LEN) {
       return this.transloco.translate('widgets.cloneModal.nameTooLong');
     }
@@ -62,7 +70,7 @@ export class CloneModal {
 
   protected readonly canSubmit = computed<boolean>(() => {
     const len = this.name().trim().length;
-    return !this.submitting() && len >= 1 && len <= MAX_NAME_LEN;
+    return !this.submitting() && !this.readOnly() && can('crm.widgets.create') && len >= 1 && len <= MAX_NAME_LEN;
   });
 
   constructor() {
@@ -86,6 +94,9 @@ export class CloneModal {
     this.touched.set(false);
     this.submitAttempted.set(false);
     this.submitting.set(false);
+    this.readOnly.set(false);
+    this.cloneIntent = null;
+    this.serverNameError.set(false);
     this.modal().open();
 
     return new Promise<boolean>((resolve) => {
@@ -94,6 +105,7 @@ export class CloneModal {
   }
 
   protected onNameInput(event: Event): void {
+    this.serverNameError.set(false);
     this.name.set((event.target as HTMLInputElement).value);
   }
 
@@ -124,8 +136,9 @@ export class CloneModal {
     const seq = this.openSeq;
     const targetName = this.name().trim();
     this.submitting.set(true);
+    if (this.cloneIntent?.name !== targetName) this.cloneIntent = { name: targetName, key: newIdempotencyKey() };
     try {
-      const cloned = await cloneWidget(source.id, targetName, newIdempotencyKey());
+      const cloned = await cloneWidget(source.id, targetName, this.cloneIntent.key);
       if (seq !== this.openSeq) return;
       this.notify.success(this.transloco.translate('widgets.cloneModal.clonedToast'));
       this.settledResult = true;
@@ -133,7 +146,19 @@ export class CloneModal {
       void this.router.navigate(['/crm/dashboard/widgets', cloned.widgetId, 'builder']);
     } catch (error) {
       if (seq !== this.openSeq) return;
-      this.notify.error(this.transloco.translate(errorKey(errorCodeOf(error))));
+      if (!isRetryableWriteError(error) && !(error instanceof ApiError && error.status === 401)) this.cloneIntent = null;
+      if (fieldErrorsOf(error)['name']) this.serverNameError.set(true);
+      else this.notify.error(widgetErrorMessage(error, this.transloco, 'widgetPage', true));
+      if (widgetWriteReadOnly(error) || widgetNeedsReload(error)) this.readOnly.set(true);
+      if (widgetWriteReadOnly(error)) this.becameReadOnly.emit();
+      if (widgetNeedsReload(error)) {
+        try {
+          const fresh = await getWidget(source.id);
+          if (seq === this.openSeq) this.widget.set(fresh);
+        } catch (loadError) {
+          if (seq === this.openSeq) this.notify.error(widgetErrorMessage(loadError, this.transloco, 'widgetPage'));
+        }
+      }
     } finally {
       if (seq === this.openSeq) {
         this.submitting.set(false);

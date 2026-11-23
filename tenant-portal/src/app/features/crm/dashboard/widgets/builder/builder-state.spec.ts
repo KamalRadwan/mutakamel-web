@@ -1,11 +1,15 @@
 import { TestBed } from '@angular/core/testing';
-import { TranslocoLoader, type Translation, provideTransloco } from '@jsverse/transloco';
+import { TranslocoLoader, TranslocoService, type Translation, provideTransloco } from '@jsverse/transloco';
 import { of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Injectable } from '@angular/core';
 import type { ManualReference } from '../../../../../shared/widgets/dashboard/analytics.model';
-import { FAKE_FAIL, withRunSlot } from '../../../../../shared/widgets/dashboard/analytics-api';
+import { ApiError } from '../../../../../core/api/api-errors';
+import { bindCrmHttpForTest, crmQueries } from '../../../shared/crm-http';
+import { WidgetHttpStub } from './builder-test-support';
 import { RUN_CONCURRENCY_CODE } from '../../../../../shared/widgets/dashboard/panel-state';
+import builderEn from '../../../../../../../public/i18n/crm-widget-builder/en.json';
+import analyticsEn from '../../../../../../../public/i18n/analytics/en.json';
 import { BuilderState } from './builder-state';
 
 @Injectable()
@@ -21,20 +25,26 @@ function ref(seriesIndex: number, label: string): ManualReference {
 
 describe('BuilderState', () => {
   let state: BuilderState;
+  let stub: WidgetHttpStub;
+  let dispose: () => void;
 
   beforeEach(() => {
+    stub = new WidgetHttpStub();
+    dispose = bindCrmHttpForTest(stub);
     TestBed.configureTestingModule({
       providers: [
         provideTransloco({ config: { availableLangs: ['ar', 'en'], defaultLang: 'en' }, loader: EmptyLoader }),
         BuilderState,
       ],
     });
+    TestBed.inject(TranslocoService).setTranslation({ builder: builderEn, analytics: analyticsEn }, 'en');
     state = TestBed.inject(BuilderState);
   });
 
   afterEach(() => {
     vi.useRealTimers();
-    FAKE_FAIL.nextCall = false;
+    crmQueries().clear();
+    dispose();
     TestBed.resetTestingModule();
   });
 
@@ -95,33 +105,27 @@ describe('BuilderState', () => {
   });
 
   describe('preview errors', () => {
-    it('maps a concurrency refusal (429) to the busy state after retries run out', async () => {
+    it('maps a concurrency refusal (429) to the busy state without polling', async () => {
       vi.useFakeTimers();
-      const releases: (() => void)[] = [];
-      const blockers = Array.from({ length: 3 }, () =>
-        withRunSlot(() => new Promise<void>((resolve) => releases.push(resolve))),
-      );
+      stub.respond = () => { throw new ApiError(429, RUN_CONCURRENCY_CODE, { retryAfterSeconds: ['9'] }); };
 
       state.patchQuery({ series: [{ metricKey: 'crm.leads.count' }] });
       state.refreshPreview();
       expect(state.preview().status).toBe('loading');
 
-      await vi.advanceTimersByTimeAsync(100);
-      expect(state.preview()).toMatchObject({ status: 'loading', retrying: true });
-
-      await vi.advanceTimersByTimeAsync(10_000);
+      await vi.advanceTimersByTimeAsync(0);
       expect(state.preview()).toMatchObject({ status: 'ERROR', reasonCode: RUN_CONCURRENCY_CODE, execution: null });
       // Not a server field error and not a form banner.
       expect(state.errors()).toEqual({});
       expect(state.formError()).toBeNull();
 
-      releases.forEach((r) => r());
-      await Promise.all(blockers);
+      await vi.advanceTimersByTimeAsync(120_000);
+      expect(stub.recordedWrites()).toHaveLength(1);
     });
 
     it('maps any other failure to UNAVAILABLE with its own code, not busy', async () => {
       vi.useFakeTimers();
-      FAKE_FAIL.nextCall = true;
+      stub.respond = () => { throw new ApiError(503, 'GW.UPSTREAM.UNAVAILABLE'); };
       state.patchQuery({ series: [{ metricKey: 'crm.leads.count' }] });
       state.refreshPreview();
       await vi.advanceTimersByTimeAsync(5_000);

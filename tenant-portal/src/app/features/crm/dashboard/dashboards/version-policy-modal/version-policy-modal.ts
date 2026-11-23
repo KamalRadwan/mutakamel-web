@@ -1,4 +1,16 @@
-import { Component, DestroyRef, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
+import { fieldErrorsOf } from '../../../../../core/api/api-errors';
+import { Router } from '@angular/router';
+import { can } from '../../../../../shared/widgets/dashboard/analytics-permissions';
+import { FullState } from '../../../../../shared/ui/full-state/full-state';
+import {
+  Component,
+  DestroyRef,
+  ElementRef,
+  computed,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
@@ -9,6 +21,9 @@ import { Button } from '../../../../../shared/ui/button/button';
 import type { Visualization } from '../../../../../shared/ui/chart/chart.model';
 import { Dropdown, type DropdownOption } from '../../../../../shared/ui/dropdown/dropdown';
 import { Field } from '../../../../../shared/ui/field/field';
+import { ConflictDialog } from '../../../../../shared/ui/conflict-dialog/conflict-dialog';
+import { ConflictChoice } from '../../shared/conflict-choice';
+import { dashboardWriteError } from '../../shared/write-state';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { rectInPage, viewport } from '../../../../../shared/ui/overlay/zoom';
 import { Segmented, type SegmentedOption } from '../../../../../shared/ui/segmented/segmented';
@@ -39,8 +54,18 @@ function clampVersion(version: number, maxVersion: number): number {
 
 @Component({
   selector: 'app-version-policy-modal',
-  imports: [NgIcon, TranslocoPipe, Button, Dropdown, Field, Modal, Segmented],
-  providers: [
+  imports: [
+    FullState,
+    NgIcon,
+    TranslocoPipe,
+    Button,
+    Dropdown,
+    Field,
+    Modal,
+    Segmented,
+    ConflictDialog,
+  ],
+  viewProviders: [
     provideTranslocoScope(
       { scope: 'crm-dash-edit', alias: 'dashEdit' },
       { scope: 'analytics', alias: 'analytics' },
@@ -53,6 +78,8 @@ export class VersionPolicyModal {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly destroyRef = inject(DestroyRef);
   private readonly notify = inject(Notify);
+  private readonly router = inject(Router);
+  protected readonly canViewReadiness = can('crm.analytics.readiness.view');
   private readonly transloco = inject(TranslocoService);
   private readonly language = inject(LanguageState).current;
   private readonly i18n = translationEvents(this.transloco);
@@ -60,9 +87,14 @@ export class VersionPolicyModal {
   private readonly modal = viewChild.required(Modal);
 
   protected readonly uid = `version-policy-modal-${++nextPolicyModalId}`;
+  protected readonly conflict = new ConflictChoice();
+  protected readonly writeReadOnly = signal(false);
+  private previewTimer: ReturnType<typeof setTimeout> | null = null;
   protected readonly loading = signal(false);
+  protected readonly loadFailure = signal<ReturnType<typeof dashboardWriteError> | null>(null);
   protected readonly loadFailed = signal(false);
   protected readonly previewing = signal(false);
+  protected readonly versionError = signal<string | null>(null);
   protected readonly saving = signal(false);
   protected readonly binding = signal<VersionBinding | null>(null);
   protected readonly policy = signal<'FOLLOW_ACTIVE' | 'PINNED'>('FOLLOW_ACTIVE');
@@ -82,8 +114,16 @@ export class VersionPolicyModal {
     this.language();
     this.i18n();
     return [
-      { value: 'FOLLOW_ACTIVE', label: this.transloco.translate('dashEdit.followActive') },
-      { value: 'PINNED', label: this.transloco.translate('dashEdit.pin') },
+      {
+        value: 'FOLLOW_ACTIVE',
+        label: this.transloco.translate('dashEdit.followActive'),
+        disabled: this.writeReadOnly(),
+      },
+      {
+        value: 'PINNED',
+        label: this.transloco.translate('dashEdit.pin'),
+        disabled: this.writeReadOnly(),
+      },
     ];
   });
 
@@ -116,6 +156,7 @@ export class VersionPolicyModal {
 
   protected readonly canSave = computed(
     () =>
+      !this.writeReadOnly() &&
       !this.loading() &&
       !this.loadFailed() &&
       !this.previewing() &&
@@ -126,6 +167,8 @@ export class VersionPolicyModal {
 
   constructor() {
     this.destroyRef.onDestroy(() => {
+      this.clearPreviewTimer();
+      this.conflict.choose(false);
       this.loadSeq++;
       this.previewSeq++;
       this.settle(null);
@@ -133,7 +176,10 @@ export class VersionPolicyModal {
   }
 
   open(dashboardId: string, placementId: string): Promise<VersionBinding | null> {
+    this.versionError.set(null);
     this.settle(null);
+    this.writeReadOnly.set(false);
+    this.clearPreviewTimer();
     this.dashboardId = dashboardId;
     this.placementId = placementId;
     this.binding.set(null);
@@ -141,6 +187,7 @@ export class VersionPolicyModal {
     this.pinnedVersion.set(1);
     this.preview.set(null);
     this.loadFailed.set(false);
+    this.loadFailure.set(null);
     this.previewing.set(false);
     this.saving.set(false);
     this.activeHint.set(null);
@@ -153,6 +200,12 @@ export class VersionPolicyModal {
     });
   }
 
+  protected onReadAction(): void {
+    if (this.loadFailure()?.kind === 'provisioning' && this.canViewReadiness) {
+      this.modal().close();
+      void this.router.navigate(['/crm/settings/data-readiness']);
+    } else this.retryLoad();
+  }
   protected retryLoad(): void {
     void this.loadBinding();
   }
@@ -169,20 +222,25 @@ export class VersionPolicyModal {
     }
 
     if (this.dirty()) {
-      void this.runPreview();
+      this.schedulePreview();
     } else {
+      this.clearPreviewTimer();
       this.previewSeq++;
+      this.previewing.set(false);
       this.preview.set(null);
     }
   }
 
   protected onPinnedVersionChange(next: number): void {
     if (next === this.pinnedVersion()) return;
+    this.versionError.set(null);
     this.pinnedVersion.set(next);
     if (this.dirty()) {
-      void this.runPreview();
+      this.schedulePreview();
     } else {
+      this.clearPreviewTimer();
       this.previewSeq++;
+      this.previewing.set(false);
       this.preview.set(null);
     }
   }
@@ -190,11 +248,15 @@ export class VersionPolicyModal {
   protected undo(): void {
     const b = this.binding();
     if (!b || !this.dirty() || this.saving()) return;
+    this.clearPreviewTimer();
     this.previewSeq++;
     this.previewing.set(false);
     this.policy.set(b.versionPolicy);
     this.pinnedVersion.set(
-      clampVersion(b.pinnedVersionNumber ?? b.selectedVersionNumber ?? b.activeVersionNumber, b.activeVersionNumber),
+      clampVersion(
+        b.pinnedVersionNumber ?? b.selectedVersionNumber ?? b.activeVersionNumber,
+        b.activeVersionNumber,
+      ),
     );
     this.preview.set(null);
   }
@@ -208,6 +270,7 @@ export class VersionPolicyModal {
     const pinnedVersionNumber = currentPolicy === 'PINNED' ? this.pinnedVersion() : null;
 
     this.saving.set(true);
+    this.versionError.set(null);
     try {
       const updated = await setVersionPolicy(this.dashboardId, this.placementId, {
         versionPolicy: currentPolicy,
@@ -221,9 +284,16 @@ export class VersionPolicyModal {
       this.settle(updated);
       this.modal().close();
     } catch (error) {
-      this.notify.error(this.transloco.translate(errorKey(errorCodeOf(error))));
-      if (isStalePlacementError(error)) {
-        await this.refreshAndRepreview();
+      if (fieldErrorsOf(error)['pinnedVersionNumber']) {
+        this.versionError.set(this.transloco.translate('dashEdit.invalidVersion'));
+      } else if (isStalePlacementError(error)) {
+        const keep = await this.conflict.open();
+        if (keep) await this.refreshAndRepreview();
+        else await this.loadBinding();
+      } else {
+        const failure = dashboardWriteError(this.transloco, error, 'dashEdit');
+        this.writeReadOnly.set(failure.readOnly || failure.reloadRequired);
+        this.notify.error(failure.message);
       }
     } finally {
       this.saving.set(false);
@@ -236,13 +306,20 @@ export class VersionPolicyModal {
   }
 
   protected onModalClosed(): void {
+    this.clearPreviewTimer();
+    this.conflict.choose(false);
     this.loadSeq++;
     this.previewSeq++;
     this.activeHint.set(null);
     this.settle(null);
   }
 
-  protected showHint(key: string, triggerEl: HTMLElement, rowEl: HTMLElement, tipEl: HTMLElement): void {
+  protected showHint(
+    key: string,
+    triggerEl: HTMLElement,
+    rowEl: HTMLElement,
+    tipEl: HTMLElement,
+  ): void {
     const rect = rectInPage(triggerEl);
     const row = rectInPage(rowEl);
     const tip = rectInPage(tipEl);
@@ -269,6 +346,7 @@ export class VersionPolicyModal {
     this.previewSeq++;
     this.loading.set(true);
     this.loadFailed.set(false);
+    this.loadFailure.set(null);
     this.preview.set(null);
 
     try {
@@ -278,7 +356,7 @@ export class VersionPolicyModal {
     } catch (error) {
       if (seq !== this.loadSeq) return;
       this.loadFailed.set(true);
-      this.notify.error(this.transloco.translate(errorKey(errorCodeOf(error))));
+      this.loadFailure.set(dashboardWriteError(this.transloco, error, 'dashEdit', false));
     } finally {
       if (seq === this.loadSeq) {
         this.loading.set(false);
@@ -286,6 +364,20 @@ export class VersionPolicyModal {
     }
   }
 
+  private clearPreviewTimer(): void {
+    if (this.previewTimer !== null) clearTimeout(this.previewTimer);
+    this.previewTimer = null;
+  }
+  private schedulePreview(): void {
+    this.clearPreviewTimer();
+    this.previewSeq++;
+    this.preview.set(null);
+    this.previewing.set(true);
+    this.previewTimer = setTimeout(() => {
+      this.previewTimer = null;
+      void this.runPreview();
+    }, 600);
+  }
   private async runPreview(): Promise<void> {
     const b = this.binding();
     if (!b) return;
@@ -307,9 +399,14 @@ export class VersionPolicyModal {
     } catch (error) {
       if (seq !== this.previewSeq) return;
       this.preview.set(null);
-      this.notify.error(this.transloco.translate(errorKey(errorCodeOf(error))));
       if (isStalePlacementError(error)) {
-        await this.refreshAndRepreview();
+        const keep = await this.conflict.open();
+        if (keep) await this.refreshAndRepreview();
+        else await this.loadBinding();
+      } else {
+        const failure = dashboardWriteError(this.transloco, error, 'dashEdit');
+        this.writeReadOnly.set(failure.readOnly || failure.reloadRequired);
+        this.notify.error(failure.message);
       }
     } finally {
       if (seq === this.previewSeq) {
@@ -325,7 +422,7 @@ export class VersionPolicyModal {
       if (seq !== this.loadSeq) return;
       this.applyBinding(fresh, false);
       if (this.dirty()) {
-        await this.runPreview();
+        this.schedulePreview();
       } else {
         this.preview.set(null);
       }
@@ -359,5 +456,9 @@ export class VersionPolicyModal {
 }
 
 function isStalePlacementError(error: unknown): boolean {
-  return error instanceof ApiError && error.status === 409 && error.code === 'CRM_DASHBOARD_PLACEMENT_VERSION_STALE';
+  return (
+    error instanceof ApiError &&
+    error.status === 409 &&
+    error.code === 'CRM_DASHBOARD_PLACEMENT_VERSION_STALE'
+  );
 }

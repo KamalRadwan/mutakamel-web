@@ -17,7 +17,7 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { differenceInCalendarDays } from 'date-fns';
 import { LanguageState } from '../../../../../core/i18n/language';
 import type { FilterDescriptor } from '../../../../../shared/widgets/dashboard/analytics.model';
-import { FAKE_BRANCHES, FAKE_PEOPLE, FAKE_TEAMS } from '../../../../../shared/widgets/dashboard/fake/fake-org';
+import { OrgApi } from '../../../../../shared/widgets/dashboard/org.api';
 import { DateField } from '../../../../../shared/ui/date-time/date-field';
 import { Dropdown, type DropdownOption } from '../../../../../shared/ui/dropdown/dropdown';
 import { Field } from '../../../../../shared/ui/field/field';
@@ -75,6 +75,7 @@ export class ReportFilters {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
   private readonly state = inject(ReportState);
+  private readonly org = inject(OrgApi);
   private readonly language = inject(LanguageState).current;
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
@@ -157,6 +158,7 @@ export class ReportFilters {
     void loadReportFilterLookups().then((lookups) => {
       if (!destroyed) this.lookups.set(lookups);
     });
+    void Promise.allSettled([this.org.listGrantedBranches(), this.org.listTeams(), this.org.listUsers()]);
   }
 
   protected periodFieldId(d: FilterDescriptor, part: 'from' | 'to'): string {
@@ -172,12 +174,14 @@ export class ReportFilters {
   protected periodPartHint(part: 'from' | 'to'): string {
     this.i18n();
     this.reportScope();
-    return this.transloco.translate(part === 'from' ? 'repReport.periodFromHint' : 'repReport.periodToHint');
+    const hint = this.transloco.translate(part === 'from' ? 'repReport.periodFromHint' : 'repReport.periodToHint');
+    const zone = this.transloco.translate('repReport.datesTimeZone', { timeZone: this.state.manifest()?.scope.timeZone || 'UTC' });
+    return `${hint} ${zone}`;
   }
 
   protected periodPartDescribedBy(d: FilterDescriptor, part: 'from' | 'to'): string {
     const id = this.periodFieldId(d, part);
-    return part === 'to' && this.periodError() ? `${id}-hint ${id}-error` : `${id}-hint`;
+    return this.periodPartError(part) ? `${id}-hint ${id}-error` : `${id}-hint`;
   }
 
   protected dateLabel(key: 'today' | 'prevMonth' | 'nextMonth'): string {
@@ -211,8 +215,16 @@ export class ReportFilters {
   }
 
   protected fieldError(d: FilterDescriptor): string | null {
+    const errors = Object.entries(this.state.fieldErrors())
+      .filter(([path]) => path === d.key || path === `filters.${d.key}` || path.startsWith(`filters.${d.key}.`))
+      .flatMap(([, messages]) => messages);
+    if (errors.length) return errors.join(' ');
     if (d.kind === 'NUMBER') return this.numberErrors()[d.key] ?? null;
     return null;
+  }
+
+  protected periodPartError(part: 'from' | 'to'): string | null {
+    return this.state.fieldErrors()[`period.${part}`]?.join(' ') || (part === 'to' ? this.periodError() : null);
   }
 
   protected optionsFor(d: FilterDescriptor): DropdownOption<string>[] {
@@ -224,19 +236,19 @@ export class ReportFilters {
 
     switch (d.kind) {
       case 'BRANCH':
-        list = FAKE_BRANCHES.map((b) => ({
+        list = this.org.branches.map((b) => ({
           value: b.id,
           label: lang === 'ar' ? b.name.ar : b.name.en,
         }));
         break;
       case 'TEAM':
-        list = FAKE_TEAMS.map((t) => ({
+        list = this.org.teams.map((t) => ({
           value: t.id,
           label: lang === 'ar' ? t.name.ar : t.name.en,
         }));
         break;
       case 'OWNER':
-        list = FAKE_PEOPLE.map((p) => ({
+        list = this.org.users.map((p) => ({
           value: p.id,
           label: lang === 'ar' ? p.nameAr : p.name,
         }));

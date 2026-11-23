@@ -110,11 +110,11 @@
 
 @if (loadErrorKey(); as errKey) {
   <ui-full-state
-    kind="load-failure"
-    [title]="'repCatalogue.loadFailed' | transloco"
-    [text]="errKey | transloco"
-    [actionLabel]="'analytics.common.retry' | transloco"
-    (action)="retry()"
+    [kind]="loadKind()"
+    [title]="(loadKind() === 'forbidden' ? 'repCatalogue.forbidden' : 'repCatalogue.loadFailed') | transloco"
+    [text]="loadErrorText()"
+    [actionLabel]="(loadKind() === 'provisioning' && canViewReadiness() ? 'repCatalogue.readinessLink' : 'analytics.common.retry') | transloco"
+    (action)="loadKind() === 'provisioning' && canViewReadiness() ? openReadiness() : retry()"
   />
 } @else if (view() === 'cards') {
   @if (loading()) {
@@ -167,6 +167,7 @@
               <app-report-card
                 [report]="report"
                 [togglingFavourite]="isToggling(report.reportKey)"
+                [readOnly]="readOnly()"
                 (open)="openReport($event)"
                 (toggleFavourite)="toggleFavourite($event)"
               />
@@ -232,6 +233,11 @@
       <ng-template uiCell="readiness" let-row>
         @let badge = badgeFor(row.readiness);
         <ui-badge [tone]="badge.tone">{{ 'repCatalogue.' + badge.key | transloco }}</ui-badge>
+        @if (isDisabled(row.readiness) && canViewReadiness()) {
+          <a uiButton size="small" variant="ghost" routerLink="/crm/settings/data-readiness" (click)="$event.stopPropagation()">
+            {{ 'repCatalogue.readinessLink' | transloco }}
+          </a>
+        }
       </ng-template>
 
       <ng-template uiCell="favourite" let-row>
@@ -242,7 +248,7 @@
             type="button"
             class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 outline-none transition-colors duration-fast hover:bg-neutral-soft focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
             [class]="row.favourite ? 'text-icon-orange' : 'text-text-muted hover:text-icon-orange'"
-            [disabled]="isToggling(row.reportKey)"
+            [disabled]="readOnly() || isToggling(row.reportKey)"
             [attr.aria-pressed]="row.favourite"
             [attr.aria-label]="(row.favourite ? 'repCatalogue.unfavourite' : 'repCatalogue.favourite') | transloco"
             [title]="(row.favourite ? 'repCatalogue.unfavourite' : 'repCatalogue.favourite') | transloco"

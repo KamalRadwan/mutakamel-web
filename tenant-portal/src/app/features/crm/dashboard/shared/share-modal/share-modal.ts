@@ -1,3 +1,5 @@
+import { Router } from '@angular/router';
+import { can } from '../../../../../shared/widgets/dashboard/analytics-permissions';
 import {
   Component,
   DestroyRef,
@@ -29,7 +31,18 @@ import { Notify } from '../../../../../core/notify/notify';
 import { Badge } from '../../../../../shared/ui/badge/badge';
 import { Button } from '../../../../../shared/ui/button/button';
 import { DASH, formatDate } from '../../../../../shared/ui/chart/chart-format';
-import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
+import { ConflictDialog } from '../../../../../shared/ui/conflict-dialog/conflict-dialog';
+import { FullState } from '../../../../../shared/ui/full-state/full-state';
+import { TenantScopeState } from '../../../../../core/scope/tenant-scope';
+import { fieldErrorsOf } from '../../../../../core/api/api-errors';
+import { ConflictChoice } from '../conflict-choice';
+import {
+  dashboardWriteError,
+  isAnalyticsConflict,
+  retainWriteIntent,
+  writeIntent,
+  type WriteIntent,
+} from '../write-state';
 import { DataCell, DataColumn, DataTable } from '../../../../../shared/ui/data-table/data-table';
 import { DateField } from '../../../../../shared/ui/date-time/date-field';
 import { Dropdown, DropdownOption } from '../../../../../shared/ui/dropdown/dropdown';
@@ -37,19 +50,31 @@ import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { rectInPage, viewport } from '../../../../../shared/ui/overlay/zoom';
 import { Segmented, SegmentedOption } from '../../../../../shared/ui/segmented/segmented';
-import { ApiError, FAKE_NOW, errorCodeOf, newIdempotencyKey } from '../../../../../shared/widgets/dashboard/analytics-api';
-import type { Share, ShareListItem, SharePreview, ShareTarget } from '../../../../../shared/widgets/dashboard/analytics.model';
-import { FAKE_ME } from '../../../../../shared/widgets/dashboard/fake/fake-org';
+import { ApiError, errorCodeOf } from '../../../../../shared/widgets/dashboard/analytics-api';
+import type {
+  Share,
+  ShareListItem,
+  SharePreview,
+  ShareTarget,
+} from '../../../../../shared/widgets/dashboard/analytics.model';
 import { errorKey, reasonKey } from '../../../../../shared/widgets/dashboard/panel-state';
 import { selectScopeTranslation } from '../../../../../shared/widgets/dashboard/scope-translation';
 
 export interface ShareApi {
   list(): Promise<ShareListItem[]>;
   add(
-    body: { subjectType: 'USER' | 'TEAM'; subjectId: string; accessLevel: 'VIEW' | 'EDIT'; expiresAt?: string | null },
+    body: {
+      subjectType: 'USER' | 'TEAM';
+      subjectId: string;
+      accessLevel: 'VIEW' | 'EDIT';
+      expiresAt?: string | null;
+    },
     key: string,
   ): Promise<Share>;
-  update(shareId: string, body: { accessLevel?: 'VIEW' | 'EDIT'; expiresAt?: string | null }): Promise<Share>;
+  update(
+    shareId: string,
+    body: { revision?: number; accessLevel?: 'VIEW' | 'EDIT'; expiresAt?: string | null },
+  ): Promise<Share>;
   revoke(shareId: string, reason: 'OWNER_REVOKED' | 'ADMIN_REVOKED'): Promise<void>;
   targets(search: string): Promise<ShareTarget[]>;
   preview(subjectType: 'USER' | 'TEAM', subjectId: string): Promise<SharePreview>;
@@ -62,7 +87,6 @@ interface TargetPlace {
 }
 
 const SEARCH_DEBOUNCE_MS = 150;
-const TODAY_ISO = FAKE_NOW.slice(0, 10);
 
 /** End of the chosen calendar day in the viewer's local time zone, as an instant. */
 function endOfLocalDayIso(day: string): string {
@@ -85,9 +109,10 @@ const ESTIMATED_LIST_HEIGHT = 240;
     DataTable,
     DataCell,
     Badge,
-    ConfirmDialog,
+    ConflictDialog,
+    FullState,
   ],
-  providers: [
+  viewProviders: [
     provideTranslocoScope(
       { scope: 'crm-dash-share', alias: 'share' },
       { scope: 'analytics', alias: 'analytics' },
@@ -113,17 +138,47 @@ export class ShareModal {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
   private readonly notify = inject(Notify);
+  private readonly router = inject(Router);
+  protected readonly canViewReadiness = can('crm.analytics.readiness.view');
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
-  private readonly shareScope = toSignal(selectScopeTranslation(this.transloco, 'crm-dash-share', 'share'));
+  private readonly shareScope = toSignal(
+    selectScopeTranslation(this.transloco, 'crm-dash-share', 'share'),
+  );
   protected readonly language = inject(LanguageState).current;
 
   private readonly modal = viewChild.required(Modal);
-  private readonly confirmDialog = viewChild.required(ConfirmDialog);
+  private readonly revokeModal = viewChild.required<Modal>('revokeModal');
+  private readonly tenantScope = inject(TenantScopeState, { optional: true });
+  protected readonly conflict = new ConflictChoice();
+  protected readonly readOnly = signal(false);
+  protected readonly readFailure = signal<ReturnType<typeof dashboardWriteError> | null>(null);
+  protected readonly shareDrafts = signal<Record<string, 'VIEW' | 'EDIT'>>({});
+  protected readonly revokeReason = signal<'OWNER_REVOKED' | 'ADMIN_REVOKED' | null>(null);
+  protected readonly reasonError = signal<string | null>(null);
+  private addIntent: WriteIntent | null = null;
+  private previewTimer: ReturnType<typeof setTimeout> | null = null;
+  protected readonly reasonOptions = computed<DropdownOption<'OWNER_REVOKED' | 'ADMIN_REVOKED'>[]>(
+    () => {
+      this.i18n();
+      return [
+        { value: 'OWNER_REVOKED', label: this.transloco.translate('share.ownerRevoked') },
+        ...(this.canAdmin()
+          ? [
+              {
+                value: 'ADMIN_REVOKED' as const,
+                label: this.transloco.translate('share.adminRevoked'),
+              },
+            ]
+          : []),
+      ];
+    },
+  );
   private readonly targetArea = viewChild<ElementRef<HTMLElement>>('targetArea');
   private readonly targetInput = viewChild<ElementRef<HTMLInputElement>>('targetInput');
   private readonly targetMenu = viewChild<ElementRef<HTMLElement>>('targetMenu');
-  private readonly targetOptionBtns = viewChildren<ElementRef<HTMLButtonElement>>('targetOptionBtn');
+  private readonly targetOptionBtns =
+    viewChildren<ElementRef<HTMLButtonElement>>('targetOptionBtn');
 
   readonly changed = output<void>();
 
@@ -156,6 +211,8 @@ export class ShareModal {
   protected readonly expiresAt = signal<string | null>(null);
   protected readonly targetError = signal<string | null>(null);
   protected readonly expiryError = signal<string | null>(null);
+  protected readonly accessError = signal<string | null>(null);
+  protected readonly rowErrors = signal<Record<string, string>>({});
 
   protected readonly adding = signal(false);
   protected readonly updatingIds = signal<ReadonlySet<string>>(new Set());
@@ -176,8 +233,8 @@ export class ShareModal {
     this.i18n();
     this.shareScope();
     return [
-      { value: 'VIEW', label: this.transloco.translate('share.view') },
-      { value: 'EDIT', label: this.transloco.translate('share.edit') },
+      { value: 'VIEW', label: this.transloco.translate('share.view'), disabled: this.readOnly() },
+      { value: 'EDIT', label: this.transloco.translate('share.edit'), disabled: this.readOnly() },
     ];
   });
 
@@ -185,8 +242,8 @@ export class ShareModal {
     this.i18n();
     this.shareScope();
     return [
-      { value: 'VIEW', label: this.transloco.translate('share.view') },
-      { value: 'EDIT', label: this.transloco.translate('share.edit') },
+      { value: 'VIEW', label: this.transloco.translate('share.view'), disabled: this.readOnly() },
+      { value: 'EDIT', label: this.transloco.translate('share.edit'), disabled: this.readOnly() },
     ];
   });
 
@@ -198,7 +255,12 @@ export class ShareModal {
       { key: 'type', label: this.transloco.translate('share.columns.type'), width: 0.85 },
       { key: 'access', label: this.transloco.translate('share.columns.access'), width: 1.25 },
       { key: 'expires', label: this.transloco.translate('share.columns.expires'), width: 1.05 },
-      { key: 'actions', label: this.transloco.translate('share.columns.actions'), width: 0.95, align: 'end' },
+      {
+        key: 'actions',
+        label: this.transloco.translate('share.columns.actions'),
+        width: 0.95,
+        align: 'end',
+      },
     ];
   });
 
@@ -222,19 +284,30 @@ export class ShareModal {
     inject(DestroyRef).onDestroy(() => {
       document.removeEventListener('scroll', onScroll, { capture: true });
       this.clearSearchTimer();
+      this.clearPreview();
+      this.conflict.choose(false);
     });
   }
 
   /** What is being shared; the access preview says "Access to this dashboard" or "... widget". */
   protected readonly resourceKind = signal<'dashboard' | 'widget'>('dashboard');
 
-  open(api: ShareApi, resourceName: string, canAdmin: boolean, resourceKind: 'dashboard' | 'widget' = 'dashboard'): void {
+  open(
+    api: ShareApi,
+    resourceName: string,
+    canAdmin: boolean,
+    resourceKind: 'dashboard' | 'widget' = 'dashboard',
+  ): void {
     const seq = ++this.openSeq;
     this.resourceKind.set(resourceKind);
     this.currentApi = api;
     this.resourceName.set(resourceName);
     this.canAdmin.set(canAdmin);
     this.resetForm();
+    this.readOnly.set(false);
+    this.readFailure.set(null);
+    this.shareDrafts.set({});
+    this.addIntent = null;
     this.shares.set([]);
     this.modal().open();
     void this.loadShares(seq);
@@ -246,6 +319,7 @@ export class ShareModal {
   }
 
   protected onModalClosed(): void {
+    this.conflict.choose(false);
     this.openSeq++;
     this.searchSeq++;
     this.previewSeq++;
@@ -342,7 +416,10 @@ export class ShareModal {
     const target = event.target as Node | null;
     const areaEl = this.targetArea()?.nativeElement;
     const menuEl = this.targetMenu()?.nativeElement;
-    if ((areaEl && target && areaEl.contains(target)) || (menuEl && target && menuEl.contains(target))) {
+    if (
+      (areaEl && target && areaEl.contains(target)) ||
+      (menuEl && target && menuEl.contains(target))
+    ) {
       return;
     }
     this.closeTargetMenu();
@@ -372,7 +449,7 @@ export class ShareModal {
 
   protected async addShare(): Promise<void> {
     const api = this.currentApi;
-    if (!api || this.adding()) return;
+    if (!api || this.adding() || this.readOnly()) return;
 
     const target = this.selectedTarget();
     if (!target) {
@@ -384,16 +461,17 @@ export class ShareModal {
     if (!this.validateExpiry(expiry)) return;
 
     this.adding.set(true);
+    this.accessError.set(null);
     try {
-      await api.add(
-        {
-          subjectType: target.type,
-          subjectId: target.id,
-          accessLevel: this.accessLevel(),
-          expiresAt: expiry ? endOfLocalDayIso(expiry) : null,
-        },
-        newIdempotencyKey(),
-      );
+      const body = {
+        subjectType: target.type,
+        subjectId: target.id,
+        accessLevel: this.accessLevel(),
+        expiresAt: expiry ? endOfLocalDayIso(expiry) : null,
+      };
+      this.addIntent = writeIntent(body, this.addIntent);
+      await api.add(body, this.addIntent.key);
+      this.addIntent = null;
       this.selectedTarget.set(null);
       this.clearPreview();
       this.searchText.set('');
@@ -405,13 +483,21 @@ export class ShareModal {
       this.changed.emit();
       await this.loadShares(this.openSeq);
     } catch (error) {
+      if (!retainWriteIntent(error)) this.addIntent = null;
       const code = errorCodeOf(error);
-      if (code === 'CRM_SHARE_SELF_INVALID' || code === 'CRM_SHARE_TARGET_INVALID') {
+      const fields = fieldErrorsOf(error);
+      if (fields['subjectId'] || fields['subjectType'])
+        this.targetError.set(this.transloco.translate('share.targetRequired'));
+      else if (fields['expiresAt'])
+        this.expiryError.set(this.transloco.translate('share.expiryPast'));
+      else if (fields['accessLevel'])
+        this.accessError.set(this.transloco.translate('share.invalidAccess'));
+      else if (code === 'CRM_SHARE_SELF_INVALID' || code === 'CRM_SHARE_TARGET_INVALID') {
         this.targetError.set(this.translateError(code));
       } else if (code === 'CRM_SHARE_EXPIRY_INVALID') {
         this.expiryError.set(this.translateError(code));
       } else {
-        this.notify.error(this.translateError(code));
+        this.showWriteError(error);
       }
     } finally {
       this.adding.set(false);
@@ -420,29 +506,38 @@ export class ShareModal {
 
   protected async updateAccess(item: ShareListItem, next: 'VIEW' | 'EDIT'): Promise<void> {
     const api = this.currentApi;
-    if (!api || next === item.accessLevel || this.updatingIds().has(item.id)) return;
-
+    if (!api || this.readOnly() || next === item.accessLevel || this.updatingIds().has(item.id))
+      return;
+    this.rowErrors.update((errors) => {
+      const nextErrors = { ...errors };
+      delete nextErrors[item.id];
+      return nextErrors;
+    });
+    this.shareDrafts.update((drafts) => ({ ...drafts, [item.id]: next }));
     this.updatingIds.update((set) => new Set(set).add(item.id));
     try {
       const updated = await api.update(item.id, { accessLevel: next });
       this.shares.update((rows) =>
         rows.map((row) =>
           row.id === item.id
-            ? {
-                ...row,
-                accessLevel: updated.accessLevel,
-                effectiveAccessLevel: updated.accessLevel,
-                updatedAt: updated.updatedAt,
-              }
+            ? { ...row, ...updated, effectiveAccessLevel: updated.accessLevel }
             : row,
         ),
       );
+      this.clearShareDraft(item.id);
       this.notify.success(this.transloco.translate('share.toast.updated'));
       this.changed.emit();
     } catch (error) {
-      // Force signal refresh so inline ui-dropdown reverts to the persisted level.
-      this.shares.update((rows) => rows.map((row) => (row.id === item.id ? { ...row } : row)));
-      this.notify.error(this.translateError(errorCodeOf(error)));
+      if (fieldErrorsOf(error)['accessLevel']) {
+        this.rowErrors.update((errors) => ({
+          ...errors,
+          [item.id]: this.transloco.translate('share.invalidAccess'),
+        }));
+      } else if (isAnalyticsConflict(error)) {
+        const keep = await this.conflict.open();
+        await this.loadShares(this.openSeq);
+        if (!keep) this.clearShareDraft(item.id);
+      } else this.showWriteError(error);
     } finally {
       this.updatingIds.update((set) => {
         const copy = new Set(set);
@@ -451,35 +546,73 @@ export class ShareModal {
       });
     }
   }
-
+  private clearShareDraft(id: string): void {
+    this.shareDrafts.update((drafts) => {
+      const copy = { ...drafts };
+      delete copy[id];
+      return copy;
+    });
+  }
   protected async revokeShare(item: ShareListItem): Promise<void> {
-    const api = this.currentApi;
-    if (!api || this.revokingId()) return;
-
+    if (!this.currentApi || this.readOnly() || this.revokingId()) return;
     this.revokingItem.set(item);
-    const confirmed = await this.confirmDialog().open();
-    if (!confirmed || this.currentApi !== api) {
-      this.revokingItem.set(null);
+    this.reasonError.set(null);
+    this.revokeReason.set(
+      this.canAdmin() && item.sharedByUserId !== this.tenantScope?.me()?.id
+        ? 'ADMIN_REVOKED'
+        : 'OWNER_REVOKED',
+    );
+    this.revokeModal().open();
+  }
+  protected async confirmRevoke(): Promise<void> {
+    const api = this.currentApi;
+    const item = this.revokingItem();
+    const reason = this.revokeReason();
+    if (!api || !item || this.revokingId() || this.readOnly()) return;
+    if (!reason) {
+      this.reasonError.set(this.transloco.translate('share.reasonRequired'));
       return;
     }
-
-    const reason: 'OWNER_REVOKED' | 'ADMIN_REVOKED' =
-      this.canAdmin() && item.sharedByUserId !== FAKE_ME.id ? 'ADMIN_REVOKED' : 'OWNER_REVOKED';
-
     this.revokingId.set(item.id);
+    this.reasonError.set(null);
     try {
       await api.revoke(item.id, reason);
       this.shares.update((rows) => rows.filter((row) => row.id !== item.id));
       this.notify.success(this.transloco.translate('share.toast.revoked'));
       this.changed.emit();
+      this.revokeModal().close();
     } catch (error) {
-      this.notify.error(this.translateError(errorCodeOf(error)));
+      if (
+        errorCodeOf(error) === 'CRM_SHARE_REVOKE_REASON_REQUIRED' ||
+        fieldErrorsOf(error)['reason']
+      ) {
+        this.reasonError.set(this.transloco.translate('share.reasonRequired'));
+      } else if (isAnalyticsConflict(error)) {
+        const keep = await this.conflict.open();
+        await this.loadShares(this.openSeq);
+        if (!keep) this.revokeModal().close();
+      } else this.showWriteError(error);
     } finally {
       this.revokingId.set(null);
-      this.revokingItem.set(null);
     }
   }
-
+  protected cancelRevoke(): void {
+    if (!this.revokingId()) this.revokeModal().close();
+  }
+  protected revokeClosed(): void {
+    this.revokingItem.set(null);
+  }
+  protected retryShares(): void {
+    if (this.readFailure()?.kind === 'provisioning' && this.canViewReadiness) {
+      this.modal().close();
+      void this.router.navigate(['/crm/settings/data-readiness']);
+    } else void this.loadShares(this.openSeq);
+  }
+  private showWriteError(error: unknown): void {
+    const failure = dashboardWriteError(this.transloco, error, 'share');
+    this.readOnly.set(this.readOnly() || failure.readOnly || failure.reloadRequired);
+    this.notify.error(failure.message);
+  }
   protected asShare(row: unknown): ShareListItem {
     return row as ShareListItem;
   }
@@ -493,7 +626,10 @@ export class ShareModal {
     const at = new Date(iso);
     if (Number.isNaN(at.getTime())) return DASH;
     // Show the calendar day in the viewer's local time zone, not the UTC day.
-    return formatDate(new Date(Date.UTC(at.getFullYear(), at.getMonth(), at.getDate())), this.language());
+    return formatDate(
+      new Date(Date.UTC(at.getFullYear(), at.getMonth(), at.getDate())),
+      this.language(),
+    );
   }
 
   protected targetOptionId(option: ShareTarget): string {
@@ -505,6 +641,9 @@ export class ShareModal {
   }
 
   private resetForm(): void {
+    this.accessError.set(null);
+    this.rowErrors.set({});
+    this.reasonError.set(null);
     this.clearSearchTimer();
     this.selectedTarget.set(null);
     this.clearPreview();
@@ -525,7 +664,7 @@ export class ShareModal {
   }
 
   private validateExpiry(iso: string | null): boolean {
-    if (iso && iso <= TODAY_ISO) {
+    if (iso && endOfLocalDayIso(iso) <= new Date().toISOString()) {
       this.expiryError.set(this.transloco.translate('share.expiryPast'));
       return false;
     }
@@ -537,13 +676,14 @@ export class ShareModal {
     const api = this.currentApi;
     if (!api) return;
     this.loadingShares.set(true);
+    this.readFailure.set(null);
     try {
       const items = await api.list();
       if (seq !== this.openSeq) return;
       this.shares.set(items);
     } catch (error) {
       if (seq !== this.openSeq) return;
-      this.notify.error(this.translateError(errorCodeOf(error)));
+      this.readFailure.set(dashboardWriteError(this.transloco, error, 'share', false));
     } finally {
       if (seq === this.openSeq) {
         this.loadingShares.set(false);
@@ -650,6 +790,8 @@ export class ShareModal {
   }
 
   private clearPreview(): void {
+    if (this.previewTimer !== null) clearTimeout(this.previewTimer);
+    this.previewTimer = null;
     this.previewSeq++;
     this.previewLoading.set(false);
     this.previewData.set(null);
@@ -658,6 +800,14 @@ export class ShareModal {
   }
 
   private async loadPreview(target: ShareTarget): Promise<void> {
+    this.clearPreview();
+    this.previewLoading.set(true);
+    this.previewTimer = setTimeout(() => {
+      this.previewTimer = null;
+      void this.fetchPreview(target);
+    }, 600);
+  }
+  private async fetchPreview(target: ShareTarget): Promise<void> {
     const api = this.currentApi;
     if (!api?.preview) return;
     const seq = ++this.previewSeq;
@@ -668,12 +818,20 @@ export class ShareModal {
     this.previewHidden.set(false);
     try {
       const res = await api.preview(target.type, target.id);
-      if (seq !== this.previewSeq || modalSeq !== this.openSeq || this.selectedTarget()?.id !== target.id) {
+      if (
+        seq !== this.previewSeq ||
+        modalSeq !== this.openSeq ||
+        this.selectedTarget()?.id !== target.id
+      ) {
         return;
       }
       this.previewData.set(res);
     } catch (error) {
-      if (seq !== this.previewSeq || modalSeq !== this.openSeq || this.selectedTarget()?.id !== target.id) {
+      if (
+        seq !== this.previewSeq ||
+        modalSeq !== this.openSeq ||
+        this.selectedTarget()?.id !== target.id
+      ) {
         return;
       }
       if (error instanceof ApiError && error.status === 403) {

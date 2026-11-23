@@ -1,3 +1,5 @@
+import { accessMessage, accessMismatch, accessReadOnly } from '../access-errors';
+import { ConflictDialog } from '../../../../../shared/ui/conflict-dialog/conflict-dialog';
 import { Component, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
@@ -8,7 +10,6 @@ import {
   tablerClipboardCheck,
   tablerKey,
   tablerLayoutDashboard,
-  tablerPlus,
   tablerPuzzle,
   tablerRefresh,
   tablerSend,
@@ -27,11 +28,10 @@ import { FullState, FullStateKind } from '../../../../../shared/ui/full-state/fu
 import { TabItem, Tabs, tabButtonId, tabPanelId } from '../../../../../shared/ui/tabs/tabs';
 import { ApiError, errorCodeOf } from '../../../../../shared/widgets/dashboard/analytics-api';
 import { can } from '../../../../../shared/widgets/dashboard/analytics-permissions';
-import { errorKey } from '../../../../../shared/widgets/dashboard/panel-state';
 import {
   cancelAccessRequest,
-  getAccessTabCounts,
   isPersonInactive,
+  getAccessRequest,
   listAccessRequests,
   listOwnerReviews,
   personName,
@@ -40,12 +40,10 @@ import {
 import type {
   AccessRequest,
   AccessRequestStatus,
-  AccessTabCounts,
   OwnerReview,
   OwnerReviewStatus,
 } from '../access.model';
 import { DecideModal } from '../decide-modal/decide-modal';
-import { RequestModal } from '../request-modal/request-modal';
 import { ReviewModal } from '../review-modal/review-modal';
 
 export type AccessTabId = 'mine' | 'inbox' | 'reviews';
@@ -74,6 +72,7 @@ const REVIEW_STATUSES: readonly OwnerReviewStatus[] = [
     Badge,
     Button,
     ConfirmDialog,
+    ConflictDialog,
     DataCell,
     DataTable,
     Dropdown,
@@ -81,7 +80,6 @@ const REVIEW_STATUSES: readonly OwnerReviewStatus[] = [
     FullState,
     Tabs,
     DecideModal,
-    RequestModal,
     ReviewModal,
   ],
   providers: [
@@ -91,7 +89,6 @@ const REVIEW_STATUSES: readonly OwnerReviewStatus[] = [
     ),
     provideIcons({
       tablerKey,
-      tablerPlus,
       tablerRefresh,
       tablerLayoutDashboard,
       tablerPuzzle,
@@ -116,7 +113,6 @@ export class AccessPage {
   protected readonly language = inject(LanguageState).current;
 
   private readonly cancelConfirm = viewChild.required<ConfirmDialog>('cancelConfirm');
-  private readonly requestModal = viewChild.required(RequestModal);
   private readonly decideModal = viewChild.required(DecideModal);
   private readonly reviewModal = viewChild.required(ReviewModal);
 
@@ -127,7 +123,6 @@ export class AccessPage {
   protected readonly tabPanelId = tabPanelId;
 
   protected readonly activeTab = signal<AccessTabId>('mine');
-  protected readonly counts = signal<AccessTabCounts>({ mine: 0, inbox: 0, reviews: 0 });
 
   protected readonly mineStatus = signal<AccessRequestStatus | 'ALL'>('ALL');
   protected readonly inboxStatus = signal<AccessRequestStatus | 'ALL'>('PENDING');
@@ -145,6 +140,10 @@ export class AccessPage {
   protected readonly reviewCursor = signal<string | null>(null);
   protected readonly reviewHasMore = signal(false);
 
+  protected readonly readOnly = signal(false);
+  protected readonly conflictOpen = signal(false);
+  private conflictRequest: AccessRequest | null = null;
+  protected readonly loadMessage = signal('');
   protected readonly loading = signal(true);
   protected readonly loadingMore = signal(false);
   protected readonly loadError = signal<FullStateKind | null>(null);
@@ -156,14 +155,12 @@ export class AccessPage {
   protected readonly tabs = computed<TabItem[]>(() => {
     this.i18n();
     this.language();
-    const c = this.counts();
     const list: TabItem[] = [
       {
         id: 'mine',
         label: this.transloco.translate('access.tabs.mine'),
         icon: 'tablerSend',
         color: 'text-icon-blue',
-        count: c.mine,
       },
     ];
     if (this.canDecide) {
@@ -172,7 +169,6 @@ export class AccessPage {
         label: this.transloco.translate('access.tabs.inbox'),
         icon: 'tablerClipboardCheck',
         color: 'text-icon-orange',
-        count: c.inbox,
       });
     }
     if (this.canReview) {
@@ -181,7 +177,6 @@ export class AccessPage {
         label: this.transloco.translate('access.tabs.reviews'),
         icon: 'tablerUserShare',
         color: 'text-icon-violet',
-        count: c.reviews,
       });
     }
     return list;
@@ -392,7 +387,7 @@ export class AccessPage {
       }
     } catch (error) {
       if (seq !== this.loadSeq) return;
-      this.notify.error(this.transloco.translate(errorKey(errorCodeOf(error))));
+      this.notify.error(accessMessage(this.transloco, error));
     } finally {
       if (seq === this.loadSeq) {
         this.loadingMore.set(false);
@@ -400,21 +395,17 @@ export class AccessPage {
     }
   }
 
-  protected openRequestModal(): void {
-    this.requestModal().open();
-  }
-
   protected openDecideModal(row: AccessRequest): void {
-    if (row.status !== 'PENDING') return;
+    if (row.status !== 'PENDING' || this.readOnly() || !this.canDecide) return;
     this.decideModal().open(row);
   }
 
   protected openReviewModal(row: OwnerReview): void {
-    this.reviewModal().open(row);
+    if (!this.readOnly() && this.canReview) this.reviewModal().open(row);
   }
 
   protected async cancelRequest(row: AccessRequest): Promise<void> {
-    if (row.status !== 'PENDING' || this.cancellingId()) return;
+    if (row.status !== 'PENDING' || this.cancellingId() || this.readOnly()) return;
     const confirmed = await this.cancelConfirm().open();
     if (!confirmed) return;
 
@@ -424,17 +415,15 @@ export class AccessPage {
       this.notify.success(this.transloco.translate('access.toast.cancelled'));
       await this.loadActiveTab();
     } catch (error) {
-      this.notify.error(this.transloco.translate(errorKey(errorCodeOf(error))));
-      if (errorCodeOf(error) === 'CRM_ACCESS_REQUEST_REVISION_STALE') {
-        await this.loadActiveTab();
+      this.notify.error(accessMessage(this.transloco, error));
+      if (accessReadOnly(error) || accessMismatch(error)) this.readOnly.set(true);
+      if (/_(STALE|CONFLICT)$/.test(errorCodeOf(error) ?? '')) {
+        this.conflictRequest = row;
+        this.conflictOpen.set(true);
       }
     } finally {
       this.cancellingId.set(null);
     }
-  }
-
-  protected onRequestCreated(): void {
-    void this.loadActiveTab();
   }
 
   protected onRequestDecided(): void {
@@ -444,6 +433,20 @@ export class AccessPage {
   protected onReviewUpdated(): void {
     void this.loadActiveTab();
   }
+
+  protected async resolveConflict(reload: boolean): Promise<void> {
+    this.conflictOpen.set(false);
+    const row = this.conflictRequest;
+    if (!row) return;
+    try {
+      const fresh = await getAccessRequest(row.id);
+      this.mineRows.update(rows => rows.map(item => item.id === fresh.id ? fresh : item));
+      if (reload) await this.loadActiveTab();
+    } catch (error) { this.notify.error(accessMessage(this.transloco, error)); }
+  }
+
+  protected readonly canViewReadiness = can('crm.analytics.readiness.view');
+  protected openReadiness(): void { void this.router.navigateByUrl('/crm/settings/data-readiness'); }
 
   protected resourceDisplay(row: { resourceName: string | null; resourceId: string }): string {
     return resourceLabel(row);
@@ -495,19 +498,22 @@ export class AccessPage {
     const tab = this.activeTab();
     this.loading.set(true);
     this.loadError.set(null);
-
+    this.loadMessage.set('');
+    if (!can('crm.dashboards.read')) {
+      this.loadError.set('forbidden');
+      this.loading.set(false);
+      return;
+    }
     try {
-      const [countsResult, pageResult] = await Promise.all([
-        getAccessTabCounts(),
+      const pageResult = await (
         tab === 'mine'
           ? listAccessRequests('mine', { status: this.mineStatus() })
           : tab === 'inbox'
             ? listAccessRequests('inbox', { status: this.inboxStatus() })
-            : listOwnerReviews({ status: this.reviewStatus() }),
-      ]);
+            : listOwnerReviews({ status: this.reviewStatus() })
+      );
       if (seq !== this.loadSeq) return;
 
-      this.counts.set(countsResult);
       if (tab === 'mine') {
         const res = pageResult as Awaited<ReturnType<typeof listAccessRequests>>;
         this.mineRows.set(res.items);
@@ -526,7 +532,13 @@ export class AccessPage {
       }
     } catch (error) {
       if (seq !== this.loadSeq) return;
-      if (error instanceof ApiError && error.status === 403) {
+      this.loadMessage.set(accessMessage(this.transloco, error));
+      const code = errorCodeOf(error);
+      if (code && ['CRM_TARGET_SOURCE_NOT_READY', 'CRM_ANALYTICS_SOURCE_UNAVAILABLE', 'CRM_DASHBOARD_BLUEPRINTS_NOT_READY', 'CRM_TEAM_SCOPE_NOT_READY', 'CRM_INQUIRY_SOURCE_NOT_READY'].includes(code)) {
+        this.loadError.set('provisioning');
+      } else if (error instanceof ApiError && error.status === 404) {
+        this.loadError.set('not-found');
+      } else if (error instanceof ApiError && error.status === 403) {
         this.loadError.set('forbidden');
       } else {
         this.loadError.set('load-failure');

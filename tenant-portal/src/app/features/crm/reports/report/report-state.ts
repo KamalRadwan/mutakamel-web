@@ -1,12 +1,15 @@
 import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
 import { Notify } from '../../../../core/notify/notify';
-import { ApiError, isAbortError, queueRun, retryWhenBusy } from '../../../../shared/widgets/dashboard/analytics-api';
-import { errorText } from '../../../../shared/widgets/dashboard/panel-state';
+import { ApiError, isAbortError, queueRun } from '../../../../shared/widgets/dashboard/analytics-api';
+import type { FullStateKind } from '../../../../shared/ui/full-state/full-state';
+import { reportErrorMessage, reportLoadKind } from './report-errors';
+import { can } from '../../../../shared/widgets/dashboard/analytics-permissions';
+import { fieldErrorsOf } from '../../../../core/api/api-errors';
 import { getManifest, runReport } from './report.api';
 import type { Panel, PanelManifest, ReportRunRequest } from './report.model';
 
-export type ReportPageError = 'not-found' | 'forbidden' | 'load-failure';
+export type ReportPageError = FullStateKind;
 
 function initialRequestFromManifest(manifest: PanelManifest): ReportRunRequest {
   const filters: Record<string, unknown> = {};
@@ -22,16 +25,15 @@ function initialRequestFromManifest(manifest: PanelManifest): ReportRunRequest {
       : 'NONE';
 
   return {
-    period: {
-      preset: manifest.period.kind,
-      from: manifest.period.from,
-      to: manifest.period.to,
-    },
+    period: manifest.period.kind === 'CUSTOM'
+      ? { preset: 'CUSTOM', from: manifest.period.from.slice(0, 10), to: manifest.period.to.slice(0, 10) }
+      : { preset: manifest.period.kind },
+    includeFilterSchema: true,
     comparison: { kind: compare },
     filters,
     scope: {
       basis: manifest.scope.basis,
-      asOf: manifest.scope.asOf,
+      ...(manifest.scope.basis === 'AS_OF' ? { asOf: manifest.scope.asOf } : {}),
       ownerMode: manifest.scope.ownerMode,
       ...(manifest.scope.branchIds !== 'ALL' ? { branchIds: [...manifest.scope.branchIds] } : {}),
     },
@@ -82,14 +84,15 @@ export class ReportState {
   private readonly loadingState = signal(false);
   private readonly loadingPanelsState = signal<ReadonlySet<string>>(new Set());
   private readonly errorState = signal<ReportPageError | null>(null);
-
-  private readonly retryingState = signal(false);
+  readonly errorMessage = signal('');
+  readonly errorCode = signal('');
+  readonly fieldErrors = signal<Record<string, string[]>>({});
 
   private loadSeq = 0;
   private runSeq = 0;
-  /** Aborted by a newer load or on destroy: the initial run stops waiting in the queue or retrying. */
+  /** Aborted by a newer load or on destroy: the initial run stops waiting in the queue. */
   private loadAbort = new AbortController();
-  /** Aborted by a newer run, a newer load or on destroy: runs and panel retries stop at once. */
+  /** Aborted by a newer run, a newer load or on destroy: pending runs stop at once. */
   private runAbort = new AbortController();
 
   readonly reportKey = this.reportKeyState.asReadonly();
@@ -98,8 +101,6 @@ export class ReportState {
   readonly loading = this.loadingState.asReadonly();
   readonly loadingPanels = this.loadingPanelsState.asReadonly();
   readonly error = this.errorState.asReadonly();
-  /** A run was refused (429) and waits to retry. */
-  readonly retrying = this.retryingState.asReadonly();
 
   constructor() {
     inject(DestroyRef).onDestroy(() => {
@@ -110,14 +111,9 @@ export class ReportState {
     });
   }
 
-  /** Runs a report through the shared run queue; a 429 shows "retrying" until it settles. */
-  private queuedRun(key: string, req: ReportRunRequest, signal: AbortSignal, isCurrent: () => boolean): Promise<PanelManifest> {
-    return retryWhenBusy(() => queueRun(() => runReport(key, req, signal), signal), {
-      signal,
-      onRetry: () => {
-        if (isCurrent()) this.retryingState.set(true);
-      },
-    });
+  /** Shared concurrency queue; a refused run is retried only by the user. */
+  private queuedRun(key: string, req: ReportRunRequest, signal: AbortSignal): Promise<PanelManifest> {
+    return queueRun(() => runReport(key, req, signal), signal);
   }
 
   readonly hasPageablePanels = computed(() =>
@@ -136,14 +132,22 @@ export class ReportState {
     this.loadAbort = new AbortController();
     this.runAbort = new AbortController();
     const loadSignal = this.loadAbort.signal;
-    this.retryingState.set(false);
 
     this.reportKeyState.set(key);
     this.manifestState.set(null);
     this.requestState.set({});
     this.errorState.set(null);
+    this.errorMessage.set('');
+    this.errorCode.set('');
+    this.fieldErrors.set({});
     this.loadingState.set(true);
     this.loadingPanelsState.set(new Set());
+
+    if (!can('crm.dashboards.read')) {
+      this.errorState.set(this.classifyError(new ApiError(403, 'CRM_SCOPED_PERMISSION_DENIED')));
+      this.loadingState.set(false);
+      return;
+    }
 
     let initialManifest: PanelManifest;
     try {
@@ -162,21 +166,18 @@ export class ReportState {
     this.loadingState.set(false);
 
     const panelKeys = new Set(initialManifest.panels.map((p) => p.panelKey));
+    const runSnapshot = this.runSeq;
     this.loadingPanelsState.set(panelKeys);
 
     try {
-      const freshManifest = await this.queuedRun(key, initialReq, loadSignal, () => seq === this.loadSeq);
-      if (seq !== this.loadSeq) return;
-      this.retryingState.set(false);
+      const freshManifest = await this.queuedRun(key, initialReq, loadSignal);
+      if (seq !== this.loadSeq || runSnapshot !== this.runSeq) return;
       this.manifestState.set(withSchemaOf(freshManifest, initialManifest));
     } catch (err) {
-      if (isAbortError(err) || seq !== this.loadSeq) return;
-      this.retryingState.set(false);
-      // First run failed: show the in-page error state (with retry) as well as the toast.
+      if (isAbortError(err) || seq !== this.loadSeq || runSnapshot !== this.runSeq) return;
       this.errorState.set(this.classifyError(err));
-      this.notifyError(err);
     } finally {
-      if (seq === this.loadSeq) {
+      if (seq === this.loadSeq && runSnapshot === this.runSeq) {
         this.loadingPanelsState.set(new Set());
       }
     }
@@ -186,6 +187,7 @@ export class ReportState {
     const key = this.reportKeyState();
     const currentManifest = this.manifestState();
     if (!key || !currentManifest) return;
+    this.fieldErrors.set({});
 
     const retryKeys = patch?.panelKeys;
     if (retryKeys && retryKeys.length > 0) {
@@ -194,6 +196,7 @@ export class ReportState {
     }
 
     const seq = ++this.runSeq;
+    this.loadAbort.abort();
     const loadSnapshot = this.loadSeq;
     this.runAbort.abort();
     this.runAbort = new AbortController();
@@ -204,18 +207,17 @@ export class ReportState {
 
     try {
       const isCurrent = () => seq === this.runSeq && loadSnapshot === this.loadSeq;
-      const nextManifest = await this.queuedRun(key, nextReq, runSignal, isCurrent);
+      const nextManifest = await this.queuedRun(key, nextReq, runSignal);
       if (!isCurrent()) return;
-      this.retryingState.set(false);
       // The request is committed only after the run succeeded, so filters and panels never disagree.
       this.requestState.set(nextReq);
       this.manifestState.set(withSchemaOf(nextManifest, currentManifest));
     } catch (err) {
       if (isAbortError(err) || seq !== this.runSeq || loadSnapshot !== this.loadSeq) return;
-      this.retryingState.set(false);
-      if (err instanceof ApiError && (err.status === 404 || err.status === 403)) {
+      this.fieldErrors.set(fieldErrorsOf(err));
+      if (reportLoadKind(err) !== 'load-failure' || (err instanceof ApiError && (err.status === 0 || err.status >= 500))) {
         this.errorState.set(this.classifyError(err));
-      } else {
+      } else if (Object.keys(this.fieldErrors()).length === 0) {
         this.notifyError(err);
       }
     } finally {
@@ -242,10 +244,8 @@ export class ReportState {
         key,
         { ...this.requestState(), panelKeys, refresh: true },
         this.runAbort.signal,
-        isCurrent,
       );
       if (!isCurrent()) return;
-      this.retryingState.set(false);
 
       const updatedByKey = new Map(partialManifest.panels.map((p) => [p.panelKey, p]));
       this.manifestState.update((curr) => {
@@ -262,7 +262,6 @@ export class ReportState {
       });
     } catch (err) {
       if (isAbortError(err) || loadSnapshot !== this.loadSeq || runSnapshot !== this.runSeq) return;
-      this.retryingState.set(false);
       this.notifyError(err);
     } finally {
       if (loadSnapshot === this.loadSeq && runSnapshot === this.runSeq) {
@@ -277,15 +276,12 @@ export class ReportState {
 
   /** Uses the error's details where its code has them (date range: "up to N days"). */
   private notifyError(err: unknown): void {
-    const text = errorText(err);
-    this.notify.error(this.transloco.translate(text.key, text.params));
+    this.notify.error(reportErrorMessage(this.transloco, err, 'repReport'));
   }
 
   private classifyError(err: unknown): ReportPageError {
-    if (err instanceof ApiError) {
-      if (err.status === 404) return 'not-found';
-      if (err.status === 403) return 'forbidden';
-    }
-    return 'load-failure';
+    this.errorMessage.set(reportErrorMessage(this.transloco, err, 'repReport'));
+    this.errorCode.set(err instanceof ApiError ? err.code : '');
+    return reportLoadKind(err);
   }
 }

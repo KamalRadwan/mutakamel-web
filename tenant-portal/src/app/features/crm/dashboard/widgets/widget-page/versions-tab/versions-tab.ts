@@ -1,6 +1,7 @@
 import { Component, DestroyRef, computed, effect, inject, input, output, signal, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../../../core/i18n/translation-events';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
+import { Router } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerArrowBackUp, tablerArrowRight, tablerArrowsDiff, tablerCheck } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../../../core/i18n/language';
@@ -9,6 +10,7 @@ import { Badge } from '../../../../../../shared/ui/badge/badge';
 import { Button } from '../../../../../../shared/ui/button/button';
 import { DASH, formatDate, formatDateTime, formatNumber } from '../../../../../../shared/ui/chart/chart-format';
 import { ConfirmDialog } from '../../../../../../shared/ui/confirm-dialog/confirm-dialog';
+import { ConflictDialog } from '../../../../../../shared/ui/conflict-dialog/conflict-dialog';
 import { DataCell, DataColumn, DataTable } from '../../../../../../shared/ui/data-table/data-table';
 import { FullState } from '../../../../../../shared/ui/full-state/full-state';
 import { ApiError, errorCodeOf } from '../../../../../../shared/widgets/dashboard/analytics-api';
@@ -23,6 +25,8 @@ import {
   restoreVersionToDraft,
 } from '../../widgets.api';
 import type { VersionCompare, VersionSnapshot, WidgetDetail } from '../../widgets.model';
+import { can } from '../../../../../../shared/widgets/dashboard/analytics-permissions';
+import { widgetConflict, widgetErrorMessage, widgetNeedsReload, widgetReadFailure, widgetWriteReadOnly, type WidgetReadFailure } from '../../builder/builder-errors';
 
 interface VersionListItem {
   versionNumber: number;
@@ -50,13 +54,14 @@ function normalizeProvenance(code: string): string {
 
 @Component({
   selector: 'app-versions-tab',
-  imports: [TranslocoPipe, NgIcon, Badge, Button, ConfirmDialog, DataTable, DataCell, FullState],
+  imports: [TranslocoPipe, NgIcon, Badge, Button, ConfirmDialog, ConflictDialog, DataTable, DataCell, FullState],
   providers: [provideIcons({ tablerArrowBackUp, tablerArrowRight, tablerArrowsDiff, tablerCheck })],
   templateUrl: './versions-tab.html',
   host: { class: 'block min-w-0' },
 })
 export class VersionsTab {
   private readonly notify = inject(Notify);
+  private readonly router = inject(Router);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   protected readonly language = inject(LanguageState).current;
@@ -69,6 +74,9 @@ export class VersionsTab {
   readonly hasUnsavedEdits = input(false);
   readonly restored = output<void>();
   readonly countChange = output<number>();
+  readonly becameReadOnly = output<void>();
+  readonly forceReadOnly = input(false);
+  readonly requestAccess = output<void>();
 
   protected readonly items = signal<VersionListItem[]>([]);
   protected readonly activeVersionNumber = signal<number | null>(null);
@@ -76,6 +84,11 @@ export class VersionsTab {
   protected readonly loading = signal(false);
   protected readonly loadingMore = signal(false);
   protected readonly loadFailed = signal(false);
+  protected readonly readFailure = signal<WidgetReadFailure | null>(null);
+  protected readonly readOnly = signal(false);
+  protected readonly conflictOpen = signal(false);
+  protected readonly canRestore = computed(() => !this.readOnly() && !this.forceReadOnly() && can('crm.widgets.update'));
+  private conflictVersions: [number, number] | null = null;
   protected readonly selected = signal<number[]>([]);
   protected readonly comparing = signal(false);
   protected readonly comparison = signal<VersionCompare | null>(null);
@@ -98,7 +111,11 @@ export class VersionsTab {
         this.activeWidgetId = current.id;
         this.selected.set([]);
         this.comparison.set(null);
+        this.readOnly.set(false);
       }
+      this.compareSeq++;
+      this.comparison.set(null);
+      this.comparing.set(false);
       void this.loadVersions(current.id);
     });
 
@@ -290,18 +307,23 @@ export class VersionsTab {
   }
 
   protected clearCompare(): void {
+    this.compareSeq++;
+    this.comparing.set(false);
     this.comparison.set(null);
   }
 
   protected async restoreLeft(): Promise<void> {
     const cmp = this.comparison();
-    if (!cmp || cmp.restoreState !== 'AVAILABLE' || !cmp.proof || this.restoring()) return;
+    if (!cmp || cmp.restoreState !== 'AVAILABLE' || !cmp.proof || this.restoring() || !this.canRestore()) return;
+
+    const id = this.widget().id;
+    const seq = this.compareSeq;
 
     const confirmed = await this.restoreDialog().open();
     if (!confirmed) return;
     if (this.hasUnsavedEdits() && !(await this.discardDialog().open())) return;
 
-    const id = this.widget().id;
+    if (id !== this.widget().id || seq !== this.compareSeq) return;
     this.restoring.set(true);
     try {
       await restoreVersionToDraft(id, {
@@ -313,25 +335,68 @@ export class VersionsTab {
         impactId: cmp.proof.impactId,
         acknowledged: true,
       });
+      if (id !== this.widget().id || seq !== this.compareSeq) return;
       this.notify.success(
         this.transloco.translate('widgetPage.versions.restoreSuccess', { n: cmp.left.versionNumber }),
       );
       this.restored.emit();
     } catch (error) {
-      const code = errorCodeOf(error);
+      if (id !== this.widget().id || seq !== this.compareSeq) return;
+      if (widgetConflict(error)) {
+        this.conflictVersions = [cmp.left.versionNumber, cmp.right.versionNumber];
+        this.comparison.set(null);
+        this.conflictOpen.set(true);
+        return;
+      }
       this.notify.error(
         this.transloco.translate('widgetPage.versions.restoreError'),
-        this.transloco.translate(errorKey(code)),
+        widgetErrorMessage(error, this.transloco, 'widgetPage', true),
       );
-      if (code === 'CRM_WIDGET_VERSION_RESTORE_STALE' || code === 'CRM_WIDGET_VERSION_RESTORE_DRAFT_EXISTS') {
-        void this.runCompare(cmp.left.versionNumber, cmp.right.versionNumber, true);
+      if (widgetWriteReadOnly(error)) {
+        this.readOnly.set(true);
+        this.becameReadOnly.emit();
+      }
+      if (widgetNeedsReload(error) || errorCodeOf(error) === 'CRM_WIDGET_VERSION_RESTORE_DRAFT_EXISTS') {
+        this.comparison.set(null);
+        await this.runCompare(cmp.left.versionNumber, cmp.right.versionNumber);
       }
     } finally {
       this.restoring.set(false);
     }
   }
 
-  private async runCompare(older: number, newer: number, silentOnError = false): Promise<void> {
+  protected async resolveConflict(keepChanges: boolean): Promise<void> {
+    this.conflictOpen.set(false);
+    const versions = this.conflictVersions;
+    this.conflictVersions = null;
+    await this.loadVersions(this.widget().id);
+    if (versions) await this.runCompare(...versions);
+    if (!keepChanges) this.selected.set([]);
+  }
+
+  protected readonly failureText = computed(() => {
+    this.i18n();
+    const failure = this.readFailure();
+    return [failure?.message, failure?.correlationId
+      ? this.transloco.translate('widgetPage.requests.correlation', { id: failure.correlationId }) : ''].filter(Boolean).join(' ');
+  });
+
+  protected readonly failureAction = computed(() => {
+    const failure = this.readFailure();
+    return failure?.kind === 'provisioning'
+      ? can('crm.analytics.readiness.view') ? 'widgetPage.requests.readiness' : null
+      : failure?.requestAccess ? 'widgetPage.requests.requestAccess'
+      : failure?.kind === 'load-failure' ? 'analytics.common.retry' : null;
+  });
+
+  protected onFailureAction(): void {
+    if (this.readFailure()?.kind === 'provisioning' && can('crm.analytics.readiness.view'))
+      void this.router.navigateByUrl('/crm/settings/data-readiness');
+    else if (this.readFailure()?.requestAccess) this.requestAccess.emit();
+    else this.retry();
+  }
+
+  private async runCompare(older: number, newer: number): Promise<void> {
     const id = this.widget().id;
     const seq = ++this.compareSeq;
     this.comparing.set(true);
@@ -341,12 +406,14 @@ export class VersionsTab {
       this.comparison.set(res);
     } catch (error) {
       if (seq !== this.compareSeq) return;
-      if (!silentOnError) {
-        this.notify.error(
-          this.transloco.translate('widgetPage.versions.compareError'),
-          this.transloco.translate(errorKey(errorCodeOf(error))),
-        );
+      this.comparison.set(null);
+      if (widgetConflict(error)) {
+        this.conflictVersions = [older, newer];
+        this.conflictOpen.set(true);
+        return;
       }
+      this.readFailure.set(widgetReadFailure(error, this.transloco, 'widgetPage'));
+      this.loadFailed.set(true);
     } finally {
       if (seq === this.compareSeq) {
         this.comparing.set(false);
@@ -358,6 +425,7 @@ export class VersionsTab {
     const seq = ++this.loadSeq;
     this.loading.set(true);
     this.loadFailed.set(false);
+    this.readFailure.set(null);
     try {
       const res = await listVersions(widgetId);
       if (seq !== this.loadSeq || this.widget().id !== widgetId) return;
@@ -373,6 +441,7 @@ export class VersionsTab {
         this.nextBeforeVersion.set(null);
         this.countChange.emit(0);
       } else {
+        this.readFailure.set(widgetReadFailure(error, this.transloco, 'widgetPage'));
         this.loadFailed.set(true);
       }
     } finally {

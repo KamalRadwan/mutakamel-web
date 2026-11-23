@@ -46,6 +46,34 @@ describe('reasonKey and errorKey', () => {
   });
 });
 
+describe.each([['en', 'light'], ['en', 'dark'], ['ar', 'light'], ['ar', 'dark']])('errorKey (%s / %s)', (language, theme) => {
+  it('catalogue groups', () => {
+    document.documentElement.lang = language;
+    document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
+    document.documentElement.dataset['theme'] = theme;
+    const messages: Record<string, string> = language === 'ar' ? ar.error : en.error;
+    const groups = [
+      'CRM_DASHBOARD_FILTER_INVALID', 'CRM_ANALYTICS_SOURCE_UNAVAILABLE', 'CRM_TARGET_SOURCE_NOT_READY',
+      'CRM_INQUIRY_SOURCE_NOT_READY', 'CRM_WIDGET_NOT_FOUND', 'CRM_DELIVERY_LINK_EXPIRED',
+      'CRM_DASHBOARD_DRILLDOWN_CURSOR_INVALID', 'CRM_WIDGET_AXIS_REQUIRED', 'CRM_SHARE_PREVIEW_LIMIT_EXCEEDED',
+      'CRM_ACCESS_REQUEST_PENDING_EXISTS', 'CRM_OWNERSHIP_TARGET_INACTIVE', 'CRM_ALERT_UNIT_MISMATCH',
+      'CRM_SUBSCRIPTION_ATTACHMENT_TTL_INVALID', 'CRM_EXPORT_QUEUE_LIMIT', 'CRM_DELIVERY_RECIPIENT_MISMATCH',
+      'CRM_DELIVERY_ENTITLEMENT_REVOKED', 'CRM_REPORT_PANEL_NOT_PAGEABLE', 'CRM_WIDGET_PUBLISH_IMPACT_STALE',
+      'GW.AUTH.MISSING_SESSION', 'GW.RATE.LIMIT_EXCEEDED', 'GW.UPSTREAM.BUSY', 'GW.IDEM.MISMATCH',
+    ];
+    for (const code of groups) {
+      expect(errorKey(code)).toBe(`analytics.error.${code}`);
+      expect(messages[code]).toBeTruthy();
+      if (language === 'ar') expect(messages[code]).toMatch(/[\u0600-\u06ff]/);
+    }
+    for (const code of KNOWN_ERRORS) {
+      expect((en.error as Record<string, string>)[code]).toBeTruthy();
+      expect(messages[code]).toBeTruthy();
+    }
+    expect(Object.keys(ar.error).sort()).toEqual(Object.keys(en.error).sort());
+  });
+});
+
 describe('viewFromRun', () => {
   it('takes the source key from the error code suffix', () => {
     const view = viewFromRun(exec({ state: 'UNAVAILABLE', error: { code: 'CRM_TARGET_SOURCE_NOT_READY:targets' } }));

@@ -13,27 +13,30 @@
       <ui-full-state
         kind="forbidden"
         [title]="'repReport.forbidden' | transloco"
-        [text]="'repReport.forbiddenText' | transloco"
-        [actionLabel]="'repReport.backToCatalogue' | transloco"
-        (action)="goToCatalogue()"
+        [text]="state.errorMessage() || ('repReport.forbiddenText' | transloco)"
+        [actionLabel]="(state.errorCode() === 'CRM_DASHBOARD_DEFINITION_ACCESS_DENIED' ? 'repReport.requestAccess' : 'repReport.backToCatalogue') | transloco"
+        (action)="state.errorCode() === 'CRM_DASHBOARD_DEFINITION_ACCESS_DENIED' ? requestAccess() : goToCatalogue()"
       />
     }
     @case ('load-failure') {
       <ui-full-state
         kind="load-failure"
         [title]="'repReport.loadFailed' | transloco"
+        [text]="state.errorMessage()"
         [actionLabel]="'analytics.common.retry' | transloco"
         (action)="retryLoad()"
       />
     }
+    @case ('provisioning') {
+      <ui-full-state
+        kind="provisioning"
+        [title]="state.errorMessage()"
+        [actionLabel]="(canViewReadiness() ? 'repReport.readinessLink' : 'analytics.common.retry') | transloco"
+        (action)="canViewReadiness() ? openReadiness() : retryLoad()"
+      />
+    }
   }
 } @else if (state.manifest(); as manifest) {
-  <!-- Always rendered so the live region persists; out of the layout (sr-only) while it is empty. -->
-  <p role="status" class="text-12 leading-16 text-text-muted" [class.sr-only]="!state.retrying()">
-    @if (state.retrying()) {
-      {{ 'analytics.common.retrying' | transloco }}
-    }
-  </p>
   <header class="flex flex-wrap items-center justify-between gap-8">
     <div class="flex min-w-0 flex-1 flex-wrap items-center gap-8">
       <span
@@ -54,6 +57,7 @@
         class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 outline-none transition-colors duration-fast hover:bg-neutral-soft focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
         [class]="favourite() ? 'text-icon-orange' : 'text-text-muted'"
         [attr.aria-pressed]="favourite()"
+        [disabled]="readOnly() || favouriting()"
         [attr.aria-label]="(favourite() ? 'repReport.unfavourite' : 'repReport.favourite') | transloco"
         [title]="(favourite() ? 'repReport.unfavourite' : 'repReport.favourite') | transloco"
         (click)="toggleFavourite()"
@@ -133,7 +137,7 @@
     }
   </div>
 
-  <app-report-pin-modal />
+  <app-report-pin-modal (becameReadOnly)="readOnly.set(true)" />
 } @else {
   <div class="flex flex-col gap-10" aria-busy="true">
     <div class="flex items-center gap-8">

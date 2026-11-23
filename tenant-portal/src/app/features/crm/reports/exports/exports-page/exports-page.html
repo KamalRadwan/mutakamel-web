@@ -15,7 +15,7 @@
   <ui-full-state
     [kind]="errKind"
     [title]="(errKind === 'forbidden' ? 'repExports.forbiddenTitle' : 'analytics.common.loadFailed') | transloco"
-    [text]="errKind === 'forbidden' ? ('repExports.forbiddenText' | transloco) : ''"
+    [text]="errKind === 'forbidden' ? ('repExports.forbiddenText' | transloco) : loadText()"
     [actionLabel]="errKind === 'load-failure' ? ('analytics.common.retry' | transloco) : ''"
     (action)="load()"
   />
@@ -121,3 +121,5 @@
   [confirmLabel]="'repExports.cancelConfirm' | transloco"
   [cancelLabel]="'analytics.common.cancel' | transloco"
 />
+
+<ui-conflict-dialog [(open)]="conflictOpen" (reload)="resolveConflict()" (keepEditing)="resolveConflict()" />

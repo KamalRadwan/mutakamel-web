@@ -13,6 +13,14 @@
         <span class="col-span-2 my-auto h-skeleton-line w-full rounded-6 bg-neutral-soft" aria-hidden="true"></span>
       }
     </div>
+  } @else if (readError(); as error) {
+    <ui-full-state
+      [kind]="error.kind"
+      [title]="'analytics.common.loadFailed' | transloco"
+      [text]="error.message"
+      [actionLabel]="(error.kind === 'provisioning' && canViewReadiness ? 'dashFilters.openReadiness' : 'analytics.common.retry') | transloco"
+      (action)="onErrorAction()"
+    />
   } @else if (explain()) {
     <dl class="grid grid-cols-3 gap-x-10 gap-y-4">
       <dt class="col-span-1 flex min-h-btn items-center gap-4 text-12 leading-18 text-text-muted">
@@ -20,7 +28,7 @@
         <span
           #countsTrigger
           class="relative inline-flex shrink-0 items-center text-accent"
-          tabindex="0"
+          tabindex="-1"
           [attr.aria-describedby]="uid + '-counts-hint'"
           (mouseenter)="showTip('counts', countsTrigger, countsTip)"
           (mouseleave)="hideTip()"
@@ -55,7 +63,7 @@
         <span
           #filtersTrigger
           class="relative inline-flex shrink-0 items-center text-accent"
-          tabindex="0"
+          tabindex="-1"
           [attr.aria-describedby]="uid + '-filters-hint'"
           (mouseenter)="showTip('filters', filtersTrigger, filtersTip)"
           (mouseleave)="hideTip()"
@@ -96,7 +104,7 @@
           <span
             #rateTrigger
             class="relative inline-flex shrink-0 items-center text-accent"
-            tabindex="0"
+            tabindex="-1"
             [attr.aria-describedby]="uid + '-rate-hint'"
             (mouseenter)="showTip('rate', rateTrigger, rateTip)"
             (mouseleave)="hideTip()"
@@ -131,7 +139,7 @@
         <span
           #valueTrigger
           class="relative inline-flex shrink-0 items-center text-accent"
-          tabindex="0"
+          tabindex="-1"
           [attr.aria-describedby]="uid + '-value-hint'"
           (mouseenter)="showTip('value', valueTrigger, valueTip)"
           (mouseleave)="hideTip()"
@@ -165,7 +173,7 @@
         <span
           #coverageTrigger
           class="relative inline-flex shrink-0 items-center text-accent"
-          tabindex="0"
+          tabindex="-1"
           [attr.aria-describedby]="uid + '-coverage-hint'"
           (mouseenter)="showTip('coverage', coverageTrigger, coverageTip)"
           (mouseleave)="hideTip()"
@@ -199,7 +207,7 @@
         <span
           #asOfTrigger
           class="relative inline-flex shrink-0 items-center text-accent"
-          tabindex="0"
+          tabindex="-1"
           [attr.aria-describedby]="uid + '-asOf-hint'"
           (mouseenter)="showTip('asOf', asOfTrigger, asOfTip)"
           (mouseleave)="hideTip()"
@@ -233,7 +241,7 @@
         <span
           #sourcesTrigger
           class="relative inline-flex shrink-0 items-center text-accent"
-          tabindex="0"
+          tabindex="-1"
           [attr.aria-describedby]="uid + '-sources-hint'"
           (mouseenter)="showTip('sources', sourcesTrigger, sourcesTip)"
           (mouseleave)="hideTip()"

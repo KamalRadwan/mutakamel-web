@@ -52,7 +52,7 @@
         type="button"
         class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 outline-none transition-colors duration-fast hover:bg-neutral-soft focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
         [class]="report().favourite ? 'text-icon-orange' : 'text-text-muted hover:text-icon-orange'"
-        [disabled]="togglingFavourite()"
+        [disabled]="readOnly() || togglingFavourite()"
         [attr.aria-pressed]="report().favourite"
         [attr.aria-label]="(report().favourite ? 'repCatalogue.unfavourite' : 'repCatalogue.favourite') | transloco"
         [title]="(report().favourite ? 'repCatalogue.unfavourite' : 'repCatalogue.favourite') | transloco"
@@ -62,4 +62,9 @@
       </button>
     }
   </div>
+  @if (disabled() && canViewReadiness()) {
+    <a uiButton size="small" variant="ghost" routerLink="/crm/settings/data-readiness">
+      {{ 'repCatalogue.readinessLink' | transloco }}
+    </a>
+  }
 </article>

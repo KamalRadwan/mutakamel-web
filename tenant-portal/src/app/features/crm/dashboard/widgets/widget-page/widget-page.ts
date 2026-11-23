@@ -32,6 +32,7 @@ import { can } from '../../../../../shared/widgets/dashboard/analytics-permissio
 import { errorKey } from '../../../../../shared/widgets/dashboard/panel-state';
 import { ShareModal, type ShareApi } from '../../shared/share-modal/share-modal';
 import { WidgetBuilder } from '../builder/widget-builder';
+import { BuilderState } from '../builder/builder-state';
 import { ArchiveModal } from '../lifecycle-modals/archive-modal';
 import { CloneModal } from '../lifecycle-modals/clone-modal';
 import { TransferModal } from '../lifecycle-modals/transfer-modal';
@@ -40,6 +41,8 @@ import type { WidgetDetail } from '../widgets.model';
 import { AccessTab } from './access-tab/access-tab';
 import { UsageTab } from './usage-tab/usage-tab';
 import { VersionsTab } from './versions-tab/versions-tab';
+import { RequestModal } from '../../access/request-modal/request-modal';
+import { widgetReadFailure, widgetWriteReadOnly, type WidgetReadFailure } from '../builder/builder-errors';
 
 export type WidgetPageTab = 'builder' | 'usage' | 'access' | 'versions';
 
@@ -68,6 +71,7 @@ function parseWidgetTab(raw: string | null): WidgetPageTab | null {
     UsageTab,
     AccessTab,
     VersionsTab,
+    RequestModal,
   ],
   providers: [
     provideTranslocoScope(
@@ -104,6 +108,8 @@ export class WidgetPage {
   protected readonly language = inject(LanguageState).current;
 
   private readonly builder = viewChild(WidgetBuilder);
+  private readonly builderState = viewChild(WidgetBuilder, { read: BuilderState });
+  protected readonly writesReadOnly = signal(false);
   private readonly unsavedDialog = viewChild.required(UnsavedDialog);
   private readonly deleteDialog = viewChild.required<ConfirmDialog>('deleteDialog');
   private readonly archiveModal = viewChild.required(ArchiveModal);
@@ -111,6 +117,7 @@ export class WidgetPage {
   private readonly cloneModal = viewChild.required(CloneModal);
   private readonly shareModal = viewChild.required(ShareModal);
   private readonly shareHost = viewChild<ElementRef<HTMLElement>>('shareHost');
+  private readonly requestModal = viewChild(RequestModal);
 
   protected readonly tabButtonId = tabButtonId;
   protected readonly tabPanelId = tabPanelId;
@@ -120,6 +127,14 @@ export class WidgetPage {
   protected readonly widget = signal<WidgetDetail | null>(null);
   protected readonly loading = signal(false);
   protected readonly loadError = signal<FullStateKind | null>(null);
+  protected readonly readFailure = signal<WidgetReadFailure | null>(null);
+  protected readonly canOpenReadiness = computed(() => can('crm.analytics.readiness.view'));
+  protected readonly loadFailureText = computed(() => {
+    this.i18n();
+    const failure = this.readFailure();
+    return (failure?.message ?? '') + (failure?.correlationId
+      ? ' ' + this.transloco.translate('widgetPage.requests.correlation', { id: failure.correlationId }) : '');
+  });
   protected readonly shareCount = signal<number | null>(null);
   protected readonly versionsCount = signal<number | null>(null);
   protected readonly accessRefresh = signal(0);
@@ -212,7 +227,7 @@ export class WidgetPage {
   protected readonly canViewAccess = computed(() => {
     const current = this.widget();
     if (!current) return false;
-    return current.accessLevel === 'OWNER' || can('crm.widgets.share');
+    return can('crm.widgets.share');
   });
 
   protected readonly tabs = computed<TabItem[]>(() => {
@@ -262,7 +277,7 @@ export class WidgetPage {
     this.i18n();
     this.language();
     const current = this.widget();
-    if (!current) return [];
+    if (!current || this.writesReadOnly()) return [];
 
     const items: ActionItem[] = [];
     const canEdit = current.accessLevel === 'OWNER' || current.accessLevel === 'EDIT';
@@ -403,6 +418,16 @@ export class WidgetPage {
     this.versionsCount.set(count);
   }
 
+  protected requestWidgetAccess(): void {
+    const id = this.widgetId();
+    if (id) this.requestModal()?.open('WIDGET', id);
+  }
+
+  protected onActionReadOnly(): void {
+    this.writesReadOnly.set(true);
+    this.builderState()?.lockReadOnly();
+  }
+
   protected onVersionRestored(): void {
     const id = this.widgetId();
     if (!id) return;
@@ -422,7 +447,7 @@ export class WidgetPage {
 
   protected async onActionSelected(selection: ActionSelection): Promise<void> {
     const current = this.widget();
-    if (!current) return;
+    if (!current || !this.actionItems().some((item) => item.id === selection.id)) return;
 
     switch (selection.id) {
       case 'clone': {
@@ -484,17 +509,17 @@ export class WidgetPage {
     return {
       list: () => listWidgetShares(widgetId),
       add: async (body, key) => {
-        const created = await addWidgetShare(widgetId, body, key);
+        const created = await this.writeShare(addWidgetShare(widgetId, body, key));
         this.accessRefresh.update((v) => v + 1);
         return created;
       },
       update: async (shareId, body) => {
-        const updated = await updateWidgetShare(widgetId, shareId, body);
+        const updated = await this.writeShare(updateWidgetShare(widgetId, shareId, body));
         this.accessRefresh.update((v) => v + 1);
         return updated;
       },
       revoke: async (shareId, reason) => {
-        await revokeWidgetShare(widgetId, shareId, reason);
+        await this.writeShare(revokeWidgetShare(widgetId, shareId, reason));
         this.accessRefresh.update((v) => v + 1);
       },
       targets: async (search) => (await listShareTargets('widgets', search)).items,
@@ -502,23 +527,35 @@ export class WidgetPage {
     };
   }
 
+  private async writeShare<T>(action: Promise<T>): Promise<T> {
+    try {
+      return await action;
+    } catch (error) {
+      if (widgetWriteReadOnly(error)) this.onActionReadOnly();
+      throw error;
+    }
+  }
+
   private async loadWidget(id: string, opts?: { silent?: boolean }): Promise<void> {
     const seq = ++this.loadSeq;
     if (!opts?.silent) {
       this.loading.set(true);
       this.loadError.set(null);
+      this.readFailure.set(null);
     }
     try {
       const detail = await getWidget(id);
       if (seq !== this.loadSeq || this.widgetId() !== id) return;
       this.widget.set(detail);
       this.loadError.set(null);
+      this.readFailure.set(null);
       if (this.activeTab() === 'access' && !this.canViewAccess()) {
         this.activeTab.set('builder');
         void this.router.navigate(['/crm/dashboard/widgets', id, 'builder'], { replaceUrl: true });
       }
     } catch (error) {
       if (seq !== this.loadSeq || this.widgetId() !== id) return;
+      this.readFailure.set(widgetReadFailure(error, this.transloco, 'widgetPage'));
       if (error instanceof ApiError && error.status === 404) {
         this.loadError.set('not-found');
         this.widget.set(null);
@@ -526,12 +563,24 @@ export class WidgetPage {
         this.loadError.set('forbidden');
         this.widget.set(null);
       } else if (!opts?.silent) {
-        this.loadError.set('load-failure');
+        this.loadError.set(this.readFailure()!.kind);
       }
     } finally {
       if (seq === this.loadSeq && !opts?.silent) {
         this.loading.set(false);
       }
+    }
+  }
+
+  protected onLoadStateAction(): void {
+    if (this.readFailure()?.kind === 'provisioning' && this.canOpenReadiness()) {
+      void this.router.navigateByUrl('/crm/settings/data-readiness');
+    } else if (this.readFailure()?.requestAccess && this.widgetId()) {
+      this.requestModal()?.open('WIDGET', this.widgetId()!);
+    } else if (this.readFailure()?.kind === 'forbidden') {
+      this.goToWidgets();
+    } else {
+      this.retryLoad();
     }
   }
 }

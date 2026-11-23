@@ -16,11 +16,11 @@
 
   @if (loadFailed()) {
     <ui-full-state
-      kind="load-failure"
+      [kind]="readFailure()!.kind"
       [title]="'widgetPage.versions.loadError' | transloco"
-      [text]="'analytics.common.loadFailed' | transloco"
-      [actionLabel]="'analytics.common.retry' | transloco"
-      (action)="retry()"
+      [text]="failureText()"
+      [actionLabel]="failureAction() ? (failureAction()! | transloco) : ''"
+      (action)="onFailureAction()"
     />
   } @else {
     <ui-data-table
@@ -103,7 +103,7 @@
 
         <div class="col-span-4 flex min-w-0 flex-wrap items-center gap-6">
           <bdi dir="ltr">{{ 'widgetPage.versions.versionHeader' | transloco: { n: cmp.left.versionNumber } }}</bdi>
-          @if (cmp.restoreState !== 'PERMISSION_REQUIRED') {
+          @if (cmp.restoreState !== 'PERMISSION_REQUIRED' && canRestore()) {
             <span
               class="inline-flex"
               [attr.title]="cmp.restoreState === 'DRAFT_EXISTS' ? ('widgetPage.versions.draftExists' | transloco) : null"
@@ -179,6 +179,12 @@
     </section>
   }
 </div>
+<ui-conflict-dialog
+  [(open)]="conflictOpen"
+  [recordLabel]="widget().name"
+  (reload)="resolveConflict(false)"
+  (keepEditing)="resolveConflict(true)"
+/>
 
 <ui-confirm-dialog
   #restoreDialog

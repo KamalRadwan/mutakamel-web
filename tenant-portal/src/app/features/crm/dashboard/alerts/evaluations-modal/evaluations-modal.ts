@@ -1,3 +1,5 @@
+import { can } from '../../../../../shared/widgets/dashboard/analytics-permissions';
+import { Router } from '@angular/router';
 import { Component, computed, inject, signal, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { provideIcons } from '@ng-icons/core';
@@ -14,6 +16,8 @@ import { FullState } from '../../../../../shared/ui/full-state/full-state';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { errorCodeOf } from '../../../../../shared/widgets/dashboard/analytics-api';
 import { errorText, reasonKey } from '../../../../../shared/widgets/dashboard/panel-state';
+import { Notify } from '../../../../../core/notify/notify';
+import { alertReadKind, alertErrorText } from '../alerts-error';
 import { listEvaluations } from '../alerts.api';
 import {
   DEFAULT_EVALUATION_WINDOW_DAYS,
@@ -55,6 +59,9 @@ function defaultDateRange(nowIso: string): DateRangeValue {
   templateUrl: './evaluations-modal.html',
 })
 export class EvaluationsModal {
+  private readonly router = inject(Router);
+  protected readonly canReadiness = can('crm.analytics.readiness.view');
+  protected openReadiness(): void { void this.router.navigateByUrl('/crm/settings/data-readiness'); }
   private readonly org = inject(OrgApi);
   private static nextId = 0;
   protected readonly uid = `alert-evals-${++EvaluationsModal.nextId}`;
@@ -64,7 +71,7 @@ export class EvaluationsModal {
   private readonly language = inject(LanguageState).current;
   private readonly modal = viewChild.required<Modal>('modal');
 
-  protected readonly fakeNow = this.org.now();
+  protected readonly today = this.org.now();
   protected readonly rule = signal<AlertRule | null>(null);
   protected readonly dateRange = signal<DateRangeValue>(defaultDateRange(this.org.now()));
   protected readonly rows = signal<AlertEvaluation[]>([]);
@@ -73,6 +80,10 @@ export class EvaluationsModal {
   protected readonly hasMore = signal(false);
   protected readonly nextCursor = signal<string | null>(null);
   protected readonly loadError = signal(false);
+  private readonly notify = inject(Notify);
+  protected readonly failure = signal<unknown>(null);
+  protected readonly failureKind = computed(() => alertReadKind(this.failure()));
+  protected readonly failureText = computed(() => alertErrorText(this.transloco, this.failure()));
   protected readonly rangeError = signal<string | null>(null);
 
   private fetchSeq = 0;
@@ -231,7 +242,10 @@ export class EvaluationsModal {
           this.nextCursor.set(null);
         }
       } else if (reset) {
+        this.failure.set(error);
         this.loadError.set(true);
+      } else {
+        this.notify.error(alertErrorText(this.transloco, error));
       }
     } finally {
       if (seq === this.fetchSeq) {

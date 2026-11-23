@@ -25,9 +25,9 @@
     <ui-full-state
       kind="forbidden"
       [title]="'dashPage.forbiddenTitle' | transloco"
-      [text]="'dashPage.forbiddenText' | transloco"
-      [actionLabel]="'dashPage.backHome' | transloco"
-      (action)="goHome()"
+      [text]="readError()?.message ?? ('dashPage.forbiddenText' | transloco)"
+      [actionLabel]="(canRequestAccess() ? 'dashPage.requestAccess' : 'dashPage.backHome') | transloco"
+      (action)="onForbiddenAction()"
     />
   }
 
@@ -55,9 +55,19 @@
     <ui-full-state
       kind="load-failure"
       [title]="'dashPage.loadFailedTitle' | transloco"
-      [text]="'dashPage.loadFailedText' | transloco"
+      [text]="readError()?.message ?? ('dashPage.loadFailedText' | transloco)"
       [actionLabel]="'analytics.common.retry' | transloco"
       (action)="retryPageLoad()"
+    />
+  }
+
+  @case ('provisioning') {
+    <ui-full-state
+      kind="provisioning"
+      [title]="'dashPage.provisioningTitle' | transloco"
+      [text]="readError()?.message ?? ''"
+      [actionLabel]="canViewReadiness ? ('dashPage.openReadiness' | transloco) : ''"
+      (action)="onOpenReadiness('')"
     />
   }
 
@@ -66,7 +76,7 @@
       <app-dashboard-header
         [detail]="current"
         [generatedAt]="latestGeneratedAt()"
-        [editing]="editing()"
+        [editing]="editing() && !writeReadOnly()"
         [canCustomize]="canCustomize()"
         [canEdit]="canEdit()"
         [canAddWidget]="canAddWidget()"
@@ -88,6 +98,9 @@
         [branches]="branchOptions()"
         [showTeams]="showTeams()"
         [partialAccess]="partialAccess()"
+        [error]="filterError()"
+        [fieldErrors]="filterFieldErrors()"
+        [timeZone]="timeZone()"
         (valueChange)="onFiltersChange($event)"
         (openWhy)="onOpenWhy()"
       />
@@ -105,6 +118,7 @@
           [dirty]="editDirty()"
           [canUndo]="editor.canUndo()"
           [saving]="savingLayout()"
+          [readOnly]="writeReadOnly()"
           [selectedName]="selectedWidgetName()"
           [selectedSize]="selectedWidgetSize()"
           [sizeError]="editSizeError()"
@@ -125,7 +139,7 @@
       } @else {
         <app-dashboard-grid
           [items]="gridItems()"
-          [editing]="editing()"
+          [editing]="editing() && !writeReadOnly()"
           [selectedId]="selectedId()"
           [keyboardHint]="'dashboardWidgets.keyboard' | transloco"
           (layoutChange)="onGridLayoutChange($event)"
@@ -140,7 +154,7 @@
                 [title]="placement.widget.name"
                 [hint]="frameHintByPlacement()[placement.id] ?? ''"
                 [tag]="frameTagByPlacement()[placement.id] ?? null"
-                [editing]="editing()"
+                [editing]="editing() && !writeReadOnly()"
                 [selected]="editing() && selectedId() === placement.id"
                 [menuItems]="frameMenuByPlacement()[placement.id] ?? []"
                 [menuLabel]="'dashboardWidgets.menu.label' | transloco"
@@ -191,7 +205,7 @@
             } @else if (unavailableById()[item.id]; as unavailable) {
               <ui-widget-frame
                 [title]="'dashPage.unavailableTitle' | transloco"
-                [editing]="editing()"
+                [editing]="editing() && !writeReadOnly()"
                 [selected]="editing() && selectedId() === unavailable.id"
                 [menuItems]="frameMenuByPlacement()[unavailable.id] ?? []"
                 [menuLabel]="'dashboardWidgets.menu.label' | transloco"
@@ -221,6 +235,7 @@
 <app-version-policy-modal />
 <app-share-modal (changed)="onSharesChanged()" />
 <app-create-dashboard-modal />
+<app-request-modal />
 
 <ui-confirm-dialog
   #deleteConfirm
@@ -231,13 +246,12 @@
   [cancelLabel]="'analytics.common.cancel' | transloco"
 />
 
-<ui-confirm-dialog
-  #conflictConfirm
-  tone="warning"
-  [title]="'dashPage.conflictTitle' | transloco"
-  [text]="'dashPage.conflictText' | transloco"
-  [confirmLabel]="'dashPage.keepMine' | transloco"
-  [cancelLabel]="'dashPage.reload' | transloco"
+<ui-conflict-dialog
+  [open]="layoutConflict.visible()"
+  [recordLabel]="detail()?.name ?? null"
+  (reload)="layoutConflict.choose(false)"
+  (keepEditing)="layoutConflict.choose(true)"
+  (openChange)="layoutConflict.dismissed($event)"
 />
 
 <ui-unsaved-dialog

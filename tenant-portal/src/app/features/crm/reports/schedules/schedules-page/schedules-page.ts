@@ -23,6 +23,8 @@ import { ActionItem, ActionSelection, ActionsMenu } from '../../../../../shared/
 import { Badge, type BadgeTone } from '../../../../../shared/ui/badge/badge';
 import { Button } from '../../../../../shared/ui/button/button';
 import { DASH, formatDateTime } from '../../../../../shared/ui/chart/chart-format';
+import { ConflictDialog } from '../../../../../shared/ui/conflict-dialog/conflict-dialog';
+import { reportCorrelation, reportWriteError } from '../report-errors';
 import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { DataCell, DataTable, type DataColumn } from '../../../../../shared/ui/data-table/data-table';
 import { FullState } from '../../../../../shared/ui/full-state/full-state';
@@ -37,6 +39,7 @@ import {
   enableSubscription,
   listScheduleTargets,
   listSubscriptions,
+  getSubscription,
   resumeSubscription,
 } from '../schedules.api';
 import {
@@ -62,6 +65,7 @@ const KNOWN_SUSPENDED_REASONS = new Set<string>(['OWNER_INACTIVE', 'REPORT_DELET
     Badge,
     Button,
     ConfirmDialog,
+    ConflictDialog,
     DataTable,
     DataCell,
     DeliveriesModal,
@@ -105,6 +109,10 @@ export class SchedulesPage {
   private readonly deleteDialog = viewChild.required<ConfirmDialog>('deleteDialog');
 
   protected readonly canManage = can('crm.subscriptions.manage');
+  protected readonly readOnly = signal(false);
+  protected readonly conflictOpen = signal(false);
+  protected readonly conflictRecord = signal<Subscription | null>(null);
+  protected readonly loadText = signal('');
   protected readonly subscriptions = signal<Subscription[]>([]);
   protected readonly search = signal('');
   protected readonly nextCursor = signal<string | null>(null);
@@ -189,6 +197,7 @@ export class SchedulesPage {
   }
 
   private async loadTargets(): Promise<void> {
+    if (!this.canManage) return;
     const seq = ++this.targetsSeq;
     try {
       const targets = await listScheduleTargets();
@@ -199,6 +208,8 @@ export class SchedulesPage {
   }
 
   protected async load(): Promise<void> {
+    if (!this.canManage) { this.loadError.set('forbidden'); return; }
+    this.readOnly.set(false);
     const seq = ++this.loadSeq;
     this.loading.set(true);
     this.loadError.set(null);
@@ -210,6 +221,7 @@ export class SchedulesPage {
       this.hasMore.set(page.pageInfo.hasMore);
     } catch (error) {
       if (seq !== this.loadSeq) return;
+      this.loadText.set(reportCorrelation(error, this.transloco, 'repSchedules'));
       this.loadError.set(error instanceof ApiError && error.status === 403 ? 'forbidden' : 'load-failure');
     } finally {
       if (seq === this.loadSeq) {
@@ -247,7 +259,7 @@ export class SchedulesPage {
   }
 
   protected openNew(): void {
-    if (!this.canManage) return;
+    if (!this.canManage || this.readOnly()) return;
     this.scheduleModal().openCreate();
   }
 
@@ -309,7 +321,7 @@ export class SchedulesPage {
   protected rowActionsFor(row: Subscription): ActionItem[] {
     this.i18n();
     const items: ActionItem[] = [];
-    if (this.canManage) {
+    if (this.canManage && !this.readOnly()) {
       if (row.enabled && !row.suspendedReason) {
         items.push({
           id: 'pause',
@@ -332,7 +344,7 @@ export class SchedulesPage {
       icon: 'tablerHistory',
       tile: 'bg-icon-navy',
     });
-    if (this.canManage) {
+    if (this.canManage && !this.readOnly()) {
       items.push({
         id: 'delete',
         title: this.transloco.translate('repSchedules.actions.delete'),
@@ -378,7 +390,7 @@ export class SchedulesPage {
   }
 
   protected async requestDelete(row: Subscription): Promise<void> {
-    if (!this.canManage || this.busyActionId()) return;
+    if (!this.canManage || this.readOnly() || this.busyActionId()) return;
     this.pendingDelete.set(row);
     const confirmed = await this.deleteDialog().open();
     if (!confirmed) {
@@ -396,8 +408,8 @@ export class SchedulesPage {
       }
     } catch (error) {
       const code = errorCodeOf(error);
-      this.notify.error(this.transloco.translate(errorKey(code)));
-      if (code === 'CRM_SUBSCRIPTION_NOT_FOUND' || code === 'CRM_SUBSCRIPTION_REVISION_STALE') {
+      const state = this.showWriteError(error, row);
+      if (code === 'CRM_SUBSCRIPTION_NOT_FOUND' || state.reloadRequired) {
         if (code === 'CRM_SUBSCRIPTION_NOT_FOUND' && this.scheduleModal().editingId() === row.id) {
           this.scheduleModal().close();
         }
@@ -410,7 +422,7 @@ export class SchedulesPage {
   }
 
   private async toggleState(row: Subscription, action: 'pause' | 'resume'): Promise<void> {
-    if (!this.canManage || this.busyActionId()) return;
+    if (!this.canManage || this.readOnly() || this.busyActionId()) return;
     this.busyActionId.set(row.id);
     try {
       let updated: Subscription;
@@ -427,12 +439,34 @@ export class SchedulesPage {
       this.subscriptions.update((list) => list.map((item) => (item.id === updated.id ? updated : item)));
     } catch (error) {
       const code = errorCodeOf(error);
-      this.notify.error(this.transloco.translate(errorKey(code)));
-      if (code === 'CRM_SUBSCRIPTION_REVISION_STALE' || code === 'CRM_SUBSCRIPTION_NOT_FOUND') {
+      const state = this.showWriteError(error, row);
+      if (code === 'CRM_SUBSCRIPTION_NOT_FOUND' || code === 'CRM_SUBSCRIPTION_SUSPENDED' || state.reloadRequired) {
         await this.refreshList();
       }
     } finally {
       this.busyActionId.set(null);
+    }
+  }
+
+  private showWriteError(error: unknown, row: Subscription) {
+    const state = reportWriteError(error, this.transloco, 'repSchedules');
+    if (state.conflict) {
+      this.conflictRecord.set(row);
+      this.conflictOpen.set(true);
+    } else this.notify.error(state.message);
+    if (state.readOnly) this.readOnly.set(true);
+    return state;
+  }
+
+  protected async resolveConflict(reload: boolean): Promise<void> {
+    const row = this.conflictRecord();
+    if (!row) return;
+    try {
+      const latest = await getSubscription(row.id);
+      this.onScheduleReloaded(latest);
+      if (reload && this.scheduleModal().editingId() === row.id) this.scheduleModal().openEdit(latest);
+    } catch (error) {
+      this.notify.error(this.transloco.translate(errorKey(errorCodeOf(error))));
     }
   }
 

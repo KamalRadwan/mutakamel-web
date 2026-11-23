@@ -2,35 +2,35 @@
   <section class="rounded-10 border border-border bg-surface p-8 shadow-card">
     <div class="grid grid-cols-2 gap-10 desktop:grid-cols-4">
       <ui-field
-        [bare]="true"
+        [for]="uid + '-dashboards'"
         [label]="'widgetPage.usage.dashboards' | transloco"
         [hint]="'widgetPage.usage.dashboardsHint' | transloco"
       >
-        <bdi dir="ltr" class="text-16 leading-24 font-medium text-text tabular-nums">{{ dashboardCountText() }}</bdi>
+        <input [id]="uid + '-dashboards'" type="text" readonly dir="ltr" [value]="dashboardCountText()" class="w-full min-w-0 bg-transparent text-12 text-text tabular-nums outline-none" />
       </ui-field>
 
       <ui-field
-        [bare]="true"
+        [for]="uid + '-placements'"
         [label]="'widgetPage.usage.placements' | transloco"
         [hint]="'widgetPage.usage.placementsHint' | transloco"
       >
-        <bdi dir="ltr" class="text-16 leading-24 font-medium text-text tabular-nums">{{ placementCountText() }}</bdi>
+        <input [id]="uid + '-placements'" type="text" readonly dir="ltr" [value]="placementCountText()" class="w-full min-w-0 bg-transparent text-12 text-text tabular-nums outline-none" />
       </ui-field>
 
       <ui-field
-        [bare]="true"
+        [for]="uid + '-hiddenPlacements'"
         [label]="'widgetPage.usage.hiddenPlacements' | transloco"
         [hint]="'widgetPage.usage.hiddenPlacementsHint' | transloco"
       >
-        <bdi dir="ltr" class="text-16 leading-24 font-medium text-text tabular-nums">{{ hiddenPlacementCountText() }}</bdi>
+        <input [id]="uid + '-hiddenPlacements'" type="text" readonly dir="ltr" [value]="hiddenPlacementCountText()" class="w-full min-w-0 bg-transparent text-12 text-text tabular-nums outline-none" />
       </ui-field>
 
       <ui-field
-        [bare]="true"
+        [for]="uid + '-activeShares'"
         [label]="'widgetPage.usage.activeShares' | transloco"
         [hint]="'widgetPage.usage.activeSharesHint' | transloco"
       >
-        <bdi dir="ltr" class="text-16 leading-24 font-medium text-text tabular-nums">{{ activeShareCountText() }}</bdi>
+        <input [id]="uid + '-activeShares'" type="text" readonly dir="ltr" [value]="activeShareCountText()" class="w-full min-w-0 bg-transparent text-12 text-text tabular-nums outline-none" />
       </ui-field>
     </div>
   </section>
@@ -64,7 +64,7 @@
 
     <ng-template uiCell="position" let-row>
       @if (row.kind === 'placement') {
-        {{ row.placement.x }}, {{ row.placement.y }}
+        {{ row.placement.x ?? dash }}, {{ row.placement.y ?? dash }}
       } @else {
         <span class="text-text-muted">{{ dash }}</span>
       }
@@ -72,7 +72,7 @@
 
     <ng-template uiCell="size" let-row>
       @if (row.kind === 'placement') {
-        {{ row.placement.w }} × {{ row.placement.h }}
+        {{ row.placement.w ?? dash }} × {{ row.placement.h ?? dash }}
       } @else {
         <span class="text-text-muted">{{ dash }}</span>
       }

@@ -24,7 +24,7 @@ interface CrossFilterChipView {
 @Component({
   selector: 'app-cross-filter-chips',
   imports: [TranslocoPipe, NgIcon, Button],
-  providers: [
+  viewProviders: [
     provideTranslocoScope({ scope: 'crm-dash-filters', alias: 'dashFilters' }),
     provideIcons({ tablerX }),
   ],

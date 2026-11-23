@@ -21,6 +21,8 @@ import { ActionsMenu, type ActionItem, type ActionSelection } from '../../../../
 import { Badge, type BadgeTone } from '../../../../../shared/ui/badge/badge';
 import { Button } from '../../../../../shared/ui/button/button';
 import { DASH, formatDateTime, formatNumber } from '../../../../../shared/ui/chart/chart-format';
+import { ConflictDialog } from '../../../../../shared/ui/conflict-dialog/conflict-dialog';
+import { alertErrorText, alertReadKind, alertWriteLocked } from '../alerts-error';
 import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { DataCell, DataTable, type DataColumn, type DataSort } from '../../../../../shared/ui/data-table/data-table';
 import { Field } from '../../../../../shared/ui/field/field';
@@ -30,10 +32,12 @@ import { errorCodeOf } from '../../../../../shared/widgets/dashboard/analytics-a
 import type { CatalogMetric } from '../../../../../shared/widgets/dashboard/analytics.model';
 import { can } from '../../../../../shared/widgets/dashboard/analytics-permissions';
 import { getCatalog } from '../../../../../shared/widgets/dashboard/analytics.api';
-import { errorKey, reasonKey } from '../../../../../shared/widgets/dashboard/panel-state';
+import { reasonKey } from '../../../../../shared/widgets/dashboard/panel-state';
 import { AlertModal } from '../alert-modal/alert-modal';
 import {
   deleteAlert,
+  getAlert,
+  resetAlertWriteConflicts,
   disableAlert,
   enableAlert,
   listAlerts,
@@ -70,6 +74,7 @@ const STATE_TONES: Record<AlertState, BadgeTone> = {
     Badge,
     Button,
     ConfirmDialog,
+    ConflictDialog,
     DataCell,
     DataTable,
     EvaluationsModal,
@@ -122,6 +127,13 @@ export class AlertsPage {
   protected readonly hasMore = signal(false);
   protected readonly nextCursor = signal<string | null>(null);
   protected readonly loadError = signal(false);
+  protected readonly failure = signal<unknown>(null);
+  protected readonly failureKind = computed(() => alertReadKind(this.failure()));
+  protected readonly failureText = computed(() => alertErrorText(this.transloco, this.failure()));
+  protected readonly canReadiness = can('crm.analytics.readiness.view');
+  protected readonly readOnly = signal(false);
+  protected readonly conflictOpen = signal(false);
+  private conflictRule: AlertRule | null = null;
   protected readonly busyRuleId = signal<string | null>(null);
   protected readonly pendingDeleteRule = signal<AlertRule | null>(null);
 
@@ -215,7 +227,9 @@ export class AlertsPage {
 
   protected reload(): void {
     if (!this.allowed()) return;
-    void this.loadPage(true);
+    resetAlertWriteConflicts();
+    this.readOnly.set(false);
+    void this.loadInitial();
   }
 
   protected loadMore(): void {
@@ -239,7 +253,7 @@ export class AlertsPage {
   }
 
   protected openCreate(): void {
-    this.alertModal().openCreate();
+    if (!this.readOnly()) this.alertModal().openCreate();
   }
 
   protected openEdit(rule: AlertRule): void {
@@ -366,7 +380,7 @@ export class AlertsPage {
       },
     );
 
-    return items;
+    return this.readOnly() ? items.filter((item) => ['test', 'evaluations'].includes(item.id ?? '')) : items;
   }
 
   protected onRowAction(rule: AlertRule, selection: ActionSelection): void {
@@ -401,7 +415,7 @@ export class AlertsPage {
   }
 
   protected async requestDelete(rule: AlertRule): Promise<void> {
-    if (this.busyRuleId()) return;
+    if (this.busyRuleId() || this.readOnly()) return;
     this.pendingDeleteRule.set(rule);
     const confirmed = await this.deleteDialog().open();
     if (!confirmed) {
@@ -418,11 +432,7 @@ export class AlertsPage {
       }
       await this.loadPage(true);
     } catch (error) {
-      const code = errorCodeOf(error);
-      this.notify.error(this.transloco.translate(errorKey(code)));
-      if (code === 'CRM_ALERT_NOT_FOUND' || code === 'CRM_ALERT_REVISION_STALE') {
-        await this.loadPage(true);
-      }
+      await this.handleWriteError(error, rule);
     } finally {
       this.busyRuleId.set(null);
       this.pendingDeleteRule.set(null);
@@ -431,8 +441,11 @@ export class AlertsPage {
 
   private async loadInitial(): Promise<void> {
     const [, catalog] = await Promise.allSettled([this.loadPage(true), getCatalog()]);
-    if (catalog.status === 'fulfilled' && catalog.value.metrics.length > 0) {
+    if (catalog.status === 'fulfilled') {
       this.catalogMetrics.set(catalog.value.metrics);
+    } else if (this.allowed()) {
+      this.failure.set(catalog.reason);
+      this.loadError.set(true);
     }
   }
 
@@ -463,9 +476,10 @@ export class AlertsPage {
       if (code === 'CRM_PERMISSION_DENIED' || code === 'CRM_SCOPED_PERMISSION_DENIED') {
         this.allowed.set(false);
       } else if (reset) {
+        this.failure.set(error);
         this.loadError.set(true);
       } else {
-        this.notify.error(this.transloco.translate(errorKey(code)));
+        this.notify.error(alertErrorText(this.transloco, error));
       }
     } finally {
       if (seq === this.loadSeq) {
@@ -476,7 +490,7 @@ export class AlertsPage {
   }
 
   private async runStateChange(rule: AlertRule, action: 'pause' | 'activate' | 'resume'): Promise<void> {
-    if (this.busyRuleId()) return;
+    if (this.busyRuleId() || this.readOnly()) return;
     this.busyRuleId.set(rule.id);
     try {
       const updated =
@@ -495,14 +509,42 @@ export class AlertsPage {
       this.notify.success(this.transloco.translate(toastKey));
       this.alerts.update((list) => list.map((item) => (item.id === updated.id ? updated : item)));
     } catch (error) {
-      const code = errorCodeOf(error);
-      this.notify.error(this.transloco.translate(errorKey(code)));
-      if (code === 'CRM_ALERT_REVISION_STALE' || code === 'CRM_ALERT_NOT_FOUND') {
-        await this.loadPage(true);
-      }
+      await this.handleWriteError(error, rule);
     } finally {
       this.busyRuleId.set(null);
     }
+  }
+
+  protected openReadiness(): void {
+    void this.router.navigateByUrl('/crm/settings/data-readiness');
+  }
+
+  protected async resolveConflict(reload: boolean): Promise<void> {
+    const rule = this.conflictRule;
+    if (!rule) return;
+    try {
+      const fresh = await getAlert(rule.id);
+      this.onAlertReloaded(fresh);
+      if (reload) await this.loadPage(true);
+    } catch (error) {
+      this.notify.error(alertErrorText(this.transloco, error));
+    }
+  }
+
+  private async handleWriteError(error: unknown, rule: AlertRule): Promise<void> {
+    const code = errorCodeOf(error);
+    if (code?.endsWith('_STALE') || code?.endsWith('_CONFLICT')) {
+      this.conflictRule = rule;
+      this.conflictOpen.set(true);
+      return;
+    }
+    if (alertWriteLocked(error)) this.readOnly.set(true);
+    this.notify.error(alertErrorText(this.transloco, error));
+    if (code === 'CRM_ALERT_SUSPENDED') {
+      try { this.onAlertReloaded(await getAlert(rule.id)); }
+      catch (readError) { this.notify.error(alertErrorText(this.transloco, readError)); }
+    }
+    if (code === 'CRM_ALERT_NOT_FOUND') await this.loadPage(true);
   }
 
   private async runTest(rule: AlertRule): Promise<void> {
@@ -543,7 +585,7 @@ export class AlertsPage {
         this.notify.info(title, text);
       }
     } catch (error) {
-      this.notify.error(this.transloco.translate(errorKey(errorCodeOf(error))));
+      this.notify.error(alertErrorText(this.transloco, error));
     } finally {
       this.busyRuleId.set(null);
     }

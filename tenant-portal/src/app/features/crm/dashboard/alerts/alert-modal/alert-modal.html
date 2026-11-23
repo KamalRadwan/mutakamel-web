@@ -9,7 +9,14 @@
   [dismissable]="!saving()"
   (closed)="onModalClosed()"
 >
+  @if (recordFailure()) {
+    <ui-full-state [kind]="failureKind()" [title]="failureText()" [actionLabel]="'analytics.common.retry' | transloco" (action)="reloadRecord()" />
+      @if (failureKind() === 'provisioning' && canReadiness) {
+        <button type="button" uiButton variant="secondary" (click)="openReadiness()">{{ 'alerts.readiness' | transloco }}</button>
+      }
+  } @else {
   <form
+    [attr.inert]="locked() || recordFailure() ? '' : null"
     class="grid grid-cols-3 gap-x-10 gap-y-8"
     (submit)="$event.preventDefault(); save()"
     (keydown.escape)="onInnerEscape($event)"
@@ -710,6 +717,7 @@
       </ui-field>
     </div>
   </form>
+  }
 
   @if (openPopover(); as menu) {
     <div
@@ -770,7 +778,7 @@
           class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto"
           [attr.aria-label]="'alerts.form.branches' | transloco"
         >
-          @for (branch of branches; track branch.id) {
+          @for (branch of branches(); track branch.id) {
             @let selected = draft().branchIds.includes(branch.id);
             <li role="option" [attr.aria-selected]="selected">
               <button
@@ -834,13 +842,16 @@
     </div>
   }
 
+  @if (testResult()) {
+    <p class="text-12 leading-18 text-text" role="status">{{ testResultText() }}</p>
+  }
   <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
     <button
       type="button"
       uiButton
       variant="primary"
       [loading]="saving()"
-      [disabled]="isEdit() && !dirty()"
+      [disabled]="locked() || !!recordFailure() || (isEdit() && !dirty())"
       (click)="save()"
     >
       {{ 'analytics.common.save' | transloco }}
@@ -857,13 +868,17 @@
       {{ 'analytics.common.cancel' | transloco }}
     </button>
 
+    @if (writeLocked()) {
+      <button type="button" uiButton variant="secondary" (click)="reloadRecord()">{{ 'analytics.common.reload' | transloco }}</button>
+    }
     @if (isEdit()) {
+      <button type="button" uiButton variant="secondary" [loading]="testing()" [disabled]="saving() || dirty() || !!recordFailure()" (click)="runTest()">{{ 'alerts.actions.testNow' | transloco }}</button>
       <button
         type="button"
         uiButton
         variant="danger"
         class="ms-auto"
-        [disabled]="saving()"
+        [disabled]="saving() || locked()"
         (click)="requestDelete()"
       >
         {{ 'analytics.common.delete' | transloco }}
@@ -881,11 +896,4 @@
   [cancelLabel]="'analytics.common.cancel' | transloco"
 />
 
-<ui-confirm-dialog
-  #conflictDialog
-  tone="warning"
-  [title]="'analytics.common.conflictTitle' | transloco"
-  [text]="'analytics.common.conflictText' | transloco"
-  [confirmLabel]="'analytics.common.reload' | transloco"
-  [cancelLabel]="'analytics.common.keepMine' | transloco"
-/>
+<ui-conflict-dialog [(open)]="conflictOpen" (reload)="resolveConflict(true)" (keepEditing)="resolveConflict(false)" />

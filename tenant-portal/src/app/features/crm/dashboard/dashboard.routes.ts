@@ -1,10 +1,9 @@
 import { Routes } from '@angular/router';
 import { DATE_RANGE_NOW } from '../../../shared/ui/date-range/date-range-clock';
-import { FAKE_NOW } from '../../../shared/widgets/dashboard/analytics-api';
+import { analyticsNow } from '../../../shared/widgets/dashboard/analytics-api';
 import { dashboardPageCanDeactivate } from './dashboards/dashboard-page/dashboard-page.guard';
 import { widgetPageCanDeactivate } from './widgets/widget-page/widget-page.guard';
 
-// The dashboard fakes run on FAKE_NOW, so date pickers without a `today` input follow it too.
 const dashboardChildren: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'home' },
   {
@@ -53,7 +52,7 @@ const dashboardChildren: Routes = [
 export const dashboardRoutes: Routes = [
   {
     path: '',
-    providers: [{ provide: DATE_RANGE_NOW, useValue: () => new Date(FAKE_NOW) }],
+    providers: [{ provide: DATE_RANGE_NOW, useValue: () => new Date(analyticsNow()) }],
     children: dashboardChildren,
   },
 ];

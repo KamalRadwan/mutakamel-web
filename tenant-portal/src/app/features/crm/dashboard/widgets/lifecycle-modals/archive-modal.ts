@@ -1,4 +1,4 @@
-import { Component, DestroyRef, computed, inject, signal, viewChild } from '@angular/core';
+import { Component, DestroyRef, computed, inject, output, signal, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { provideIcons } from '@ng-icons/core';
@@ -8,21 +8,26 @@ import { Badge } from '../../../../../shared/ui/badge/badge';
 import { Button } from '../../../../../shared/ui/button/button';
 import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
+import { ConflictDialog } from '../../../../../shared/ui/conflict-dialog/conflict-dialog';
+import { FullState } from '../../../../../shared/ui/full-state/full-state';
+import { Router } from '@angular/router';
+import { fieldErrorsOf } from '../../../../../core/api/api-errors';
+import { can } from '../../../../../shared/widgets/dashboard/analytics-permissions';
 import { errorCodeOf } from '../../../../../shared/widgets/dashboard/analytics-api';
-import { errorKey } from '../../../../../shared/widgets/dashboard/panel-state';
 import { applyLifecycle, getWidget, lifecycleImpact } from '../widgets.api';
 import type { LifecycleImpact, WidgetSummary } from '../widgets.model';
+import { widgetConflict, widgetErrorMessage, widgetNeedsReload, widgetReadFailure, widgetWriteReadOnly, type WidgetReadFailure } from '../builder/builder-errors';
 
 const MAX_REASON_LEN = 500;
-const MAX_VISIBLE_DASHBOARDS = 5;
 
 @Component({
   selector: 'app-widget-archive-modal',
-  imports: [TranslocoPipe, Badge, Button, Field, Modal],
+  imports: [TranslocoPipe, Badge, Button, Field, Modal, ConflictDialog, FullState],
   providers: [
     provideTranslocoScope(
       { scope: 'crm-widgets', alias: 'widgets' },
       { scope: 'analytics', alias: 'analytics' },
+      { scope: 'crm-widget-page', alias: 'widgetPage' },
     ),
     provideIcons({ tablerArchive, tablerRestore }),
   ],
@@ -30,10 +35,12 @@ const MAX_VISIBLE_DASHBOARDS = 5;
   host: { class: 'contents' },
 })
 export class ArchiveModal {
+  readonly becameReadOnly = output<void>();
   private static nextId = 0;
   protected readonly uid = `widget-archive-${++ArchiveModal.nextId}`;
 
   private readonly notify = inject(Notify);
+  private readonly router = inject(Router);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly modal = viewChild.required(Modal);
@@ -44,6 +51,10 @@ export class ArchiveModal {
   protected readonly submitting = signal(false);
   protected readonly impact = signal<LifecycleImpact | null>(null);
   protected readonly reason = signal('');
+  protected readonly readOnly = signal(false);
+  protected readonly conflictOpen = signal(false);
+  protected readonly readFailure = signal<WidgetReadFailure | null>(null);
+  private readonly serverReasonError = signal(false);
 
   private openSeq = 0;
   private resolver: ((changed: boolean) => void) | null = null;
@@ -62,20 +73,12 @@ export class ArchiveModal {
     return names;
   });
 
-  protected readonly visibleDashboardNames = computed<string[]>(() =>
-    this.dashboardNames().slice(0, MAX_VISIBLE_DASHBOARDS),
-  );
-
-  protected readonly extraDashboardsCount = computed<number>(() =>
-    Math.max(0, this.dashboardNames().length - MAX_VISIBLE_DASHBOARDS),
-  );
-
   protected readonly placementCount = computed<number>(() => {
     const imp = this.impact();
     if (!imp) return 0;
     return this.action() === 'ARCHIVE'
-      ? imp.placements.length
-      : imp.placements.filter((p) => p.eligibleToResume).length || imp.hiddenPlacementCount;
+      ? imp.placements.length + imp.hiddenPlacementCount
+      : imp.placements.filter((p) => p.eligibleToResume).length;
   });
 
   protected readonly alertRulesCount = computed<number>(() => this.impact()?.alertRules?.count ?? 0);
@@ -89,6 +92,7 @@ export class ArchiveModal {
 
   protected readonly reasonError = computed<string | null>(() => {
     this.i18n();
+    if (this.serverReasonError()) return this.transloco.translate('analytics.error.CRM_VALIDATION_FAILED');
     if (this.reason().trim().length > MAX_REASON_LEN) {
       return this.transloco.translate('widgets.archiveModal.reasonTooLong');
     }
@@ -96,7 +100,9 @@ export class ArchiveModal {
   });
 
   protected readonly canSubmit = computed<boolean>(
-    () => !this.loadingImpact() && !this.submitting() && this.impact() !== null && !this.reasonError(),
+    () => !this.loadingImpact() && !this.submitting() && !this.readOnly() && !this.conflictOpen()
+      && can('crm.widgets.delete') && this.widget()?.accessLevel === 'OWNER' && this.impact() !== null && !this.reasonError()
+      && (this.action() !== 'ARCHIVE' || this.reason().trim().length > 0),
   );
 
   constructor() {
@@ -115,11 +121,15 @@ export class ArchiveModal {
     this.widget.set(widget);
     this.action.set(action);
     this.reason.set('');
+    this.serverReasonError.set(false);
+    this.readOnly.set(false);
+    this.conflictOpen.set(false);
+    this.readFailure.set(null);
     this.impact.set(null);
     this.submitting.set(false);
     this.modal().open();
 
-    void this.loadImpact(seq, widget, action, false);
+    void this.loadImpact(seq, widget, action);
 
     return new Promise<boolean>((resolve) => {
       this.resolver = resolve;
@@ -127,6 +137,7 @@ export class ArchiveModal {
   }
 
   protected onReasonInput(event: Event): void {
+    this.serverReasonError.set(false);
     this.reason.set((event.target as HTMLTextAreaElement).value);
   }
 
@@ -135,6 +146,7 @@ export class ArchiveModal {
   }
 
   protected onClosed(): void {
+    this.conflictOpen.set(false);
     this.openSeq++;
     this.loadingImpact.set(false);
     this.submitting.set(false);
@@ -172,15 +184,21 @@ export class ArchiveModal {
     } catch (error) {
       if (seq !== this.openSeq) return;
       const code = errorCodeOf(error);
-      if (
-        code === 'CRM_WIDGET_LIFECYCLE_IMPACT_STALE' ||
-        code === 'CRM_WIDGET_REVISION_CONFLICT'
-      ) {
-        this.notify.warning(this.transloco.translate(errorKey(code)));
-        await this.refreshAndReloadImpact(seq, currentWidget.id, action);
+      if (widgetConflict(error)) {
+        this.impact.set(null);
+        this.conflictOpen.set(true);
         return;
       }
-      this.notify.error(this.transloco.translate(errorKey(code)));
+      if (fieldErrorsOf(error)['reason']) this.serverReasonError.set(true);
+      else this.notify.error(widgetErrorMessage(error, this.transloco, 'widgetPage', true));
+      if (widgetWriteReadOnly(error)) {
+        this.readOnly.set(true);
+        this.becameReadOnly.emit();
+      }
+      if (code === 'CRM_WIDGET_LIFECYCLE_CONSUMER_LIMIT' || widgetNeedsReload(error)) {
+        this.impact.set(null);
+        await this.refreshAndReloadImpact(seq, currentWidget.id, action);
+      }
     } finally {
       if (seq === this.openSeq) {
         this.submitting.set(false);
@@ -188,13 +206,41 @@ export class ArchiveModal {
     }
   }
 
+  protected async resolveConflict(keepChanges: boolean): Promise<void> {
+    this.conflictOpen.set(false);
+    if (!keepChanges) this.reason.set('');
+    const current = this.widget();
+    if (current) await this.refreshAndReloadImpact(this.openSeq, current.id, this.action());
+  }
+
+  protected failureText(): string {
+    const failure = this.readFailure();
+    return [failure?.message, failure?.correlationId
+      ? this.transloco.translate('widgetPage.requests.correlation', { id: failure.correlationId }) : ''].filter(Boolean).join(' ');
+  }
+
+  protected failureAction(): string | null {
+    return this.readFailure()?.kind === 'provisioning'
+      ? can('crm.analytics.readiness.view') ? 'widgetPage.requests.readiness' : null
+      : this.readFailure()?.kind === 'load-failure' ? 'analytics.common.retry' : null;
+  }
+
+  protected async retryImpact(): Promise<void> {
+    if (this.readFailure()?.kind === 'provisioning' && can('crm.analytics.readiness.view')) {
+      void this.router.navigateByUrl('/crm/settings/data-readiness');
+      return;
+    }
+    const current = this.widget();
+    if (current) await this.refreshAndReloadImpact(this.openSeq, current.id, this.action());
+  }
+
   private async loadImpact(
     seq: number,
     widget: WidgetSummary,
     action: 'ARCHIVE' | 'RESTORE',
-    retryingConflict: boolean,
   ): Promise<void> {
     this.loadingImpact.set(true);
+    this.readFailure.set(null);
     try {
       const imp = await lifecycleImpact(widget.id, {
         action,
@@ -205,14 +251,12 @@ export class ArchiveModal {
       this.impact.set(imp);
     } catch (error) {
       if (seq !== this.openSeq) return;
-      const code = errorCodeOf(error);
-      if (!retryingConflict && code === 'CRM_WIDGET_LIFECYCLE_IMPACT_STALE') {
-        this.notify.warning(this.transloco.translate(errorKey(code)));
-        await this.refreshAndReloadImpact(seq, widget.id, action, true);
+      if (widgetConflict(error)) {
+        this.impact.set(null);
+        this.conflictOpen.set(true);
         return;
       }
-      this.notify.error(this.transloco.translate(errorKey(code)));
-      this.modal().close();
+      this.readFailure.set(widgetReadFailure(error, this.transloco, 'widgetPage'));
     } finally {
       if (seq === this.openSeq) {
         this.loadingImpact.set(false);
@@ -224,7 +268,6 @@ export class ArchiveModal {
     seq: number,
     widgetId: string,
     action: 'ARCHIVE' | 'RESTORE',
-    retryingConflict = false,
   ): Promise<void> {
     this.loadingImpact.set(true);
     try {
@@ -233,11 +276,12 @@ export class ArchiveModal {
       this.widget.set(fresh);
       const nextAction: 'ARCHIVE' | 'RESTORE' = fresh.status === 'ARCHIVED' ? 'RESTORE' : action;
       this.action.set(nextAction);
-      await this.loadImpact(seq, fresh, nextAction, retryingConflict);
+      await this.loadImpact(seq, fresh, nextAction);
     } catch (error) {
       if (seq !== this.openSeq) return;
-      this.notify.error(this.transloco.translate(errorKey(errorCodeOf(error))));
-      this.modal().close();
+      this.readFailure.set(widgetReadFailure(error, this.transloco, 'widgetPage'));
+    } finally {
+      if (seq === this.openSeq) this.loadingImpact.set(false);
     }
   }
 

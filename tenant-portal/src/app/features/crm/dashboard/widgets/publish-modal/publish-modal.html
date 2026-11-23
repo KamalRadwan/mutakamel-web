@@ -17,14 +17,23 @@
     </div>
   } @else if (impactError(); as errMsg) {
     <ui-full-state
-      kind="load-failure"
-      [title]="'analytics.common.loadFailed' | transloco"
+      [kind]="failure()?.kind ?? 'load-failure'"
+      [title]="(failure()?.kind === 'provisioning' ? 'builder2.requests.provisioningTitle' : 'analytics.common.loadFailed') | transloco"
       [text]="errMsg"
-      [actionLabel]="'builder2.publish.retry' | transloco"
-      (action)="loadImpact()"
+      [actionLabel]="(failure()?.kind === 'provisioning' && canOpenReadiness() ? 'builder2.requests.readiness' : failure()?.requestAccess ? 'builder2.requests.requestAccess' : failure()?.kind === 'forbidden' || failure()?.kind === 'not-found' ? '' : 'builder2.publish.retry') | transloco"
+      (action)="onFailureAction()"
     />
   } @else if (impact(); as imp) {
     <div class="flex flex-col gap-12">
+      @if (usage(); as currentUsage) {
+        <div class="grid grid-cols-3 gap-10">
+          @for (key of usageFields; track key) {
+            <ui-field [label]="('builder2.publish.' + key) | transloco" [hint]="('builder2.publish.' + key + 'Hint') | transloco" [for]="uid + '-' + key">
+              <input [id]="uid + '-' + key" type="text" readonly dir="ltr" [value]="currentUsage[key]" class="w-full min-w-0 bg-transparent text-12 text-text tabular-nums outline-none" />
+            </ui-field>
+          }
+        </div>
+      }
       <dl class="grid grid-cols-1 gap-8 rounded-10 border border-border bg-surface-muted p-8 desktop:grid-cols-2">
         <div class="flex flex-col gap-2">
           <dt class="flex h-label items-center gap-4 text-12 text-text-muted">
@@ -32,7 +41,7 @@
             <span
               #verHintTrigger
               class="relative inline-flex shrink-0 items-center text-accent"
-              tabindex="0"
+              tabindex="-1"
               (mouseenter)="showHint('nextVersion', verHintTrigger, verHintTip)"
               (focus)="showHint('nextVersion', verHintTrigger, verHintTip)"
               (blur)="hideHint()"
@@ -65,7 +74,7 @@
             <span
               #expHintTrigger
               class="relative inline-flex shrink-0 items-center text-accent"
-              tabindex="0"
+              tabindex="-1"
               (mouseenter)="showHint('validUntil', expHintTrigger, expHintTip)"
               (focus)="showHint('validUntil', expHintTrigger, expHintTip)"
               (blur)="hideHint()"
@@ -99,7 +108,7 @@
           <span
             #dashHintTrigger
             class="relative inline-flex shrink-0 items-center text-accent"
-            tabindex="0"
+            tabindex="-1"
             (mouseenter)="showHint('dashboards', dashHintTrigger, dashHintTip)"
             (focus)="showHint('dashboards', dashHintTrigger, dashHintTip)"
             (blur)="hideHint()"
@@ -143,7 +152,7 @@
           <span
             #layoutHintTrigger
             class="relative inline-flex shrink-0 items-center text-accent"
-            tabindex="0"
+            tabindex="-1"
             (mouseenter)="showHint('layout', layoutHintTrigger, layoutHintTip)"
             (focus)="showHint('layout', layoutHintTrigger, layoutHintTip)"
             (blur)="hideHint()"
@@ -190,7 +199,7 @@
           <span
             #depsHintTrigger
             class="relative inline-flex shrink-0 items-center text-accent"
-            tabindex="0"
+            tabindex="-1"
             (mouseenter)="showHint('dependents', depsHintTrigger, depsHintTip)"
             (focus)="showHint('dependents', depsHintTrigger, depsHintTip)"
             (blur)="hideHint()"
@@ -246,7 +255,7 @@
       type="button"
       variant="primary"
       [loading]="publishing()"
-      [disabled]="loadingImpact() || !impact() || publishing()"
+      [disabled]="loadingImpact() || !impact() || publishing() || conflictOpen() || !canPublish()"
       (click)="confirmPublish()"
     >
       <ng-icon name="tablerSend" size="15" aria-hidden="true" />
@@ -263,3 +272,12 @@
     </button>
   </ng-container>
 </ui-modal>
+
+<ui-conflict-dialog
+  [open]="conflictOpen()"
+  [recordLabel]="currentWidgetName()"
+  (openChange)="onConflictOpenChange($event)"
+  (reload)="settleConflict('reload')"
+  (keepEditing)="settleConflict('keep')"
+/>
+<app-request-modal />

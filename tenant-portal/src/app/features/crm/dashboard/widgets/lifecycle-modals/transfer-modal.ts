@@ -6,6 +6,7 @@ import {
   afterNextRender,
   computed,
   inject,
+  output,
   signal,
   viewChild,
 } from '@angular/core';
@@ -25,11 +26,17 @@ import { Button } from '../../../../../shared/ui/button/button';
 import { Checkbox } from '../../../../../shared/ui/checkbox/checkbox';
 import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
+import { ConflictDialog } from '../../../../../shared/ui/conflict-dialog/conflict-dialog';
+import { FullState } from '../../../../../shared/ui/full-state/full-state';
+import { Router } from '@angular/router';
+import { fieldErrorsOf } from '../../../../../core/api/api-errors';
+import { can } from '../../../../../shared/widgets/dashboard/analytics-permissions';
 import { rectInPage, viewport } from '../../../../../shared/ui/overlay/zoom';
 import { errorCodeOf } from '../../../../../shared/widgets/dashboard/analytics-api';
 import { errorKey } from '../../../../../shared/widgets/dashboard/panel-state';
 import { getWidget, listTransferTargets, transferImpact, transferWidget } from '../widgets.api';
 import type { TransferImpact, WidgetSummary } from '../widgets.model';
+import { widgetConflict, widgetErrorMessage, widgetNeedsReload, widgetReadFailure, widgetWriteReadOnly, type WidgetReadFailure } from '../builder/builder-errors';
 
 interface TargetOption {
   id: string;
@@ -47,11 +54,12 @@ const MAX_REASON_LEN = 500;
 
 @Component({
   selector: 'app-widget-transfer-modal',
-  imports: [NgIcon, TranslocoPipe, Badge, Button, Checkbox, Field, Modal],
+  imports: [NgIcon, TranslocoPipe, Badge, Button, Checkbox, Field, Modal, ConflictDialog, FullState],
   providers: [
     provideTranslocoScope(
       { scope: 'crm-widgets', alias: 'widgets' },
       { scope: 'analytics', alias: 'analytics' },
+      { scope: 'crm-widget-page', alias: 'widgetPage' },
     ),
     provideIcons({ tablerUserShare, tablerChevronDown, tablerCheck, tablerSearch, tablerLoader2 }),
   ],
@@ -63,12 +71,14 @@ const MAX_REASON_LEN = 500;
   },
 })
 export class TransferModal {
+  readonly becameReadOnly = output<void>();
   private static nextId = 0;
   protected readonly uid = `widget-transfer-${++TransferModal.nextId}`;
 
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
   private readonly notify = inject(Notify);
+  private readonly router = inject(Router);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
 
@@ -93,11 +103,17 @@ export class TransferModal {
   protected readonly submitAttempted = signal(false);
   protected readonly acknowledged = signal(false);
   protected readonly submitting = signal(false);
+  protected readonly readOnly = signal(false);
+  protected readonly conflictOpen = signal(false);
+  protected readonly readFailure = signal<WidgetReadFailure | null>(null);
+  private failureStage: 'targets' | 'impact' = 'targets';
+  private readonly serverReasonError = signal(false);
   private readonly serverOwnerError = signal<string | null>(null);
 
   private openSeq = 0;
   private menuSeq = 0;
   private impactSeq = 0;
+  private targetsSeq = 0;
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
   private resolver: ((changed: boolean) => void) | null = null;
   private settledResult = false;
@@ -115,6 +131,7 @@ export class TransferModal {
   protected readonly reasonError = computed<string | null>(() => {
     this.i18n();
     const trimmed = this.reason().trim();
+    if (this.serverReasonError()) return this.transloco.translate('analytics.error.CRM_VALIDATION_FAILED');
     if (trimmed.length > MAX_REASON_LEN) {
       return this.transloco.translate('widgets.transferModal.reasonTooLong');
     }
@@ -128,9 +145,11 @@ export class TransferModal {
     const trimmedReason = this.reason().trim();
     return (
       !this.submitting() &&
+      !this.readOnly() && !this.conflictOpen() && can('crm.widgets.transfer_ownership') &&
       !this.loadingImpact() &&
       Boolean(this.selectedTargetId()) &&
       this.impact() !== null &&
+      !this.ownerError() && !this.reasonError() &&
       trimmedReason.length >= 1 &&
       trimmedReason.length <= MAX_REASON_LEN &&
       this.acknowledged()
@@ -159,6 +178,7 @@ export class TransferModal {
       document.removeEventListener('scroll', onScroll, { capture: true });
       document.removeEventListener('keydown', onEscape, { capture: true });
       this.openSeq++;
+      this.targetsSeq++;
       this.settle(false);
     });
   }
@@ -180,6 +200,10 @@ export class TransferModal {
     this.submitAttempted.set(false);
     this.acknowledged.set(false);
     this.submitting.set(false);
+    this.readOnly.set(false);
+    this.conflictOpen.set(false);
+    this.serverReasonError.set(false);
+    this.readFailure.set(null);
     this.serverOwnerError.set(null);
     this.closeOwnerMenu();
 
@@ -192,7 +216,7 @@ export class TransferModal {
   }
 
   protected toggleOwnerMenu(): void {
-    if (this.submitting()) return;
+    if (this.submitting() || this.readOnly()) return;
     if (this.ownerMenuOpen()) {
       this.closeOwnerMenu();
       return;
@@ -211,6 +235,7 @@ export class TransferModal {
   protected onOwnerSearchInput(event: Event): void {
     const term = (event.target as HTMLInputElement).value;
     this.ownerSearch.set(term);
+    this.targetsSeq++;
     this.clearSearchTimer();
     const w = this.widget();
     if (!w) return;
@@ -221,14 +246,16 @@ export class TransferModal {
   }
 
   protected selectTarget(targetId: string): void {
+    if (this.submitting() || this.readOnly()) return;
     this.selectedTargetId.set(targetId);
+    this.acknowledged.set(false);
     this.serverOwnerError.set(null);
     this.closeOwnerMenu();
     this.ownerTrigger()?.nativeElement.focus();
 
     const w = this.widget();
     if (w) {
-      void this.loadImpact(this.openSeq, w, targetId, false);
+      void this.loadImpact(this.openSeq, w, targetId);
     }
   }
 
@@ -289,6 +316,7 @@ export class TransferModal {
   }
 
   protected onReasonInput(event: Event): void {
+    this.serverReasonError.set(false);
     this.reason.set((event.target as HTMLTextAreaElement).value);
   }
 
@@ -302,7 +330,9 @@ export class TransferModal {
   }
 
   protected onClosed(): void {
+    this.conflictOpen.set(false);
     this.openSeq++;
+    this.targetsSeq++;
     this.impactSeq++;
     this.clearSearchTimer();
     this.closeOwnerMenu();
@@ -326,8 +356,8 @@ export class TransferModal {
     try {
       await transferWidget(currentWidget.id, {
         targetUserId,
-        expectedWidgetRevision: currentWidget.revision,
-        expectedGovernanceRevision: currentWidget.governanceRevision,
+        expectedWidgetRevision: currentImpact.widget.widgetRevision,
+        expectedGovernanceRevision: currentImpact.widget.governanceRevision,
         impactId: currentImpact.impactId,
         reason: this.reason().trim(),
         acknowledged: true,
@@ -344,17 +374,24 @@ export class TransferModal {
         code === 'CRM_WIDGET_TRANSFER_TARGET_INELIGIBLE'
       ) {
         this.serverOwnerError.set(this.transloco.translate(errorKey(code)));
+        this.impact.set(null);
+        this.acknowledged.set(false);
         return;
       }
-      if (
-        code === 'CRM_WIDGET_TRANSFER_IMPACT_STALE' ||
-        code === 'CRM_WIDGET_REVISION_CONFLICT'
-      ) {
-        this.notify.warning(this.transloco.translate(errorKey(code)));
-        await this.refreshAndReloadImpact(seq, currentWidget.id, targetUserId);
+      if (widgetConflict(error)) {
+        this.impact.set(null);
+        this.conflictOpen.set(true);
         return;
       }
-      this.notify.error(this.transloco.translate(errorKey(code)));
+      const fields = fieldErrorsOf(error);
+      if (fields['targetUserId']) this.serverOwnerError.set(this.transloco.translate('analytics.error.CRM_VALIDATION_FAILED'));
+      else if (fields['reason']) this.serverReasonError.set(true);
+      else this.notify.error(widgetErrorMessage(error, this.transloco, 'widgetPage', true));
+      if (widgetWriteReadOnly(error)) {
+        this.readOnly.set(true);
+        this.becameReadOnly.emit();
+      }
+      if (widgetNeedsReload(error)) await this.refreshAndReloadImpact(seq, currentWidget.id, targetUserId);
     } finally {
       if (seq === this.openSeq) {
         this.submitting.set(false);
@@ -362,17 +399,29 @@ export class TransferModal {
     }
   }
 
+  protected async resolveConflict(keepChanges: boolean): Promise<void> {
+    this.conflictOpen.set(false);
+    this.acknowledged.set(false);
+    if (!keepChanges) this.reason.set('');
+    const current = this.widget();
+    if (current && this.selectedTargetId())
+      await this.refreshAndReloadImpact(this.openSeq, current.id, this.selectedTargetId());
+  }
+
   private async loadTargets(seq: number, widgetId: string, search: string): Promise<void> {
+    const request = ++this.targetsSeq;
     this.loadingTargets.set(true);
+    this.readFailure.set(null);
     try {
       const page = await listTransferTargets(widgetId, search);
-      if (seq !== this.openSeq) return;
+      if (seq !== this.openSeq || request !== this.targetsSeq) return;
       this.targets.set(page.items);
     } catch (error) {
-      if (seq !== this.openSeq) return;
-      this.notify.error(this.transloco.translate(errorKey(errorCodeOf(error))));
+      if (seq !== this.openSeq || request !== this.targetsSeq) return;
+      this.failureStage = 'targets';
+      this.readFailure.set(widgetReadFailure(error, this.transloco, 'widgetPage'));
     } finally {
-      if (seq === this.openSeq) {
+      if (seq === this.openSeq && request === this.targetsSeq) {
         this.loadingTargets.set(false);
       }
     }
@@ -382,11 +431,11 @@ export class TransferModal {
     seq: number,
     widget: WidgetSummary,
     targetUserId: string,
-    retryingConflict: boolean,
   ): Promise<void> {
     const reqSeq = ++this.impactSeq;
     this.loadingImpact.set(true);
     this.impact.set(null);
+    this.readFailure.set(null);
     try {
       const imp = await transferImpact(widget.id, {
         targetUserId,
@@ -398,12 +447,16 @@ export class TransferModal {
     } catch (error) {
       if (seq !== this.openSeq || reqSeq !== this.impactSeq) return;
       const code = errorCodeOf(error);
-      if (!retryingConflict && code === 'CRM_WIDGET_TRANSFER_IMPACT_STALE') {
-        this.notify.warning(this.transloco.translate(errorKey(code)));
-        await this.refreshAndReloadImpact(seq, widget.id, targetUserId, true);
+      if (code === 'CRM_OWNERSHIP_TARGET_INACTIVE' || code === 'CRM_WIDGET_TRANSFER_TARGET_INELIGIBLE') {
+        this.serverOwnerError.set(this.transloco.translate(errorKey(code)));
         return;
       }
-      this.notify.error(this.transloco.translate(errorKey(code)));
+      if (widgetConflict(error)) {
+        this.conflictOpen.set(true);
+        return;
+      }
+      this.failureStage = 'impact';
+      this.readFailure.set(widgetReadFailure(error, this.transloco, 'widgetPage'));
     } finally {
       if (seq === this.openSeq && reqSeq === this.impactSeq) {
         this.loadingImpact.set(false);
@@ -415,17 +468,43 @@ export class TransferModal {
     seq: number,
     widgetId: string,
     targetUserId: string,
-    retryingConflict = false,
   ): Promise<void> {
+    this.loadingImpact.set(true);
     try {
       const fresh = await getWidget(widgetId);
-      if (seq !== this.openSeq) return;
+      if (seq !== this.openSeq || targetUserId !== this.selectedTargetId()) return;
       this.widget.set(fresh);
-      await this.loadImpact(seq, fresh, targetUserId, retryingConflict);
+      await this.loadImpact(seq, fresh, targetUserId);
     } catch (error) {
       if (seq !== this.openSeq) return;
-      this.notify.error(this.transloco.translate(errorKey(errorCodeOf(error))));
+      this.failureStage = 'impact';
+      this.readFailure.set(widgetReadFailure(error, this.transloco, 'widgetPage'));
+    } finally {
+      if (seq === this.openSeq) this.loadingImpact.set(false);
     }
+  }
+
+  protected failureText(): string {
+    const failure = this.readFailure();
+    return [failure?.message, failure?.correlationId
+      ? this.transloco.translate('widgetPage.requests.correlation', { id: failure.correlationId }) : ''].filter(Boolean).join(' ');
+  }
+
+  protected failureAction(): string | null {
+    return this.readFailure()?.kind === 'provisioning'
+      ? can('crm.analytics.readiness.view') ? 'widgetPage.requests.readiness' : null
+      : this.readFailure()?.kind === 'load-failure' ? 'analytics.common.retry' : null;
+  }
+
+  protected async retryRead(): Promise<void> {
+    if (this.readFailure()?.kind === 'provisioning' && can('crm.analytics.readiness.view')) {
+      void this.router.navigateByUrl('/crm/settings/data-readiness');
+      return;
+    }
+    const current = this.widget();
+    if (!current) return;
+    if (this.failureStage === 'targets') await this.loadTargets(this.openSeq, current.id, this.ownerSearch());
+    else await this.refreshAndReloadImpact(this.openSeq, current.id, this.selectedTargetId());
   }
 
   private clearSearchTimer(): void {

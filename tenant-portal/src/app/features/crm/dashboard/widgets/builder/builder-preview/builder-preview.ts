@@ -1,4 +1,4 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, inject, viewChild } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { translationEvents } from '../../../../../../core/i18n/translation-events';
 import { Router } from '@angular/router';
@@ -30,6 +30,9 @@ import { WidgetState } from '../../../../../../shared/ui/widget-state/widget-sta
 import { defaultVisualizationForDraft } from '../builder-schemas';
 import { BuilderState } from '../builder-state';
 import { selectScopeTranslation } from '../../../../../../shared/widgets/dashboard/scope-translation';
+import { can } from '../../../../../../shared/widgets/dashboard/analytics-permissions';
+import { FullState } from '../../../../../../shared/ui/full-state/full-state';
+import { RequestModal } from '../../../access/request-modal/request-modal';
 
 const KNOWN_DATE_FIELDS = new Set<string>([
   'CREATED_AT',
@@ -52,9 +55,10 @@ const MAX_PREVIEW_ROWS = 48;
 
 @Component({
   selector: 'app-builder-preview',
-  imports: [TranslocoPipe, Field, WidgetFrame, WidgetState, WidgetBody, WidgetTable],
-  providers: [
+  imports: [TranslocoPipe, Field, WidgetFrame, WidgetState, WidgetBody, WidgetTable, FullState, RequestModal],
+  viewProviders: [
     provideTranslocoScope(
+      { scope: 'crm-widget-builder', alias: 'builder' },
       { scope: 'chart', alias: 'chart' },
       { scope: 'analytics', alias: 'analytics' },
     ),
@@ -72,6 +76,25 @@ export class BuilderPreview {
   private readonly builderScope = toSignal(selectScopeTranslation(this.transloco, 'crm-widget-builder', 'builder'));
   private readonly analyticsScope = toSignal(this.transloco.selectTranslation('analytics'));
   private readonly chartScope = toSignal(this.transloco.selectTranslation('chart'));
+  private readonly requestModal = viewChild(RequestModal);
+  protected readonly canOpenReadiness = computed(() => can('crm.analytics.readiness.view'));
+  protected readonly failureText = computed(() => {
+    this.i18n();
+    const failure = this.state.previewFailure();
+    return (failure?.message ?? '') + (failure?.correlationId
+      ? ' ' + this.transloco.translate('builder.requests.correlation', { id: failure.correlationId }) : '');
+  });
+
+  protected retryPreview(): void {
+    const failure = this.state.previewFailure();
+    if (failure?.kind === 'provisioning' && this.canOpenReadiness()) {
+      void this.router.navigateByUrl('/crm/settings/data-readiness');
+    } else if (failure?.requestAccess && this.state.widgetId()) {
+      this.requestModal()?.open('WIDGET', this.state.widgetId()!);
+    } else {
+      this.state.refreshPreview();
+    }
+  }
 
   protected readonly firstMetric = computed(() => {
     const key = this.state.draft().querySpec.series[0]?.metricKey;

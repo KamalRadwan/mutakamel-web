@@ -1,3 +1,12 @@
+@if (!canRead()) {
+  <ui-full-state
+    kind="forbidden"
+    [title]="'widgets.forbiddenTitle' | transloco"
+    [text]="'analytics.error.CRM_SCOPED_PERMISSION_DENIED' | transloco"
+    [actionLabel]="'widgets.backHome' | transloco"
+    (action)="goHome()"
+  />
+} @else {
 <div class="flex shrink-0 flex-wrap items-end gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
   @if (canCreate()) {
     <a uiButton routerLink="/crm/dashboard/widgets/new" class="shrink-0">
@@ -104,13 +113,13 @@
   [attr.aria-labelledby]="tabButtonId(activeTab())"
   class="flex min-h-0 flex-1 flex-col gap-12"
 >
-  @if (failed()) {
+  @if (loadFailure(); as failure) {
     <ui-full-state
-      kind="load-failure"
-      [title]="'widgets.loadFailedTitle' | transloco"
-      [text]="'analytics.common.loadFailed' | transloco"
-      [actionLabel]="'analytics.common.retry' | transloco"
-      (action)="reload()"
+      [kind]="failure.kind"
+      [title]="failure.title | transloco"
+      [text]="failure.text"
+      [actionLabel]="failure.actionLabel | transloco"
+      (action)="onLoadFailureAction()"
     />
   } @else if (viewMode() === 'table') {
     @if (loading() || items().length > 0) {
@@ -162,17 +171,6 @@
 
         <ng-template uiCell="owner" let-row>
           <span class="truncate text-13 text-text">{{ row.ownerName || '—' }}</span>
-        </ng-template>
-
-        <ng-template uiCell="usedOn" let-row>
-          @let count = usageCount(row.id);
-          <ui-badge
-            tone="count"
-            [attr.title]="'widgets.usedOnCount' | transloco: { count }"
-            [attr.aria-label]="'widgets.usedOnCount' | transloco: { count }"
-          >
-            {{ count }}
-          </ui-badge>
         </ng-template>
 
         <ng-template uiCell="updated" let-row>
@@ -248,7 +246,6 @@
       >
         @for (row of items(); track row.id) {
           @let fam = familyVisual(row.visualizationType);
-          @let count = usageCount(row.id);
           <article
             role="button"
             tabindex="0"
@@ -298,14 +295,6 @@
 
               <span class="flex-1" aria-hidden="true"></span>
 
-              <ui-badge
-                tone="count"
-                [attr.title]="'widgets.usedOnCount' | transloco: { count }"
-                [attr.aria-label]="'widgets.usedOnCount' | transloco: { count }"
-              >
-                {{ count }}
-              </ui-badge>
-
               <ui-actions-menu
                 [items]="actionsFor(row)"
                 [label]="'widgets.actions.menu' | transloco"
@@ -318,7 +307,7 @@
     }
   }
 
-  @if (!failed() && !loading() && nextCursor()) {
+  @if (!loadFailure() && !loading() && nextCursor()) {
     <div class="flex justify-center pt-4">
       <button
         type="button"
@@ -347,3 +336,4 @@
   [confirmLabel]="'analytics.common.delete' | transloco"
   [cancelLabel]="'analytics.common.cancel' | transloco"
 />
+}

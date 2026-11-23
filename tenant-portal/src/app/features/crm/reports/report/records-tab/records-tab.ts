@@ -55,13 +55,15 @@ import { Dropdown, DropdownOption } from '../../../../../shared/ui/dropdown/drop
 import { Field } from '../../../../../shared/ui/field/field';
 import { FullState } from '../../../../../shared/ui/full-state/full-state';
 import { rectInPage } from '../../../../../shared/ui/overlay/zoom';
-import { errorCodeOf, isAbortError, queueRun, retryWhenBusy } from '../../../../../shared/widgets/dashboard/analytics-api';
+import { errorCodeOf, isAbortError, queueRun } from '../../../../../shared/widgets/dashboard/analytics-api';
 import type { Panel, PanelManifest, PanelTable } from '../../../../../shared/widgets/dashboard/analytics.model';
-import { errorKey } from '../../../../../shared/widgets/dashboard/panel-state';
 import { getPanelRows } from '../report.api';
 import type { PanelRowsPage, ReportRunRequest } from '../report.model';
 import { ReportState } from '../report-state';
 import { selectScopeTranslation } from '../../../../../shared/widgets/dashboard/scope-translation';
+import { reportErrorMessage, reportLoadKind } from '../report-errors';
+import type { FullStateKind } from '../../../../../shared/ui/full-state/full-state';
+import { can } from '../../../../../shared/widgets/dashboard/analytics-permissions';
 
 const PAGE_SIZES = [25, 50, 100] as const;
 const DEFAULT_PAGE = 1;
@@ -279,10 +281,12 @@ export class RecordsTab {
   protected readonly sort = signal<DataSort | null>(null);
   protected readonly loading = signal(false);
   /** A rows call was refused (429) and waits to retry: shown as a status line above the table. */
-  protected readonly retrying = signal(false);
   /** Aborted when a newer fetch starts or the tab is destroyed: queued and retrying calls stop at once. */
   private fetchAbort = new AbortController();
   protected readonly initialFailed = signal(false);
+  protected readonly loadKind = signal<FullStateKind>('load-failure');
+  protected readonly loadMessage = signal('');
+  protected readonly canViewReadiness = computed(() => can('crm.analytics.readiness.view'));
   private readonly retryTick = signal(0);
 
   private readonly scrollElement = signal<HTMLElement | undefined>(undefined);
@@ -726,6 +730,10 @@ export class RecordsTab {
     this.retryTick.update((n) => n + 1);
   }
 
+  protected openReadiness(): void {
+    void this.router.navigate(['/crm/settings/data-readiness']);
+  }
+
   protected virtualHeaderColumn(header: Header<typeof RECORDS_TABLE_FEATURES, RowData, unknown>, index: number): DataColumn {
     return header.column.columnDef.meta ?? this.columns()[index];
   }
@@ -804,13 +812,6 @@ export class RecordsTab {
     this.fetchAbort.abort();
     this.fetchAbort = new AbortController();
     const signal = this.fetchAbort.signal;
-    const busyOptions = {
-      signal,
-      onRetry: () => {
-        if (seq === this.fetchSeq && !this.destroyed) this.retrying.set(true);
-      },
-    };
-    this.retrying.set(false);
     const prevCursors = [...this.cursors];
     const prevExactTotal = this.exactTotal;
     const prevKnownTotal = this.knownTotal();
@@ -833,6 +834,20 @@ export class RecordsTab {
         }
       : undefined;
 
+    const readPage = (cursor: string | null) => queueRun(() => getPanelRows(
+      params.reportKey,
+      params.panelKey,
+      {
+        period,
+        ...(filters ? { filters } : {}),
+        ...(scope ? { scope } : {}),
+        cursor,
+        limit: params.size,
+        ...(sortPayload ? { sort: sortPayload } : {}),
+      },
+      signal,
+    ), signal);
+
     try {
       let actualPage = params.targetPage;
       let result: PanelRowsPage | null = null;
@@ -841,29 +856,8 @@ export class RecordsTab {
         let step = this.cursors.length - 1;
         while (step < params.targetPage) {
           const cursor = this.cursors[step] ?? null;
-          const res = await retryWhenBusy(
-            () =>
-              queueRun(
-                () =>
-                  getPanelRows(
-                    params.reportKey,
-                    params.panelKey,
-                    {
-                      period,
-                      ...(filters ? { filters } : {}),
-                      ...(scope ? { scope } : {}),
-                      cursor,
-                      limit: params.size,
-                      ...(sortPayload ? { sort: sortPayload } : {}),
-                    },
-                    signal,
-                  ),
-                signal,
-              ),
-            busyOptions,
-          );
+          const res = await readPage(cursor);
           if (seq !== this.fetchSeq || this.destroyed) return;
-          this.retrying.set(false);
 
           result = res;
           actualPage = step + 1;
@@ -877,29 +871,8 @@ export class RecordsTab {
         }
       } else {
         const cursor = this.cursors[params.targetPage - 1] ?? null;
-        result = await retryWhenBusy(
-          () =>
-            queueRun(
-              () =>
-                getPanelRows(
-                  params.reportKey,
-                  params.panelKey,
-                  {
-                    period,
-                    ...(filters ? { filters } : {}),
-                    ...(scope ? { scope } : {}),
-                    cursor,
-                    limit: params.size,
-                    ...(sortPayload ? { sort: sortPayload } : {}),
-                  },
-                  signal,
-                ),
-              signal,
-            ),
-          busyOptions,
-        );
+        result = await readPage(cursor);
         if (seq !== this.fetchSeq || this.destroyed) return;
-        this.retrying.set(false);
       }
 
       if (!result) {
@@ -955,7 +928,6 @@ export class RecordsTab {
       }
     } catch (error) {
       if (isAbortError(error) || seq !== this.fetchSeq || this.destroyed) return;
-      this.retrying.set(false);
 
       this.cursors = prevCursors;
       this.exactTotal = prevExactTotal;
@@ -963,7 +935,14 @@ export class RecordsTab {
       this.loading.set(false);
 
       const code = errorCodeOf(error);
-      this.notify.error(this.transloco.translate(errorKey(code)));
+      this.loadKind.set(reportLoadKind(error));
+      this.loadMessage.set(reportErrorMessage(this.transloco, error, 'repTabs'));
+      this.notify.error(this.loadMessage());
+      if (this.loadKind() === 'forbidden' || this.loadKind() === 'provisioning') {
+        this.pageData.set(null);
+        this.initialFailed.set(true);
+        return;
+      }
 
       if (code === 'CRM_REPORT_PANEL_NOT_PAGEABLE') {
         const fallback = this.pageablePanels()[0];

@@ -1,7 +1,7 @@
-import { Component, computed, effect, inject, input, signal } from '@angular/core';
+import { Component, DestroyRef, computed, effect, inject, input, signal } from '@angular/core';
 import { translationEvents } from '../../../../../../core/i18n/translation-events';
 import { Router } from '@angular/router';
-import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
+import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerLayoutDashboard } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../../../core/i18n/language';
@@ -25,10 +25,13 @@ export type UsageRow =
   selector: 'app-usage-tab',
   imports: [TranslocoPipe, NgIcon, Button, DataTable, DataCell, Field],
   providers: [provideIcons({ tablerLayoutDashboard })],
+  viewProviders: [provideTranslocoScope({ scope: 'crm-widget-page', alias: 'widgetPage' }, { scope: 'analytics', alias: 'analytics' })],
   templateUrl: './usage-tab.html',
   host: { class: 'block min-w-0' },
 })
 export class UsageTab {
+  private static nextId = 0;
+  protected readonly uid = `widget-usage-${++UsageTab.nextId}`;
   private readonly router = inject(Router);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
@@ -42,20 +45,17 @@ export class UsageTab {
   protected readonly nextCursor = signal<string | null>(null);
   protected readonly loadingMore = signal(false);
 
-  private activeWidgetId: string | null = null;
   private loadMoreSeq = 0;
 
   constructor() {
     effect(() => {
       const current = this.widget();
-      if (current.id !== this.activeWidgetId) {
-        this.activeWidgetId = current.id;
-        this.loadMoreSeq++;
-        this.loadingMore.set(false);
-      }
+      this.loadMoreSeq++;
+      this.loadingMore.set(false);
       this.extraPlacements.set([]);
       this.nextCursor.set(current.usage.nextCursor);
     });
+    inject(DestroyRef).onDestroy(() => this.loadMoreSeq++);
   }
 
   protected readonly dashboardCountText = computed(() =>
@@ -103,7 +103,7 @@ export class UsageTab {
   protected readonly rows = computed<UsageRow[]>(() => {
     const placements = this.allPlacements();
     const result: UsageRow[] = placements.map((placement) => ({ kind: 'placement', placement }));
-    const hiddenCount = this.widget().usage.placementCount - placements.length;
+    const hiddenCount = this.widget().usage.hiddenPlacementCount;
     if (!this.nextCursor() && hiddenCount > 0) {
       result.push({ kind: 'hidden', count: hiddenCount });
     }

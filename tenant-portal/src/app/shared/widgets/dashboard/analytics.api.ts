@@ -1,161 +1,93 @@
-import { ApiError, fakeDelay, isUuidV7, pageOf, validationFailed } from './analytics-api';
-import type { Catalog, Explain, Receipt, ShareTarget, SourceReadiness } from './analytics.model';
-import { can } from './analytics-permissions';
-import { FAKE_CATALOG } from './fake/fake-catalog';
-import { FAKE_BRANCHES, FAKE_ME, FAKE_PEOPLE, FAKE_TEAMS, fakeLang } from './fake/fake-org';
-import { FAKE_READINESS, FAKE_READINESS_AFFECTED, type ReadinessAffectedItem } from './fake/fake-readiness';
-import { findExplain, findReceipt } from './fake/fake-receipts';
-import { FAKE_ALL_STAFF_TEAM_ID, FAKE_EMPTY_TEAM_ID } from './fake/fake-results';
+import { crmHttp, crmQueries } from '../../../features/crm/shared/crm-http';
+import {
+  getReadiness as settingsReadiness,
+  listReadiness as settingsReadinessList,
+} from '../../../features/crm/settings/data-readiness/readiness.api';
+import type { ReadinessDetail } from '../../../features/crm/settings/data-readiness/readiness.api';
+import { ApiError, isUuidV7, validationFailed, type FlatPage, type InfoPage } from './analytics-api';
+import type {
+  Catalog, Explain, GovernedTargetOption, MetricStatsQuery, MetricStat, Receipt, ShareTarget, SourceReadiness,
+} from './analytics.model';
 
-// {B} = /api/v1/crm. Each fake follows the crm-app controller: RequirePermissions (403 CRM_PERMISSION_DENIED) runs
-// before the ValidationPipe (400 CRM_VALIDATION_FAILED), then the service codes.
+export type { ReadinessDetail };
 
-export interface ReadinessDetail extends SourceReadiness {
-  captureSourceKey: string | null;
-  lastConfirmedAt: string | null;
-  watermarkPinned: { watermark: string; firstSeenAt: string } | null;
-  affected: ReadinessAffectedItem[];
-  pageInfo: { limit: number; hasMore: boolean; nextCursor: string | null };
-}
-
-const SHARE_TARGETS_LIMIT_DEFAULT = 50;
-
-function requirePermission(key: string): void {
-  if (!can(key)) throw new ApiError(403, 'CRM_PERMISSION_DENIED');
-}
-
-function validateLimit(limit: number, field = 'limit'): void {
-  if (!Number.isInteger(limit)) throw validationFailed(field, 'is_int');
-  if (limit < 1) throw validationFailed(field, 'min');
-  if (limit > 100) throw validationFailed(field, 'max');
-}
-
-// GET {B}/dashboards/catalog
-export async function getCatalog(): Promise<Catalog> {
-  await fakeDelay();
-  const canReadCatalog = can('crm.dashboards.read') || can('crm.widgets.read');
-  const metrics = canReadCatalog
-    ? FAKE_CATALOG.metrics.filter((m) => (m.accessResources.includes('targets') ? can('crm.targets.read') : true))
-    : [];
-  return structuredClone({
-    ...FAKE_CATALOG,
-    metrics,
+// Analytics reads have no organization scope headers; the server resolves dataset access.
+export function getCatalog(): Promise<Catalog> {
+  return crmQueries().fetchQuery({
+    queryKey: ['crm-analytics', 'catalog', 'dashboards'],
+    queryFn: () => crmHttp().read('/dashboards/catalog'),
   });
 }
 
-// GET {B}/analytics/readiness?status
+export function getWidgetCatalog(): Promise<Catalog> {
+  return crmQueries().fetchQuery({
+    queryKey: ['crm-analytics', 'catalog', 'widgets'],
+    queryFn: () => crmHttp().read('/widgets/catalog'),
+  });
+}
+
 export async function listReadiness(status?: SourceReadiness['status']): Promise<{ items: SourceReadiness[] }> {
-  await fakeDelay();
-  requirePermission('crm.analytics.readiness.view');
-  const items = status ? FAKE_READINESS.filter((row) => row.status === status) : FAKE_READINESS;
-  return structuredClone({ items });
+  const result = await settingsReadinessList();
+  // The settings API has no status argument. Keep the existing shared caller contract.
+  return status ? { items: result.items.filter((item) => item.status === status) } : result;
 }
 
-// GET {B}/analytics/readiness/:sourceKey?cursor&limit
-export async function getReadiness(
-  key: string,
-  cursor: string | null = null,
-  limit = 20,
-): Promise<ReadinessDetail> {
-  await fakeDelay();
-  requirePermission('crm.analytics.readiness.view');
-  validateLimit(limit);
-  if (cursor && cursor.length > 1024) throw validationFailed('cursor', 'max_length');
-  const row = FAKE_READINESS.find((item) => item.sourceKey === key);
-  if (!row) {
-    throw new ApiError(404, 'CRM_READINESS_SOURCE_UNKNOWN');
-  }
-  const allAffected = FAKE_READINESS_AFFECTED[key] ?? [];
-  const page = pageOf(allAffected, cursor, limit);
-  const detail: ReadinessDetail = {
-    ...row,
-    captureSourceKey: row.sourceKey,
-    lastConfirmedAt: row.lastCheckedAt,
-    watermarkPinned:
-      row.stale && row.watermarkAt
-        ? { watermark: row.watermarkAt, firstSeenAt: '2026-11-21T07:35:00.000Z' }
-        : null,
-    affected: page.items,
-    pageInfo: page.pageInfo,
-  };
-  return structuredClone(detail);
+export function getReadiness(key: string, cursor: string | null = null, limit = 20): Promise<ReadinessDetail> {
+  return settingsReadiness(key, { cursor, limit });
 }
 
-/** Receipts are visible to their requester only: an unknown id is 404 `CRM_RECEIPT_NOT_FOUND`. */
-function receiptOrThrow(id: string, field: string): Receipt {
-  if (!isUuidV7(id)) throw validationFailed(field, 'is_uuid');
-  const receipt = findReceipt(id);
-  if (!receipt) throw new ApiError(404, 'CRM_RECEIPT_NOT_FOUND');
-  return receipt;
+export function getReceipt(id: string): Promise<Receipt> {
+  return crmQueries().fetchQuery({
+    queryKey: ['crm-analytics', 'receipt', id],
+    queryFn: () => crmHttp().read(`/dashboards/receipts/${encodeURIComponent(id)}`),
+  });
 }
 
-// GET {B}/dashboards/receipts/:receiptId
-export async function getReceipt(id: string): Promise<Receipt> {
-  await fakeDelay();
-  requirePermission('crm.dashboards.read');
-  return structuredClone(receiptOrThrow(id, 'receiptId'));
+/** Heavy read: invoked only when the caller opens or refreshes the explanation. */
+export function explainReceipt(id: string, compareTo?: string): Promise<Explain> {
+  return crmQueries().fetchQuery({
+    queryKey: ['crm-analytics', 'explain', id, compareTo],
+    queryFn: () => crmHttp().read(`/dashboards/receipts/${encodeURIComponent(id)}/explain`, { compareTo }),
+    staleTime: 0,
+  });
 }
 
-// GET {B}/dashboards/receipts/:receiptId/explain?compareTo
-export async function explainReceipt(id: string, compareTo?: string): Promise<Explain> {
-  await fakeDelay();
-  requirePermission('crm.dashboards.read');
-  if (!isUuidV7(id)) throw validationFailed('receiptId', 'is_uuid');
-  if (compareTo !== undefined && !isUuidV7(compareTo)) throw validationFailed('compareTo', 'is_uuid');
-  const receipt = receiptOrThrow(id, 'receiptId');
-  if (compareTo !== undefined) {
-    const compared = receiptOrThrow(compareTo, 'compareTo');
-    if (compared.metricKey !== receipt.metricKey) throw new ApiError(422, 'CRM_EXPLAIN_NOT_COMPARABLE');
-  }
-  const explain = findExplain(id);
-  if (!explain) throw new ApiError(404, 'CRM_RECEIPT_NOT_FOUND');
-  return structuredClone(explain);
-}
-
-/**
- * GET {B}/dashboards/share-targets | GET {B}/widgets/share-targets?search&limit&offset
- * Users (never the caller) and teams are paged separately by the same limit/offset; `nextOffset` is present only
- * while either list filled the page.
- */
-export async function listShareTargets(
-  kind: 'dashboards' | 'widgets',
-  search = '',
-  offset = 0,
-  limit = SHARE_TARGETS_LIMIT_DEFAULT,
+export function listShareTargets(
+  kind: 'dashboards' | 'widgets', search = '', offset = 0, limit = 50,
 ): Promise<{ items: ShareTarget[]; nextOffset?: number }> {
-  await fakeDelay();
-  requirePermission(kind === 'dashboards' ? 'crm.dashboards.share' : 'crm.widgets.share');
-  const q = search.trim();
-  if (q.length > 80) throw validationFailed('search', 'max_length');
-  validateLimit(limit);
-  if (!Number.isInteger(offset) || offset < 0) throw validationFailed('offset', 'min');
-  if (offset > 10_000) throw validationFailed('offset', 'max');
-  const lang = fakeLang();
-  const needle = q.toLowerCase();
-  const matches = (text: string) => !needle || text.toLowerCase().includes(needle);
+  return crmQueries().fetchQuery({
+    queryKey: ['crm-analytics', 'share-targets', kind, search, offset, limit],
+    queryFn: () => crmHttp().read(`/${kind}/share-targets`, { search, offset, limit }),
+  });
+}
 
-  const users: ShareTarget[] = FAKE_PEOPLE.filter(
-    (p) => p.id !== FAKE_ME.id && matches(`${p.name} ${p.nameAr} ${p.email}`),
-  ).map((p) => ({ id: p.id, type: 'USER', name: lang === 'ar' ? p.nameAr : p.name, email: p.email, branchId: p.branchId }));
+export async function listMetricStats(query: MetricStatsQuery): Promise<InfoPage<MetricStat>> {
+  const civilTime = (value: string): number => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return NaN;
+    const time = Date.parse(`${value}T00:00:00Z`);
+    return Number.isFinite(time) && new Date(time).toISOString().slice(0, 10) === value ? time : NaN;
+  };
+  const days = (civilTime(query.to) - civilTime(query.from)) / 86_400_000 + 1;
+  if (!(days >= 1 && days <= 92)) throw new ApiError(422, 'CRM_DASHBOARD_FILTER_INVALID');
+  return crmQueries().fetchQuery({
+    queryKey: ['crm-analytics', 'metric-stats', query],
+    queryFn: () => crmHttp().read('/analytics/metric-stats', { ...query }),
+  });
+}
 
-  // Fake-only teams that reach the preview limit (422 CRM_SHARE_PREVIEW_LIMIT_EXCEEDED) and the EMPTY preview state.
-  const teamRows = [
-    ...FAKE_TEAMS.map((t, index) => ({ id: t.id, code: `TEAM-${index + 1}`, en: t.name.en, ar: t.name.ar, branchId: t.branchId })),
-    { id: FAKE_ALL_STAFF_TEAM_ID, code: 'TEAM-ALL', en: 'All staff', ar: 'جميع الموظفين', branchId: FAKE_BRANCHES[0].id },
-    {
-      id: FAKE_EMPTY_TEAM_ID,
-      code: 'TEAM-EMPTY',
-      en: 'New team (no members)',
-      ar: 'فريق جديد (بلا أعضاء)',
-      branchId: FAKE_BRANCHES[0].id,
-    },
-  ];
-  const teams: ShareTarget[] = teamRows
-    .filter((t) => matches(`${t.en} ${t.ar} ${t.code}`))
-    .map((t) => ({ id: t.id, type: 'TEAM', name: lang === 'ar' ? t.ar : t.en, code: t.code, branchId: t.branchId }));
-
-  const userPage = users.slice(offset, offset + limit);
-  const teamPage = teams.slice(offset, offset + limit);
-  const full = userPage.length === limit || teamPage.length === limit;
-  return structuredClone({ items: [...userPage, ...teamPage], ...(full ? { nextOffset: offset + limit } : {}) });
+/** The target list requires a branch even though dashboard permissions are tenant-level. */
+export async function listGovernedTargets(
+  metricKey: string, periodGrain: 'MONTH' | 'QUARTER' | 'YEAR', branchId: string,
+): Promise<GovernedTargetOption[]> {
+  if (!isUuidV7(branchId)) throw validationFailed('branchId', 'is_uuid');
+  const items: GovernedTargetOption[] = [];
+  for (let page = 1; ; page++) {
+    const query = { branchId, metricKey, periodGrain, approvalState: 'APPROVED', page, limit: 100 };
+    const result = await crmQueries().fetchQuery({
+      queryKey: ['crm-analytics', 'governed-targets', query],
+      queryFn: () => crmHttp().read<FlatPage<GovernedTargetOption>>('/targets', query),
+    });
+    items.push(...result.items);
+    if (!result.hasNext) return items;
+  }
 }

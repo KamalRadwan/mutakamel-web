@@ -38,7 +38,7 @@ import { selectScopeTranslation } from '../../../../../shared/widgets/dashboard/
     DashboardSwitcher,
     ExportMenu,
   ],
-  providers: [
+  viewProviders: [
     provideTranslocoScope(
       { scope: 'crm-dash-page', alias: 'dashPage' },
       { scope: 'analytics', alias: 'analytics' },

@@ -27,8 +27,8 @@
           [placeholder]="'repSchedules.form.namePlaceholder' | transloco"
           [value]="name()"
           [attr.maxlength]="maxNameLength"
-          [readOnly]="!canManage()"
-          [attr.aria-readonly]="!canManage() ? 'true' : null"
+          [readOnly]="!editable()"
+          [attr.aria-readonly]="!editable() ? 'true' : null"
           [attr.aria-invalid]="nameErr ? 'true' : null"
           [attr.aria-describedby]="describedBy(uid + '-name', 'name')"
           (input)="onNameInput($event)"
@@ -43,7 +43,7 @@
         [for]="uid + '-targetType'"
         [hint]="'repSchedules.form.targetTypeHint' | transloco"
       >
-        @if (canManage() && !isEdit()) {
+        @if (editable() && !isEdit()) {
           <ui-segmented
             [id]="uid + '-targetType'"
             [options]="targetTypeOptions()"
@@ -77,7 +77,7 @@
         [required]="true"
         [error]="targetErr"
       >
-        @if (canManage() && !isEdit()) {
+        @if (editable() && !isEdit()) {
           <ui-dropdown
             class="w-full"
             size="field"
@@ -111,7 +111,7 @@
         [hint]="'repSchedules.form.periodHint' | transloco"
         [required]="true"
       >
-        @if (canManage()) {
+        @if (editable()) {
           <ui-dropdown
             class="w-full"
             size="field"
@@ -144,7 +144,7 @@
         [hint]="'repSchedules.form.recurrenceHint' | transloco"
         [required]="true"
       >
-        @if (canManage()) {
+        @if (editable()) {
           <ui-dropdown
             class="w-full"
             size="field"
@@ -181,7 +181,7 @@
           [required]="true"
           [error]="weekdayErr"
         >
-          @if (canManage()) {
+          @if (editable()) {
             <ui-dropdown
               class="w-full"
               size="field"
@@ -216,7 +216,7 @@
           [required]="true"
           [error]="monthDayErr"
         >
-          @if (canManage()) {
+          @if (editable()) {
             <ui-dropdown
               class="w-full"
               size="field"
@@ -252,7 +252,7 @@
         [required]="true"
         [error]="timeErr"
       >
-        @if (canManage()) {
+        @if (editable()) {
           <ui-time-field
             [id]="uid + '-time'"
             [ariaLabel]="'repSchedules.form.time' | transloco"
@@ -289,7 +289,7 @@
         [required]="true"
         [error]="tzErr"
       >
-        @if (canManage()) {
+        @if (editable()) {
           <ui-dropdown
             class="w-full"
             size="field"
@@ -322,7 +322,7 @@
         [hint]="'repSchedules.form.languageHint' | transloco"
         [required]="true"
       >
-        @if (canManage()) {
+        @if (editable()) {
           <ui-dropdown
             class="w-full"
             size="field"
@@ -357,7 +357,7 @@
         [required]="true"
         [error]="startsErr"
       >
-        @if (canManage()) {
+        @if (editable()) {
           <ui-date-field
             class="w-full"
             [id]="uid + '-startsOn'"
@@ -395,7 +395,7 @@
         [hint]="'repSchedules.form.endsOnHint' | transloco"
         [error]="endsErr"
       >
-        @if (canManage()) {
+        @if (editable()) {
           <div class="flex items-center gap-4">
             <ui-date-field
               class="min-w-0 flex-1"
@@ -456,8 +456,8 @@
           step="1"
           class="w-full bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
           [value]="linkTtlHoursText()"
-          [readOnly]="!canManage()"
-          [attr.aria-readonly]="!canManage() ? 'true' : null"
+          [readOnly]="!editable()"
+          [attr.aria-readonly]="!editable() ? 'true' : null"
           [attr.aria-invalid]="ttlErr ? 'true' : null"
           [attr.aria-describedby]="describedBy(uid + '-ttl', 'linkTtlHours')"
           (input)="onTtlInput($event)"
@@ -477,7 +477,7 @@
         [max]="maxRecipients"
         [error]="recErr"
       >
-        @if (canManage()) {
+        @if (editable()) {
           <div
             #recipientsAnchor
             class="flex min-h-field flex-wrap items-center gap-4 rounded-8 border bg-surface-field px-8 py-2 text-12 transition-colors duration-fast"
@@ -632,11 +632,11 @@
           [attr.aria-describedby]="describedBy(uid + '-attachments', 'attachmentFormats')"
         >
           @for (fmt of attachmentFormatOptions; track fmt) {
-            @let pdfBlocked = fmt === 'PDF' && !pdfEnabled;
-            @let boxDisabled = !canManage() || pdfBlocked;
+            @let pdfBlocked = fmt === 'PDF' && !pdfEnabled();
+            @let boxDisabled = !editable() || pdfBlocked;
             <span
               class="inline-flex"
-              [class]="pdfBlocked ? 'cursor-not-allowed opacity-drag-source' : canManage() ? '' : 'cursor-default'"
+              [class]="pdfBlocked ? 'cursor-not-allowed opacity-drag-source' : editable() ? '' : 'cursor-default'"
               [attr.title]="pdfBlocked ? ('repSchedules.form.notAvailableYet' | transloco) : null"
             >
               <ui-checkbox [checked]="hasFormat(fmt)" [disabled]="boxDisabled" (change)="onAttachmentChange(fmt, $event)">
@@ -650,7 +650,7 @@
   </form>
 
   <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
-    @if (canManage()) {
+    @if (editable()) {
       <button
         type="button"
         uiButton
@@ -662,7 +662,7 @@
       </button>
     }
 
-    @if (isEdit() && canManage() && dirty()) {
+    @if (isEdit() && editable() && dirty()) {
       <button
         type="button"
         uiButton
@@ -682,10 +682,10 @@
       [disabled]="saving()"
       (click)="requestClose()"
     >
-      {{ (canManage() ? 'analytics.common.cancel' : 'analytics.common.close') | transloco }}
+      {{ (editable() ? 'analytics.common.cancel' : 'analytics.common.close') | transloco }}
     </button>
 
-    @if (isEdit() && canManage() && editingSubscription(); as sub) {
+    @if (isEdit() && editable() && editingSubscription(); as sub) {
       <button
         type="button"
         uiButton
@@ -709,11 +709,8 @@
   [cancelLabel]="'repSchedules.discard.cancel' | transloco"
 />
 
-<ui-confirm-dialog
-  #conflictDialog
-  tone="warning"
-  [title]="'analytics.common.conflictTitle' | transloco"
-  [text]="'analytics.common.conflictText' | transloco"
-  [confirmLabel]="'analytics.common.reload' | transloco"
-  [cancelLabel]="'analytics.common.keepMine' | transloco"
+<ui-conflict-dialog
+  [(open)]="conflictOpen"
+  (reload)="resolveConflict(true)"
+  (keepEditing)="resolveConflict(false)"
 />

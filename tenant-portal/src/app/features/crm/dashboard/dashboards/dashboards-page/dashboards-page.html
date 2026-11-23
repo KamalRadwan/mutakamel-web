@@ -8,7 +8,7 @@
   />
 } @else {
   <div class="flex shrink-0 flex-wrap items-center gap-8 rounded-10 bg-surface p-8 shadow-card">
-    @if (canCreate) {
+    @if (canCreate && !readOnly()) {
       <button type="button" uiButton class="shrink-0" (click)="openCreate()">
         <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
         {{ 'dashLibrary.newDashboard' | transloco }}
@@ -43,18 +43,6 @@
     @if (activeTab() !== 'templates') {
       <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
 
-      @if (activeTab() === 'all') {
-        <div class="shrink-0">
-          <ui-dropdown
-            icon="tablerFilter"
-            [label]="'dashLibrary.kind.label' | transloco"
-            [options]="kindOptions()"
-            [value]="kindFilter()"
-            (valueChange)="onKindChange($event)"
-          />
-        </div>
-      }
-
       <button
         type="button"
         class="inline-flex h-btn shrink-0 cursor-pointer items-center gap-6 rounded-8 border px-10 text-12 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
@@ -73,7 +61,6 @@
           aria-hidden="true"
         />
         <span>{{ 'dashLibrary.favourites' | transloco }}</span>
-        <ui-badge tone="count">{{ favouriteCount() }}</ui-badge>
       </button>
 
       <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
@@ -84,6 +71,9 @@
         [value]="view()"
         (valueChange)="setView($event)"
       />
+    }
+    @if (reloadRequired()) {
+      <button type="button" uiButton variant="secondary" (click)="reloadLibrary()">{{ 'dashLibrary.reload' | transloco }}</button>
     }
   </div>
 
@@ -102,14 +92,19 @@
     [attr.aria-labelledby]="tabButtonId(activeTab())"
   >
     @if (activeTab() === 'templates') {
-      @if (blueprintsError(); as errKind) {
+      @if (blueprintsError(); as failure) {
         <ui-full-state
-          [kind]="errKind"
-          [title]="(errKind === 'forbidden' ? 'dashLibrary.forbiddenTitle' : 'dashLibrary.loadFailedTitle') | transloco"
-          [text]="(errKind === 'forbidden' ? 'analytics.error.CRM_DASHBOARD_DEFINITION_ACCESS_DENIED' : 'analytics.common.loadFailed') | transloco"
-          [actionLabel]="(errKind === 'forbidden' ? 'analytics.common.back' : 'analytics.common.retry') | transloco"
-          (action)="errKind === 'forbidden' ? goHome() : retryActive()"
+          [kind]="failure.kind"
+          [title]="(failure.kind === 'provisioning' ? 'dashLibrary.provisioningTitle' : failure.kind === 'forbidden' ? 'dashLibrary.forbiddenTitle' : failure.kind === 'not-found' ? 'dashLibrary.notFoundTitle' : 'dashLibrary.loadFailedTitle') | transloco"
+          [text]="failure.message + (failure.correlationId ? ('dashLibrary.correlation' | transloco: { id: failure.correlationId }) : '')"
+          [actionLabel]="(failure.code === 'CRM_DASHBOARD_DEFINITION_ACCESS_DENIED' ? 'dashLibrary.requestAccess' : failure.kind === 'forbidden' || failure.kind === 'not-found' ? 'analytics.common.back' : 'analytics.common.retry') | transloco"
+          (action)="failure.code === 'CRM_DASHBOARD_DEFINITION_ACCESS_DENIED' ? requestAccess() : failure.kind === 'forbidden' || failure.kind === 'not-found' ? goHome() : retryActive()"
         />
+        @if (failure.kind === 'provisioning' && canViewReadiness) {
+          <div class="flex justify-center">
+            <a uiButton variant="secondary" routerLink="/crm/settings/data-readiness">{{ 'dashLibrary.readiness' | transloco }}</a>
+          </div>
+        }
       } @else if (loadingBlueprints()) {
         <div
           class="grid grid-cols-kanban-cards gap-12"
@@ -189,14 +184,14 @@
                   >
                     {{ 'dashLibrary.openTemplate' | transloco }}
                   </button>
-                } @else if (canCreate) {
+                } @else if (canUseTemplates && !readOnly()) {
                   <button
                     type="button"
                     uiButton
                     variant="secondary"
                     size="small"
                     [loading]="adoptingKey() === bp.key"
-                    [disabled]="adoptingKey() !== null"
+                    [disabled]="adoptingKey() !== null || reloadRequired() || readOnly() || conflictOpen()"
                     (click)="useBlueprint(bp)"
                   >
                     {{ 'dashLibrary.use' | transloco }}
@@ -207,13 +202,13 @@
           }
         </div>
       }
-    } @else if (dashboardsError(); as errKind) {
+    } @else if (dashboardsError(); as failure) {
       <ui-full-state
-        [kind]="errKind"
-        [title]="(errKind === 'forbidden' ? 'dashLibrary.forbiddenTitle' : 'dashLibrary.loadFailedTitle') | transloco"
-        [text]="(errKind === 'forbidden' ? 'analytics.error.CRM_DASHBOARD_DEFINITION_ACCESS_DENIED' : 'analytics.common.loadFailed') | transloco"
-        [actionLabel]="(errKind === 'forbidden' ? 'analytics.common.back' : 'analytics.common.retry') | transloco"
-        (action)="errKind === 'forbidden' ? goHome() : retryActive()"
+        [kind]="failure.kind"
+        [title]="(failure.kind === 'provisioning' ? 'dashLibrary.provisioningTitle' : failure.kind === 'forbidden' ? 'dashLibrary.forbiddenTitle' : failure.kind === 'not-found' ? 'dashLibrary.notFoundTitle' : 'dashLibrary.loadFailedTitle') | transloco"
+        [text]="failure.message + (failure.correlationId ? ('dashLibrary.correlation' | transloco: { id: failure.correlationId }) : '')"
+        [actionLabel]="(failure.code === 'CRM_DASHBOARD_DEFINITION_ACCESS_DENIED' ? 'dashLibrary.requestAccess' : failure.kind === 'forbidden' || failure.kind === 'not-found' ? 'analytics.common.back' : 'analytics.common.retry') | transloco"
+        (action)="failure.code === 'CRM_DASHBOARD_DEFINITION_ACCESS_DENIED' ? requestAccess() : failure.kind === 'forbidden' || failure.kind === 'not-found' ? goHome() : retryActive()"
       />
     } @else if (!loadingDashboards() && visibleDashboards().length === 0) {
       <div class="flex flex-1 flex-col items-center justify-center gap-8 p-16 text-center">
@@ -225,6 +220,14 @@
           <ng-icon [name]="emptyConfig().icon" size="var(--icon-empty)" class="size-icon-empty" aria-hidden="true" />
         </span>
         <p class="text-13 leading-18 font-medium text-text-muted">{{ emptyConfig().textKey | transloco }}</p>
+        @if (!hasActiveFilters() && canCreate && !readOnly()) {
+          <div class="flex items-center gap-8">
+            <button type="button" uiButton variant="secondary" (click)="openCreate()">{{ 'dashLibrary.newDashboard' | transloco }}</button>
+            @if (canUseTemplates) {
+              <button type="button" uiButton variant="secondary" (click)="setTab('templates')">{{ 'dashLibrary.fromTemplates' | transloco }}</button>
+            }
+          </div>
+        }
       </div>
     } @else if (view() === 'table') {
       <ui-data-table
@@ -283,6 +286,7 @@
             class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 outline-none transition-colors duration-fast hover:bg-neutral-soft focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
             [class]="item.isDefault ? 'text-icon-orange' : 'text-border-field hover:text-text-muted'"
             [attr.aria-pressed]="item.isDefault"
+            [disabled]="readOnly() || reloadRequired() || activeWrite() !== null"
             [attr.aria-label]="(item.isDefault ? 'dashLibrary.defaultActive' : 'dashLibrary.setDefaultFor') | transloco: { name: item.name }"
             [title]="(item.isDefault ? 'dashLibrary.alreadyDefault' : 'dashLibrary.setDefaultFor') | transloco: { name: item.name }"
             (click)="$event.stopPropagation(); onDefaultClick(item)"
@@ -303,13 +307,6 @@
         </ng-template>
       </ui-data-table>
 
-      @if (!loadingDashboards() && nextCursor()) {
-        <div class="flex justify-center pt-4">
-          <button type="button" uiButton variant="secondary" size="small" [loading]="loadingMore()" (click)="loadMore()">
-            {{ 'dashLibrary.loadMore' | transloco }}
-          </button>
-        </div>
-      }
     } @else {
       @if (loadingDashboards()) {
         <div
@@ -366,6 +363,7 @@
                     class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 outline-none transition-colors duration-fast hover:bg-neutral-soft focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
                     [class]="item.isFavorite ? 'text-icon-orange' : 'text-border-field hover:text-text-muted'"
                     [attr.aria-pressed]="item.isFavorite"
+                    [disabled]="readOnly() || reloadRequired() || activeWrite() !== null"
                     [attr.aria-label]="(item.isFavorite ? 'dashLibrary.unfavouriteFor' : 'dashLibrary.favouriteFor') | transloco: { name: item.name }"
                     [title]="(item.isFavorite ? 'dashLibrary.menu.unfavourite' : 'dashLibrary.menu.favourite') | transloco"
                     (click)="toggleFavorite(item)"
@@ -394,14 +392,14 @@
           }
         </div>
 
-        @if (nextCursor()) {
-          <div class="flex justify-center pt-4">
-            <button type="button" uiButton variant="secondary" size="small" [loading]="loadingMore()" (click)="loadMore()">
-              {{ 'dashLibrary.loadMore' | transloco }}
-            </button>
-          </div>
-        }
       }
+    }
+    @if (activeTab() !== 'templates' && !dashboardsError() && !loadingDashboards() && nextCursor()) {
+      <div class="flex justify-center pt-4">
+        <button type="button" uiButton variant="secondary" size="small" [loading]="loadingMore()" [disabled]="loadingMore()" (click)="loadMore()">
+          {{ 'dashLibrary.loadMore' | transloco }}
+        </button>
+      </div>
     }
   </section>
 }
@@ -437,15 +435,18 @@
           [bare]="true"
           [label]="'dashLibrary.branchLabel' | transloco"
           [hint]="'dashLibrary.branchHint' | transloco"
+          [required]="true"
+          [error]="branchError()"
         >
           <ui-dropdown
             class="w-full"
             id="tpl-adopt-branch"
-            describedBy="tpl-adopt-branch-hint"
+            [describedBy]="branchError() ? 'tpl-adopt-branch-hint tpl-adopt-branch-error' : 'tpl-adopt-branch-hint'"
             size="field"
             [label]="'dashLibrary.branchLabel' | transloco"
             [options]="branchOptions()"
             [value]="templateBranchId()"
+            [disabled]="adoptingKey() !== null || readOnly() || reloadRequired()"
             (valueChange)="templateBranchId.set($event)"
           />
         </ui-field>
@@ -475,7 +476,7 @@
       uiButton
       variant="primary"
       [loading]="adoptingKey() !== null"
-      [disabled]="adoptingKey() !== null"
+      [disabled]="adoptingKey() !== null || reloadRequired() || readOnly() || conflictOpen()"
       (click)="confirmTemplateTargets()"
     >
       {{ 'dashLibrary.confirmTargetsAction' | transloco }}
@@ -484,10 +485,31 @@
       type="button"
       uiButton
       variant="secondary"
-      [disabled]="adoptingKey() !== null"
+      [disabled]="adoptingKey() !== null || reloadRequired() || readOnly() || conflictOpen()"
       (click)="cancelTemplateTargets()"
     >
       {{ 'analytics.common.cancel' | transloco }}
     </button>
   </div>
 </ui-modal>
+
+<ui-modal
+  #ownerLimitModal
+  size="alert"
+  icon="tablerAlertTriangle"
+  tile="bg-icon-orange"
+  [title]="'dashLibrary.ownerLimitTitle' | transloco"
+  [closeLabel]="'analytics.common.close' | transloco"
+>
+  <p class="text-12 leading-18 text-text">{{ ownerLimitMessage() }}</p>
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    <button type="button" uiButton (click)="ownerLimitModal.close()">{{ 'analytics.common.close' | transloco }}</button>
+  </div>
+</ui-modal>
+
+<ui-conflict-dialog
+  [(open)]="conflictOpen"
+  [recordLabel]="pendingTemplate()?.name ?? null"
+  (reload)="reloadAfterConflict(false)"
+  (keepEditing)="reloadAfterConflict(true)"
+/>

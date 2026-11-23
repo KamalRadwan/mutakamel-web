@@ -23,7 +23,7 @@
         [describedBy]="uid + '-panel-hint'"
         [label]="'repReport.panel' | transloco"
         [options]="panelOptions()"
-        [disabled]="submitting() || panelOptions().length === 0"
+        [disabled]="submitting() || !canPin() || conflictOpen() || panelOptions().length === 0"
         [(value)]="selectedPanelKey"
       />
     </ui-field>
@@ -42,7 +42,7 @@
         [describedBy]="uid + '-dashboard-hint'"
         [label]="'repReport.dashboard' | transloco"
         [options]="dashboardOptions()"
-        [disabled]="submitting() || loadingTargets() || dashboardOptions().length === 0"
+        [disabled]="submitting() || !canPin() || conflictOpen() || loadingTargets() || dashboardOptions().length === 0"
         [(value)]="selectedDashboardId"
       />
     </ui-field>
@@ -54,7 +54,7 @@
       uiButton
       variant="primary"
       [loading]="submitting()"
-      [disabled]="loadingTargets() || panelOptions().length === 0 || dashboardOptions().length === 0"
+      [disabled]="!canPin() || conflictOpen() || loadingTargets() || panelOptions().length === 0 || dashboardOptions().length === 0"
       (click)="submit()"
     >
       {{ 'repReport.add' | transloco }}
@@ -70,3 +70,8 @@
     </button>
   </div>
 </ui-modal>
+<ui-conflict-dialog
+  [(open)]="conflictOpen"
+  (reload)="resolveConflict(false)"
+  (keepEditing)="resolveConflict(true)"
+/>

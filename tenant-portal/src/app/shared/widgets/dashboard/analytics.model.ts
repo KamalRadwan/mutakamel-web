@@ -585,6 +585,26 @@ export interface Receipt {
   /** True when the evidence passed 12 KB and was cut. */
   evidenceTruncated?: true;
   durationMs: number;
+  // Optional during the transition: still-fake producers do not carry server evidence metadata.
+  widgetVersionNumber?: number | null;
+  scopeFingerprint?: string;
+  permissionRevision?: string;
+  queryHash?: string;
+  sourceWatermarks?: Record<string, {
+    epoch: number | null;
+    settledTxid: string | null;
+    visibleTxid: string | null;
+    aboveCount: number | null;
+    asOf: string | null;
+  }>;
+  config?: {
+    targetReleases?: { targetId: string; releaseId: string; releaseNumber: number }[];
+    slaPolicyIds?: string[];
+    calendarRevisions?: { branchId: string; year: number; revision: number }[];
+  };
+  isolationLevel?: 'REPEATABLE_READ' | 'READ_COMMITTED';
+  engineRelease?: string;
+  cached?: false;
 }
 
 export interface Operand {
@@ -614,6 +634,9 @@ export interface Explain {
   numerator: Operand | null;
   denominator: Operand | null;
   value: Operand;
+  sensitivity?: { label: string; value: string }[];
+  decomposition?: { driver: string; delta: string; contribution: string }[];
+  compareTo?: { receiptId: string; value: string | null };
 }
 
 export interface Share {
@@ -643,4 +666,74 @@ export interface ShareTarget {
   email?: string;
   code?: string;
   branchId: string;
+}
+
+export interface MetricStatsQuery {
+  from: string;
+  to: string;
+  metricKey?: string;
+  cursor?: string | null;
+  limit?: number;
+}
+
+export interface MetricStat {
+  statDate: string;
+  metricKey: string;
+  executionKind: 'DASHBOARD_RUN' | 'WIDGET_PREVIEW' | 'REPORT_RUN' | 'ALERT_EVALUATION' | 'SUBSCRIPTION' | 'EXPORT' | 'EXPLAIN';
+  executions: number;
+  cacheHits: number;
+  p50Ms: number | null;
+  p95Ms: number | null;
+  maxMs: number;
+  timeouts: number;
+  errors: number;
+  denied: number;
+}
+
+/** Approved target list row; amounts remain decimal strings. */
+export interface GovernedTargetOption {
+  id: string;
+  branchId: string | null;
+  subjectType: 'USER' | 'TEAM' | 'BRANCH' | 'TEAM_SET';
+  subjectId: string | null;
+  metricKey: string;
+  currencyCode: string | null;
+  periodGrain: 'MONTH' | 'QUARTER' | 'YEAR';
+  periodStart: string;
+  targetValue: string;
+  revision: number;
+  approvalState: 'APPROVED';
+}
+
+export interface OrgBranch {
+  id: string;
+  name: { en: string; ar: string };
+  companyId: string;
+}
+
+export interface OrgTeam {
+  id: string;
+  name: { en: string; ar: string };
+  branchId: string;
+}
+
+export interface OrgUser {
+  id: string;
+  name: string;
+  nameAr: string;
+  email: string;
+  teamId: string;
+  branchId: string;
+}
+
+export interface OwnerOption {
+  id: string;
+  name: string | null;
+}
+
+export interface PipelineOption {
+  id: string;
+  code: string;
+  nameEn: string;
+  nameAr: string;
 }

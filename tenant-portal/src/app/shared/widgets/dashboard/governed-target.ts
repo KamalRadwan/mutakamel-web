@@ -1,6 +1,8 @@
 import { formatMoneyNumber } from '../../ui/money/money-format';
 import type { GovernedTargetResult, WidgetExecution } from './analytics.model';
 
+export { listGovernedTargets } from './analytics.api';
+
 type Translate = (key: string, params?: Record<string, unknown>) => string;
 
 /** States that carry no amounts: the hint shows their reason only. */

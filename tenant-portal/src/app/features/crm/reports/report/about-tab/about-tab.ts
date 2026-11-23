@@ -37,7 +37,7 @@ import type {
   SourceReadiness,
 } from '../../../../../shared/widgets/dashboard/analytics.model';
 import { can } from '../../../../../shared/widgets/dashboard/analytics-permissions';
-import { FAKE_BRANCHES, FAKE_PEOPLE, FAKE_TEAMS } from '../../../../../shared/widgets/dashboard/fake/fake-org';
+import { OrgApi } from '../../../../../shared/widgets/dashboard/org.api';
 import { errorKey } from '../../../../../shared/widgets/dashboard/panel-state';
 import { ReportState } from '../report-state';
 import { selectScopeTranslation } from '../../../../../shared/widgets/dashboard/scope-translation';
@@ -150,6 +150,7 @@ let nextAboutId = 0;
   host: { class: 'flex min-h-0 flex-1 flex-col gap-10' },
 })
 export class AboutTab {
+  private readonly org = inject(OrgApi);
   private readonly destroyRef = inject(DestroyRef);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -274,7 +275,7 @@ export class AboutTab {
     let branchesLabel = this.transloco.translate('repTabs.allBranches');
     if (scope.branchIds !== 'ALL' && scope.branchIds.length > 0) {
       const names = scope.branchIds.map((id) => {
-        const branch = FAKE_BRANCHES.find((item) => item.id === id);
+        const branch = this.org.branches.find((item) => item.id === id);
         return branch ? branch.name[lang] : id;
       });
       branchesLabel = names.join(', ');
@@ -498,6 +499,7 @@ export class AboutTab {
   protected readonly isStale = computed(() => Boolean(this.manifest()?.freshness.stale));
 
   constructor() {
+    void Promise.allSettled([this.org.listGrantedBranches(), this.org.listTeams(), this.org.listUsers()]);
     this.destroyRef.onDestroy(() => {
       this.destroyed = true;
     });
@@ -636,13 +638,13 @@ export class AboutTab {
       return translated === `analytics.compare.${str}` ? str : translated;
     }
     if (key === 'branchId' || key === 'branchIds') {
-      return FAKE_BRANCHES.find((b) => b.id === str)?.name[lang] ?? str;
+      return this.org.branches.find((b) => b.id === str)?.name[lang] ?? str;
     }
     if (key === 'teamIds') {
-      return FAKE_TEAMS.find((t) => t.id === str)?.name[lang] ?? str;
+      return this.org.teams.find((t) => t.id === str)?.name[lang] ?? str;
     }
     if (key === 'ownerUserId' || key === 'ownerUserIds') {
-      const person = FAKE_PEOPLE.find((p) => p.id === str);
+      const person = this.org.users.find((p) => p.id === str);
       return person ? (lang === 'ar' ? person.nameAr : person.name) : str;
     }
     if (/^\d{4}-\d{2}-\d{2}/.test(str)) {

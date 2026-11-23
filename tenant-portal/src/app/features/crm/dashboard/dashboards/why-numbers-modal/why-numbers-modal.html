@@ -1,259 +1,50 @@
-<ui-modal
-  size="wide"
-  [title]="'dashFilters.why' | transloco"
-  icon="tablerHelpCircle"
-  tile="bg-icon-blue"
-  [closeLabel]="'dashFilters.close' | transloco"
-  (closed)="onClosed()"
->
+<ui-modal size="wide" [title]="'dashFilters.why' | transloco" icon="tablerHelpCircle" tile="bg-icon-blue"
+  [closeLabel]="'dashFilters.close' | transloco" (closed)="onClosed()">
   @if (loading()) {
+    <div class="grid grid-cols-3 gap-x-10 gap-y-8">
+      @for (row of skeletonRows; track row) {
+        <span class="h-skeleton-line rounded-6 bg-neutral-soft" aria-hidden="true"></span>
+      }
+    </div>
+  } @else if (readError(); as error) {
+    <ui-full-state [kind]="error.kind" [title]="'analytics.common.loadFailed' | transloco" [text]="error.message"
+      [actionLabel]="(error.kind === 'provisioning' && canViewReadiness ? 'dashFilters.openReadiness' : 'analytics.common.retry') | transloco"
+      (action)="onErrorAction()" />
+  } @else {
     <div class="flex flex-col gap-12">
       <div class="grid grid-cols-3 gap-x-10 gap-y-8">
-        @for (row of skeletonRows; track row) {
-          <span class="col-span-1 my-auto h-skeleton-line w-2/3 rounded-6 bg-neutral-soft" aria-hidden="true"></span>
-          <span class="col-span-2 my-auto h-skeleton-line w-full rounded-6 bg-neutral-soft" aria-hidden="true"></span>
-        }
+        <ui-field [for]="uid + '-access'" [label]="'dashFilters.yourAccess' | transloco" [hint]="'dashFilters.yourAccessHint' | transloco">
+          <input [id]="uid + '-access'" readonly [value]="accessText()" />
+        </ui-field>
+        <ui-field [for]="uid + '-org'" [label]="'dashFilters.companyBranch' | transloco" [hint]="'dashFilters.companyBranchHint' | transloco">
+          <input [id]="uid + '-org'" readonly [value]="organizationText()" />
+        </ui-field>
+        <ui-field [for]="uid + '-period'" [label]="'dashFilters.periodLabel' | transloco" [hint]="'dashFilters.periodLabelHint' | transloco">
+          <input [id]="uid + '-period'" readonly [value]="periodText()" />
+        </ui-field>
+        <ui-field [for]="uid + '-as-of'" [label]="'dashFilters.dataAsOf' | transloco" [hint]="'dashFilters.dataAsOfHint' | transloco">
+          <input [id]="uid + '-as-of'" readonly [value]="asOfText()" />
+        </ui-field>
       </div>
-      <ui-data-table
-        [columns]="sourceColumns()"
-        [rows]="sourceRows()"
-        [rowKey]="rowKeyFn"
-        [loading]="true"
-        [label]="'dashFilters.sources' | transloco"
-      />
-    </div>
-  } @else if (inspector()) {
-    <div class="flex flex-col gap-12">
-      <dl class="grid grid-cols-3 gap-x-10 gap-y-2">
-        <dt class="col-span-1 flex min-h-btn items-center gap-4 text-12 leading-18 text-text-muted">
-          <span class="truncate">{{ 'dashFilters.yourAccess' | transloco }}</span>
-          <span
-            #accessTrigger
-            class="relative inline-flex shrink-0 items-center text-accent"
-            tabindex="0"
-            [attr.aria-describedby]="uid + '-access-hint'"
-            (mouseenter)="showTip('access', accessTrigger, accessTip)"
-            (mouseleave)="hideTip()"
-            (focus)="showTip('access', accessTrigger, accessTip)"
-            (blur)="hideTip()"
-            (keydown.escape)="hideTip()"
-          >
-            <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
-            <span
-              #accessTip
-              [id]="uid + '-access-hint'"
-              role="tooltip"
-              class="pointer-events-none fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
-              [class]="activeTip() === 'access' ? 'visible' : 'invisible'"
-              [style.top.px]="tipPlace().top"
-              [style.inset-inline-start.px]="tipPlace().start"
-            >
-              {{ 'dashFilters.yourAccessHint' | transloco }}
-            </span>
-          </span>
-        </dt>
-        <dd
-          class="col-span-2 flex min-h-btn flex-wrap items-center gap-6 text-12 leading-18 text-text"
-          [attr.aria-describedby]="uid + '-access-hint'"
-        >
-          <ui-badge tone="brand">{{ accessBadgeText() }}</ui-badge>
-          @if (capReasonText(); as capReason) {
-            <span class="text-12 text-text-muted">{{ capReason }}</span>
-          }
-        </dd>
-
-        <dt class="col-span-1 flex min-h-btn items-center gap-4 text-12 leading-18 text-text-muted">
-          <span class="truncate">{{ 'dashFilters.companyBranch' | transloco }}</span>
-          <span
-            #orgTrigger
-            class="relative inline-flex shrink-0 items-center text-accent"
-            tabindex="0"
-            [attr.aria-describedby]="uid + '-org-hint'"
-            (mouseenter)="showTip('org', orgTrigger, orgTip)"
-            (mouseleave)="hideTip()"
-            (focus)="showTip('org', orgTrigger, orgTip)"
-            (blur)="hideTip()"
-            (keydown.escape)="hideTip()"
-          >
-            <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
-            <span
-              #orgTip
-              [id]="uid + '-org-hint'"
-              role="tooltip"
-              class="pointer-events-none fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
-              [class]="activeTip() === 'org' ? 'visible' : 'invisible'"
-              [style.top.px]="tipPlace().top"
-              [style.inset-inline-start.px]="tipPlace().start"
-            >
-              {{ 'dashFilters.companyBranchHint' | transloco }}
-            </span>
-          </span>
-        </dt>
-        <dd
-          class="col-span-2 flex min-h-btn items-center text-12 leading-18 text-text"
-          [attr.aria-describedby]="uid + '-org-hint'"
-        >
-          <span class="truncate">{{ companyBranchText() }}</span>
-        </dd>
-
-        <dt class="col-span-1 flex min-h-btn items-center gap-4 text-12 leading-18 text-text-muted">
-          <span class="truncate">{{ 'dashFilters.recordsCounted' | transloco }}</span>
-          <span
-            #recordsTrigger
-            class="relative inline-flex shrink-0 items-center text-accent"
-            tabindex="0"
-            [attr.aria-describedby]="uid + '-records-hint'"
-            (mouseenter)="showTip('records', recordsTrigger, recordsTip)"
-            (mouseleave)="hideTip()"
-            (focus)="showTip('records', recordsTrigger, recordsTip)"
-            (blur)="hideTip()"
-            (keydown.escape)="hideTip()"
-          >
-            <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
-            <span
-              #recordsTip
-              [id]="uid + '-records-hint'"
-              role="tooltip"
-              class="pointer-events-none fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
-              [class]="activeTip() === 'records' ? 'visible' : 'invisible'"
-              [style.top.px]="tipPlace().top"
-              [style.inset-inline-start.px]="tipPlace().start"
-            >
-              {{ 'dashFilters.recordsCountedHint' | transloco }}
-            </span>
-          </span>
-        </dt>
-        <dd
-          class="col-span-2 flex min-h-btn items-center text-12 leading-18 text-text"
-          [attr.aria-describedby]="uid + '-records-hint'"
-        >
-          <span>{{ recordsCountedText() }}</span>
-        </dd>
-
-        <dt class="col-span-1 flex min-h-btn items-center gap-4 text-12 leading-18 text-text-muted">
-          <span class="truncate">{{ 'dashFilters.periodLabel' | transloco }}</span>
-          <span
-            #periodTrigger
-            class="relative inline-flex shrink-0 items-center text-accent"
-            tabindex="0"
-            [attr.aria-describedby]="uid + '-period-hint'"
-            (mouseenter)="showTip('period', periodTrigger, periodTip)"
-            (mouseleave)="hideTip()"
-            (focus)="showTip('period', periodTrigger, periodTip)"
-            (blur)="hideTip()"
-            (keydown.escape)="hideTip()"
-          >
-            <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
-            <span
-              #periodTip
-              [id]="uid + '-period-hint'"
-              role="tooltip"
-              class="pointer-events-none fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
-              [class]="activeTip() === 'period' ? 'visible' : 'invisible'"
-              [style.top.px]="tipPlace().top"
-              [style.inset-inline-start.px]="tipPlace().start"
-            >
-              {{ 'dashFilters.periodLabelHint' | transloco }}
-            </span>
-          </span>
-        </dt>
-        <dd
-          class="col-span-2 flex min-h-btn items-center text-12 leading-18 text-text"
-          [attr.aria-describedby]="uid + '-period-hint'"
-        >
-          <span>{{ periodText() }}</span>
-        </dd>
-
-        <dt class="col-span-1 flex min-h-btn items-center gap-4 text-12 leading-18 text-text-muted">
-          <span class="truncate">{{ 'dashFilters.dataAsOf' | transloco }}</span>
-          <span
-            #asOfTrigger
-            class="relative inline-flex shrink-0 items-center text-accent"
-            tabindex="0"
-            [attr.aria-describedby]="uid + '-asOf-hint'"
-            (mouseenter)="showTip('asOf', asOfTrigger, asOfTip)"
-            (mouseleave)="hideTip()"
-            (focus)="showTip('asOf', asOfTrigger, asOfTip)"
-            (blur)="hideTip()"
-            (keydown.escape)="hideTip()"
-          >
-            <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
-            <span
-              #asOfTip
-              [id]="uid + '-asOf-hint'"
-              role="tooltip"
-              class="pointer-events-none fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
-              [class]="activeTip() === 'asOf' ? 'visible' : 'invisible'"
-              [style.top.px]="tipPlace().top"
-              [style.inset-inline-start.px]="tipPlace().start"
-            >
-              {{ 'dashFilters.dataAsOfHint' | transloco }}
-            </span>
-          </span>
-        </dt>
-        <dd
-          class="col-span-2 flex min-h-btn items-center text-12 leading-18 text-text"
-          [attr.aria-describedby]="uid + '-asOf-hint'"
-        >
-          <span>{{ dataAsOfText() }}</span>
-        </dd>
-      </dl>
-
-      <div class="flex flex-col gap-6">
-        <div class="flex h-label items-center gap-4 text-12 leading-18 text-text-muted">
-          <span class="truncate">{{ 'dashFilters.sources' | transloco }}</span>
-          <span
-            #sourcesTrigger
-            class="relative inline-flex shrink-0 items-center text-accent"
-            tabindex="0"
-            [attr.aria-describedby]="uid + '-sources-hint'"
-            (mouseenter)="showTip('sources', sourcesTrigger, sourcesTip)"
-            (mouseleave)="hideTip()"
-            (focus)="showTip('sources', sourcesTrigger, sourcesTip)"
-            (blur)="hideTip()"
-            (keydown.escape)="hideTip()"
-          >
-            <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
-            <span
-              #sourcesTip
-              [id]="uid + '-sources-hint'"
-              role="tooltip"
-              class="pointer-events-none fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
-              [class]="activeTip() === 'sources' ? 'visible' : 'invisible'"
-              [style.top.px]="tipPlace().top"
-              [style.inset-inline-start.px]="tipPlace().start"
-            >
-              {{ 'dashFilters.sourcesHint' | transloco }}
-            </span>
-          </span>
-        </div>
-
-        <div [attr.aria-describedby]="uid + '-sources-hint'">
-          <ui-data-table
-            [columns]="sourceColumns()"
-            [rows]="sourceRows()"
-            [rowKey]="rowKeyFn"
-            [label]="'dashFilters.sources' | transloco"
-          >
-            <ng-template uiCell="statusText" let-row>
-              <ui-badge [tone]="row.statusTone">{{ row.statusText }}</ui-badge>
-            </ng-template>
-          </ui-data-table>
-        </div>
-      </div>
+      <ui-field size="bare" [for]="uid + '-receipts'" [label]="'dashFilters.receipts' | transloco" [hint]="'dashFilters.receiptsHint' | transloco">
+        <ui-data-table [id]="uid + '-receipts'" [attr.aria-describedby]="uid + '-receipts-hint'" [columns]="columns()"
+          [rows]="receipts()" [rowKey]="rowKey" [label]="'dashFilters.receipts' | transloco" [emptyText]="'dashFilters.receiptsEmpty' | transloco">
+          <ng-template uiCell="metricKey" let-row>{{ metricName(row.metricKey) }}</ng-template>
+          <ng-template uiCell="resultStatus" let-row>{{ ('dashFilters.receiptStatus.' + row.resultStatus) | transloco }}</ng-template>
+          <ng-template uiCell="executedAt" let-row>{{ executionTime(row.executedAt) }}</ng-template>
+          <ng-template uiCell="explain" let-row>
+            <button uiButton variant="secondary" size="small" (click)="openExplanation(row.id)">{{ 'dashFilters.explainTitle' | transloco }}</button>
+          </ng-template>
+        </ui-data-table>
+      </ui-field>
     </div>
   }
-
   <ng-container modal-footer>
-    <button type="button" uiButton variant="secondary" (click)="close()">
-      {{ 'dashFilters.close' | transloco }}
-    </button>
+    <button uiButton variant="secondary" (click)="close()">{{ 'dashFilters.close' | transloco }}</button>
     <span class="flex-1" aria-hidden="true"></span>
-    @if (canViewReadiness()) {
-      <button type="button" uiButton variant="ghost" size="small" (click)="openReadiness()">
-        <ng-icon name="tablerDatabase" size="14" aria-hidden="true" />
-        <span>{{ 'dashFilters.dataReadiness' | transloco }}</span>
-      </button>
+    @if (canViewReadiness) {
+      <button uiButton variant="ghost" size="small" (click)="openReadiness()">{{ 'dashFilters.dataReadiness' | transloco }}</button>
     }
   </ng-container>
 </ui-modal>
+<app-explain-modal />

@@ -12,6 +12,7 @@ export interface ReportCatalogueItem {
   summary: { en: string; ar: string } | null;
   blueprintRevision: number;
   readiness: ReportReadiness;
+  available?: boolean;
   favourite: boolean;
   dashboardId: string | null;
   pinnedCount: number;

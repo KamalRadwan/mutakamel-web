@@ -30,13 +30,6 @@
   </div>
 }
 
-<!-- Always rendered so the live region persists; out of the layout (sr-only) while it is empty. -->
-<p role="status" class="text-12 leading-16 text-text-muted" [class.sr-only]="!retrying()">
-  @if (retrying()) {
-    {{ 'analytics.common.retrying' | transloco }}
-  }
-</p>
-
 @if (hasNoPageableTables()) {
   <ui-full-state
     kind="not-found"
@@ -44,10 +37,11 @@
   />
 } @else if (initialFailed()) {
   <ui-full-state
-    kind="load-failure"
+    [kind]="loadKind()"
     [title]="'analytics.common.loadFailed' | transloco"
-    [actionLabel]="'analytics.common.retry' | transloco"
-    (action)="retry()"
+    [text]="loadMessage()"
+    [actionLabel]="(loadKind() === 'provisioning' && canViewReadiness() ? 'repTabs.readinessLink' : 'analytics.common.retry') | transloco"
+    (action)="loadKind() === 'provisioning' && canViewReadiness() ? openReadiness() : retry()"
   />
 } @else if (useVirtual()) {
   <div class="overflow-x-auto pb-4">

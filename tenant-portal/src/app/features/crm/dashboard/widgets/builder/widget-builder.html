@@ -3,7 +3,7 @@
     [kind]="errKind"
     [title]="fullStateTitle()"
     [text]="fullStateText()"
-    [actionLabel]="errKind === 'load-failure' ? ('builder.loadError.retry' | transloco) : ''"
+    [actionLabel]="(errKind === 'provisioning' && canOpenReadiness() ? 'builder.requests.readiness' : state.readFailure()?.requestAccess ? 'builder.requests.requestAccess' : errKind === 'load-failure' ? 'builder.loadError.retry' : '') | transloco"
     (action)="retryLoad()"
   />
 } @else if (state.loading() && !state.catalog()) {
@@ -26,18 +26,11 @@
   </div>
 
   <div class="grid min-h-0 flex-1 grid-cols-12 items-start gap-8">
-    <div
+    <fieldset
       #formPane
+      [disabled]="state.readOnly() && state.step() !== 'review'"
       class="col-span-12 flex min-w-0 flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card desktop:col-span-5"
     >
-      @if (state.formError(); as formError) {
-        <div
-          class="rounded-8 border border-danger-border bg-danger-soft p-6 text-13 leading-20 text-danger-text"
-          role="alert"
-        >
-          {{ formError }}
-        </div>
-      }
       @switch (state.step()) {
         @case ('data') {
           <app-step-data />
@@ -58,14 +51,22 @@
           <app-step-review />
         }
       }
-    </div>
+    </fieldset>
 
     <div class="col-span-12 min-w-0 desktop:col-span-7">
       <app-builder-preview />
+      @if (state.widget(); as current) {
+        <app-usage-tab [widget]="current" />
+      }
     </div>
   </div>
 
   <footer class="sticky bottom-0 z-sticky flex flex-wrap items-center gap-8 rounded-10 border border-border bg-surface-muted px-10 py-8 shadow-card">
+    @if (state.reloadRequired()) {
+      <button type="button" uiButton variant="secondary" (click)="state.reload({ keepStep: true })">
+        {{ 'builder.footer.reload' | transloco }}
+      </button>
+    }
     @if (state.step() === 'review') {
       @if (canSave()) {
         <button
@@ -139,6 +140,8 @@
     </button>
   </footer>
 }
+
+<app-request-modal />
 
 <ui-conflict-dialog
   [open]="conflictOpen()"

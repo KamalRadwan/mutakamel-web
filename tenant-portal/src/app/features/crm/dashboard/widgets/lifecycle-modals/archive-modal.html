@@ -15,6 +15,9 @@
         <div class="h-skeleton-line w-1/2 rounded-4 bg-neutral-soft"></div>
         <div class="h-skeleton-line w-3/4 rounded-4 bg-neutral-soft"></div>
       </div>
+    } @else if (readFailure(); as failure) {
+      <ui-full-state [kind]="failure.kind" [title]="'analytics.common.loadFailed' | transloco"
+        [text]="failureText()" [actionLabel]="failureAction() ? (failureAction()! | transloco) : ''" (action)="retryImpact()" />
     } @else if (impact()) {
       <div class="flex flex-col gap-8">
         <ui-field
@@ -24,11 +27,11 @@
         >
           <div class="flex min-h-field flex-wrap items-center gap-6">
             <ui-badge tone="count">{{ dashboardNames().length }}</ui-badge>
-            @for (dashName of visibleDashboardNames(); track dashName) {
+            @for (dashName of dashboardNames(); track $index) {
               <ui-badge tone="tag">{{ dashName }}</ui-badge>
             }
-            @if (extraDashboardsCount() > 0) {
-              <ui-badge tone="count">+{{ extraDashboardsCount() }}</ui-badge>
+            @if (impact()!.hiddenPlacementCount > 0) {
+              <ui-badge tone="count">+{{ impact()!.hiddenPlacementCount }} {{ 'widgetPage.usage.hiddenPlacements' | transloco }}</ui-badge>
             }
           </div>
         </ui-field>
@@ -52,6 +55,9 @@
             <div class="flex min-h-field flex-wrap items-center gap-6">
               <ui-badge tone="count">{{ alertRulesCount() }}</ui-badge>
               @if (alertRulesCount() > 0) {
+                @for (rule of impact()!.alertRules.items; track rule.id) {
+                  <ui-badge tone="tag">{{ rule.name }}</ui-badge>
+                }
                 <span class="text-12 leading-18 text-text-muted">{{ alertEffectKey() | transloco }}</span>
               } @else {
                 <span class="text-12 leading-18 text-text-muted">{{ 'widgets.archiveModal.none' | transloco }}</span>
@@ -66,6 +72,7 @@
         [label]="'widgets.modal.reason' | transloco"
         [for]="uid + '-reason'"
         [hint]="'widgets.archiveModal.reasonHint' | transloco"
+        [required]="action() === 'ARCHIVE'"
         [count]="reason().length"
         [max]="500"
         [error]="reasonError()"
@@ -77,7 +84,7 @@
           class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder disabled:cursor-not-allowed disabled:text-text-placeholder"
           [value]="reason()"
           [placeholder]="'widgets.archiveModal.reasonPlaceholder' | transloco"
-          [disabled]="submitting()"
+          [disabled]="submitting() || readOnly()"
           (input)="onReasonInput($event)"
         ></textarea>
       </ui-field>
@@ -93,3 +100,9 @@
     </button>
   </ng-container>
 </ui-modal>
+<ui-conflict-dialog
+  [(open)]="conflictOpen"
+  [recordLabel]="widget()?.name ?? null"
+  (reload)="resolveConflict(false)"
+  (keepEditing)="resolveConflict(true)"
+/>

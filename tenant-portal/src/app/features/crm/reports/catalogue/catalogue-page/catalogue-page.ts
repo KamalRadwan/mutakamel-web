@@ -1,7 +1,7 @@
 import { Component, DestroyRef, computed, effect, inject, linkedSignal, signal, untracked } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   tablerArrowsExchange,
@@ -53,6 +53,10 @@ import {
   reportTitleIn,
 } from '../catalogue.model';
 import { ReportCard } from '../report-card/report-card';
+import { ApiError } from '../../../../../core/api/api-errors';
+import { can } from '../../../../../shared/widgets/dashboard/analytics-permissions';
+import type { FullStateKind } from '../../../../../shared/ui/full-state/full-state';
+import { reportErrorMessage, reportIdempotencyMismatch, reportLoadKind, reportWriteReadOnly } from '../../report/report-errors';
 
 const PAGE_LIMIT = 100;
 const SEARCH_DEBOUNCE_MS = 200;
@@ -79,7 +83,7 @@ function sumCounts(counts: Record<ReportDomain, number>): number {
 
 @Component({
   selector: 'app-catalogue-page',
-  imports: [NgIcon, TranslocoPipe, Badge, Button, DataCell, DataTable, FullState, ViewSwitcher, ReportCard],
+  imports: [NgIcon, TranslocoPipe, Badge, Button, DataCell, DataTable, FullState, ViewSwitcher, ReportCard, RouterLink],
   providers: [
     provideTranslocoScope(
       { scope: 'crm-rep-catalogue', alias: 'repCatalogue' },
@@ -152,6 +156,10 @@ export class CataloguePage {
   protected readonly loadErrorKey = signal<string | null>(null);
   protected readonly searchErrorKey = signal<string | null>(null);
   protected readonly togglingKeys = signal<ReadonlySet<string>>(new Set());
+  protected readonly readOnly = signal(false);
+  protected readonly loadKind = signal<FullStateKind>('load-failure');
+  protected readonly loadErrorText = signal('');
+  protected readonly canViewReadiness = computed(() => can('crm.analytics.readiness.view'));
   private readonly reloadTick = signal(0);
 
   protected readonly totalCount = computed(() => sumCounts(this.counts()));
@@ -286,6 +294,10 @@ export class CataloguePage {
     this.reloadTick.update((tick) => tick + 1);
   }
 
+  protected openReadiness(): void {
+    void this.router.navigate(['/crm/settings/data-readiness']);
+  }
+
   protected async loadMore(): Promise<void> {
     const cursor = this.nextCursor();
     if (!cursor || this.loadingMore() || this.loading()) return;
@@ -326,7 +338,7 @@ export class CataloguePage {
   }
 
   protected async toggleFavourite(report: ReportCatalogueItem): Promise<void> {
-    if (isReportDisabled(report.readiness) || this.isToggling(report.reportKey)) return;
+    if (this.readOnly() || isReportDisabled(report.readiness) || this.isToggling(report.reportKey)) return;
 
     const seq = this.loadSeq;
     const nextFav = !report.favourite;
@@ -366,7 +378,9 @@ export class CataloguePage {
         this.counts.set(prevCounts);
         this.favouriteCount.set(prevFavCount);
       }
-      this.notify.error(this.transloco.translate(errorKey(errorCodeOf(error))));
+      this.notify.error(reportErrorMessage(this.transloco, error, 'repCatalogue'));
+      if (reportWriteReadOnly(error)) this.readOnly.set(true);
+      if (reportIdempotencyMismatch(error)) this.retry();
     } finally {
       this.setToggling(report.reportKey, false);
     }
@@ -401,6 +415,13 @@ export class CataloguePage {
     const seq = ++this.loadSeq;
     this.loading.set(true);
     this.loadErrorKey.set(null);
+    if (!can('crm.dashboards.read')) {
+      this.loadKind.set('forbidden');
+      this.loadErrorKey.set('repCatalogue.forbidden');
+      this.loadErrorText.set(this.transloco.translate('repCatalogue.forbidden'));
+      this.loading.set(false);
+      return;
+    }
     if (q.length <= 120) {
       this.searchErrorKey.set(null);
     }
@@ -432,9 +453,11 @@ export class CataloguePage {
     } catch (error) {
       if (seq !== this.loadSeq) return;
       const code = errorCodeOf(error);
-      if (code === 'CRM_VALIDATION_FAILED') {
+      if (code === 'CRM_VALIDATION_FAILED' && error instanceof ApiError && error.details?.['q']) {
         this.searchErrorKey.set('repCatalogue.searchTooLong');
       } else {
+        this.loadKind.set(reportLoadKind(error));
+        this.loadErrorText.set(reportErrorMessage(this.transloco, error, 'repCatalogue'));
         this.loadErrorKey.set(errorKey(code));
       }
     } finally {

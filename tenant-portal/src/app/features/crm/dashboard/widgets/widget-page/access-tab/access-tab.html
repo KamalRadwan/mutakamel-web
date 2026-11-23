@@ -10,11 +10,11 @@
 
   @if (loadFailed()) {
     <ui-full-state
-      kind="load-failure"
+      [kind]="readFailure()!.kind"
       [title]="'widgetPage.access.loadError' | transloco"
-      [text]="'analytics.common.loadFailed' | transloco"
-      [actionLabel]="'analytics.common.retry' | transloco"
-      (action)="retry()"
+      [text]="failureText()"
+      [actionLabel]="failureAction() ? (failureAction()! | transloco) : ''"
+      (action)="onFailureAction()"
     />
   } @else {
     <ui-data-table

@@ -13,13 +13,6 @@
   class="flex min-h-0 flex-1 flex-col gap-8"
 >
   <div class="flex shrink-0 flex-wrap items-end gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
-    @if (activeTab() === 'mine') {
-      <button type="button" uiButton variant="primary" class="shrink-0" (click)="openRequestModal()">
-        <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
-        {{ 'access.actions.requestAccess' | transloco }}
-      </button>
-    }
-
     @switch (activeTab()) {
       @case ('mine') {
         <ui-field
@@ -100,9 +93,9 @@
     <ui-full-state
       [kind]="errKind"
       [title]="(errKind === 'forbidden' ? 'access.errors.forbiddenTitle' : 'access.errors.loadTitle') | transloco"
-      [text]="(errKind === 'forbidden' ? 'access.errors.forbiddenText' : 'analytics.common.loadFailed') | transloco"
-      [actionLabel]="errKind === 'forbidden' ? '' : ('analytics.common.retry' | transloco)"
-      (action)="reload()"
+      [text]="loadMessage() || ((errKind === 'forbidden' ? 'access.errors.forbiddenText' : 'analytics.common.loadFailed') | transloco)"
+      [actionLabel]="errKind === 'provisioning' ? (canViewReadiness ? ('access.actions.readiness' | transloco) : '') : errKind === 'forbidden' || errKind === 'not-found' ? '' : ('analytics.common.retry' | transloco)"
+      (action)="errKind === 'provisioning' ? openReadiness() : reload()"
     />
   } @else if (!loading() && activeRowCount() === 0) {
     <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
@@ -182,7 +175,7 @@
                 variant="ghost"
                 size="small"
                 [loading]="cancellingId() === row.id"
-                [disabled]="!!cancellingId() && cancellingId() !== row.id"
+                [disabled]="readOnly() || (!!cancellingId() && cancellingId() !== row.id)"
                 (click)="cancelRequest(row)"
               >
                 {{ 'access.actions.cancel' | transloco }}
@@ -246,7 +239,7 @@
 
           <ng-template uiCell="actions" let-row>
             @if (row.status === 'PENDING') {
-              <button type="button" uiButton variant="secondary" size="small" (click)="openDecideModal(row)">
+              <button type="button" uiButton variant="secondary" size="small" [disabled]="readOnly()" (click)="openDecideModal(row)">
                 {{ 'access.actions.decide' | transloco }}
               </button>
             } @else {
@@ -350,6 +343,7 @@
   [cancelLabel]="'analytics.common.close' | transloco"
 />
 
-<app-request-modal class="absolute" (created)="onRequestCreated()" />
-<app-decide-modal class="absolute" (decided)="onRequestDecided()" />
-<app-review-modal class="absolute" (updated)="onReviewUpdated()" />
+<app-decide-modal class="absolute" (decided)="onRequestDecided()" (readOnlyChange)="readOnly.set($event)" />
+<app-review-modal class="absolute" (updated)="onReviewUpdated()" (readOnlyChange)="readOnly.set($event)" />
+
+<ui-conflict-dialog [(open)]="conflictOpen" (reload)="resolveConflict(true)" (keepEditing)="resolveConflict(false)" />

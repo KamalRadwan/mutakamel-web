@@ -15,12 +15,17 @@
       <span class="sr-only" role="status">{{ 'dashEdit.loading' | transloco }}</span>
     </div>
   } @else if (loadFailed()) {
-    <div class="flex flex-col items-center justify-center gap-8 py-8 text-center">
-      <p class="text-12 leading-18 text-text-muted">{{ 'analytics.common.loadFailed' | transloco }}</p>
-      <button type="button" uiButton variant="secondary" size="small" (click)="retryLoad()">
-        {{ 'analytics.common.retry' | transloco }}
-      </button>
-    </div>
+    <ui-full-state
+      [kind]="loadFailure()?.kind ?? 'load-failure'"
+      [title]="'dashEdit.loadFailed' | transloco"
+      [text]="loadFailure()?.message ?? ''"
+      [actionLabel]="
+        loadFailure()?.kind === 'provisioning' && canViewReadiness
+          ? ('dashEdit.openReadiness' | transloco)
+          : ('analytics.common.retry' | transloco)
+      "
+      (action)="onReadAction()"
+    />
   } @else if (binding(); as b) {
     <div class="flex flex-col gap-10">
       <dl class="divide-y divide-border rounded-10 border border-border bg-surface px-10">
@@ -30,7 +35,7 @@
             <span
               #activeTrigger
               class="relative inline-flex shrink-0 items-center text-accent"
-              tabindex="0"
+              tabindex="-1"
               [attr.aria-describedby]="uid + '-active-hint'"
               (mouseenter)="showHint('active', activeTrigger, activeRow, activeTip)"
               (mouseleave)="hideHint()"
@@ -38,7 +43,13 @@
               (blur)="hideHint()"
               (keydown.escape)="hideHint()"
             >
-              <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
+              <ng-icon
+                name="tablerExclamationCircle"
+                size="14"
+                class="cursor-help"
+                tabindex="-1"
+                aria-hidden="true"
+              />
               <span
                 #activeTip
                 [id]="uid + '-active-hint'"
@@ -52,7 +63,10 @@
               </span>
             </span>
           </dt>
-          <dd [attr.aria-describedby]="uid + '-active-hint'" class="shrink-0 font-medium text-text tabular-nums">
+          <dd
+            [attr.aria-describedby]="uid + '-active-hint'"
+            class="shrink-0 font-medium text-text tabular-nums"
+          >
             <bdi dir="ltr">{{ b.activeVersionNumber }}</bdi>
           </dd>
         </div>
@@ -63,7 +77,7 @@
             <span
               #selectedTrigger
               class="relative inline-flex shrink-0 items-center text-accent"
-              tabindex="0"
+              tabindex="-1"
               [attr.aria-describedby]="uid + '-selected-hint'"
               (mouseenter)="showHint('selected', selectedTrigger, selectedRow, selectedTip)"
               (mouseleave)="hideHint()"
@@ -71,7 +85,13 @@
               (blur)="hideHint()"
               (keydown.escape)="hideHint()"
             >
-              <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
+              <ng-icon
+                name="tablerExclamationCircle"
+                size="14"
+                class="cursor-help"
+                tabindex="-1"
+                aria-hidden="true"
+              />
               <span
                 #selectedTip
                 [id]="uid + '-selected-hint'"
@@ -85,7 +105,10 @@
               </span>
             </span>
           </dt>
-          <dd [attr.aria-describedby]="uid + '-selected-hint'" class="shrink-0 font-medium text-text tabular-nums">
+          <dd
+            [attr.aria-describedby]="uid + '-selected-hint'"
+            class="shrink-0 font-medium text-text tabular-nums"
+          >
             <bdi dir="ltr">{{ b.selectedVersionNumber }}</bdi>
           </dd>
         </div>
@@ -96,7 +119,7 @@
             <span
               #revisionTrigger
               class="relative inline-flex shrink-0 items-center text-accent"
-              tabindex="0"
+              tabindex="-1"
               [attr.aria-describedby]="uid + '-revision-hint'"
               (mouseenter)="showHint('revision', revisionTrigger, revisionRow, revisionTip)"
               (mouseleave)="hideHint()"
@@ -104,7 +127,13 @@
               (blur)="hideHint()"
               (keydown.escape)="hideHint()"
             >
-              <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
+              <ng-icon
+                name="tablerExclamationCircle"
+                size="14"
+                class="cursor-help"
+                tabindex="-1"
+                aria-hidden="true"
+              />
               <span
                 #revisionTip
                 [id]="uid + '-revision-hint'"
@@ -118,7 +147,10 @@
               </span>
             </span>
           </dt>
-          <dd [attr.aria-describedby]="uid + '-revision-hint'" class="shrink-0 font-medium text-text tabular-nums">
+          <dd
+            [attr.aria-describedby]="uid + '-revision-hint'"
+            class="shrink-0 font-medium text-text tabular-nums"
+          >
             <bdi dir="ltr">{{ b.widgetRevision }}</bdi>
           </dd>
         </div>
@@ -147,12 +179,16 @@
           [label]="'dashEdit.version' | transloco"
           [for]="uid + '-version'"
           [hint]="'dashEdit.versionSelectHint' | transloco"
+          [error]="versionError()"
         >
           <ui-dropdown
             class="w-full"
             size="field"
             [id]="uid + '-version'"
-            [describedBy]="uid + '-version-hint'"
+            [describedBy]="
+              uid + (versionError() ? '-version-hint ' + uid + '-version-error' : '-version-hint')
+            "
+            [disabled]="writeReadOnly() || saving()"
             [label]="'dashEdit.version' | transloco"
             [options]="versionOptions()"
             [value]="pinnedVersion()"
@@ -169,7 +205,7 @@
               <span
                 #newSizeTrigger
                 class="relative inline-flex shrink-0 items-center text-accent"
-                tabindex="0"
+                tabindex="-1"
                 [attr.aria-describedby]="uid + '-newsize-hint'"
                 (mouseenter)="showHint('newSize', newSizeTrigger, newSizeRow, newSizeTip)"
                 (mouseleave)="hideHint()"
@@ -177,7 +213,13 @@
                 (blur)="hideHint()"
                 (keydown.escape)="hideHint()"
               >
-                <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
+                <ng-icon
+                  name="tablerExclamationCircle"
+                  size="14"
+                  class="cursor-help"
+                  tabindex="-1"
+                  aria-hidden="true"
+                />
                 <span
                   #newSizeTip
                   [id]="uid + '-newsize-hint'"
@@ -191,7 +233,10 @@
                 </span>
               </span>
             </dt>
-            <dd [attr.aria-describedby]="uid + '-newsize-hint'" class="shrink-0 font-medium text-text tabular-nums">
+            <dd
+              [attr.aria-describedby]="uid + '-newsize-hint'"
+              class="shrink-0 font-medium text-text tabular-nums"
+            >
               <bdi dir="ltr">{{ 'dashEdit.size' | transloco: { w: box.w, h: box.h } }}</bdi>
             </dd>
           </div>
@@ -227,14 +272,15 @@
       <span class="text-12 leading-18 text-text-muted">{{ 'dashEdit.unsaved' | transloco }}</span>
     }
 
-    <button
-      type="button"
-      uiButton
-      variant="secondary"
-      [disabled]="saving()"
-      (click)="cancel()"
-    >
+    <button type="button" uiButton variant="secondary" [disabled]="saving()" (click)="cancel()">
       {{ 'dashEdit.cancel' | transloco }}
     </button>
   </div>
 </ui-modal>
+
+<ui-conflict-dialog
+  [open]="conflict.visible()"
+  (reload)="conflict.choose(false)"
+  (keepEditing)="conflict.choose(true)"
+  (openChange)="conflict.dismissed($event)"
+/>

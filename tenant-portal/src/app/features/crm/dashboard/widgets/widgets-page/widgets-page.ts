@@ -26,6 +26,7 @@ import {
 } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../../core/i18n/language';
 import { Notify } from '../../../../../core/notify/notify';
+import { ApiError } from '../../../../../core/api/api-errors';
 import { ActionsMenu, type ActionItem, type ActionSelection } from '../../../../../shared/ui/actions-menu/actions-menu';
 import { Badge, type BadgeTone } from '../../../../../shared/ui/badge/badge';
 import { Button } from '../../../../../shared/ui/button/button';
@@ -41,6 +42,7 @@ import { listShareTargets } from '../../../../../shared/widgets/dashboard/analyt
 import { errorCodeOf } from '../../../../../shared/widgets/dashboard/analytics-api';
 import { can } from '../../../../../shared/widgets/dashboard/analytics-permissions';
 import { errorKey } from '../../../../../shared/widgets/dashboard/panel-state';
+import { crmSettingsError } from '../../../settings/shared/settings-api';
 import { ShareModal, type ShareApi } from '../../shared/share-modal/share-modal';
 import { ArchiveModal } from '../lifecycle-modals/archive-modal';
 import { CloneModal } from '../lifecycle-modals/clone-modal';
@@ -48,8 +50,6 @@ import { TransferModal } from '../lifecycle-modals/transfer-modal';
 import {
   addWidgetShare,
   deleteWidget,
-  getWidgetTabCounts,
-  getWidgetUsageCounts,
   listOwnerOptions,
   listWidgetShares,
   listWidgets,
@@ -63,20 +63,28 @@ import type {
   WidgetSourceResource,
   WidgetStatus,
   WidgetSummary,
-  WidgetTabCounts,
 } from '../widgets.model';
 
 type LibraryTab = 'mine' | 'shared' | 'published';
 type LibraryView = 'table' | 'cards';
+type LibrarySource = WidgetSourceResource | 'unclassified';
 
 const LIBRARY_TABS: readonly LibraryTab[] = ['mine', 'shared', 'published'];
-const SOURCE_VALUES: readonly WidgetSourceResource[] = [
+const SOURCE_VALUES: readonly LibrarySource[] = [
   'leads',
   'opportunities',
   'activities',
   'customer_profiles',
   'targets',
+  'unclassified',
 ];
+const NOT_READY_CODES = new Set([
+  'CRM_TARGET_SOURCE_NOT_READY',
+  'CRM_ANALYTICS_SOURCE_UNAVAILABLE',
+  'CRM_DASHBOARD_BLUEPRINTS_NOT_READY',
+  'CRM_TEAM_SCOPE_NOT_READY',
+  'CRM_INQUIRY_SOURCE_NOT_READY',
+]);
 const STATUS_VALUES: readonly WidgetStatus[] = ['DRAFT', 'PUBLISHED', 'ARCHIVED'];
 
 const KPI_KINDS = new Set<Visualization>(['METRIC_CARD', 'MULTI_KPI', 'PROGRESS_CARD']);
@@ -168,10 +176,12 @@ export class WidgetsPage {
   protected readonly skeletonCards = SKELETON_CARDS;
   protected readonly tabButtonId = tabButtonId;
   protected readonly tabPanelId = tabPanelId;
+  protected readonly canRead = computed(() => can('crm.widgets.read'));
   protected readonly canCreate = computed(() => can('crm.widgets.create'));
+  protected readonly canViewReadiness = computed(() => can('crm.analytics.readiness.view'));
 
   protected readonly search = signal('');
-  protected readonly sourceFilter = signal<'' | WidgetSourceResource>('');
+  protected readonly sourceFilter = signal<'' | LibrarySource>('');
   protected readonly ownerFilter = signal('');
   protected readonly statusFilter = signal<'' | WidgetStatus>('');
   protected readonly activeTab = signal<LibraryTab>('mine');
@@ -186,12 +196,37 @@ export class WidgetsPage {
 
   protected readonly ownerOptionsRaw = signal<{ id: string; name: string }[]>([]);
   protected readonly items = signal<WidgetSummary[]>([]);
-  protected readonly usageCounts = signal<Record<string, number>>({});
-  protected readonly tabCounts = signal<WidgetTabCounts | null>(null);
   protected readonly nextCursor = signal<string | null>(null);
   protected readonly loading = signal(true);
   protected readonly loadingMore = signal(false);
-  protected readonly failed = signal(false);
+  private readonly loadError = signal<unknown | null>(null);
+  protected readonly loadFailure = computed(() => {
+    this.i18n();
+    const error = this.loadError();
+    if (!error) return null;
+    const code = errorCodeOf(error);
+    // Analytics owns the error copy; the CRM mapper supplies status and correlation metadata.
+    const state = crmSettingsError(
+      () => this.transloco.translate(errorKey(code)), error, 'widgets',
+    );
+    const kind = NOT_READY_CODES.has(code ?? '') ? 'provisioning' : state.kind;
+    const delay = error instanceof ApiError ? error.details?.['retryAfterSeconds'] : undefined;
+    const message = error instanceof ApiError && error.status === 429 && Array.isArray(delay) && delay[0]
+      ? this.transloco.translate('widgets.rateLimited', { seconds: delay[0] })
+      : state.message;
+    return {
+      kind,
+      title: kind === 'forbidden' ? 'widgets.forbiddenTitle'
+        : kind === 'not-found' ? 'widgets.notFoundTitle'
+        : kind === 'provisioning' ? 'widgets.notReadyTitle' : 'widgets.loadFailedTitle',
+      actionLabel: kind === 'forbidden' || kind === 'not-found' ? 'widgets.backHome'
+        : kind === 'provisioning' && this.canViewReadiness() ? 'analytics.common.dataReadiness'
+        : 'analytics.common.retry',
+      text: state.correlationId
+        ? `${message} ${this.transloco.translate('widgets.correlationId', { id: state.correlationId })}`
+        : message,
+    };
+  });
   protected readonly deletingName = signal('');
 
   private loadSeq = 0;
@@ -218,7 +253,7 @@ export class WidgetsPage {
     ];
   });
 
-  protected readonly sourceOptions = computed<DropdownOption<'' | WidgetSourceResource>[]>(() => {
+  protected readonly sourceOptions = computed<DropdownOption<'' | LibrarySource>[]>(() => {
     this.i18n();
     return [
       { value: '', label: this.transloco.translate('widgets.allSources') },
@@ -253,25 +288,21 @@ export class WidgetsPage {
 
   protected readonly tabs = computed<TabItem[]>(() => {
     this.i18n();
-    const counts = this.tabCounts();
     return [
       {
         id: 'mine',
         label: this.transloco.translate('widgets.tabs.mine'),
         icon: 'tablerUser',
-        count: counts ? counts.mine : null,
       },
       {
         id: 'shared',
         label: this.transloco.translate('widgets.tabs.shared'),
         icon: 'tablerUsers',
-        count: counts ? counts.shared : null,
       },
       {
         id: 'published',
         label: this.transloco.translate('widgets.tabs.published'),
         icon: 'tablerWorld',
-        count: counts ? counts.published : null,
       },
     ];
   });
@@ -283,13 +314,6 @@ export class WidgetsPage {
       { key: 'kind', label: this.transloco.translate('widgets.kind'), width: 1.3 },
       { key: 'status', label: this.transloco.translate('widgets.status'), width: 1.5 },
       { key: 'owner', label: this.transloco.translate('widgets.owner'), width: 1.2 },
-      {
-        key: 'usedOn',
-        label: this.transloco.translate('widgets.usedOn'),
-        width: 0.8,
-        align: 'end',
-        numeric: true,
-      },
       { key: 'updated', label: this.transloco.translate('widgets.updated'), width: 1 },
       { key: 'actions', label: '', width: 0.4, align: 'end' },
     ];
@@ -305,7 +329,15 @@ export class WidgetsPage {
   constructor() {
     effect(() => {
       this.language();
+      const canRead = this.canRead();
       untracked(() => {
+        if (!canRead) {
+          this.loadSeq++;
+          this.ownersSeq++;
+          this.items.set([]);
+          this.loading.set(false);
+          return;
+        }
         void this.loadOwners();
         void this.reloadAll();
       });
@@ -321,13 +353,14 @@ export class WidgetsPage {
   protected onSearchInput(event: Event): void {
     const value = (event.target as HTMLInputElement).value;
     this.search.set(value);
+    this.loadSeq++;
     this.clearSearchTimer();
     this.searchTimer = setTimeout(() => {
       void this.reloadAll();
     }, 180);
   }
 
-  protected onSourceChange(value: '' | WidgetSourceResource): void {
+  protected onSourceChange(value: '' | LibrarySource): void {
     this.sourceFilter.set(value);
     void this.reloadAll();
   }
@@ -353,7 +386,7 @@ export class WidgetsPage {
     if (next === 'published') {
       this.statusFilter.set('');
     }
-    void this.reloadListOnly();
+    void this.reloadAll();
   }
 
   protected onViewChange(view: string): void {
@@ -377,6 +410,18 @@ export class WidgetsPage {
 
   protected reload(): void {
     void this.reloadAll();
+  }
+
+  protected goHome(): void {
+    void this.router.navigate(['/workspace/home']);
+  }
+
+  protected onLoadFailureAction(): void {
+    const kind = this.loadFailure()?.kind;
+    if (kind === 'forbidden' || kind === 'not-found') this.goHome();
+    else if (kind === 'provisioning' && this.canViewReadiness()) {
+      void this.router.navigate(['/crm/settings/data-readiness']);
+    } else this.reload();
   }
 
   protected loadMore(): void {
@@ -419,10 +464,6 @@ export class WidgetsPage {
       case 'ARCHIVED':
         return 'tag';
     }
-  }
-
-  protected usageCount(widgetId: string): number {
-    return this.usageCounts()[widgetId] ?? 0;
   }
 
   protected formattedDate(iso: string): string {
@@ -571,10 +612,7 @@ export class WidgetsPage {
   }
 
   private async reloadAll(): Promise<void> {
-    await Promise.all([this.fetchPage(null, false), this.fetchTabCounts()]);
-  }
-
-  private async reloadListOnly(): Promise<void> {
+    if (!this.canRead()) return;
     await this.fetchPage(null, false);
   }
 
@@ -610,56 +648,29 @@ export class WidgetsPage {
       this.loadingMore.set(true);
     } else {
       this.loading.set(true);
-      this.failed.set(false);
+      this.loadingMore.set(false);
+      this.loadError.set(null);
+      this.nextCursor.set(null);
     }
 
     try {
-      const page = await listWidgets({ ...this.buildListParams(), cursor, limit: 20 });
-      if (seq !== this.loadSeq) return;
-
-      const counts = await getWidgetUsageCounts(page.items.map((item) => item.id));
+      const page = await listWidgets({ ...this.buildListParams(), cursor });
       if (seq !== this.loadSeq) return;
 
       if (append) {
         this.items.update((prev) => [...prev, ...page.items]);
-        this.usageCounts.update((prev) => ({ ...prev, ...counts }));
       } else {
         this.items.set(page.items);
-        this.usageCounts.set(counts);
       }
       this.nextCursor.set(page.nextCursor);
     } catch (error) {
       if (seq !== this.loadSeq) return;
-      if (append) {
-        this.notify.error(this.transloco.translate(errorKey(errorCodeOf(error))));
-      } else {
-        this.failed.set(true);
-      }
+      this.loadError.set(error);
     } finally {
       if (seq === this.loadSeq) {
         this.loading.set(false);
         this.loadingMore.set(false);
       }
-    }
-  }
-
-  private async fetchTabCounts(): Promise<void> {
-    const seq = this.loadSeq;
-    try {
-      const search = this.search().trim();
-      const source = this.sourceFilter();
-      const ownerUserId = this.ownerFilter();
-      const status = this.statusFilter();
-      const counts = await getWidgetTabCounts({
-        ...(search ? { search } : {}),
-        ...(source ? { source } : {}),
-        ...(ownerUserId ? { ownerUserId } : {}),
-        ...(status ? { status } : {}),
-      });
-      if (seq !== this.loadSeq) return;
-      this.tabCounts.set(counts);
-    } catch {
-      // tab counters remain optional when main list fails
     }
   }
 

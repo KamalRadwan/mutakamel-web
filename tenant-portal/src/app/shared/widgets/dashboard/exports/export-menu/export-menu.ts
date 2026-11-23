@@ -18,17 +18,21 @@ import {
   tablerFileSpreadsheet,
   tablerFileTypeCsv,
   tablerFileTypePdf,
+  tablerRefresh,
+  tablerExclamationCircle,
 } from '@ng-icons/tabler-icons';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { LanguageState } from '../../../../../core/i18n/language';
 import { Notify } from '../../../../../core/notify/notify';
 import { Button } from '../../../../ui/button/button';
+import { FullState } from '../../../../ui/full-state/full-state';
+import { ApiError, correlationIdOf, isRetryableWriteError } from '../../../../../core/api/api-errors';
+import { newIdempotencyKey } from '../../../../../core/api/idempotency';
 import { rectInPage, viewport } from '../../../../ui/overlay/zoom';
-import { newIdempotencyKey } from '../../analytics-api';
 import { can } from '../../analytics-permissions';
 import { errorText } from '../../panel-state';
-import { createExport, pdfAvailable, toExportPeriod } from '../exports.api';
-import type { ExportFormat, ExportPeriod } from '../exports.model';
+import { createExport, exportCapabilities, listExports, pdfAvailable, toExportPeriod } from '../exports.api';
+import type { CreateExportRequest, ExportFormat, ExportPeriod } from '../exports.model';
 
 interface FormatOption {
   format: ExportFormat;
@@ -65,7 +69,7 @@ const FORMAT_OPTIONS: readonly FormatOption[] = [
 
 @Component({
   selector: 'app-export-menu',
-  imports: [NgIcon, TranslocoPipe, Button],
+  imports: [NgIcon, TranslocoPipe, Button, FullState],
   viewProviders: [
     provideTranslocoScope(
       { scope: 'export-menu', alias: 'exportMenu' },
@@ -79,6 +83,8 @@ const FORMAT_OPTIONS: readonly FormatOption[] = [
       tablerFileTypeCsv,
       tablerFileSpreadsheet,
       tablerFileTypePdf,
+      tablerRefresh,
+      tablerExclamationCircle,
     }),
   ],
   templateUrl: './export-menu.html',
@@ -90,14 +96,16 @@ const FORMAT_OPTIONS: readonly FormatOption[] = [
   },
 })
 export class ExportMenu {
+  private static nextId = 0;
+  protected readonly hintId = `export-menu-${++ExportMenu.nextId}`;
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
   private readonly transloco = inject(TranslocoService);
   private readonly notify = inject(Notify);
   private readonly language = inject(LanguageState).current;
-  private readonly trigger = viewChild<ElementRef<HTMLButtonElement>>('trigger');
+  private readonly trigger = viewChild<Button, ElementRef<HTMLButtonElement>>('trigger', { read: ElementRef });
   private readonly panelRef = viewChild<ElementRef<HTMLElement>>('panel');
-  private readonly rows = viewChildren<ElementRef<HTMLButtonElement>>('rowBtn');
+  private readonly rows = viewChildren<Button, ElementRef<HTMLButtonElement>>('rowBtn', { read: ElementRef });
 
   readonly target = input.required<{ dashboardId: string } | { reportKey: string }>();
   readonly period = input.required<ExportPeriod>();
@@ -112,19 +120,34 @@ export class ExportMenu {
   protected readonly placed = signal(false);
   protected readonly submitting = signal(false);
   protected readonly pdfEnabled = signal(pdfAvailable());
+  protected readonly pdfReason = signal('exportMenu.pdfNotAvailable');
+  protected readonly loading = signal(false);
+  protected readonly loadError = signal<unknown>(null);
+  protected readonly correlationId = computed(() => correlationIdOf(this.loadError()));
+  protected readonly forbidden = computed(() => {
+    const error = this.loadError();
+    return error instanceof ApiError && error.status === 403;
+  });
+  protected readonly readOnly = signal(false);
   protected readonly place = signal<MenuPlace>({ top: 0, end: 0 });
   protected readonly iconSize = computed(() => (this.small() ? '14' : '15'));
 
   private panelSeq = 0;
+  private refreshSeq = 0;
+  private pending: { bodyJson: string; key: string } | null = null;
+  private mismatch = false;
 
   constructor() {
     const close = () => this.close();
     document.addEventListener('scroll', close, { capture: true, passive: true });
-    inject(DestroyRef).onDestroy(() => document.removeEventListener('scroll', close, { capture: true }));
+    inject(DestroyRef).onDestroy(() => {
+      this.refreshSeq++;
+      document.removeEventListener('scroll', close, { capture: true });
+    });
   }
 
   protected isFormatDisabled(format: ExportFormat): boolean {
-    if (this.submitting()) return true;
+    if (!this.canExport || this.submitting() || this.loading() || this.loadError() || this.readOnly() || this.mismatch) return true;
     return format === 'PDF' && !this.pdfEnabled();
   }
 
@@ -134,13 +157,36 @@ export class ExportMenu {
       this.close();
       return;
     }
-    this.pdfEnabled.set(pdfAvailable());
     const seq = ++this.panelSeq;
     this.placed.set(false);
     this.place.set(this.initialPlace());
     this.open.set(true);
     queueMicrotask(() => this.placePanel(seq));
     afterNextRender(() => this.placePanel(seq), { injector: this.injector });
+    void this.refresh();
+  }
+
+  protected async refresh(): Promise<void> {
+    if (this.loading() || !this.canExport) return;
+    const seq = ++this.refreshSeq;
+    this.loading.set(true);
+    this.loadError.set(null);
+    try {
+      await listExports();
+      if (seq !== this.refreshSeq) return;
+      this.pdfEnabled.set(pdfAvailable());
+      const reason = exportCapabilities().formats.find((format) => format.format === 'PDF')?.reason;
+      this.pdfReason.set(reason === 'PDF_RENDERER_UNAVAILABLE' ? 'exportMenu.pdfRendererUnavailable' : 'exportMenu.pdfNotAvailable');
+      this.mismatch = false;
+    } catch (error) {
+      if (seq === this.refreshSeq) this.loadError.set(error);
+    } finally {
+      if (seq === this.refreshSeq) {
+        this.loading.set(false);
+        this.placed.set(false);
+        afterNextRender(() => this.placePanel(this.panelSeq), { injector: this.injector });
+      }
+    }
   }
 
   protected close(): void {
@@ -155,35 +201,37 @@ export class ExportMenu {
     }
   }
 
-  protected async choose(format: ExportFormat, viaKeyboard = false): Promise<void> {
+  protected async choose(format: ExportFormat): Promise<void> {
     if (this.isFormatDisabled(format)) return;
     this.close();
-    if (viaKeyboard) {
-      this.trigger()?.nativeElement.focus();
-    }
     this.submitting.set(true);
     const filters = this.filters();
     const panelKeys = this.panelKeys();
+    const body: CreateExportRequest = {
+      ...this.target(), format, locale: this.language(), period: toExportPeriod(this.period()),
+      ...(filters ? { filters: { ...filters } } : {}),
+      ...(panelKeys?.length ? { panelKeys: [...panelKeys] } : {}),
+    };
+    const bodyJson = JSON.stringify(body);
+    if (this.pending?.bodyJson !== bodyJson) this.pending = { bodyJson, key: newIdempotencyKey() };
     try {
-      await createExport(
-        {
-          ...this.target(),
-          format,
-          locale: this.language(),
-          period: toExportPeriod(this.period()),
-          ...(filters ? { filters: { ...filters } } : {}),
-          ...(panelKeys?.length ? { panelKeys: [...panelKeys] } : {}),
-        },
-        newIdempotencyKey(),
-      );
+      await createExport(body, this.pending.key);
+      this.pending = null;
       this.notify.success(
         this.transloco.translate('exportMenu.queued'),
         this.transloco.translate('exportMenu.findIt'),
       );
     } catch (error) {
-      this.pdfEnabled.set(pdfAvailable());
+      const code = error instanceof ApiError ? error.code : '';
+      if (!isRetryableWriteError(error) && !(error instanceof ApiError && error.status === 401)) this.pending = null;
+      if (code === 'GW.IDEM.MISMATCH' || code.endsWith('_IDEMPOTENCY_MISMATCH') || code === 'CRM_IDEMPOTENCY_KEY_REUSED') this.mismatch = true;
+      if (error instanceof ApiError && error.status === 403 &&
+        (code.endsWith('_DISABLED') || ['CRM_SUBSCRIPTION_READ_ONLY', 'SEAT_OVER_CAPACITY_READ_ONLY'].includes(code))) this.readOnly.set(true);
       const text = errorText(error);
-      this.notify.error(this.transloco.translate(text.key, text.params));
+      const key = error instanceof ApiError && error.status === 401 ? 'exportMenu.notSaved'
+        : code === 'CRM_EXPORT_QUEUE_LIMIT' ? 'exportMenu.queueLimit'
+        : code.endsWith('_DISABLED') ? 'exportMenu.moduleDisabled' : text.key;
+      this.notify.error(this.transloco.translate(key, text.params));
     } finally {
       this.submitting.set(false);
     }
@@ -207,8 +255,8 @@ export class ExportMenu {
     }
 
     const rowEls = this.rows().map((r) => r.nativeElement);
-    const enabledIndices = this.options.reduce<number[]>((acc, opt, idx) => {
-      if (!this.isFormatDisabled(opt.format)) acc.push(idx);
+    const enabledIndices = rowEls.reduce<number[]>((acc, row, idx) => {
+      if (row.getAttribute('aria-disabled') !== 'true' && !row.disabled) acc.push(idx);
       return acc;
     }, []);
     if (enabledIndices.length === 0) return;
@@ -236,8 +284,8 @@ export class ExportMenu {
       rowEls[enabledIndices[enabledIndices.length - 1]]?.focus();
     } else if ((event.key === 'Enter' || event.key === ' ') && currentIndex >= 0) {
       event.preventDefault();
-      const opt = this.options[currentIndex];
-      if (opt) void this.choose(opt.format, true);
+      rowEls[currentIndex]?.click();
+      if (currentIndex < this.options.length) triggerEl?.focus();
     }
   }
 
@@ -280,9 +328,6 @@ export class ExportMenu {
     panelEl.style.insetInlineEnd = `${end}px`;
     panelEl.classList.remove('invisible');
 
-    const firstEnabledIndex = this.options.findIndex((opt) => !this.isFormatDisabled(opt.format));
-    if (firstEnabledIndex >= 0) {
-      this.rows()[firstEnabledIndex]?.nativeElement.focus();
-    }
+    this.rows().find((row) => !row.nativeElement.disabled && row.nativeElement.getAttribute('aria-disabled') !== 'true')?.nativeElement.focus();
   }
 }

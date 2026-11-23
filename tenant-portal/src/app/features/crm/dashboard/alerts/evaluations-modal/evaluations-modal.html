@@ -24,7 +24,7 @@
             [ariaLabel]="'alerts.evaluations.period' | transloco"
             [months]="1"
             [withTime]="false"
-            [today]="fakeNow"
+            [today]="today"
             [invalid]="!!rangeError()"
             [value]="dateRange()"
             (valueChange)="onRangeChange($event)"
@@ -35,11 +35,14 @@
 
     @if (loadError()) {
       <ui-full-state
-        kind="load-failure"
-        [title]="'analytics.common.loadFailed' | transloco"
+        [kind]="failureKind()"
+        [title]="failureText()"
         [actionLabel]="'analytics.common.retry' | transloco"
         (action)="retry()"
       />
+      @if (failureKind() === 'provisioning' && canReadiness) {
+        <button type="button" uiButton variant="secondary" (click)="openReadiness()">{{ 'alerts.readiness' | transloco }}</button>
+      }
     } @else {
       <div class="overflow-x-auto pb-4">
         <ui-data-table

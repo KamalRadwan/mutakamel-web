@@ -24,18 +24,27 @@
       <ui-full-state
         kind="forbidden"
         [title]="'widgetPage.forbidden.title' | transloco"
-        [text]="'widgetPage.forbidden.text' | transloco"
-        [actionLabel]="'widgetPage.notFound.action' | transloco"
-        (action)="goToWidgets()"
+        [text]="loadFailureText() || ('widgetPage.forbidden.text' | transloco)"
+        [actionLabel]="(readFailure()?.requestAccess ? 'widgetPage.requests.requestAccess' : 'widgetPage.notFound.action') | transloco"
+        (action)="onLoadStateAction()"
       />
     }
     @case ('load-failure') {
       <ui-full-state
         kind="load-failure"
         [title]="'analytics.common.loadFailed' | transloco"
-        [text]="'widgetPage.loadFailure.text' | transloco"
+        [text]="loadFailureText() || ('widgetPage.loadFailure.text' | transloco)"
         [actionLabel]="'analytics.common.retry' | transloco"
         (action)="retryLoad()"
+      />
+    }
+    @case ('provisioning') {
+      <ui-full-state
+        kind="provisioning"
+        [title]="'widgetPage.requests.provisioningTitle' | transloco"
+        [text]="loadFailureText()"
+        [actionLabel]="canOpenReadiness() ? ('widgetPage.requests.readiness' | transloco) : ''"
+        (action)="onLoadStateAction()"
       />
     }
   }
@@ -145,6 +154,9 @@
             [widget]="w"
             [refreshToken]="accessRefresh()"
             (countChange)="onShareCountChange($event)"
+            (requestAccess)="requestWidgetAccess()"
+            [forceReadOnly]="writesReadOnly()"
+            (becameReadOnly)="onActionReadOnly()"
           />
         </div>
       }
@@ -161,6 +173,9 @@
             [hasUnsavedEdits]="isDirty()"
             (restored)="onVersionRestored()"
             (countChange)="onVersionsCountChange($event)"
+            (requestAccess)="requestWidgetAccess()"
+            [forceReadOnly]="writesReadOnly()"
+            (becameReadOnly)="onActionReadOnly()"
           />
         </div>
       }
@@ -168,9 +183,10 @@
   </div>
 }
 
-<app-widget-archive-modal />
-<app-widget-transfer-modal />
-<app-widget-clone-modal />
+<app-widget-archive-modal (becameReadOnly)="onActionReadOnly()" />
+<app-widget-transfer-modal (becameReadOnly)="onActionReadOnly()" />
+<app-widget-clone-modal (becameReadOnly)="onActionReadOnly()" />
+<app-request-modal />
 
 <div #shareHost class="contents">
   <app-share-modal />

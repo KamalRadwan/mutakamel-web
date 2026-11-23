@@ -28,7 +28,6 @@ import {
 import { Field } from '../../../../../../shared/ui/field/field';
 import { rectInPage, viewport } from '../../../../../../shared/ui/overlay/zoom';
 import type { CatalogMetric } from '../../../../../../shared/widgets/dashboard/analytics.model';
-import { can } from '../../../../../../shared/widgets/dashboard/analytics-permissions';
 import { PublishModal } from '../../publish-modal/publish-modal';
 import {
   BuilderState,
@@ -91,7 +90,7 @@ export class StepReview {
 
   private readonly publishModal = viewChild.required<PublishModal>('publishModal');
 
-  protected readonly canPublish = can('crm.widgets.publish');
+  protected readonly canPublish = this.state.canPublish;
   protected readonly publishingFlow = signal(false);
   protected readonly activeHint = signal<string | null>(null);
   protected readonly tooltipPlace = signal({ top: 0, start: 0 });
@@ -323,7 +322,7 @@ export class StepReview {
   }
 
   protected async onPublish(): Promise<void> {
-    if (!this.canPublish || this.publishingFlow()) return;
+    if (!this.canPublish() || this.publishingFlow()) return;
 
     const invalid = this.state.validateAll();
     if (invalid) {
@@ -345,7 +344,7 @@ export class StepReview {
         return;
       }
 
-      const published = await this.publishModal().open(id, ds);
+      const published = await this.publishModal().open(id, ds, this.state.widget()?.usage ?? null);
       if (!published) return;
 
       const version =

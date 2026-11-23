@@ -17,16 +17,15 @@ import { tablerStarFill } from '@ng-icons/tabler-icons/fill';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { LanguageState } from '../../../../../core/i18n/language';
 import { Notify } from '../../../../../core/notify/notify';
-import { errorCodeOf } from '../../../../../shared/widgets/dashboard/analytics-api';
 import { can } from '../../../../../shared/widgets/dashboard/analytics-permissions';
 import { ExportMenu } from '../../../../../shared/widgets/dashboard/exports/export-menu/export-menu';
-import { errorKey } from '../../../../../shared/widgets/dashboard/panel-state';
 import { Badge } from '../../../../../shared/ui/badge/badge';
 import { Button } from '../../../../../shared/ui/button/button';
 import { formatDateTime } from '../../../../../shared/ui/chart/chart-format';
 import { FullState } from '../../../../../shared/ui/full-state/full-state';
 import { Tabs, tabButtonId, tabPanelId, type TabItem } from '../../../../../shared/ui/tabs/tabs';
-import { peekCatalogueReport, setReportFavourite } from '../../catalogue/catalogue.api';
+import { listCatalogue, peekCatalogueReport, setReportFavourite } from '../../catalogue/catalogue.api';
+import { reportErrorMessage, reportIdempotencyMismatch, reportWriteReadOnly } from '../report-errors';
 import { AboutTab } from '../about-tab/about-tab';
 import { OverviewTab } from '../overview-tab/overview-tab';
 import { PinModal } from '../pin-modal/pin-modal';
@@ -96,6 +95,9 @@ export class ReportPage {
   protected readonly tabButtonId = tabButtonId;
   protected readonly tabPanelId = tabPanelId;
   protected readonly favourite = signal(false);
+  protected readonly favouriting = signal(false);
+  protected readonly readOnly = signal(false);
+  protected readonly canViewReadiness = computed(() => can('crm.analytics.readiness.view'));
   protected readonly skeletonItems = [0, 1, 2, 3] as const;
 
   private lastLoadedLang: 'ar' | 'en' | null = null;
@@ -155,11 +157,11 @@ export class ReportPage {
   });
 
   protected readonly canPin = computed(
-    () => can('crm.dashboards.update') && this.state.pinnablePanels().length > 0,
+    () => !this.readOnly() && can('crm.dashboards.update') && can('crm.widgets.create') && this.state.pinnablePanels().length > 0,
   );
 
-  protected readonly canSchedule = computed(() => can('crm.subscriptions.manage'));
-  protected readonly canExport = computed(() => can('crm.exports.create'));
+  protected readonly canSchedule = computed(() => !this.readOnly() && can('crm.subscriptions.manage'));
+  protected readonly canExport = computed(() => !this.readOnly() && can('crm.exports.create'));
 
   /** `ExportPeriodDto` is `{ from, to, kind? }`: the preset name travels as `kind`. */
   protected readonly exportPeriod = computed<ExportPeriod>(() => {
@@ -167,8 +169,8 @@ export class ReportPage {
     const req = this.state.request();
     return {
       kind: req.period?.preset ?? manifest?.period.kind ?? 'CURRENT_MONTH',
-      from: req.period?.from ?? manifest?.period.from ?? '2026-11-01',
-      to: req.period?.to ?? manifest?.period.to ?? '2026-11-21',
+      from: req.period?.from ?? manifest?.period.from ?? '',
+      to: req.period?.to ?? manifest?.period.to ?? '',
     };
   });
 
@@ -210,6 +212,7 @@ export class ReportPage {
       this.lastLoadedLang = lang;
       untracked(() => {
         this.favourite.set(peekCatalogueReport(key)?.favourite ?? false);
+        void this.loadFavourite(key);
         void this.state.load(key);
       });
     });
@@ -248,7 +251,8 @@ export class ReportPage {
 
   protected async toggleFavourite(): Promise<void> {
     const key = this.state.reportKey() || this.routeKey();
-    if (!key) return;
+    if (!key || this.favouriting() || this.readOnly()) return;
+    this.favouriting.set(true);
     const prev = this.favourite();
     const next = !prev;
     this.favourite.set(next);
@@ -261,7 +265,11 @@ export class ReportPage {
       if ((this.state.reportKey() || this.routeKey()) === key) {
         this.favourite.set(prev);
       }
-      this.notify.error(this.transloco.translate(errorKey(errorCodeOf(err))));
+      this.notify.error(reportErrorMessage(this.transloco, err, 'repReport'));
+      if (reportWriteReadOnly(err)) this.readOnly.set(true);
+      if (reportIdempotencyMismatch(err)) await this.loadFavourite(key, true);
+    } finally {
+      this.favouriting.set(false);
     }
   }
 
@@ -272,6 +280,7 @@ export class ReportPage {
   }
 
   protected openPinModal(panelKey?: string): void {
+    if (!this.canPin()) return;
     const manifest = this.state.manifest();
     if (!manifest) return;
     this.pinModal().open(this.state.reportKey() || this.routeKey(), manifest.panels, panelKey);
@@ -309,5 +318,25 @@ export class ReportPage {
     const key = this.routeKey();
     if (!key) return;
     void this.state.load(key);
+  }
+
+  protected openReadiness(): void {
+    void this.router.navigate(['/crm/settings/data-readiness']);
+  }
+
+  protected requestAccess(): void {
+    void this.router.navigate(['/crm/dashboard/access']);
+  }
+
+  private async loadFavourite(key: string, force = false): Promise<void> {
+    if (!can('crm.dashboards.read')) return;
+    try {
+      const page = await listCatalogue({ q: key, limit: 100 });
+      if (key === this.routeKey() && (force || !this.favouriting())) {
+        this.favourite.set(page.items.find((item) => item.reportKey === key)?.favourite ?? false);
+      }
+    } catch {
+      // Favourite metadata is optional; the manifest/run owns the page's load state.
+    }
   }
 }

@@ -9,7 +9,6 @@ import {
 } from '@ng-icons/tabler-icons';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { LanguageState } from '../../../../../core/i18n/language';
-import { Notify } from '../../../../../core/notify/notify';
 import { Badge } from '../../../../../shared/ui/badge/badge';
 import { Button } from '../../../../../shared/ui/button/button';
 import type { SeriesUnit } from '../../../../../shared/ui/chart/chart.model';
@@ -21,6 +20,7 @@ import {
   formatValue,
 } from '../../../../../shared/ui/chart/chart-format';
 import { Modal } from '../../../../../shared/ui/modal/modal';
+import { FullState } from '../../../../../shared/ui/full-state/full-state';
 import { rectInPage, viewport } from '../../../../../shared/ui/overlay/zoom';
 import {
   explainReceipt,
@@ -32,13 +32,8 @@ import type {
   Explain,
   Receipt,
 } from '../../../../../shared/widgets/dashboard/analytics.model';
-import { errorCodeOf } from '../../../../../shared/widgets/dashboard/analytics-api';
-import {
-  FAKE_BRANCHES,
-  FAKE_PEOPLE,
-  FAKE_TEAMS,
-} from '../../../../../shared/widgets/dashboard/fake/fake-org';
-import { errorKey } from '../../../../../shared/widgets/dashboard/panel-state';
+import { can } from '../../../../../shared/widgets/dashboard/analytics-permissions';
+import { dashboardReadError } from '../dashboard-page/dashboard-read-error';
 
 export type RecordsNavTarget =
   | unknown[]
@@ -96,7 +91,7 @@ function parseFiniteNumber(raw: string | null | undefined): number | null {
 
 @Component({
   selector: 'app-explain-modal',
-  imports: [NgIcon, TranslocoPipe, Badge, Button, Modal],
+  imports: [NgIcon, TranslocoPipe, Badge, Button, Modal, FullState],
   providers: [
     provideTranslocoScope(
       { scope: 'crm-dash-filters', alias: 'dashFilters' },
@@ -112,7 +107,6 @@ export class ExplainModal {
 
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly router = inject(Router);
-  private readonly notify = inject(Notify);
   private readonly language = inject(LanguageState).current;
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
@@ -120,6 +114,13 @@ export class ExplainModal {
 
   protected readonly skeletonRows = SKELETON_ROWS;
   protected readonly loading = signal(false);
+  protected readonly failure = signal<unknown | null>(null);
+  protected readonly readError = computed(() => {
+    this.i18n();
+    return this.failure() ? dashboardReadError(this.failure(), this.transloco, 'dashFilters') : null;
+  });
+  protected readonly canViewReadiness = can('crm.analytics.readiness.view');
+  private receiptId = '';
   protected readonly receipt = signal<Receipt | null>(null);
   protected readonly explain = signal<Explain | null>(null);
   protected readonly catalog = signal<Catalog | null>(null);
@@ -169,20 +170,9 @@ export class ExplainModal {
     const rawFilters = exp?.filters ?? rec?.filters ?? {};
     const chips: string[] = [];
 
-    const branchMap = new Map(
-      FAKE_BRANCHES.map((b) => [b.id, lang === 'ar' ? b.name.ar : b.name.en]),
-    );
-    const teamMap = new Map(
-      FAKE_TEAMS.map((t) => [t.id, lang === 'ar' ? t.name.ar : t.name.en]),
-    );
-    const personMap = new Map(
-      FAKE_PEOPLE.map((p) => [p.id, lang === 'ar' ? p.nameAr : p.name]),
-    );
-
-    const resolveList = (val: unknown, lookup: Map<string, string>): string => {
+    const resolveList = (val: unknown): string => {
       const ids = Array.isArray(val) ? val.map(String) : [String(val)];
-      const sep = lang === 'ar' ? '، ' : ', ';
-      return ids.map((id) => lookup.get(id) ?? id).join(sep);
+      return ids.join(lang === 'ar' ? '، ' : ', ');
     };
 
     const keyLabel = (key: string): string => {
@@ -209,11 +199,11 @@ export class ExplainModal {
       } else if (key === 'dateFrom' || key === 'dateTo') {
         formattedVal = formatDate(String(val), lang);
       } else if (key === 'branchId' || key === 'branchIds') {
-        formattedVal = resolveList(val, branchMap);
+        formattedVal = resolveList(val);
       } else if (key === 'teamIds') {
-        formattedVal = resolveList(val, teamMap);
+        formattedVal = resolveList(val);
       } else if (key === 'ownerUserId' || key === 'ownerUserIds') {
-        formattedVal = resolveList(val, personMap);
+        formattedVal = resolveList(val);
       } else if (Array.isArray(val)) {
         formattedVal = val.map(String).join(lang === 'ar' ? '، ' : ', ');
       } else {
@@ -299,6 +289,8 @@ export class ExplainModal {
 
   open(receiptId: string, recordsLink: RecordsNavTarget | null = null): void {
     const seq = ++this.loadSeq;
+    this.receiptId = receiptId;
+    this.failure.set(null);
     this.recordsTarget.set(recordsLink);
     this.receipt.set(null);
     this.explain.set(null);
@@ -321,9 +313,17 @@ export class ExplainModal {
       .catch((error: unknown) => {
         if (seq !== this.loadSeq) return;
         this.loading.set(false);
-        this.notify.error(this.transloco.translate(errorKey(errorCodeOf(error))));
-        this.modal().close();
+        this.failure.set(error);
       });
+  }
+
+  protected onErrorAction(): void {
+    if (this.readError()?.kind === 'provisioning' && this.canViewReadiness) {
+      this.modal().close();
+      void this.router.navigate(['/crm/settings/data-readiness']);
+    } else {
+      this.open(this.receiptId, this.recordsTarget());
+    }
   }
 
   protected close(): void {

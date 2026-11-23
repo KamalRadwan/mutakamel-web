@@ -4,7 +4,7 @@
       {{ 'builder2.review.summary' | transloco }}
     </h2>
 
-    @if (canPublish) {
+    @if (canPublish()) {
       <button
         uiButton
         type="button"
@@ -27,7 +27,7 @@
           <span
             #hintTrigger
             class="relative inline-flex shrink-0 items-center text-accent"
-            tabindex="0"
+            tabindex="-1"
             (mouseenter)="showHint(row.key, hintTrigger, hintTip)"
             (focus)="showHint(row.key, hintTrigger, hintTip)"
             (blur)="hideHint()"
@@ -65,7 +65,7 @@
       <span
         #valHintTrigger
         class="relative inline-flex shrink-0 items-center text-accent"
-        tabindex="0"
+        tabindex="-1"
         (mouseenter)="showHint('validation', valHintTrigger, valHintTip)"
         (focus)="showHint('validation', valHintTrigger, valHintTip)"
         (blur)="hideHint()"
@@ -118,6 +118,7 @@
     size="multiline"
     [label]="'builder2.review.changeSummary' | transloco"
     [hint]="'builder2.review.changeSummaryHint' | transloco"
+    [error]="state.errors().review?.['changeSummary'] ?? null"
     [max]="500"
     [count]="changeSummaryValue().length"
   >
@@ -128,6 +129,7 @@
       class="min-h-textarea w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
       [placeholder]="'builder2.review.changeSummaryPlaceholder' | transloco"
       [value]="changeSummaryValue()"
+      [readOnly]="state.readOnly()"
       (input)="onChangeSummaryInput(changeSummaryInput.value)"
     ></textarea>
   </ui-field>
@@ -137,6 +139,7 @@
     size="multiline"
     [label]="'builder2.review.internalNotes' | transloco"
     [hint]="'builder2.review.internalNotesHint' | transloco"
+    [error]="state.errors().review?.['internalNotes'] ?? null"
     [max]="1000"
     [count]="internalNotesValue().length"
   >
@@ -147,9 +150,10 @@
       class="min-h-textarea w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
       [placeholder]="'builder2.review.internalNotesPlaceholder' | transloco"
       [value]="internalNotesValue()"
+      [readOnly]="state.readOnly()"
       (input)="onInternalNotesInput(internalNotesInput.value)"
     ></textarea>
   </ui-field>
 </div>
 
-<app-publish-modal #publishModal />
+<app-publish-modal #publishModal (validationError)="state.applyValidationError($event)" (becameReadOnly)="state.lockReadOnly()" />
