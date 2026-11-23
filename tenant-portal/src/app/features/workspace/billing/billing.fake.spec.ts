@@ -1,17 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../../core/api/api-errors';
 import {
-  applyChange,
-  createPaymentIntent,
-  createPaymentQuote,
-  getReceipt,
-  getSubscription,
-  listInvoices,
-  listPaymentCurrencies,
-  prepareChange,
-  topUpWallet,
-} from './billing.api';
-import { setFakeBillingErrorNext, setFakeBillingFailNext } from './billing.fake';
+  fakeApplyChange as applyChange,
+  fakeCreatePaymentIntent as createPaymentIntent,
+  fakeCreatePaymentQuote as createPaymentQuote,
+  fakeGetReceipt as getReceipt,
+  fakeGetSubscription as getSubscription,
+  fakeListInvoices as listInvoices,
+  fakeListPaymentCurrencies as listPaymentCurrencies,
+  fakePrepareChange as prepareChange,
+  fakeTopUpWallet as topUpWallet,
+  setFakeBillingErrorNext,
+  setFakeBillingFailNext,
+} from './billing.fake';
 
 // The fakes stand in for the backend until Phase 5, so their status codes, error
 // codes, details and list shapes are checked against the backend contract here.

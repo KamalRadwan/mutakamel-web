@@ -7,7 +7,9 @@
 import { FAKE_ADDON_CATALOGUE, FAKE_ADDON_HOMES, FAKE_ADDON_WHATSAPP } from '../../billing/shared/addon-catalogue.fake';
 import { ApiError } from '../../../../core/api/api-errors';
 import { newIdempotencyKey } from '../../../../core/api/idempotency';
-import { getBranch } from '../../staff/shared/staff.api';
+import {
+  fakeGetBranch as getBranch,
+} from '../../staff/shared/staff.fake';
 import { fakeActorMe } from '../shared/fake-actor';
 import { Me } from '../../staff/shared/staff.model';
 import {

@@ -524,17 +524,14 @@ describe('templates api', () => {
     expect(newTemplateIdempotencyKey()).toMatch(uuidV7);
   });
 
-  it('plain exports stay available for callers', async () => {
+  it('fake compatibility functions are absent from the production facade', () => {
     const names = ['listTemplates', 'searchTemplates', 'getCreationScopes', 'listDataSources', 'getDataSourceSchema',
       'listStarters', 'getStarterThumbnail', 'createTemplate', 'duplicateTemplate', 'getTemplate', 'patchTemplate',
       'archiveTemplate', 'restoreTemplate', 'deleteTemplate', 'getTemplateThumbnail', 'retryTemplateThumbnail',
       'getDraft', 'patchDraft', 'validateDraft', 'getValidationRun', 'publishTemplate', 'listVersions', 'getVersion',
-      'restoreVersion', 'retireVersion', 'listRecoverySnapshots', 'restoreRecoverySnapshot', 'listAssets',
-      'getAsset', 'getAssetContent', 'uploadAsset', 'retireAsset', 'listAssignments', 'getAssignment',
-      'createAssignment', 'patchAssignment', 'deactivateAssignment', 'resolveAssignment', 'previewHtml',
+      'restoreVersion', 'retireVersion', 'listRecoverySnapshots', 'restoreRecoverySnapshot', 'previewHtml',
       'previewEmail', 'previewPdf', 'getPreviewJob', 'getPreviewJobArtifact', 'getPreviewJobLayoutReceipt'] as const;
-    for (const name of names) expect(exports[name]).toBeTypeOf('function');
-    await expect(exports.listTemplates({ assignmentScopeType: 'TENANT' })).resolves.toHaveProperty('items');
+    for (const name of [...names, 'FAKE_TEMPLATE_IDS']) expect(exports).not.toHaveProperty(name);
   });
 
   it('asset and assignment functions are re-exported', () => {

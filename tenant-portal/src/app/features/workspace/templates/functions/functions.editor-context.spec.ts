@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { FAKE_TEMPLATE_IDS, TemplateApiError, getDataSourceSchema, getDraft, getTemplate } from '../templates.api';
+import { TemplateApiError } from '../templates.api';
+import {
+  FAKE_TEMPLATE_IDS,
+  fakeGetDataSourceSchema as getDataSourceSchema,
+  fakeGetDraft as getDraft,
+  fakeGetTemplate as getTemplate,
+} from '../templates.fake';
 import {
   fakeGetFunctionEditorContext as getFunctionEditorContext,
   fakeListFunctionVersions as listFunctionVersions,

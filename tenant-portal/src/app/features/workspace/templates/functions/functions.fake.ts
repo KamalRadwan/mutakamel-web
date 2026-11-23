@@ -1,4 +1,10 @@
-import { FAKE_TEMPLATE_IDS, TemplateApiError, getDataSourceSchema, getDraft, getTemplate } from '../templates.api';
+import { TemplateApiError } from '../templates.api';
+import {
+  FAKE_TEMPLATE_IDS,
+  fakeGetDataSourceSchema as getDataSourceSchema,
+  fakeGetDraft as getDraft,
+  fakeGetTemplate as getTemplate,
+} from '../templates.fake';
 import type { TemplateFormulaExpression, TemplateFormulaRounding } from '../templates.model';
 import {
   ApplyFunctionToDraftsRequestDto,

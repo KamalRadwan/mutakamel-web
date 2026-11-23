@@ -6,28 +6,6 @@ import { CoreHttp, type CoreQuery } from '../../../core/api/core-http';
 import type { CorePage, CorePageMeta } from '../../../core/api/core-page';
 import { newIdempotencyKey } from '../../../core/api/idempotency';
 import {
-  fakeApplyChange,
-  fakeCreatePaymentIntent,
-  fakeCreatePaymentQuote,
-  fakeGetActivePaymentIntent,
-  fakeGetBillingSummary,
-  fakeGetInvoice,
-  fakeGetOperation,
-  fakeGetPayment,
-  fakeGetReceipt,
-  fakeGetSubscription,
-  fakeGetWallet,
-  fakeListCatalogue,
-  fakeListInvoices,
-  fakeListPaymentCurrencies,
-  fakeListPayments,
-  fakeListWalletLedger,
-  fakePrepareChange,
-  fakeQuoteChange,
-  fakeRecoverOperation,
-  fakeTopUpWallet,
-} from './billing.fake';
-import {
   ActiveInvoicePaymentIntent,
   AppliedReceipt,
   BillingSummary,
@@ -39,7 +17,6 @@ import {
   InvoiceRead,
   InvoiceListQuery,
   PageQuery,
-  Paged,
   PaymentInputCurrencies,
   PaymentStatusView,
   PrepareBody,
@@ -193,124 +170,6 @@ function unwrapBillingEnvelope<T>(body: unknown): { data: T; meta?: CorePageMeta
     throw new ApiError(502, 'COMMON.GENERIC.INTERNAL_ERROR');
   }
   return { data: body.data as T, ...('meta' in body ? { meta: body.meta as CorePageMeta } : {}) };
-}
-
-// Fake-backed until each Billing page package switches to BillingApi; removed by WS-10.
-/** GET /api/tenant/core/v1/billing/summary */
-export function getBillingSummary(): Promise<BillingSummary> {
-  return fakeGetBillingSummary();
-}
-
-/** GET /api/tenant/core/v1/billing/invoices?page&limit */
-export function listInvoices(q: PageQuery): Promise<Paged<TenantInvoiceView>> {
-  return fakeListInvoices(q);
-}
-
-/** GET /api/tenant/core/v1/billing/invoices/:id (no query, no company/branch headers) */
-export function getInvoice(id: string): Promise<InvoiceRead> {
-  return fakeGetInvoice(id);
-}
-
-/** GET /api/tenant/core/v1/billing/payment-input-currencies */
-export function listPaymentCurrencies(): Promise<PaymentInputCurrencies> {
-  return fakeListPaymentCurrencies();
-}
-
-/** POST /api/tenant/core/v1/billing/invoices/:id/payment-quote (no key) */
-export function createPaymentQuote(
-  invoiceId: string,
-  paymentCurrencyCode: string,
-): Promise<InvoicePaymentQuote> {
-  return fakeCreatePaymentQuote(invoiceId, paymentCurrencyCode);
-}
-
-/** POST /api/tenant/core/v1/billing/invoices/:id/payment-intents (header x-idempotency-key UUIDv7) */
-export function createPaymentIntent(
-  invoiceId: string,
-  paymentQuoteId: string,
-  idempotencyKey: string,
-): Promise<InvoicePaymentIntent> {
-  return fakeCreatePaymentIntent(invoiceId, paymentQuoteId, idempotencyKey);
-}
-
-/** GET /api/tenant/core/v1/billing/invoices/:id/payment-intents/active */
-export function getActivePaymentIntent(invoiceId: string): Promise<ActiveInvoicePaymentIntent | null> {
-  return fakeGetActivePaymentIntent(invoiceId);
-}
-
-/** GET /api/tenant/core/v1/billing/payments/:id */
-export function getPayment(paymentId: string): Promise<PaymentStatusView> {
-  return fakeGetPayment(paymentId);
-}
-
-/** GET /api/tenant/core/v1/wallet */
-export function getWallet(): Promise<WalletView> {
-  return fakeGetWallet();
-}
-
-/** GET /api/tenant/core/v1/wallet/ledger?page&limit */
-export function listWalletLedger(q: PageQuery): Promise<Paged<WalletLedgerEntry>> {
-  return fakeListWalletLedger(q);
-}
-
-/** GET /api/tenant/core/v1/payments?page&limit */
-export function listPayments(q: PageQuery): Promise<Paged<PaymentStatusView>> {
-  return fakeListPayments(q);
-}
-
-/** POST /api/tenant/core/v1/payments/topup (header x-idempotency-key UUIDv7) */
-export function topUpWallet(body: TopupBody, idempotencyKey: string): Promise<TopupResult> {
-  return fakeTopUpWallet(body, idempotencyKey);
-}
-
-/** GET /api/tenant/core/v1/subscription */
-export function getSubscription(): Promise<SubscriptionView> {
-  return fakeGetSubscription();
-}
-
-/** GET /api/tenant/core/v1/subscription/catalogue?page&limit&applicationKey&parentTierId */
-export function listCatalogue(q: CatalogueQuery): Promise<Paged<SubscriptionOffer>> {
-  return fakeListCatalogue(q);
-}
-
-/** POST /api/tenant/core/v1/subscription/preparations (202, header x-idempotency-key UUIDv7) */
-export function prepareChange(
-  body: PrepareBody,
-  idempotencyKey: string,
-): Promise<CommercialOperation> {
-  return fakePrepareChange(body, idempotencyKey);
-}
-
-/** GET /api/tenant/core/v1/subscription/operations/:id */
-export function getOperation(operationId: string): Promise<CommercialOperation> {
-  return fakeGetOperation(operationId);
-}
-
-/** POST /api/tenant/core/v1/subscription/plan-change-previews (header x-idempotency-key UUIDv7) */
-export function quoteChange(
-  body: QuoteBody,
-  idempotencyKey: string,
-): Promise<CommercialPreview> {
-  return fakeQuoteChange(body, idempotencyKey);
-}
-
-/** POST /api/tenant/core/v1/subscription/plan-change-previews/:id/apply (body {}, header x-idempotency-key UUIDv7) */
-export function applyChange(previewId: string, idempotencyKey: string): Promise<AppliedReceipt> {
-  return fakeApplyChange(previewId, idempotencyKey);
-}
-
-/** GET /api/tenant/core/v1/subscription/plan-change-previews/:id/receipt */
-export function getReceipt(previewId: string): Promise<AppliedReceipt> {
-  return fakeGetReceipt(previewId);
-}
-
-/** POST /api/tenant/core/v1/subscription/operations/:id/recovery (202, header x-idempotency-key UUIDv7) */
-export function recoverOperation(
-  operationId: string,
-  body: RecoveryBody,
-  idempotencyKey: string,
-): Promise<CommercialOperation> {
-  return fakeRecoverOperation(operationId, body, idempotencyKey);
 }
 
 export function billingErrorMessage(error: unknown, t: TranslocoService, operation: 'read' | 'write' = 'read'): string {

@@ -2,30 +2,27 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError as CoreApiError, errorCodeOf as coreErrorCodeOf, errorMessage as coreErrorMessage } from '../../../../core/api/api-errors';
 import { newIdempotencyKey as coreNewIdempotencyKey } from '../../../../core/api/idempotency';
 import en from '../../../../../../public/i18n/staff/en.json';
+import { ApiError, errorCodeOf, staffErrorMessage, errorMessage, listAllPages, newIdempotencyKey } from './staff.api';
 import {
-  addMembership,
-  ApiError,
-  errorCodeOf,
-  staffErrorMessage,
-  createBranch,
-  createCompany,
-  createRole,
-  deleteBranch,
-  deleteCompany,
-  errorMessage,
-  listAllPages,
-  listBranches,
-  listCompanies,
-  listCurrencies,
-  listDepartments,
-  listMemberships,
-  listPermissions,
-  listRoles,
-  listTeams,
-  listUsers,
-  newIdempotencyKey,
-} from './staff.api';
-import { fakeListCurrencies, resetStaffFake, setFakeActor, setFakeSeatCascade } from './staff.fake';
+  fakeAddMembership as addMembership,
+  fakeCreateBranch as createBranch,
+  fakeCreateCompany as createCompany,
+  fakeCreateRole as createRole,
+  fakeDeleteBranch as deleteBranch,
+  fakeDeleteCompany as deleteCompany,
+  fakeListBranches as listBranches,
+  fakeListCompanies as listCompanies,
+  fakeListCurrencies,
+  fakeListDepartments as listDepartments,
+  fakeListMemberships as listMemberships,
+  fakeListPermissions as listPermissions,
+  fakeListRoles as listRoles,
+  fakeListTeams as listTeams,
+  fakeListUsers as listUsers,
+  resetStaffFake,
+  setFakeActor,
+  setFakeSeatCascade,
+} from './staff.fake';
 
 async function rejectsWith(promise: Promise<unknown>, status: number, code: string): Promise<void> {
   await expect(promise).rejects.toMatchObject({ status, code });
@@ -40,9 +37,9 @@ describe('staff api follows the Core tenant backend', () => {
 
   afterAll(() => setFakeSeatCascade(false));
 
-  it('GET currencies is paged; listCurrencies reads every page', async () => {
+  it('listAllPages reads every currency fixture page', async () => {
     const onePerPage = await listAllPages((q) => fakeListCurrencies(q), { limit: 1 });
-    const all = await listCurrencies();
+    const all = await listAllPages(fakeListCurrencies);
     expect(all.length).toBeGreaterThan(1);
     expect(all).toEqual(onePerPage);
   });
