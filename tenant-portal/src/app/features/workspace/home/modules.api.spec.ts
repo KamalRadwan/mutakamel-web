@@ -1,27 +1,10 @@
-import { afterEach, describe, expect, it } from 'vitest';
-import type { Me } from '../staff/shared/staff.model';
+import { HttpClient, HttpErrorResponse, provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { TestBed } from '@angular/core/testing';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { appIcon, FALLBACK_ICON } from './app-presentation';
-import { listModules } from './modules.api';
-import { CatalogueEntry, fakeGetAppsOverview, setFakeCatalogue } from './modules.fake';
+import { getAppsOverview, listModules } from './modules.api';
 import { AppsOverviewItem, groupWorkspaceApps } from './modules.model';
-
-const ITEM_KEYS = ['group', 'iconKey', 'isAddon', 'moduleKey', 'myAccessState', 'nameI18n', 'seats'];
-
-const NON_ADMIN: Me = {
-  id: 'u-agent',
-  firstName: 'Sara',
-  lastName: 'Adel',
-  isTenantOwner: false,
-  permissions: ['crm.lead.read'],
-  permissionScopes: { 'crm.lead.read': { tenantWide: true, companyIds: [], branchIds: [] } },
-};
-
-const ADMIN: Me = {
-  ...NON_ADMIN,
-  id: 'u-admin',
-  permissions: ['users.user.read'],
-  permissionScopes: { 'users.user.read': { tenantWide: true, companyIds: [], branchIds: [] } },
-};
 
 function item(moduleKey: string, group: AppsOverviewItem['group']): AppsOverviewItem {
   return {
@@ -35,89 +18,69 @@ function item(moduleKey: string, group: AppsOverviewItem['group']): AppsOverview
   };
 }
 
-describe('apps overview fake (GET /api/tenant/core/v1/apps/overview)', () => {
-  it('returns { items } with exactly the agreed item shape', async () => {
-    const response = await fakeGetAppsOverview();
-    expect(Object.keys(response)).toEqual(['items']);
-    expect(response.items.length).toBeGreaterThan(0);
-    for (const app of response.items) {
-      expect(Object.keys(app).sort()).toEqual(ITEM_KEYS);
-      expect(typeof app.moduleKey).toBe('string');
-      expect(Object.keys(app.nameI18n).sort()).toEqual(['ar', 'en']);
-      expect(app.iconKey === null || typeof app.iconKey === 'string').toBe(true);
-      expect(['SUBSCRIBED', 'AVAILABLE', 'FUTURE']).toContain(app.group);
-      expect(typeof app.isAddon).toBe('boolean');
-      expect([null, 'ACTIVE', 'OVER_CAPACITY']).toContain(app.myAccessState);
-      if (app.seats !== null) {
-        expect(Object.keys(app.seats).sort()).toEqual(['total', 'used']);
-      }
-    }
+describe('apps overview HTTP adapter', () => {
+  const path = '/api/tenant/core/v1/apps/overview';
+  let client: HttpClient;
+  let http: HttpTestingController;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    client = TestBed.inject(HttpClient);
+    http = TestBed.inject(HttpTestingController);
   });
 
-  it('seeds the route-guard fixture, with an over-capacity app and iconKey null everywhere', async () => {
-    const { items } = await fakeGetAppsOverview();
-    const keys = items.map((app) => app.moduleKey);
-    expect(keys.slice(0, 3)).toEqual(['crm', 'trade', 'accounting']);
-    expect(items.some((app) => app.myAccessState === 'OVER_CAPACITY')).toBe(true);
-    expect(items.every((app) => app.iconKey === null)).toBe(true);
+  afterEach(() => http.verify());
+
+  it('unwraps the Core envelope and preserves overview fields', async () => {
+    const data = { items: [{ ...item('crm', 'SUBSCRIBED'), myAccessState: 'OVER_CAPACITY', seats: { used: 3, total: 2 } }] };
+    const pending = getAppsOverview(client);
+    const request = http.expectOne(path);
+    expect(request.request.method).toBe('GET');
+    expect(request.request.withCredentials).toBe(true);
+    request.flush({ success: true, data });
+    await expect(pending).resolves.toEqual(data);
   });
 
-  it('gives seats to a users.user.read caller on SUBSCRIBED, non-add-on items only', async () => {
-    const { items } = await fakeGetAppsOverview(ADMIN);
-    for (const app of items) {
-      if (app.group === 'SUBSCRIBED' && !app.isAddon) {
-        expect(app.seats).not.toBeNull();
-      } else {
-        expect(app.seats).toBeNull();
-      }
-    }
-  });
-
-  it('gives seats to the owner even without users.user.read', async () => {
-    const { items } = await fakeGetAppsOverview({ ...NON_ADMIN, isTenantOwner: true });
-    expect(items.find((app) => app.moduleKey === 'crm')?.seats).toEqual({ used: 12, total: 20 });
-  });
-
-  it('returns seats null on every item for a caller without users.user.read', async () => {
-    const { items } = await fakeGetAppsOverview(NON_ADMIN);
-    expect(items.length).toBeGreaterThan(0);
-    expect(items.every((app) => app.seats === null)).toBe(true);
-  });
-
-  it('keeps the route guard view (id + lower-case group) in step with the overview', async () => {
-    const modules = await listModules();
-    expect(modules.find((m) => m.id === 'crm')?.group).toBe('subscribed');
-    expect(modules.find((m) => m.id === 'pos')?.group).toBe('available');
-  });
-});
-
-describe('apps overview fake rules on a custom catalogue', () => {
-  afterEach(() => setFakeCatalogue(null));
-
-  function entry(moduleKey: string, rank: number, extra: Partial<CatalogueEntry> = {}): CatalogueEntry {
-    return { ...item(moduleKey, 'SUBSCRIBED'), rank, ...extra };
-  }
-
-  it('orders by catalogue rank, then moduleKey', async () => {
-    setFakeCatalogue([entry('zeta', 20), entry('beta', 10), entry('alpha', 20), entry('gamma', 5)]);
-    const { items } = await fakeGetAppsOverview(ADMIN);
-    expect(items.map((app) => app.moduleKey)).toEqual(['gamma', 'beta', 'alpha', 'zeta']);
-  });
-
-  it('keeps seats null for add-ons and for apps without a seat module', async () => {
-    setFakeCatalogue([
-      entry('seated', 1, { seats: { used: 2, total: 5 } }),
-      entry('addon', 2, { isAddon: true, seats: { used: 1, total: 3 } }),
-      entry('no-seat-module', 3, { seats: null }),
+  it('projects server module keys and all groups in catalogue order', async () => {
+    const pending = listModules(client);
+    const request = http.expectOne(path);
+    expect(request.request.method).toBe('GET');
+    expect(request.request.withCredentials).toBe(true);
+    request.flush({ success: true, data: { items: [
+      item('custom-addon', 'FUTURE'), item('trade', 'SUBSCRIBED'), item('crm', 'AVAILABLE'),
+    ] } });
+    await expect(pending).resolves.toEqual([
+      { id: 'custom-addon', group: 'future' },
+      { id: 'trade', group: 'subscribed' },
+      { id: 'crm', group: 'available' },
     ]);
-    const { items } = await fakeGetAppsOverview(ADMIN);
-    expect(items.map((app) => app.seats)).toEqual([{ used: 2, total: 5 }, null, null]);
   });
 
-  it('can return an empty FUTURE group', async () => {
-    setFakeCatalogue([entry('crm', 1), { ...item('pos', 'AVAILABLE'), rank: 2 }]);
-    const { items } = await fakeGetAppsOverview(ADMIN);
-    expect(items.some((app) => app.group === 'FUTURE')).toBe(false);
+  it('returns an empty projection for an empty catalogue', async () => {
+    const pending = listModules(client);
+    http.expectOne(path).flush({ success: true, data: { items: [] } });
+    await expect(pending).resolves.toEqual([]);
+  });
+
+  it('rejects malformed envelopes instead of returning fallback entitlements', async () => {
+    for (const body of [{}, { success: false, data: { items: [] } }, { success: true, data: null }, { success: true, data: { items: {} } }]) {
+      const pending = listModules(client);
+      http.expectOne(path).flush(body);
+      await expect(pending).rejects.toThrow('Invalid apps overview response');
+    }
+  });
+
+  it.each([401, 403, 500])('preserves HTTP error codes for existing error handling (%s)', async (status) => {
+    const error = { success: false, error: { code: 'INVALID_CREDENTIALS' } };
+    const pending = listModules(client);
+    http.expectOne(path).flush(error, { status, statusText: 'Request failed' });
+    await expect(pending).rejects.toMatchObject({ status, error });
+  });
+
+  it('propagates network failures without a fixture fallback', async () => {
+    const pending = listModules(client);
+    http.expectOne(path).error(new ProgressEvent('error'));
+    await expect(pending).rejects.toBeInstanceOf(HttpErrorResponse);
   });
 });
 

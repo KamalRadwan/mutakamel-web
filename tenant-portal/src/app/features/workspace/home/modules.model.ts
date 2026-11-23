@@ -62,7 +62,7 @@ export function appName(item: AppsOverviewItem, language: Language): string {
   return language === 'ar' ? item.nameI18n.ar : item.nameI18n.en;
 }
 
-/** Entitlement view read by the app route guard (core/guards/app-entitlement.guard.ts). */
+/** Legacy entitlement projection of the apps overview. */
 export interface AppModule {
   id: string;
   group: 'subscribed' | 'available' | 'future';

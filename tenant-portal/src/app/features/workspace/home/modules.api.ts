@@ -1,6 +1,5 @@
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import { fakeGetAppsOverview } from './modules.fake';
 import { AppModule, AppsOverviewResponse } from './modules.model';
 
 // GET /api/tenant/core/v1/apps/overview (authenticated, no permission)
@@ -15,10 +14,15 @@ export async function getAppsOverview(http: HttpClient): Promise<AppsOverviewRes
   return response.data;
 }
 
-export async function listModules(): Promise<AppModule[]> {
-  const { items } = await fakeGetAppsOverview();
+export async function listModules(http: HttpClient): Promise<AppModule[]> {
+  const { items } = await getAppsOverview(http);
+  const groups: Record<AppsOverviewResponse['items'][number]['group'], AppModule['group']> = {
+    SUBSCRIBED: 'subscribed',
+    AVAILABLE: 'available',
+    FUTURE: 'future',
+  };
   return items.map((item) => ({
     id: item.moduleKey,
-    group: item.group.toLowerCase() as AppModule['group'],
+    group: groups[item.group],
   }));
 }
