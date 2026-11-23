@@ -2,9 +2,9 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Injectable, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, ParamMap, provideRouter, Router } from '@angular/router';
 import { provideTransloco, Translation, TranslocoLoader, TranslocoService } from '@jsverse/transloco';
-import { defer, of } from 'rxjs';
+import { BehaviorSubject, defer } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import enAudit from '../../../../../../../public/i18n/ws-audit-log/en.json';
 import enSettings from '../../../../../../../public/i18n/settings/en.json';
@@ -39,14 +39,29 @@ describe('AuditLogPage', () => {
   let page: AuditLogPage;
   let http: HttpTestingController;
   let lookups: { users: ReturnType<typeof vi.fn>; allBranches: ReturnType<typeof vi.fn> };
+  let queryParams$: BehaviorSubject<ParamMap>;
+  let meSignal: ReturnType<typeof signal<{
+    id: string;
+    isTenantOwner: boolean;
+    permissions: string[];
+    permissionScopes: Record<string, { tenantWide: boolean; companyIds: string[]; branchIds: string[] }>;
+  } | null>>;
 
   beforeEach(() => {
     lookups = { users: vi.fn().mockResolvedValue({ data: [], meta: {} }), allBranches: vi.fn().mockResolvedValue([]) };
+    queryParams$ = new BehaviorSubject(convertToParamMap({}));
+    meSignal = signal({ id: 'actor', isTenantOwner: true, permissions: [], permissionScopes: {} });
     TestBed.configureTestingModule({ imports: [AuditLogPage], providers: [
       provideHttpClient(), provideHttpClientTesting(), provideRouter([]),
-      { provide: TenantScopeState, useValue: { me: signal({ id: 'actor', isTenantOwner: true, permissions: [], permissionScopes: {} }), selection: signal(null) } },
+      { provide: TenantScopeState, useValue: { me: meSignal, selection: signal(null) } },
       { provide: WorkspaceLookups, useValue: lookups },
-      { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({}) }, queryParamMap: of(convertToParamMap({})) } },
+      {
+        provide: ActivatedRoute,
+        useValue: {
+          snapshot: { get queryParamMap() { return queryParams$.value; } },
+          queryParamMap: queryParams$.asObservable(),
+        },
+      },
       provideTransloco({ config: { availableLangs: ['en'], defaultLang: 'en', reRenderOnLangChange: true, prodMode: true }, loader: TestLoader }),
     ] });
     http = TestBed.inject(HttpTestingController);
@@ -54,12 +69,31 @@ describe('AuditLogPage', () => {
     page = fixture.componentInstance;
     fixture.detectChanges();
   });
-  afterEach(() => { vi.useRealTimers(); fixture.destroy(); http.verify(); });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    try {
+      fixture?.destroy();
+      http?.verify();
+    } finally {
+      TestBed.resetTestingModule();
+    }
+  });
 
   async function initial(items: AuditEvent[] = [], nextCursor: string | null = null) {
     http.expectOne((r) => r.url === PATH).flush({ success: true, data: { items, nextCursor } });
     await fixture.whenStable();
     fixture.detectChanges();
+  }
+  async function settle() {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await fixture.whenStable();
+    fixture.detectChanges();
+  }
+  function exportToolbarButton(): HTMLButtonElement | undefined {
+    return [...(fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('section button')]
+      .find((button) => button.textContent?.trim() === 'Export CSV');
   }
   async function debounce() {
     await vi.advanceTimersByTimeAsync(300);
@@ -230,5 +264,247 @@ describe('AuditLogPage', () => {
   it('branch filter uses the workspace lookups', async () => {
     await initial();
     expect(lookups.allBranches).toHaveBeenCalledExactlyOnceWith();
+  });
+
+  it('export button for workspace-wide auditors', async () => {
+    await initial();
+    expect(exportToolbarButton()).toBeTruthy();
+
+    meSignal.set({
+      id: 'auditor',
+      isTenantOwner: false,
+      permissions: ['audit.read'],
+      permissionScopes: { 'audit.read': { tenantWide: true, companyIds: [], branchIds: [] } },
+    });
+    fixture.detectChanges();
+    expect(exportToolbarButton()).toBeTruthy();
+  });
+
+  it('no export button for branch or own readers', async () => {
+    await initial();
+    const actors: NonNullable<ReturnType<typeof meSignal>>[] = [
+      {
+        id: 'branch-reader',
+        isTenantOwner: false,
+        permissions: ['audit.read.branch'],
+        permissionScopes: { 'audit.read.branch': { tenantWide: false, companyIds: [], branchIds: ['br-1'] } },
+      },
+      {
+        id: 'own-reader',
+        isTenantOwner: false,
+        permissions: ['audit.read.own'],
+        permissionScopes: {},
+      },
+    ];
+    for (const actor of actors) {
+      meSignal.set(actor);
+      fixture.detectChanges();
+      expect(exportToolbarButton()).toBeUndefined();
+      expect(fixture.nativeElement.querySelector('app-audit-export-modal')).toBeNull();
+    }
+  });
+
+  it('ready export downloads', async () => {
+    await initial();
+    const exportId = '019a7c20-0020-7000-8000-000000000020';
+    const router = TestBed.inject(Router);
+    const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    const hadCreate = 'createObjectURL' in URL;
+    const hadRevoke = 'revokeObjectURL' in URL;
+    const origCreate = URL.createObjectURL;
+    const origRevoke = URL.revokeObjectURL;
+    const createUrlMock = vi.fn(() => 'blob:audit-export');
+    const revokeUrlMock = vi.fn();
+    URL.createObjectURL = createUrlMock;
+    URL.revokeObjectURL = revokeUrlMock;
+
+    try {
+      queryParams$.next(convertToParamMap({ exportId }));
+      fixture.detectChanges();
+
+      http.expectOne(`${PATH}/exports/${exportId}`).flush({
+        success: true,
+        data: {
+          status: 'READY',
+          rowsWritten: 42,
+          fileName: 'audit-export-20.csv',
+          sizeBytes: 512,
+          expiresAt: '2026-12-01T00:00:00.000Z',
+        },
+      });
+      await settle();
+
+      const downloadReq = http.expectOne(`${PATH}/exports/${exportId}/download`);
+      expect(downloadReq.request.responseType).toBe('blob');
+      downloadReq.flush(new Blob(['\uFEFFid\n'], { type: 'text/csv; charset=utf-8' }));
+      await settle();
+
+      expect(createUrlMock).toHaveBeenCalledTimes(1);
+      expect(clickSpy).toHaveBeenCalledTimes(1);
+      expect(revokeUrlMock).toHaveBeenCalledWith('blob:audit-export');
+      expect(navigateSpy).toHaveBeenCalledWith(
+        [],
+        expect.objectContaining({
+          queryParams: { exportId: null },
+          queryParamsHandling: 'merge',
+          replaceUrl: true,
+        }),
+      );
+    } finally {
+      if (hadCreate) URL.createObjectURL = origCreate;
+      else delete (URL as unknown as Record<string, unknown>)['createObjectURL'];
+      if (hadRevoke) URL.revokeObjectURL = origRevoke;
+      else delete (URL as unknown as Record<string, unknown>)['revokeObjectURL'];
+    }
+  });
+
+  it('running export shows still being prepared', async () => {
+    await initial();
+    const notify = TestBed.inject(Notify);
+
+    for (const [idx, status] of (['QUEUED', 'RUNNING'] as const).entries()) {
+      const exportId = `019a7c20-0021-7000-8000-00000000002${idx}`;
+      queryParams$.next(convertToParamMap({ exportId }));
+      fixture.detectChanges();
+
+      http.expectOne(`${PATH}/exports/${exportId}`).flush({
+        success: true,
+        data: { status, rowsWritten: 0, fileName: `audit-${exportId}.csv`, sizeBytes: 0, expiresAt: null },
+      });
+      await settle();
+
+      const last = notify.toasts()[notify.toasts().length - 1];
+      expect(last?.type).toBe('info');
+      expect(last?.title).toBe('The export is still being prepared. You will be notified.');
+    }
+  });
+
+  it('failed limit export text', async () => {
+    await initial();
+    const exportId = '019a7c20-0022-7000-8000-000000000022';
+    queryParams$.next(convertToParamMap({ exportId }));
+    fixture.detectChanges();
+
+    http.expectOne(`${PATH}/exports/${exportId}`).flush({
+      success: true,
+      data: {
+        status: 'FAILED',
+        rowsWritten: 500000,
+        fileName: `audit-${exportId}.csv`,
+        sizeBytes: 0,
+        expiresAt: null,
+        errorCode: 'AUDIT_EXPORT_LIMIT_EXCEEDED',
+      },
+    });
+    await settle();
+
+    const toast = TestBed.inject(Notify).toasts()[0];
+    expect(toast?.type).toBe('error');
+    expect(toast?.title).toBe('Too many rows (max 500 000); narrow the filters');
+  });
+
+  it('failed export text', async () => {
+    await initial();
+    const notify = TestBed.inject(Notify);
+
+    const stalledId = '019a7c20-0023-7000-8000-000000000023';
+    queryParams$.next(convertToParamMap({ exportId: stalledId }));
+    fixture.detectChanges();
+    http.expectOne(`${PATH}/exports/${stalledId}`).flush({
+      success: true,
+      data: {
+        status: 'FAILED',
+        rowsWritten: 10000,
+        fileName: `audit-${stalledId}.csv`,
+        sizeBytes: 0,
+        expiresAt: null,
+        errorCode: 'AUDIT_EXPORT_STALLED',
+      },
+    });
+    await settle();
+    expect(notify.toasts()[0]?.title).toBe('The export stopped making progress. Request a new export.');
+
+    const genericId = '019a7c20-0024-7000-8000-000000000024';
+    queryParams$.next(convertToParamMap({ exportId: genericId }));
+    fixture.detectChanges();
+    http.expectOne(`${PATH}/exports/${genericId}`).flush({
+      success: true,
+      correlationId: 'corr-fail-9',
+      data: {
+        status: 'FAILED',
+        rowsWritten: 0,
+        fileName: `audit-${genericId}.csv`,
+        sizeBytes: 0,
+        expiresAt: null,
+        errorCode: 'UNEXPECTED_ERROR',
+      },
+    });
+    await settle();
+
+    const genericToast = notify.toasts()[notify.toasts().length - 1];
+    expect(genericToast?.title).toBe('Export failed');
+    expect(genericToast?.text).toContain('corr-fail-9');
+  });
+
+  it('expired export asks for a new one', async () => {
+    await initial();
+    const notify = TestBed.inject(Notify);
+
+    const expiredId = '019a7c20-0025-7000-8000-000000000025';
+    queryParams$.next(convertToParamMap({ exportId: expiredId }));
+    fixture.detectChanges();
+    http.expectOne(`${PATH}/exports/${expiredId}`).flush({
+      success: true,
+      data: {
+        status: 'EXPIRED',
+        rowsWritten: 12,
+        fileName: `audit-${expiredId}.csv`,
+        sizeBytes: 128,
+        expiresAt: '2026-11-15T00:00:00.000Z',
+      },
+    });
+    await settle();
+    expect(notify.toasts()[0]?.title).toBe('Export expired, start a new one');
+
+    const downloadExpiredId = '019a7c20-0026-7000-8000-000000000026';
+    queryParams$.next(convertToParamMap({ exportId: downloadExpiredId }));
+    fixture.detectChanges();
+    http.expectOne(`${PATH}/exports/${downloadExpiredId}`).flush({
+      success: true,
+      data: {
+        status: 'READY',
+        rowsWritten: 12,
+        fileName: `audit-${downloadExpiredId}.csv`,
+        sizeBytes: 128,
+        expiresAt: '2026-11-15T00:00:00.000Z',
+      },
+    });
+    await settle();
+    http.expectOne(`${PATH}/exports/${downloadExpiredId}/download`).flush(
+      new Blob([JSON.stringify({ code: 'AUDIT_EXPORT_EXPIRED' })], { type: 'application/json' }),
+      { status: 410, statusText: 'Gone' },
+    );
+    await settle();
+
+    const latest = notify.toasts()[notify.toasts().length - 1];
+    expect(latest?.title).toBe('Export expired, start a new one');
+  });
+
+  it('unknown export says no longer available', async () => {
+    await initial();
+    const exportId = '019a7c20-0027-7000-8000-000000000027';
+    queryParams$.next(convertToParamMap({ exportId }));
+    fixture.detectChanges();
+
+    http.expectOne(`${PATH}/exports/${exportId}`).flush(
+      { errorCode: 'AUDIT_EVENT_NOT_FOUND' },
+      { status: 404, statusText: 'Not Found' },
+    );
+    await settle();
+
+    const toast = TestBed.inject(Notify).toasts()[0];
+    expect(toast?.type).toBe('error');
+    expect(toast?.title).toBe('No longer available');
   });
 });

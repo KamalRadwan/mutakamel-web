@@ -198,11 +198,29 @@
     "Session": "Session",
     "Template": "Template"
   },
+  "export": {
+    "button": "Export CSV",
+    "modalTitle": "Export audit log",
+    "confirm": "Export CSV",
+    "filtersHeading": "Active filters",
+    "noExtraFilters": "No additional filters selected.",
+    "limits": "Up to 92 days and 500 000 rows",
+    "started": "Export started. You will be notified when it is ready.",
+    "preparing": "The export is still being prepared. You will be notified.",
+    "notFound": "No longer available"
+  },
   "errors": {
     "AUDIT_QUERY_INVALID": "The audit query is invalid. Check the selected dates and filters.",
     "AUDIT_EVENT_NOT_FOUND": "Audit event was not found or is outside your access scope.",
     "MISSING_REQUIRED_PERMISSIONS": "You do not have permission to view the audit log.",
     "CORE_VALIDATION_FAILED": "Some filter values are invalid.",
+    "AUDIT_EXPORT_FORBIDDEN": "Only workspace-wide auditors can export",
+    "AUDIT_EXPORT_RANGE_INVALID": "Date range must be between 1 and 92 days.",
+    "AUDIT_EXPORT_IN_PROGRESS": "An export is already running",
+    "AUDIT_EXPORT_EXPIRED": "Export expired, start a new one",
+    "AUDIT_EXPORT_LIMIT_EXCEEDED": "Too many rows (max 500 000); narrow the filters",
+    "AUDIT_EXPORT_STALLED": "The export stopped making progress. Request a new export.",
+    "exportFailed": "Export failed",
     "generic": "Could not load audit data. Try again."
   }
 }

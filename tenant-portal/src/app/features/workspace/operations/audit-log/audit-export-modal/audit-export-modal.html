@@ -1,0 +1,83 @@
+<ui-modal
+  size="confirm"
+  icon="tablerFileExport"
+  tile="bg-icon-teal"
+  [title]="'wsAudit.export.modalTitle' | transloco"
+  [closeLabel]="'wsAudit.modal.close' | transloco"
+  [dismissable]="!submitting()"
+  [preventDismiss]="submitting()"
+  (closed)="onClosed()"
+>
+  <div class="flex flex-col gap-10">
+    <ui-field
+      [for]="uid + '-date-range'"
+      [label]="'wsAudit.filters.dateRange' | transloco"
+      [hint]="'wsAudit.filters.dateRangeHint' | transloco"
+      [error]="rangeError()"
+    >
+      <input
+        [id]="uid + '-date-range'"
+        type="text"
+        readonly
+        dir="ltr"
+        class="h-full min-w-0 flex-1 bg-transparent text-12 text-text outline-none tabular-nums"
+        [attr.aria-invalid]="rangeError() ? 'true' : null"
+        [value]="dateRangeDisplay()"
+      />
+    </ui-field>
+
+    @if (context()?.filters?.length) {
+      <div class="flex flex-col gap-6">
+        <h3 class="text-12 leading-18 font-medium text-text-muted">
+          {{ 'wsAudit.export.filtersHeading' | transloco }}
+        </h3>
+        <dl class="flex flex-col gap-6 rounded-10 border border-border bg-surface-muted p-10">
+          @for (item of context()!.filters; track item.label) {
+            <div class="flex min-w-0 items-baseline justify-between gap-8 text-12 leading-18">
+              <dt class="shrink-0 text-text-muted">{{ item.label }}</dt>
+              <dd
+                class="min-w-0 truncate font-medium text-text"
+                [attr.dir]="item.ltr ? 'ltr' : null"
+                [class.tabular-nums]="item.ltr"
+                [title]="item.value"
+              >
+                {{ item.value }}
+              </dd>
+            </div>
+          }
+        </dl>
+      </div>
+    } @else {
+      <p class="text-12 leading-18 text-text-muted">
+        {{ 'wsAudit.export.noExtraFilters' | transloco }}
+      </p>
+    }
+
+    <p class="text-12 leading-18 text-text-muted">
+      {{ 'wsAudit.export.limits' | transloco }}
+    </p>
+  </div>
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    <button
+      type="button"
+      uiButton
+      variant="primary"
+      [loading]="submitting()"
+      [disabled]="!context()"
+      (click)="submit()"
+    >
+      {{ 'wsAudit.export.confirm' | transloco }}
+    </button>
+
+    <button
+      type="button"
+      uiButton
+      variant="ghost"
+      [disabled]="submitting()"
+      (click)="close()"
+    >
+      {{ 'settings.common.cancel' | transloco }}
+    </button>
+  </div>
+</ui-modal>

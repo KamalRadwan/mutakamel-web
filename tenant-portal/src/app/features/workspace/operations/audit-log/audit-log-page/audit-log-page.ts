@@ -1,4 +1,4 @@
-import { Component, DestroyRef, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
+import { Component, DOCUMENT, DestroyRef, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { ActivatedRoute, ParamMap, Router } from '@angular/router';
@@ -6,6 +6,7 @@ import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   tablerAlertTriangle,
+  tablerFileExport,
   tablerHistory,
   tablerLock,
   tablerRefresh,
@@ -37,6 +38,7 @@ import { QuerySingleSelect } from '../../../../../shared/ui/query-builder/query-
 import { QueryField } from '../../../../../shared/query-builder/query.model';
 import { FullState } from '../../../../../shared/ui/full-state/full-state';
 import { AuditEventModal } from '../audit-event-modal/audit-event-modal';
+import { AuditExportModal } from '../audit-export-modal/audit-export-modal';
 import {
   AUDIT_LIMITS,
   AUDIT_OUTCOMES,
@@ -44,12 +46,16 @@ import {
   AUDIT_SOURCE_APPS,
   AuditDeletedQuery,
   AuditEvent,
+  AuditExportContext,
+  AuditExportFilterSummaryItem,
+  AuditExportFilters,
   AuditOutcome,
   AuditQuery,
   AuditSensitivity,
   AuditSourceApp,
   AuditViewMode,
   ApiError,
+  auditExportErrorKey,
   avatarToneForName,
   errorCodeOf,
   formatAuditDateTime,
@@ -210,6 +216,7 @@ function serializeFilterKey(state: AuditFilterState): string {
     NgIcon,
     TranslocoPipe,
     AuditEventModal,
+    AuditExportModal,
     Button,
     DateRange,
     Dropdown,
@@ -222,6 +229,7 @@ function serializeFilterKey(state: AuditFilterState): string {
     provideIcons({
       tablerLock,
       tablerAlertTriangle,
+      tablerFileExport,
       tablerHistory,
       tablerRefresh,
       tablerX,
@@ -238,6 +246,7 @@ export class AuditLogPage {
 
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly document = inject(DOCUMENT);
   private readonly scope = inject(TenantScopeState);
   private readonly api = inject(AuditLogApi);
   private readonly lookups = inject(WorkspaceLookups);
@@ -251,6 +260,7 @@ export class AuditLogPage {
   private readonly queryParams = toSignal(this.route.queryParamMap);
 
   private readonly eventModal = viewChild.required(AuditEventModal);
+  private readonly exportModal = viewChild(AuditExportModal);
 
   protected readonly skeletonRows = SKELETON_ROWS;
   protected readonly limits = AUDIT_LIMITS;
@@ -297,6 +307,14 @@ export class AuditLogPage {
 
   protected readonly isForbidden = computed(() => !this.canReadAudit() || this.forbidden());
 
+  protected readonly canExportAudit = computed(() => {
+    const me = this.scope.me();
+    if (!me) return false;
+    if (me.isTenantOwner) return true;
+    return me.permissions.includes('audit.read') && me.permissionScopes['audit.read']?.tenantWide === true;
+  });
+
+  protected readonly exportRangeError = signal<string | null>(null);
   protected readonly dateRangeErrorKind = computed(() => validateDateRange(this.draftRange()));
 
   protected readonly dateRangeError = computed<string | null>(() => {
@@ -305,7 +323,7 @@ export class AuditLogPage {
     if (kind === 'required') return this.transloco.translate('wsAudit.validation.rangeRequired');
     if (kind === 'order') return this.transloco.translate('wsAudit.validation.rangeOrder');
     if (kind === 'max') return this.transloco.translate('wsAudit.validation.rangeMaxDays');
-    return null;
+    return this.exportRangeError();
   });
 
   protected readonly dateRangeDescribedBy = computed(() =>
@@ -414,6 +432,7 @@ export class AuditLogPage {
   private loadSeq = 0;
   private lookupsLoaded = false;
   private lastSyncedUrlKey = serializeFilterKey(this.initialState);
+  private handledExportId: string | null = null;
 
   constructor() {
     this.destroyRef.onDestroy(() => {
@@ -464,6 +483,19 @@ export class AuditLogPage {
         void this.fetchInitial(state);
       });
     });
+
+    effect(() => {
+      const exportId = this.queryParams()?.get('exportId')?.trim() || null;
+      if (!exportId) {
+        this.handledExportId = null;
+        return;
+      }
+      if (exportId === this.handledExportId) return;
+      this.handledExportId = exportId;
+      untracked(() => {
+        void this.processExportParam(exportId);
+      });
+    });
   }
 
   protected reload(): void {
@@ -477,6 +509,7 @@ export class AuditLogPage {
 
   protected onRangePicked(range: DateRangeValue | null): void {
     this.draftRange.set(range);
+    this.exportRangeError.set(null);
     if (validateDateRange(range) !== null) {
       return;
     }
@@ -541,7 +574,22 @@ export class AuditLogPage {
     if (this.filterTimer !== null) clearTimeout(this.filterTimer);
     this.filterTimer = null;
     if (this.dateRangeErrorKind() !== null) return;
-    const next: AuditFilterState = {
+    this.commitAndSync(this.buildFilterStateFromDraft());
+  }
+
+  protected openExportModal(): void {
+    if (!this.canExportAudit() || this.dateRangeErrorKind() !== null) return;
+    const context = this.buildExportContext(this.buildFilterStateFromDraft());
+    if (!context) return;
+    this.exportModal()?.open(context);
+  }
+
+  protected onExportRangeInvalid(message: string): void {
+    this.exportRangeError.set(message);
+  }
+
+  private buildFilterStateFromDraft(): AuditFilterState {
+    return {
       range: this.draftRange(),
       mode: this.draftMode(),
       q: this.draftMode() === 'deleted' ? this.draftQ().trim() : '',
@@ -557,7 +605,6 @@ export class AuditLogPage {
       includeRequests: this.includeRequestsAvailable && this.draftIncludeRequests(),
       correlationId: this.draftCorrelationId(),
     };
-    this.commitAndSync(next);
   }
 
   protected clearFilters(): void {
@@ -706,6 +753,7 @@ export class AuditLogPage {
   }
 
   private applyStateToDraft(state: AuditFilterState): void {
+    this.exportRangeError.set(null);
     this.draftRange.set(state.range);
     this.draftMode.set(state.mode);
     this.draftQ.set(state.q);
@@ -874,6 +922,159 @@ export class AuditLogPage {
       if (!this.destroyRef.destroyed) this.branches.set(branches);
     } catch {
       this.lookupsLoaded = false;
+    }
+  }
+
+  private buildExportContext(state: AuditFilterState): AuditExportContext | null {
+    if (!state.range) return null;
+    const isoRange = toApiIsoRange(state.range);
+    if (!isoRange) return null;
+
+    const query: AuditExportFilters = {
+      from: isoRange.from,
+      to: isoRange.to,
+    };
+    const filters: AuditExportFilterSummaryItem[] = [];
+
+    if (state.mode === 'deleted') {
+      query.deletedOnly = true;
+      filters.push({
+        label: this.transloco.translate('wsAudit.filters.show'),
+        value: this.transloco.translate('wsAudit.filters.showDeleted'),
+      });
+      if (state.q) {
+        query.q = state.q;
+        filters.push({
+          label: this.transloco.translate('wsAudit.filters.deletedPrefix'),
+          value: state.q,
+        });
+      }
+    }
+    if (state.sourceApp) {
+      query.sourceApp = state.sourceApp;
+      filters.push({
+        label: this.transloco.translate('wsAudit.filters.app'),
+        value: this.transloco.translate(`wsAudit.apps.${state.sourceApp}`),
+      });
+    }
+    if (state.outcome) {
+      query.outcome = state.outcome;
+      filters.push({
+        label: this.transloco.translate('wsAudit.filters.outcome'),
+        value: this.transloco.translate(`wsAudit.outcomes.${state.outcome}`),
+      });
+    }
+    if (state.sensitivity) {
+      query.sensitivity = state.sensitivity;
+      filters.push({
+        label: this.transloco.translate('wsAudit.filters.sensitivity'),
+        value: this.transloco.translate(`wsAudit.sensitivities.${state.sensitivity}`),
+      });
+    }
+    if (state.actorUserId) {
+      query.actorUserId = state.actorUserId;
+      filters.push({
+        label: this.transloco.translate('wsAudit.filters.user'),
+        value: this.userNames().get(state.actorUserId) ?? state.actorUserId,
+      });
+    }
+    if (state.branchId) {
+      query.branchId = state.branchId;
+      filters.push({
+        label: this.transloco.translate('wsAudit.filters.branch'),
+        value: this.branchNames().get(state.branchId) ?? state.branchId,
+      });
+    }
+    if (state.entityType) {
+      query.entityType = state.entityType;
+      filters.push({
+        label: this.transloco.translate('wsAudit.filters.entityType'),
+        value: this.translateEntityType(state.entityType),
+      });
+    }
+    if (state.action) {
+      query.action = state.action;
+      filters.push({
+        label: this.transloco.translate('wsAudit.filters.action'),
+        value: state.action,
+        ltr: true,
+      });
+    }
+    if (this.includeRequestsAvailable && state.includeRequests) {
+      query.includeRequests = true;
+      filters.push({
+        label: this.transloco.translate('wsAudit.filters.includeRequests'),
+        value: this.transloco.translate('settings.common.yes'),
+      });
+    }
+    if (state.correlationId) {
+      query.correlationId = state.correlationId;
+      filters.push({
+        label: this.transloco.translate('wsAudit.modal.facts.correlationId'),
+        value: state.correlationId,
+        ltr: true,
+      });
+    }
+
+    return {
+      query,
+      dateRangeLabel: `${this.formatDateTime(isoRange.from)} — ${this.formatDateTime(isoRange.to)}`,
+      filters,
+    };
+  }
+
+  private async processExportParam(exportId: string): Promise<void> {
+    try {
+      const job = await this.api.getAuditExport(exportId);
+      if (this.destroyRef.destroyed) return;
+
+      if (job.status === 'READY') {
+        const blob = await this.api.downloadAuditExport(exportId);
+        if (this.destroyRef.destroyed) return;
+        this.triggerCsvDownload(blob, job.fileName || `audit-${exportId}.csv`);
+        void this.router.navigate([], {
+          relativeTo: this.route,
+          queryParams: { exportId: null },
+          queryParamsHandling: 'merge',
+          replaceUrl: true,
+        });
+      } else if (job.status === 'QUEUED' || job.status === 'RUNNING') {
+        this.notify.info(this.transloco.translate('wsAudit.export.preparing'));
+      } else if (job.status === 'FAILED') {
+        const title = this.transloco.translate(auditExportErrorKey(job.errorCode));
+        const text = job.correlationId
+          ? this.transloco.translate('settings.common.correlationId', { id: job.correlationId })
+          : '';
+        this.notify.error(title, text);
+      } else if (job.status === 'EXPIRED') {
+        this.notify.error(this.transloco.translate('wsAudit.errors.AUDIT_EXPORT_EXPIRED'));
+      }
+    } catch (error) {
+      if (this.destroyRef.destroyed) return;
+      if (error instanceof ApiError && error.status === 404) {
+        this.notify.error(this.transloco.translate('wsAudit.export.notFound'));
+      } else if (error instanceof ApiError && (error.status === 410 || error.code === 'AUDIT_EXPORT_EXPIRED')) {
+        this.notify.error(this.transloco.translate('wsAudit.errors.AUDIT_EXPORT_EXPIRED'));
+      } else {
+        const corrId = correlationIdOf(error);
+        const text = corrId ? this.transloco.translate('settings.common.correlationId', { id: corrId }) : '';
+        this.notify.error(this.resolveError(error), text);
+      }
+    }
+  }
+
+  private triggerCsvDownload(blob: Blob, fileName: string): void {
+    const url = URL.createObjectURL(blob);
+    try {
+      const link = this.document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      link.style.display = 'none';
+      this.document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } finally {
+      URL.revokeObjectURL(url);
     }
   }
 

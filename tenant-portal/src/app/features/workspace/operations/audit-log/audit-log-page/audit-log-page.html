@@ -272,18 +272,31 @@
           type="button"
           uiButton
           variant="secondary"
-          [disabled]="loading() || !!dateRangeError()"
+          [disabled]="loading() || dateRangeErrorKind() !== null"
           (click)="applyFilters()"
         >
           {{ 'wsAudit.filters.apply' | transloco }}
         </button>
+
+        @if (canExportAudit()) {
+          <button
+            type="button"
+            uiButton
+            variant="secondary"
+            [disabled]="dateRangeErrorKind() !== null"
+            (click)="openExportModal()"
+          >
+            <ng-icon name="tablerFileExport" size="15" aria-hidden="true" />
+            <span>{{ 'wsAudit.export.button' | transloco }}</span>
+          </button>
+        }
 
         <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
 
         <button
           type="button"
           class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text active:bg-border focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
-          [disabled]="loading() || !!dateRangeError()"
+          [disabled]="loading() || dateRangeErrorKind() !== null"
           [attr.aria-label]="'wsAudit.filters.reload' | transloco"
           [title]="'wsAudit.filters.reload' | transloco"
           (click)="reload()"
@@ -498,3 +511,7 @@
   [userNames]="userNames()"
   (showRelated)="onShowRelated($event)"
 />
+
+@if (canExportAudit()) {
+  <app-audit-export-modal (rangeInvalid)="onExportRangeInvalid($event)" />
+}

@@ -15,6 +15,9 @@ import {
   AuditDeletedQuery,
   AuditDiffItem,
   AuditEvent,
+  AuditExportJob,
+  AuditExportReceipt,
+  AuditExportStatus,
   AuditHistoryCategory,
   AuditHistoryChange,
   AuditHistoryGroup,
@@ -1187,6 +1190,7 @@ export function resetAuditFake(): void {
   seedEvents = createSeedEvents();
   crmSeeded = null;
   crmRootLinks = new Map();
+  fakeExports.clear();
 }
 
 async function fakeDelay(ms = 220): Promise<void> {
@@ -1640,4 +1644,116 @@ export async function fakeGetAuditEvent(id: string): Promise<AuditEvent> {
     throw new ApiError(404, 'AUDIT_EVENT_NOT_FOUND');
   }
   return clone(event);
+}
+
+interface FakeAuditExportEntry {
+  id: string;
+  requestedBy: string;
+  idempotencyKey: string;
+  status: AuditExportStatus;
+  rowsWritten: number;
+  fileName: string;
+  sizeBytes: number;
+  expiresAt: string | null;
+  errorCode?: string;
+  details?: Record<string, string[]>;
+  csv: string;
+}
+
+const fakeExports = new Map<string, FakeAuditExportEntry>();
+
+function hasTenantWideAuditExportAuthority(me: Me): boolean {
+  return me.isTenantOwner || Boolean(me.permissions.includes('audit.read') && me.permissionScopes['audit.read']?.tenantWide);
+}
+
+export function seedFakeAuditExport(
+  entry: Omit<FakeAuditExportEntry, 'fileName' | 'sizeBytes' | 'csv'> & { fileName?: string; csv?: string; sizeBytes?: number },
+): void {
+  const csv = entry.csv ?? '\uFEFFid,action,entityType,createdAt\n';
+  fakeExports.set(entry.id, {
+    ...entry,
+    fileName: entry.fileName ?? `audit-${entry.id}.csv`,
+    csv,
+    sizeBytes: entry.sizeBytes ?? new TextEncoder().encode(csv).byteLength,
+  });
+}
+
+export async function fakeStartAuditExport(filters: AuditQuery, key: string): Promise<AuditExportReceipt> {
+  await fakeDelay(120);
+  const me = buildActorMeSync();
+  if (!hasTenantWideAuditExportAuthority(me)) {
+    throw new ApiError(403, 'AUDIT_EXPORT_FORBIDDEN');
+  }
+  const rangeMs = Date.parse(filters.to ?? '') - Date.parse(filters.from ?? '');
+  if (!Number.isFinite(rangeMs) || rangeMs < 86_400_000 || rangeMs > 92 * 86_400_000) {
+    throw new ApiError(400, 'AUDIT_EXPORT_RANGE_INVALID');
+  }
+  if (!UUID_V7.test(key)) {
+    throw new ApiError(400, 'CORE_VALIDATION_FAILED');
+  }
+
+  for (const existing of fakeExports.values()) {
+    if (existing.requestedBy === me.id && existing.idempotencyKey === key) {
+      return { exportId: existing.id, status: 'QUEUED' };
+    }
+  }
+  for (const existing of fakeExports.values()) {
+    if (existing.requestedBy === me.id && (existing.status === 'QUEUED' || existing.status === 'RUNNING')) {
+      throw new ApiError(409, 'AUDIT_EXPORT_IN_PROGRESS', { exportId: [existing.id] });
+    }
+  }
+
+  const rng = createRng(fakeExports.size + 20261123);
+  const id = seededUuid(fakeExports.size + 1, 0xe01, rng);
+  const { rows } = filterEvents({ ...filters, cursor: undefined, limit: AUDIT_LIMITS.maxLimit }, false);
+  const csv = `\uFEFFid,action,entityType,createdAt\n${rows.map((r) => `${r.id},${r.action},${r.entityType},${r.createdAt}`).join('\n')}\n`;
+  fakeExports.set(id, {
+    id,
+    requestedBy: me.id,
+    idempotencyKey: key,
+    status: 'QUEUED',
+    rowsWritten: rows.length,
+    fileName: `audit-${id}.csv`,
+    sizeBytes: new TextEncoder().encode(csv).byteLength,
+    expiresAt: null,
+    csv,
+  });
+  return { exportId: id, status: 'QUEUED' };
+}
+
+export async function fakeGetAuditExport(exportId: string): Promise<AuditExportJob> {
+  await fakeDelay(120);
+  const me = buildActorMeSync();
+  const entry = fakeExports.get(exportId);
+  if (!entry || entry.requestedBy !== me.id) {
+    throw new ApiError(404, 'AUDIT_EVENT_NOT_FOUND');
+  }
+  return {
+    status: entry.status,
+    rowsWritten: entry.rowsWritten,
+    fileName: entry.fileName,
+    sizeBytes: entry.sizeBytes,
+    expiresAt: entry.expiresAt,
+    ...(entry.errorCode ? { errorCode: entry.errorCode } : {}),
+    ...(entry.details ? { details: clone(entry.details) } : {}),
+  };
+}
+
+export async function fakeDownloadAuditExport(exportId: string): Promise<Blob> {
+  await fakeDelay(120);
+  const me = buildActorMeSync();
+  const entry = fakeExports.get(exportId);
+  if (!entry || entry.requestedBy !== me.id) {
+    throw new ApiError(404, 'AUDIT_EVENT_NOT_FOUND');
+  }
+  if (entry.status === 'EXPIRED') {
+    throw new ApiError(410, 'AUDIT_EXPORT_EXPIRED');
+  }
+  if (entry.status !== 'READY') {
+    throw new ApiError(404, 'AUDIT_EVENT_NOT_FOUND');
+  }
+  if (!hasTenantWideAuditExportAuthority(me)) {
+    throw new ApiError(403, 'AUDIT_EXPORT_FORBIDDEN');
+  }
+  return new Blob([entry.csv], { type: 'text/csv; charset=utf-8' });
 }

@@ -3,7 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { TenantScopeState } from '../../../../core/scope/tenant-scope';
-import { AuditLogApi } from './audit-log.api';
+import { auditExportErrorKey, AuditLogApi } from './audit-log.api';
 import { setFakeActor } from '../../staff/shared/staff.fake';
 import {
   fakeListAuditEvents as listAuditEvents,
@@ -19,6 +19,19 @@ import { opportunityRef } from '../../../crm/opportunities/opportunities.model';
 import { resetAuditFake } from './audit-log.fake';
 
 const UUID_V7 = '019a7c20-0002-7000-8000-000000000002';
+const UUID_V7_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+function csrfCookieName(): string {
+  return document.location?.protocol === 'https:' ? '__Host-mutakamel-tenant-csrf' : 'mutakamel-http-tenant-csrf';
+}
+
+function setCsrfCookie(value = 'csrf-test-token'): void {
+  document.cookie = `${csrfCookieName()}=${value}; path=/`;
+}
+
+function clearCsrfCookie(): void {
+  document.cookie = `${csrfCookieName()}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+}
 
 async function rejectsWith(promise: Promise<unknown>, status: number, code: string): Promise<void> {
   await expect(promise).rejects.toMatchObject({ status, code });
@@ -281,11 +294,15 @@ describe('AuditLogApi', () => {
   const scope = { me: signal({ id: 'actor', permissions: ['audit.read'], permissionScopes: {}, isTenantOwner: true }), selection: signal(null) };
 
   beforeEach(() => {
+    setCsrfCookie();
     TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting(), { provide: TenantScopeState, useValue: scope }] });
     api = TestBed.inject(AuditLogApi);
     http = TestBed.inject(HttpTestingController);
   });
-  afterEach(() => http.verify());
+  afterEach(() => {
+    clearCsrfCookie();
+    http.verify();
+  });
 
   it('list unwraps the cursor page', async () => {
     const pending = api.listAuditEvents({ action: 'UPDATE', cursor: 'cursor-1' });
@@ -343,6 +360,142 @@ describe('AuditLogApi', () => {
   it('preserves gateway errors, correlation and Retry-After', async () => {
     const pending = expect(api.listAuditEvents()).rejects.toMatchObject({ status: 429, code: 'GW.RATE.LIMIT_EXCEEDED', correlationId: 'support', details: { retryAfterSeconds: ['9'] } });
     http.expectOne((r) => r.url.endsWith('/audit')).flush({ code: 'GW.RATE.LIMIT_EXCEEDED', correlationId: 'support' }, { status: 429, statusText: 'Rate limited', headers: { 'Retry-After': '9' } });
+    await pending;
+  });
+
+  it('export sends the filters with a key and no cursor', async () => {
+    const key = '019a7c20-0003-7000-8000-000000000003';
+    const pending = api.startAuditExport(
+      {
+        cursor: 'ignored-cursor',
+        limit: 25,
+        from: '2026-11-01T00:00:00.000Z',
+        to: '2026-11-10T23:59:59.000Z',
+        sourceApp: 'CRM',
+        includeRequests: true,
+        deletedOnly: true,
+        q: 'Nile',
+      },
+      key,
+    );
+    const request = http.expectOne((r) => r.method === 'POST' && r.url === '/api/tenant/core/v1/audit/exports');
+    expect(request.request.withCredentials).toBe(true);
+    expect(request.request.headers.get('x-idempotency-key')).toMatch(UUID_V7_REGEX);
+    expect(request.request.headers.get('x-idempotency-key')).toBe(key);
+    expect(request.request.headers.get('x-csrf-token')).toBe('csrf-test-token');
+    expect(request.request.body).toEqual({
+      from: '2026-11-01T00:00:00.000Z',
+      to: '2026-11-10T23:59:59.000Z',
+      sourceApp: 'CRM',
+      includeRequests: true,
+      deletedOnly: true,
+      q: 'Nile',
+    });
+    expect(request.request.body).not.toHaveProperty('cursor');
+    expect(request.request.body).not.toHaveProperty('limit');
+    request.flush({ success: true, data: { exportId: UUID_V7, status: 'QUEUED' } }, { status: 202, statusText: 'Accepted' });
+    await expect(pending).resolves.toEqual({ exportId: UUID_V7, status: 'QUEUED' });
+  });
+
+  it('export rejects without a CSRF cookie without sending a request', async () => {
+    clearCsrfCookie();
+    await expect(
+      api.startAuditExport({ from: '2026-11-01T00:00:00.000Z', to: '2026-11-05T00:00:00.000Z' }, UUID_V7),
+    ).rejects.toMatchObject({ status: 403, code: 'GW.AUTH.CSRF_INVALID' });
+    http.expectNone((r) => r.url.includes('/exports'));
+  });
+
+  it('export rejects malformed success envelopes', async () => {
+    const startPending = expect(
+      api.startAuditExport({ from: '2026-11-01T00:00:00.000Z', to: '2026-11-05T00:00:00.000Z' }, UUID_V7),
+    ).rejects.toMatchObject({ status: 502, code: 'COMMON.GENERIC.INTERNAL_ERROR' });
+    http.expectOne('/api/tenant/core/v1/audit/exports').flush({ exportId: UUID_V7, status: 'QUEUED' });
+    await startPending;
+
+    const statusPending = expect(api.getAuditExport(UUID_V7)).rejects.toMatchObject({
+      status: 502,
+      code: 'COMMON.GENERIC.INTERNAL_ERROR',
+    });
+    http.expectOne(`/api/tenant/core/v1/audit/exports/${UUID_V7}`).flush({ status: 'READY' });
+    await statusPending;
+  });
+
+  it('getAuditExport unwraps status and preserves envelope correlationId', async () => {
+    const pending = api.getAuditExport(UUID_V7);
+    const request = http.expectOne(`/api/tenant/core/v1/audit/exports/${UUID_V7}`);
+    expect(request.request.withCredentials).toBe(true);
+    request.flush({
+      success: true,
+      correlationId: 'corr-export-1',
+      data: {
+        status: 'FAILED',
+        rowsWritten: 500000,
+        fileName: `audit-${UUID_V7}.csv`,
+        sizeBytes: 0,
+        expiresAt: null,
+        errorCode: 'AUDIT_EXPORT_STALLED',
+      },
+    });
+    await expect(pending).resolves.toEqual({
+      status: 'FAILED',
+      rowsWritten: 500000,
+      fileName: `audit-${UUID_V7}.csv`,
+      sizeBytes: 0,
+      expiresAt: null,
+      errorCode: 'AUDIT_EXPORT_STALLED',
+      correlationId: 'corr-export-1',
+    });
+  });
+
+  it('downloadAuditExport reads a CSV blob and parses JSON error blobs', async () => {
+    const csvBlob = new Blob(['\uFEFFid,action\n'], { type: 'text/csv; charset=utf-8' });
+    const pending = api.downloadAuditExport(UUID_V7);
+    const okReq = http.expectOne(`/api/tenant/core/v1/audit/exports/${UUID_V7}/download`);
+    expect(okReq.request.responseType).toBe('blob');
+    okReq.flush(csvBlob);
+    await expect(pending).resolves.toBe(csvBlob);
+
+    const expiredPending = expect(api.downloadAuditExport(UUID_V7)).rejects.toMatchObject({
+      status: 410,
+      code: 'AUDIT_EXPORT_EXPIRED',
+    });
+    const errReq = http.expectOne(`/api/tenant/core/v1/audit/exports/${UUID_V7}/download`);
+    errReq.flush(
+      new Blob([JSON.stringify({ code: 'AUDIT_EXPORT_EXPIRED' })], { type: 'application/json' }),
+      { status: 410, statusText: 'Gone' },
+    );
+    await expiredPending;
+  });
+
+  it('auditExportErrorKey maps known export codes including AUDIT_EXPORT_STALLED', () => {
+    expect(auditExportErrorKey('AUDIT_EXPORT_LIMIT_EXCEEDED')).toBe('wsAudit.errors.AUDIT_EXPORT_LIMIT_EXCEEDED');
+    expect(auditExportErrorKey('AUDIT_EXPORT_STALLED')).toBe('wsAudit.errors.AUDIT_EXPORT_STALLED');
+    expect(auditExportErrorKey('SOMETHING_ELSE')).toBe('wsAudit.errors.exportFailed');
+    expect(auditExportErrorKey(undefined)).toBe('wsAudit.errors.exportFailed');
+  });
+});
+
+describe('audit-log', () => {
+  let api: AuditLogApi;
+  let http: HttpTestingController;
+  const scope = { me: signal({ id: 'actor', permissions: ['audit.read'], permissionScopes: {}, isTenantOwner: true }), selection: signal(null) };
+
+  beforeEach(() => {
+    setCsrfCookie();
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting(), { provide: TenantScopeState, useValue: scope }] });
+    api = TestBed.inject(AuditLogApi);
+    http = TestBed.inject(HttpTestingController);
+  });
+  afterEach(() => {
+    clearCsrfCookie();
+    http.verify();
+  });
+
+  it('export does not use bulk jobs', async () => {
+    const pending = api.startAuditExport({ from: '2026-11-01T00:00:00.000Z', to: '2026-11-05T00:00:00.000Z' }, UUID_V7);
+    http.expectNone((r) => r.url.includes('bulk-jobs') || r.url.includes('bulkJobs'));
+    const req = http.expectOne('/api/tenant/core/v1/audit/exports');
+    req.flush({ success: true, data: { exportId: UUID_V7, status: 'QUEUED' } }, { status: 202, statusText: 'Accepted' });
     await pending;
   });
 });

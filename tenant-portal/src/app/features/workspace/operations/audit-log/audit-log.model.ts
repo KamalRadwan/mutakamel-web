@@ -178,7 +178,55 @@ export const AUDIT_LIMITS = {
   maxRelatedPartyIds: 21,
   maxRangeDays: 92,
   defaultRangeDays: 7,
+  maxExportRows: 500_000,
 } as const;
+
+export const AUDIT_EXPORT_STATUSES = ['QUEUED', 'RUNNING', 'READY', 'FAILED', 'EXPIRED'] as const;
+
+export type AuditExportStatus = (typeof AUDIT_EXPORT_STATUSES)[number];
+
+export type AuditExportFilters = Omit<AuditQuery, 'cursor' | 'limit'>;
+
+export interface AuditExportReceipt {
+  exportId: string;
+  status: 'QUEUED';
+}
+
+export interface AuditExportJob {
+  status: AuditExportStatus;
+  rowsWritten: number;
+  fileName: string;
+  sizeBytes: number;
+  expiresAt: string | null;
+  errorCode?: string;
+  details?: Record<string, string[]>;
+  correlationId?: string;
+}
+
+export interface AuditExportFilterSummaryItem {
+  label: string;
+  value: string;
+  ltr?: boolean;
+}
+
+export interface AuditExportContext {
+  query: AuditExportFilters;
+  dateRangeLabel: string;
+  filters: readonly AuditExportFilterSummaryItem[];
+}
+
+const AUDIT_EXPORT_ERROR_KEYS: Readonly<Record<string, string>> = {
+  AUDIT_EXPORT_LIMIT_EXCEEDED: 'wsAudit.errors.AUDIT_EXPORT_LIMIT_EXCEEDED',
+  AUDIT_EXPORT_STALLED: 'wsAudit.errors.AUDIT_EXPORT_STALLED',
+  AUDIT_EXPORT_FORBIDDEN: 'wsAudit.errors.AUDIT_EXPORT_FORBIDDEN',
+  AUDIT_EXPORT_EXPIRED: 'wsAudit.errors.AUDIT_EXPORT_EXPIRED',
+  AUDIT_EXPORT_RANGE_INVALID: 'wsAudit.errors.AUDIT_EXPORT_RANGE_INVALID',
+  AUDIT_EXPORT_IN_PROGRESS: 'wsAudit.errors.AUDIT_EXPORT_IN_PROGRESS',
+};
+
+export function auditExportErrorKey(code: string | null | undefined): string {
+  return (code && AUDIT_EXPORT_ERROR_KEYS[code]) || 'wsAudit.errors.exportFailed';
+}
 
 const AVATAR_TONES = [
   'bg-icon-blue',
