@@ -89,7 +89,7 @@
           [class]="badge.className"
           [attr.title]="reasonTooltipFor('lifecycle')"
         >
-          {{ badge.labelKey | transloco }}
+          {{ badgeLabel(badge.labelKey) }}
         </span>
       }
 
@@ -103,7 +103,7 @@
           [class]="hold.className"
           [attr.title]="reasonTooltipFor('hold')"
         >
-          {{ hold.labelKey | transloco }}
+          {{ badgeLabel(hold.labelKey) }}
         </span>
       }
 
@@ -122,7 +122,7 @@
           [class]="appr.className"
           [attr.title]="reasonTooltipFor('approval')"
         >
-          {{ appr.labelKey | transloco }}
+          {{ badgeLabel(appr.labelKey) }}
         </span>
       }
 
@@ -150,11 +150,11 @@
           [attr.title]="
             opp
               ? ('tdpg.header.opportunityLink' | transloco: { name: opp.name })
-              : ('tdpg.fields.opportunity' | transloco)
+              : ('tdpg.header.linkedOpportunity' | transloco)
           "
         >
           <ng-icon name="tablerTarget" size="12" class="shrink-0" aria-hidden="true" />
-          <span class="truncate">{{ opp ? opp.name : ('tdpg.fields.opportunity' | transloco) }}</span>
+          <span class="truncate">{{ opp ? opp.name : ('tdpg.header.linkedOpportunity' | transloco) }}</span>
         </a>
       }
 
@@ -190,6 +190,7 @@
         @if (!saving() && isDraftInvalid()) {
           <button
             type="button"
+            [disabled]="paymentTermsMissing()"
             aria-disabled="true"
             class="inline-flex h-btn cursor-not-allowed items-center justify-center gap-4 rounded-8 bg-neutral-soft px-12 text-12 font-medium whitespace-nowrap text-text-placeholder outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
             (click)="revealValidationAndFocusFirst()"

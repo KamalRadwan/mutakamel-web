@@ -1,4 +1,5 @@
-import { ApiError } from '../../shared/trade-api';
+import type { ScopeState } from '../../../../core/scope/scope';
+import { ApiError, type TradeContext } from '../../shared/trade-api';
 import { KIND_CONFIG } from '../shared/document-kinds';
 import {
   cancelPurchaseQuotation,
@@ -46,12 +47,10 @@ export type DocAction =
   | 'deleteDraft'
   | 'print';
 
-// later from the session permissions
-export const TRADE_DOCUMENT_PERMS: ReadonlySet<string> = new Set([
+export const DOCUMENT_ACTION_PERMISSION_KEYS: readonly string[] = [
   'trade.quotations.read',
   'trade.quotations.create',
   'trade.quotations.update',
-  'trade.quotations.delete',
   'trade.quotations.send',
   'trade.quotations.accept',
   'trade.quotations.reject',
@@ -60,14 +59,12 @@ export const TRADE_DOCUMENT_PERMS: ReadonlySet<string> = new Set([
   'trade.sales_orders.read',
   'trade.sales_orders.create',
   'trade.sales_orders.update',
-  'trade.sales_orders.delete',
   'trade.sales_orders.confirm',
   'trade.sales_orders.hold',
   'trade.sales_orders.cancel',
   'trade.purchase_orders.read',
   'trade.purchase_orders.create',
   'trade.purchase_orders.update',
-  'trade.purchase_orders.delete',
   'trade.purchase_orders.submit',
   'trade.purchase_orders.approve',
   'trade.purchase_orders.confirm',
@@ -75,10 +72,10 @@ export const TRADE_DOCUMENT_PERMS: ReadonlySet<string> = new Set([
   'trade.purchase_quotations.read',
   'trade.purchase_quotations.create',
   'trade.purchase_quotations.update',
-  'trade.purchase_quotations.delete',
   'trade.purchase_quotations.issue',
   'trade.purchase_quotations.cancel',
-]);
+  'trade.purchase_quotations.convert',
+];
 
 export type CommandOutcome =
   | {
@@ -92,6 +89,7 @@ export type CommandOutcome =
       detail?: unknown;
     }
   | { type: 'conflict' }
+  | { type: 'forbidden' }
   | { type: 'error'; code: string; details?: Record<string, unknown> };
 
 export interface RunCommandParams {
@@ -111,6 +109,7 @@ export interface RunCommandInput {
    * same version and parameters (DocumentRequestKeys), and starts a new one for the next action.
    */
   idempotencyKey: string;
+  ctx?: TradeContext | ScopeState;
 }
 
 export interface DocumentCommandApi {
@@ -153,6 +152,9 @@ function mapCommandError(err: unknown): CommandOutcome {
   if (!(err instanceof ApiError)) {
     return { type: 'error', code: 'generic' };
   }
+  if (err.status === 403 || err.code === 'TRADE.AUTH.TARGET_DENIED') {
+    return { type: 'forbidden' };
+  }
   if (err.status === 409 && err.code === 'TRADE.CONCURRENCY.STALE_VERSION') {
     return { type: 'conflict' };
   }
@@ -168,13 +170,16 @@ export async function runCommand(
   input: RunCommandInput,
   api: DocumentCommandApi = DEFAULT_COMMAND_API,
 ): Promise<CommandOutcome> {
-  const { kind, action, detail, params, idempotencyKey } = input;
+  const { kind, action, detail, params, idempotencyKey, ctx } = input;
   const doc = detail as AnyDocumentDetail;
 
   try {
     switch (action) {
       case 'send': {
-        const updated = await api.quotationAction(doc.id, doc.version, 'send', undefined, idempotencyKey);
+        const updated =
+          ctx !== undefined
+            ? await api.quotationAction(doc.id, doc.version, 'send', undefined, idempotencyKey, ctx)
+            : await api.quotationAction(doc.id, doc.version, 'send', undefined, idempotencyKey);
         return {
           type: 'done',
           toastKey: 'tdpg.toast.quotationSent',
@@ -185,7 +190,10 @@ export async function runCommand(
       }
 
       case 'accept': {
-        const updated = await api.quotationAction(doc.id, doc.version, 'accept', undefined, idempotencyKey);
+        const updated =
+          ctx !== undefined
+            ? await api.quotationAction(doc.id, doc.version, 'accept', undefined, idempotencyKey, ctx)
+            : await api.quotationAction(doc.id, doc.version, 'accept', undefined, idempotencyKey);
         return {
           type: 'done',
           toastKey: 'tdpg.toast.quotationAccepted',
@@ -196,7 +204,11 @@ export async function runCommand(
       }
 
       case 'reject': {
-        const updated = await api.quotationAction(doc.id, doc.version, 'reject', toReason(params), idempotencyKey);
+        const reason = toReason(params);
+        const updated =
+          ctx !== undefined
+            ? await api.quotationAction(doc.id, doc.version, 'reject', reason, idempotencyKey, ctx)
+            : await api.quotationAction(doc.id, doc.version, 'reject', reason, idempotencyKey);
         return {
           type: 'done',
           toastKey: 'tdpg.toast.quotationRejected',
@@ -210,7 +222,10 @@ export async function runCommand(
         const reason = toReason(params);
         switch (kind) {
           case 'quotation': {
-            const updated = await api.quotationAction(doc.id, doc.version, 'cancel', reason, idempotencyKey);
+            const updated =
+              ctx !== undefined
+                ? await api.quotationAction(doc.id, doc.version, 'cancel', reason, idempotencyKey, ctx)
+                : await api.quotationAction(doc.id, doc.version, 'cancel', reason, idempotencyKey);
             return {
               type: 'done',
               toastKey: 'tdpg.toast.quotationCancelled',
@@ -220,7 +235,10 @@ export async function runCommand(
             };
           }
           case 'sales-order': {
-            const updated = await api.salesOrderAction(doc.id, doc.version, 'cancel', reason, idempotencyKey);
+            const updated =
+              ctx !== undefined
+                ? await api.salesOrderAction(doc.id, doc.version, 'cancel', reason, idempotencyKey, ctx)
+                : await api.salesOrderAction(doc.id, doc.version, 'cancel', reason, idempotencyKey);
             return {
               type: 'done',
               toastKey: 'tdpg.toast.salesOrderCancelled',
@@ -230,7 +248,10 @@ export async function runCommand(
             };
           }
           case 'purchase-order': {
-            const updated = await api.purchaseOrderAction(doc.id, doc.version, 'cancel', reason, idempotencyKey);
+            const updated =
+              ctx !== undefined
+                ? await api.purchaseOrderAction(doc.id, doc.version, 'cancel', reason, idempotencyKey, ctx)
+                : await api.purchaseOrderAction(doc.id, doc.version, 'cancel', reason, idempotencyKey);
             return {
               type: 'done',
               toastKey: 'tdpg.toast.purchaseOrderCancelled',
@@ -240,7 +261,10 @@ export async function runCommand(
             };
           }
           case 'purchase-quotation': {
-            const updated = await api.cancelPurchaseQuotation(doc.id, doc.version, reason, idempotencyKey);
+            const updated =
+              ctx !== undefined
+                ? await api.cancelPurchaseQuotation(doc.id, doc.version, reason, idempotencyKey, ctx)
+                : await api.cancelPurchaseQuotation(doc.id, doc.version, reason, idempotencyKey);
             return {
               type: 'done',
               toastKey: 'tdpg.toast.purchaseQuotationCancelled',
@@ -253,7 +277,11 @@ export async function runCommand(
       }
 
       case 'pqCancel': {
-        const updated = await api.cancelPurchaseQuotation(doc.id, doc.version, toReason(params), idempotencyKey);
+        const reason = toReason(params);
+        const updated =
+          ctx !== undefined
+            ? await api.cancelPurchaseQuotation(doc.id, doc.version, reason, idempotencyKey, ctx)
+            : await api.cancelPurchaseQuotation(doc.id, doc.version, reason, idempotencyKey);
         return {
           type: 'done',
           toastKey: 'tdpg.toast.purchaseQuotationCancelled',
@@ -271,7 +299,10 @@ export async function runCommand(
         };
 
       case 'createSalesOrderDirect': {
-        const order = await api.createSalesOrderFromQuotation(doc.id, doc.version, {}, idempotencyKey);
+        const order =
+          ctx !== undefined
+            ? await api.createSalesOrderFromQuotation(doc.id, doc.version, {}, idempotencyKey, ctx)
+            : await api.createSalesOrderFromQuotation(doc.id, doc.version, {}, idempotencyKey);
         return {
           type: 'done',
           toastKey: 'tdpg.toast.salesOrderCreated',
@@ -282,11 +313,15 @@ export async function runCommand(
       }
 
       case 'openSalesOrder': {
-        const page = await api.listDocuments('sales-order', {
-          page: 1,
-          limit: 100,
-          partyId: doc.partyId,
-        });
+        const page = await api.listDocuments(
+          'sales-order',
+          {
+            page: 1,
+            limit: 100,
+            partyId: doc.partyId,
+          },
+          ctx ?? { companyId: doc.companyId, branchId: doc.branchId },
+        );
         const match = page.items.find((item) => item.sourceQuotationId === doc.id);
         return {
           type: 'done',
@@ -298,7 +333,10 @@ export async function runCommand(
       }
 
       case 'confirm': {
-        const res = await api.confirmSalesOrder(doc.id, doc.version, params?.requestedDeadline, idempotencyKey);
+        const res =
+          ctx !== undefined
+            ? await api.confirmSalesOrder(doc.id, doc.version, params?.requestedDeadline, idempotencyKey, ctx)
+            : await api.confirmSalesOrder(doc.id, doc.version, params?.requestedDeadline, idempotencyKey);
         const unallocatedCount = res.unallocatedLines.length;
         return {
           type: 'done',
@@ -316,7 +354,11 @@ export async function runCommand(
       }
 
       case 'hold': {
-        const updated = await api.salesOrderAction(doc.id, doc.version, 'hold', toReason(params), idempotencyKey);
+        const reason = toReason(params);
+        const updated =
+          ctx !== undefined
+            ? await api.salesOrderAction(doc.id, doc.version, 'hold', reason, idempotencyKey, ctx)
+            : await api.salesOrderAction(doc.id, doc.version, 'hold', reason, idempotencyKey);
         return {
           type: 'done',
           toastKey: 'tdpg.toast.salesOrderHeld',
@@ -327,13 +369,11 @@ export async function runCommand(
       }
 
       case 'releaseHold': {
-        const updated = await api.salesOrderAction(
-          doc.id,
-          doc.version,
-          'release-hold',
-          toReason(params),
-          idempotencyKey,
-        );
+        const reason = toReason(params);
+        const updated =
+          ctx !== undefined
+            ? await api.salesOrderAction(doc.id, doc.version, 'release-hold', reason, idempotencyKey, ctx)
+            : await api.salesOrderAction(doc.id, doc.version, 'release-hold', reason, idempotencyKey);
         return {
           type: 'done',
           toastKey: 'tdpg.toast.salesOrderHoldReleased',
@@ -344,7 +384,10 @@ export async function runCommand(
       }
 
       case 'submit': {
-        const updated = await api.purchaseOrderAction(doc.id, doc.version, 'submit', undefined, idempotencyKey);
+        const updated =
+          ctx !== undefined
+            ? await api.purchaseOrderAction(doc.id, doc.version, 'submit', undefined, idempotencyKey, ctx)
+            : await api.purchaseOrderAction(doc.id, doc.version, 'submit', undefined, idempotencyKey);
         return {
           type: 'done',
           toastKey: 'tdpg.toast.purchaseOrderSubmitted',
@@ -355,7 +398,10 @@ export async function runCommand(
       }
 
       case 'withdraw': {
-        const updated = await api.purchaseOrderAction(doc.id, doc.version, 'withdraw', undefined, idempotencyKey);
+        const updated =
+          ctx !== undefined
+            ? await api.purchaseOrderAction(doc.id, doc.version, 'withdraw', undefined, idempotencyKey, ctx)
+            : await api.purchaseOrderAction(doc.id, doc.version, 'withdraw', undefined, idempotencyKey);
         return {
           type: 'done',
           toastKey: 'tdpg.toast.purchaseOrderWithdrawn',
@@ -366,7 +412,10 @@ export async function runCommand(
       }
 
       case 'approve': {
-        const updated = await api.purchaseOrderAction(doc.id, doc.version, 'approve', undefined, idempotencyKey);
+        const updated =
+          ctx !== undefined
+            ? await api.purchaseOrderAction(doc.id, doc.version, 'approve', undefined, idempotencyKey, ctx)
+            : await api.purchaseOrderAction(doc.id, doc.version, 'approve', undefined, idempotencyKey);
         return {
           type: 'done',
           toastKey: 'tdpg.toast.purchaseOrderApproved',
@@ -377,7 +426,11 @@ export async function runCommand(
       }
 
       case 'poReject': {
-        const updated = await api.purchaseOrderAction(doc.id, doc.version, 'reject', toReason(params), idempotencyKey);
+        const reason = toReason(params);
+        const updated =
+          ctx !== undefined
+            ? await api.purchaseOrderAction(doc.id, doc.version, 'reject', reason, idempotencyKey, ctx)
+            : await api.purchaseOrderAction(doc.id, doc.version, 'reject', reason, idempotencyKey);
         return {
           type: 'done',
           toastKey: 'tdpg.toast.purchaseOrderRejected',
@@ -388,7 +441,10 @@ export async function runCommand(
       }
 
       case 'poConfirm': {
-        const updated = await api.purchaseOrderAction(doc.id, doc.version, 'confirm', undefined, idempotencyKey);
+        const updated =
+          ctx !== undefined
+            ? await api.purchaseOrderAction(doc.id, doc.version, 'confirm', undefined, idempotencyKey, ctx)
+            : await api.purchaseOrderAction(doc.id, doc.version, 'confirm', undefined, idempotencyKey);
         return {
           type: 'done',
           toastKey: 'tdpg.toast.purchaseOrderConfirmed',
@@ -399,7 +455,10 @@ export async function runCommand(
       }
 
       case 'retryDelivery': {
-        const updated = await api.retryPurchaseDelivery(doc.id, doc.version, idempotencyKey);
+        const updated =
+          ctx !== undefined
+            ? await api.retryPurchaseDelivery(doc.id, doc.version, idempotencyKey, ctx)
+            : await api.retryPurchaseDelivery(doc.id, doc.version, idempotencyKey);
         return {
           type: 'done',
           toastKey: 'tdpg.toast.deliveryRetried',
@@ -410,7 +469,10 @@ export async function runCommand(
       }
 
       case 'issue': {
-        const updated = await api.issuePurchaseQuotation(doc.id, doc.version, idempotencyKey);
+        const updated =
+          ctx !== undefined
+            ? await api.issuePurchaseQuotation(doc.id, doc.version, idempotencyKey, ctx)
+            : await api.issuePurchaseQuotation(doc.id, doc.version, idempotencyKey);
         return {
           type: 'done',
           toastKey: 'tdpg.toast.purchaseQuotationIssued',
@@ -429,9 +491,11 @@ export async function runCommand(
         };
 
       case 'createPurchaseOrderDirect': {
-        const order = await api.createPurchaseOrderFromPurchaseQuotation(doc.id, doc.version, {
-          receivingNodeId: params?.receivingNodeId ?? '',
-        }, idempotencyKey);
+        const body = { receivingNodeId: params?.receivingNodeId ?? '' };
+        const order =
+          ctx !== undefined
+            ? await api.createPurchaseOrderFromPurchaseQuotation(doc.id, doc.version, body, idempotencyKey, ctx)
+            : await api.createPurchaseOrderFromPurchaseQuotation(doc.id, doc.version, body, idempotencyKey);
         return {
           type: 'done',
           toastKey: 'tdpg.toast.purchaseOrderCreated',
@@ -454,7 +518,11 @@ export async function runCommand(
       }
 
       case 'deleteDraft': {
-        await api.deleteDocument(kind, doc.id, doc.version, idempotencyKey);
+        if (ctx !== undefined) {
+          await api.deleteDocument(kind, doc.id, doc.version, idempotencyKey, ctx);
+        } else {
+          await api.deleteDocument(kind, doc.id, doc.version, idempotencyKey);
+        }
         return {
           type: 'done',
           toastKey: 'tdpg.toast.draftDeleted',

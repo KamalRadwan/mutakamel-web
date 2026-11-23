@@ -1,3 +1,4 @@
+import { termSelectionsBody } from '../../shared/terms/terms.model';
 import { fakeId } from '../../shared/trade-api';
 import { lineEvidence, rateBpsFromPercent, totalsEvidence } from '../shared/document-evidence';
 import type {
@@ -408,8 +409,8 @@ export function toDraft(kind: DocumentKind, detail: unknown): DocumentDraft {
         quantity: line.orderedQuantity,
         unitPrice: line.unitPrice,
         discount: null,
-        discountTotal: line.discountTotal,
-        chargeTotal: line.chargeTotal,
+        discountTotal: line.discountTotal ?? '0',
+        chargeTotal: line.chargeTotal ?? '0',
         tax: line.taxSnapshot
           ? { category: line.taxSnapshot.category, rateBps: line.taxSnapshot.rateBps }
           : null,
@@ -448,7 +449,7 @@ export function toDraft(kind: DocumentKind, detail: unknown): DocumentDraft {
         unitPrice: line.unitPrice,
         discount: null,
         discountTotal: '0',
-        chargeTotal: line.chargeTotal,
+        chargeTotal: line.chargeTotal ?? '0',
         tax: line.taxSnapshot
           ? { category: line.taxSnapshot.category, rateBps: line.taxSnapshot.rateBps }
           : null,
@@ -482,7 +483,7 @@ export function toDraft(kind: DocumentKind, detail: unknown): DocumentDraft {
         clientLineId: line.clientLineId,
         itemId: line.itemId,
         itemLabel: line.itemLabel,
-        description: line.descriptionSnapshot,
+        description: line.descriptionSnapshot ?? '',
         uomId: line.uomId,
         quantity: line.quantity,
         unitPrice: line.unitPrice,
@@ -558,7 +559,7 @@ export function draftFromPurchaseQuotation(pq: PurchaseQuotationDetail): Documen
     clientLineId: line.clientLineId,
     itemId: line.itemId,
     itemLabel: line.itemLabel,
-    description: line.descriptionSnapshot,
+    description: line.descriptionSnapshot ?? '',
     uomId: line.uomId,
     quantity: line.quantity,
     unitPrice: line.unitPrice,
@@ -763,7 +764,7 @@ export const bodies = {
       validUntil: draft.validUntil ?? '',
       lines,
       pricing,
-      termSelections: cloneTermSelections(draft.termSelections),
+      termSelections: termSelectionsBody(draft.termSelections),
     };
     if (expectedPricingFingerprint) {
       body.expectedPricingFingerprint = expectedPricingFingerprint;
@@ -798,7 +799,7 @@ export const bodies = {
       currencyCode,
       lines,
       totals,
-      termSelections: cloneTermSelections(draft.termSelections),
+      termSelections: termSelectionsBody(draft.termSelections),
     };
     const contactPartyId = headerNullable(draft.header, 'contactPartyId');
     if (contactPartyId) body.contactPartyId = contactPartyId;
@@ -835,7 +836,7 @@ export const bodies = {
     const termsChanged =
       !deepEqual(oldDraft.termSelections, nextDraft.termSelections) || oldDraft.notes !== nextDraft.notes;
     if (opts?.includeTerms !== false && termsChanged) {
-      body.termSelections = cloneTermSelections(nextDraft.termSelections);
+      body.termSelections = termSelectionsBody(nextDraft.termSelections);
       body.notes = nextDraft.notes.trim();
     }
     return body;
@@ -876,7 +877,7 @@ export const bodies = {
       ? !deepEqual(opts.loaded.termSelections, draft.termSelections) || opts.loaded.notes !== draft.notes
       : false;
     if (opts?.includeTermSelections === true || termsChanged) {
-      body.termSelections = cloneTermSelections(draft.termSelections);
+      body.termSelections = termSelectionsBody(draft.termSelections);
       const cleanNotes = draft.notes.trim();
       if (cleanNotes) {
         body.notes = cleanNotes;
@@ -916,7 +917,7 @@ export const bodies = {
       receivingNodeId: headerStr(draft.header, 'receivingNodeId'),
       lines,
       totals,
-      termSelections: cloneTermSelections(draft.termSelections),
+      termSelections: termSelectionsBody(draft.termSelections),
     };
     const contactPartyId = headerNullable(draft.header, 'contactPartyId');
     if (contactPartyId) body.contactPartyId = contactPartyId;
@@ -965,7 +966,7 @@ export const bodies = {
     const termsChanged =
       !deepEqual(oldDraft.termSelections, nextDraft.termSelections) || oldDraft.notes !== nextDraft.notes;
     if (opts?.includeTerms !== false && termsChanged) {
-      body.termSelections = cloneTermSelections(nextDraft.termSelections);
+      body.termSelections = termSelectionsBody(nextDraft.termSelections);
       body.notes = nextDraft.notes.trim();
     }
     return body;
@@ -1005,7 +1006,7 @@ export const bodies = {
     const body: ReplaceOrderLinesBody = {
       lines,
       totals,
-      termSelections: cloneTermSelections(draft.termSelections),
+      termSelections: termSelectionsBody(draft.termSelections),
     };
     if (opts?.expectedPricingFingerprint) {
       body.expectedPricingFingerprint = opts.expectedPricingFingerprint;
@@ -1056,7 +1057,7 @@ export const bodies = {
       ? !deepEqual(opts.loaded.termSelections, draft.termSelections) || opts.loaded.notes !== draft.notes
       : false;
     if (opts?.includeTermSelections === true || termsChanged) {
-      body.termSelections = cloneTermSelections(draft.termSelections);
+      body.termSelections = termSelectionsBody(draft.termSelections);
       const cleanNotes = draft.notes.trim();
       if (cleanNotes) {
         body.notes = cleanNotes;
@@ -1084,7 +1085,7 @@ export const bodies = {
       supplierPartyId: supplierPartyIdOf(draft.header),
       currencyCode: headerStr(draft.header, 'currencyCode'),
       validUntil: draft.validUntil ?? '',
-      termSelections: cloneTermSelections(draft.termSelections),
+      termSelections: termSelectionsBody(draft.termSelections),
       lines,
     };
     const reference = headerNullable(draft.header, 'reference');
@@ -1132,8 +1133,8 @@ export const bodies = {
     const termsChanged =
       !deepEqual(oldDraft.termSelections, nextDraft.termSelections) || oldDraft.notes !== nextDraft.notes;
     if (termsChanged) {
-      body.termSelections = cloneTermSelections(nextDraft.termSelections);
-      body.notes = nextDraft.notes.trim() || null;
+      body.termSelections = termSelectionsBody(nextDraft.termSelections);
+      body.notes = nextDraft.notes.trim();
     }
 
     const linesChanged = !deepEqual(oldDraft.lines, nextDraft.lines);

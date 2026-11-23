@@ -1,4 +1,5 @@
-import { ApiError } from '../../shared/trade-api';
+import type { ScopeState } from '../../../../core/scope/scope';
+import { ApiError, type TradeContext } from '../../shared/trade-api';
 import { cmp, formatPercentCap, isDecimal } from '../shared/decimal';
 import { TERMS_NOTES_MAX_LENGTH } from '../shared/document.model';
 import {
@@ -39,7 +40,9 @@ export type SaveOutcome =
   | { type: 'saved'; id: string; navigateTo: string | null; toastKey: string }
   | { type: 'cancelled' }
   | { type: 'conflict'; navigateTo?: string }
-  | { type: 'pricingChanged'; navigateTo?: string }
+  | { type: 'forbidden'; navigateTo?: string }
+  | { type: 'pricingChanged'; toastKey?: string; navigateTo?: string }
+  | { type: 'costUnavailable'; code: string; navigateTo?: string }
   | {
       type: 'invalid';
       fieldErrors: Record<string, string>;
@@ -67,6 +70,7 @@ export interface SaveDocumentInput {
    * request (same id, version and body) reuses its key; a success resets it.
    */
   requestKeys: RequestKeySource;
+  ctx?: TradeContext | ScopeState;
 }
 
 export interface DraftValidationResult {
@@ -91,6 +95,7 @@ export interface DocumentSaveApi {
     version: number,
     body: ReplaceOrderLinesBody,
     idempotencyKey: string,
+    ctx?: TradeContext | ScopeState,
   ) => Promise<SalesOrderDetail | PurchaseOrderDetail>;
   createPurchaseQuotation: typeof createPurchaseQuotation;
   updatePurchaseQuotation: typeof updatePurchaseQuotation;
@@ -296,22 +301,119 @@ export function validateDraft(
   };
 }
 
-function mapSaveError(err: unknown): SaveOutcome {
+function resolveLineId(
+  details: Record<string, unknown> | undefined,
+  draft?: DocumentDraft,
+): string | null {
+  const direct = detailValue(details, 'clientLineId');
+  if (direct) return direct;
+  if (!draft || !details) return null;
+  const rawIdx = detailValue(details, 'lineIndex') ?? details['lineIndex'];
+  if (typeof rawIdx === 'number' && Number.isInteger(rawIdx) && rawIdx >= 0 && rawIdx < draft.lines.length) {
+    return draft.lines[rawIdx]?.clientLineId ?? null;
+  }
+  if (typeof rawIdx === 'string' && /^\d+$/.test(rawIdx)) {
+    const idx = Number(rawIdx);
+    if (idx >= 0 && idx < draft.lines.length) {
+      return draft.lines[idx]?.clientLineId ?? null;
+    }
+  }
+  const itemId = detailValue(details, 'itemId');
+  if (itemId) {
+    const match = draft.lines.find((line) => line.itemId === itemId);
+    if (match) return match.clientLineId;
+  }
+  return null;
+}
+
+const PRICE_BOOK_FIELD_CODES = new Set([
+  'TRADE.PRICE.BOOK_REQUIRED',
+  'TRADE.PRICE.BOOK_OVERRIDE_FORBIDDEN',
+  'TRADE.PRICE.PRICE_BOOK_REQUIRED',
+  'TRADE.PRICE.PRICE_BOOK_CURRENCY_MISMATCH',
+  'TRADE.PRICE.PRICE_BOOK_NOT_FOUND',
+  'TRADE.PRICE.PRICE_BOOK_INACTIVE',
+]);
+
+const PRICE_LINE_ERROR_CODES = new Set([
+  'TRADE.PRICE.MARGIN_GUARD',
+  'TRADE.PRICE.OVERRIDE_REJECTED',
+  'TRADE.PRICE.RULE_SELECTION_INVALID',
+  'TRADE.PRICE.NOT_PRICED_IN_CURRENCY',
+  'TRADE.PRICE.NOT_FOUND',
+  'TRADE.PRICE.CATALOG_UNAVAILABLE',
+  'TRADE.PRICE.NO_ACTIVE_VERSION',
+  'TRADE.PRICE.CONFLICTING_ACTIVE_VERSIONS',
+  'TRADE.PRICE.RULE_INACTIVE',
+  'TRADE.PRICE.QUANTITY_MISMATCH',
+  'TRADE.PRICE.INVALID_PRICING_TARGET',
+  'TRADE.PRICE.MULTIPLE_RULES_MATCH',
+]);
+
+const DISCOUNT_VALUE_LINE_OR_DOC_CODES = new Set([
+  'TRADE.QUOTE.DISCOUNT_FREE_NOT_ALLOWED',
+  'TRADE.QUOTE.DISCOUNT_INVALID',
+  'TRADE.QUOTE.DISCOUNT_LIMIT_CONFLICT',
+  'TRADE.QUOTE.DISCOUNT_LIMIT_INVALID',
+  'TRADE.QUOTE.DISCOUNT_LIMIT_NOT_FOUND',
+  'TRADE.QUOTE.DISCOUNT_LIMIT_REQUIRED',
+  'TRADE.QUOTE.DISCOUNT_PERCENT_INVALID',
+  'TRADE.QUOTE.DISCOUNT_AMOUNT_INVALID',
+  'TRADE.QUOTE.DISCOUNT_NOT_POSITIVE',
+  'TRADE.QUOTE.DISCOUNT_BELOW_COST',
+  'TRADE.QUOTE.DISCOUNT_MARGIN_FLOOR',
+]);
+
+const CUSTOMER_ELIGIBILITY_CODES = new Set([
+  'TRADE.QUOTE.CUSTOMER_INVALID',
+  'TRADE.QUOTE.CUSTOMER_AMBIGUOUS',
+  'TRADE.QUOTE.CUSTOMER_ELIGIBILITY_UNAVAILABLE',
+  'TRADE.SALES_ORDER.CUSTOMER_BLOCKED',
+  'TRADE.CUSTOMER.NOT_FOUND',
+  'TRADE.CUSTOMER.INACTIVE',
+  'TRADE.CUSTOMER.ELIGIBLE_STATUS_REQUIRED',
+]);
+
+function mapSaveError(err: unknown, draft?: DocumentDraft): SaveOutcome {
   if (!(err instanceof ApiError)) {
     return { type: 'error', code: 'generic' };
   }
 
   const details = err.details as Record<string, unknown> | undefined;
 
+  if (err.status === 403 || err.code === 'TRADE.AUTH.TARGET_DENIED') {
+    return { type: 'forbidden' };
+  }
+
   if (err.status === 409 && err.code === 'TRADE.CONCURRENCY.STALE_VERSION') {
     return { type: 'conflict' };
   }
 
   if (
-    err.status === 409 &&
-    (err.code === 'TRADE.QUOTE.PRICING_CHANGED' || err.code === 'TRADE.PRICE.PREVIEW_CHANGED')
+    err.code === 'TRADE.QUOTE.PRICING_CHANGED' ||
+    err.code === 'TRADE.PRICE.PREVIEW_CHANGED' ||
+    err.code === 'TRADE.PRICE.PREVIEW_REQUIRED' ||
+    err.code === 'TRADE.PRICE.PREVIEW_EXPIRED' ||
+    err.code === 'TRADE.PRICE.PREVIEW_EMPTY'
   ) {
     return { type: 'pricingChanged' };
+  }
+
+  if (err.code === 'TRADE.QUOTE.PRICE_LOCKED' || [
+    'TRADE.PRICE.LOCK_INVALID',
+    'TRADE.PRICE.LOCK_EXPIRED',
+    'TRADE.PRICE.LOCK_CONTEXT_MISMATCH',
+    'TRADE.PRICE.LOCK_DATA_INVALID',
+  ].includes(err.code)) {
+    return { type: 'pricingChanged', toastKey: 'tdpg.toast.priceLockReload' };
+  }
+
+  if (err.code === 'TRADE.PRICE.COST_UNAVAILABLE') {
+    return { type: 'costUnavailable', code: err.code };
+  }
+
+  if (err.code === 'TRADE.PRICE.CURRENCY_INACTIVE' || err.code === 'TRADE.PRICE.FX_UNAVAILABLE') {
+    return { type: 'invalid', fieldErrors: { currencyCode: `tdpg.errors.${err.code}` }, lineErrors: {} };
   }
 
   if (err.status === 409 && err.code === 'TRADE.QUOTE.ALREADY_CONVERTED') {
@@ -336,19 +438,88 @@ function mapSaveError(err: unknown): SaveOutcome {
     }
   }
 
-  if (err.status === 422 && err.code === 'TRADE.QUOTE.DISCOUNT_EXCEEDS_ALLOWED') {
-    const clientLineId = detailValue(details, 'clientLineId');
+  if (PRICE_BOOK_FIELD_CODES.has(err.code)) {
+    return {
+      type: 'invalid',
+      fieldErrors: { priceBookId: `tdpg.errors.${err.code}` },
+      lineErrors: {},
+    };
+  }
+
+  if (PRICE_LINE_ERROR_CODES.has(err.code)) {
+    const lineId = resolveLineId(details, draft);
+    if (lineId) {
+      return {
+        type: 'invalid',
+        fieldErrors: {},
+        lineErrors: { [lineId]: `tdpg.errors.${err.code}` },
+      };
+    }
+    if (err.code === 'TRADE.PRICE.NOT_PRICED_IN_CURRENCY') {
+      return {
+        type: 'invalid',
+        fieldErrors: { priceBookId: `tdpg.errors.${err.code}` },
+        lineErrors: {},
+      };
+    }
+    return { type: 'invalid', fieldErrors: { lines: `tdpg.errors.${err.code}` }, lineErrors: {} };
+  }
+
+  if (err.code === 'TRADE.QUOTE.DISCOUNT_EXCEEDS_ALLOWED') {
+    const lineId = resolveLineId(details, draft);
     const max = detailValue(details, 'maxDiscountPercent');
-    if (clientLineId) {
+    if (lineId) {
       return {
         type: 'invalid',
         fieldErrors: {},
         lineErrors: {
-          [clientLineId]: max ? 'tdlines.maxLimit' : 'td.errors.TRADE.QUOTE.DISCOUNT_EXCEEDS_ALLOWED',
+          [lineId]: max ? 'tdlines.maxLimit' : 'td.errors.TRADE.QUOTE.DISCOUNT_EXCEEDS_ALLOWED',
         },
-        ...(max ? { lineErrorParams: { [clientLineId]: { max: formatPercentCap(max) } } } : {}),
+        ...(max ? { lineErrorParams: { [lineId]: { max: formatPercentCap(max) } } } : {}),
       };
     }
+  }
+
+  if (DISCOUNT_VALUE_LINE_OR_DOC_CODES.has(err.code)) {
+    const lineId = resolveLineId(details, draft);
+    if (lineId) {
+      return {
+        type: 'invalid',
+        fieldErrors: {},
+        lineErrors: { [lineId]: `tdpg.errors.${err.code}` },
+      };
+    }
+    if (draft?.pricing?.scope === 'DOCUMENT') {
+      return {
+        type: 'invalid',
+        fieldErrors: { pricingValue: `tdpg.errors.${err.code}` },
+        lineErrors: {},
+      };
+    }
+  }
+
+  if (err.code === 'TRADE.QUOTE.DISCOUNT_VALUE_REQUIRED') {
+    return {
+      type: 'invalid',
+      fieldErrors: { pricingValue: 'tdpg.errors.TRADE.QUOTE.DISCOUNT_VALUE_REQUIRED' },
+      lineErrors: {},
+    };
+  }
+
+  if (err.code === 'TRADE.QUOTE.DISCOUNT_REASON_INVALID') {
+    return {
+      type: 'invalid',
+      fieldErrors: { pricingReason: 'tdpg.errors.TRADE.QUOTE.DISCOUNT_REASON_INVALID' },
+      lineErrors: {},
+    };
+  }
+
+  if (CUSTOMER_ELIGIBILITY_CODES.has(err.code)) {
+    return {
+      type: 'invalid',
+      fieldErrors: { partyId: `tdpg.errors.${err.code}` },
+      lineErrors: {},
+    };
   }
 
   if (err.status === 422 && (err.code === 'TRADE.QUOTE.VALIDITY_INVALID' || err.code === 'VALIDITY_INVALID')) {
@@ -383,31 +554,78 @@ function mapSaveError(err: unknown): SaveOutcome {
     };
   }
 
-  if (err.status === 422 && err.code === 'TRADE.VALIDATION_FAILED' && detailValue(details, 'notes')) {
+  if (err.code === 'TRADE.TERMS.INVALID_FOR_DOCUMENT' && detailValue(details, 'termType') === 'PAYMENT') {
     return {
       type: 'invalid',
-      fieldErrors: { notes: 'tdpg.validation.notesMax' },
+      fieldErrors: { paymentTermId: 'tdpg.errors.TRADE.TERMS.INVALID_FOR_DOCUMENT' },
       lineErrors: {},
     };
   }
 
-  if (err.status === 400 && err.code === 'TRADE.VALIDATION_FAILED' && isNotesTooLong(details)) {
-    return {
-      type: 'invalid',
-      fieldErrors: { notes: 'tdpg.validation.notesMax' },
-      lineErrors: {},
-    };
-  }
-
-  if (err.status === 422 && err.code === 'TRADE.TAX.INCLUSIVE_NOT_SUPPORTED') {
-    const clientLineId = detailValue(details, 'clientLineId');
-    if (clientLineId) {
+  if (err.code === 'TRADE.QUOTE.TAX_DEFAULT_REQUIRED') {
+    const lineId = resolveLineId(details, draft);
+    if (lineId) {
       return {
         type: 'invalid',
         fieldErrors: {},
-        lineErrors: { [clientLineId]: 'td.errors.TRADE.TAX.INCLUSIVE_NOT_SUPPORTED' },
+        lineErrors: { [lineId]: 'tdpg.errors.TRADE.QUOTE.TAX_DEFAULT_REQUIRED' },
       };
     }
+  }
+
+  if (
+    err.code === 'TRADE.INVENTORY.INSUFFICIENT_AVAILABILITY' ||
+    err.code === 'TRADE.INVENTORY.OVER_RECEIPT' ||
+    err.code === 'TRADE.ITEM.NOT_FOUND'
+  ) {
+    const lineId = resolveLineId(details, draft);
+    if (lineId) {
+      return {
+        type: 'invalid',
+        fieldErrors: {},
+        lineErrors: { [lineId]: `tdpg.errors.${err.code}` },
+      };
+    }
+  }
+
+  if (err.code === 'TRADE.PO.RECEIVING_NODE_REQUIRED') {
+    return {
+      type: 'invalid',
+      fieldErrors: { receivingNodeId: 'tdpg.errors.TRADE.PO.RECEIVING_NODE_REQUIRED' },
+      lineErrors: {},
+    };
+  }
+
+  if (err.code === 'TRADE.PO.SUPPLIER_NOT_FOUND') {
+    return {
+      type: 'invalid',
+      fieldErrors: { supplierPartyId: 'tdpg.errors.TRADE.PO.SUPPLIER_NOT_FOUND' },
+      lineErrors: {},
+    };
+  }
+
+  if (err.code === 'TRADE.PO.SUPPLIER_ACCOUNT_NOT_FOUND') {
+    return {
+      type: 'invalid',
+      fieldErrors: { supplierAccountId: 'tdpg.errors.TRADE.PO.SUPPLIER_ACCOUNT_NOT_FOUND' },
+      lineErrors: {},
+    };
+  }
+
+  if (err.code === 'TRADE.CURRENCY.CONVERSION_NOT_SUPPORTED') {
+    return {
+      type: 'invalid',
+      fieldErrors: { currencyCode: 'tdpg.errors.TRADE.CURRENCY.CONVERSION_NOT_SUPPORTED' },
+      lineErrors: {},
+    };
+  }
+
+  if (err.code === 'TRADE.VALIDATION_FAILED' && (detailValue(details, 'notes') || isNotesTooLong(details))) {
+    return {
+      type: 'invalid',
+      fieldErrors: { notes: 'tdpg.validation.notesMax' },
+      lineErrors: {},
+    };
   }
 
   return {
@@ -431,7 +649,9 @@ function attachCreatedQuotationNavigation(outcome: SaveOutcome, createdId: strin
         details: { ...(outcome.details ?? {}), createdId },
       };
     case 'conflict':
+    case 'forbidden':
     case 'pricingChanged':
+    case 'costUnavailable':
     case 'invalid':
       return {
         ...outcome,
@@ -444,7 +664,7 @@ export async function saveDocument(
   input: SaveDocumentInput,
   api: DocumentSaveApi = DEFAULT_SAVE_API,
 ): Promise<SaveOutcome> {
-  const { kind, mode, draft, loaded, detail, sourceId, sourceVersion, fingerprint, orderPreview } = input;
+  const { kind, mode, draft, loaded, detail, sourceId, sourceVersion, fingerprint, orderPreview, ctx } = input;
   const keyFor = (slot: string, ...request: unknown[]): string => input.requestKeys.for(slot, request);
   const validateRevision = kind === 'quotation' && mode === 'edit'
     ? quotationChangeKind(loaded, draft).revision
@@ -467,15 +687,19 @@ export async function saveDocument(
       case 'quotation': {
         if (mode === 'new') {
           const createBody = bodies.quotationCreate(draft);
-          const created = await api.createQuotation(createBody, keyFor('createQuotation', createBody));
+          const createKey = keyFor('createQuotation', createBody);
+          const created =
+            ctx !== undefined
+              ? await api.createQuotation(createBody, createKey, ctx)
+              : await api.createQuotation(createBody, createKey);
           try {
             const revisionBody = bodies.quotationRevision(draft, fingerprint);
-            await api.createQuotationRevision(
-              created.id,
-              created.version,
-              revisionBody,
-              keyFor('createQuotationRevision', created.id, created.version, revisionBody),
-            );
+            const revKey = keyFor('createQuotationRevision', created.id, created.version, revisionBody);
+            if (ctx !== undefined) {
+              await api.createQuotationRevision(created.id, created.version, revisionBody, revKey, ctx);
+            } else {
+              await api.createQuotationRevision(created.id, created.version, revisionBody, revKey);
+            }
             return {
               type: 'saved',
               id: created.id,
@@ -483,7 +707,7 @@ export async function saveDocument(
               toastKey: 'tdpg.toast.quotationSaved',
             };
           } catch (revErr) {
-            return attachCreatedQuotationNavigation(mapSaveError(revErr), created.id);
+            return attachCreatedQuotationNavigation(mapSaveError(revErr, draft), created.id);
           }
         }
 
@@ -511,22 +735,21 @@ export async function saveDocument(
 
         if (header) {
           const updateBody = bodies.quotationUpdate(loaded, draft);
-          const updated = await api.updateQuotation(
-            q.id,
-            version,
-            updateBody,
-            keyFor('updateQuotation', q.id, version, updateBody),
-          );
+          const updateKey = keyFor('updateQuotation', q.id, version, updateBody);
+          const updated =
+            ctx !== undefined
+              ? await api.updateQuotation(q.id, version, updateBody, updateKey, ctx)
+              : await api.updateQuotation(q.id, version, updateBody, updateKey);
           version = updated.version;
         }
         if (revision) {
           const revisionBody = bodies.quotationRevision(draft, fingerprint);
-          await api.createQuotationRevision(
-            q.id,
-            version,
-            revisionBody,
-            keyFor('createQuotationRevision', q.id, version, revisionBody),
-          );
+          const revKey = keyFor('createQuotationRevision', q.id, version, revisionBody);
+          if (ctx !== undefined) {
+            await api.createQuotationRevision(q.id, version, revisionBody, revKey, ctx);
+          } else {
+            await api.createQuotationRevision(q.id, version, revisionBody, revKey);
+          }
         }
         return {
           type: 'saved',
@@ -542,7 +765,11 @@ export async function saveDocument(
             expectedPricingFingerprint: fingerprint,
             preview: orderPreview,
           });
-          const created = await api.createSalesOrder(createBody, keyFor('createSalesOrder', createBody));
+          const createKey = keyFor('createSalesOrder', createBody);
+          const created =
+            ctx !== undefined
+              ? await api.createSalesOrder(createBody, createKey, ctx)
+              : await api.createSalesOrder(createBody, createKey);
           return {
             type: 'saved',
             id: created.id,
@@ -564,12 +791,11 @@ export async function saveDocument(
             currencyDecimalPlaces: dp,
             preview: orderPreview,
           });
-          const created = await api.convertQuotation(
-            srcId,
-            srcVer,
-            convertBody,
-            keyFor('convertQuotation', srcId, srcVer, convertBody),
-          );
+          const convertKey = keyFor('convertQuotation', srcId, srcVer, convertBody);
+          const created =
+            ctx !== undefined
+              ? await api.convertQuotation(srcId, srcVer, convertBody, convertKey, ctx)
+              : await api.convertQuotation(srcId, srcVer, convertBody, convertKey);
           return {
             type: 'saved',
             id: created.id,
@@ -583,12 +809,11 @@ export async function saveDocument(
         const { header, lines } = orderChangeKind('sales-order', loaded, draft);
         if (header) {
           const updateBody = bodies.salesOrderUpdate(loaded, draft, { includeTerms: !lines });
-          const updated = await api.updateSalesOrder(
-            so.id,
-            version,
-            updateBody,
-            keyFor('updateSalesOrder', so.id, version, updateBody),
-          );
+          const updateKey = keyFor('updateSalesOrder', so.id, version, updateBody);
+          const updated =
+            ctx !== undefined
+              ? await api.updateSalesOrder(so.id, version, updateBody, updateKey, ctx)
+              : await api.updateSalesOrder(so.id, version, updateBody, updateKey);
           version = updated.version;
         }
         if (lines) {
@@ -597,13 +822,12 @@ export async function saveDocument(
             preview: orderPreview,
             currencyDecimalPlaces: so.totalsSnapshot?.currencyDecimalPlaces,
           });
-          await api.replaceOrderLines(
-            'sales-order',
-            so.id,
-            version,
-            linesBody,
-            keyFor('replaceOrderLines', 'sales-order', so.id, version, linesBody),
-          );
+          const linesKey = keyFor('replaceOrderLines', 'sales-order', so.id, version, linesBody);
+          if (ctx !== undefined) {
+            await api.replaceOrderLines('sales-order', so.id, version, linesBody, linesKey, ctx);
+          } else {
+            await api.replaceOrderLines('sales-order', so.id, version, linesBody, linesKey);
+          }
         }
         return {
           type: 'saved',
@@ -619,10 +843,11 @@ export async function saveDocument(
             expectedPricingFingerprint: fingerprint,
             preview: orderPreview,
           });
-          const created = await api.createPurchaseOrder(
-            createBody,
-            keyFor('createPurchaseOrder', createBody),
-          );
+          const createKey = keyFor('createPurchaseOrder', createBody);
+          const created =
+            ctx !== undefined
+              ? await api.createPurchaseOrder(createBody, createKey, ctx)
+              : await api.createPurchaseOrder(createBody, createKey);
           return {
             type: 'saved',
             id: created.id,
@@ -641,12 +866,11 @@ export async function saveDocument(
             currencyDecimalPlaces: dp,
             preview: orderPreview,
           });
-          const created = await api.convertPurchaseQuotation(
-            srcId,
-            srcVer,
-            convertBody,
-            keyFor('convertPurchaseQuotation', srcId, srcVer, convertBody),
-          );
+          const convertKey = keyFor('convertPurchaseQuotation', srcId, srcVer, convertBody);
+          const created =
+            ctx !== undefined
+              ? await api.convertPurchaseQuotation(srcId, srcVer, convertBody, convertKey, ctx)
+              : await api.convertPurchaseQuotation(srcId, srcVer, convertBody, convertKey);
           return {
             type: 'saved',
             id: created.id,
@@ -660,12 +884,11 @@ export async function saveDocument(
         const { header, lines } = orderChangeKind('purchase-order', loaded, draft);
         if (header) {
           const updateBody = bodies.purchaseOrderUpdate(loaded, draft, { includeTerms: !lines });
-          const updated = await api.updatePurchaseOrder(
-            po.id,
-            version,
-            updateBody,
-            keyFor('updatePurchaseOrder', po.id, version, updateBody),
-          );
+          const updateKey = keyFor('updatePurchaseOrder', po.id, version, updateBody);
+          const updated =
+            ctx !== undefined
+              ? await api.updatePurchaseOrder(po.id, version, updateBody, updateKey, ctx)
+              : await api.updatePurchaseOrder(po.id, version, updateBody, updateKey);
           version = updated.version;
         }
         if (lines) {
@@ -674,13 +897,12 @@ export async function saveDocument(
             preview: orderPreview,
             currencyDecimalPlaces: po.totalsSnapshot?.currencyDecimalPlaces,
           });
-          await api.replaceOrderLines(
-            'purchase-order',
-            po.id,
-            version,
-            linesBody,
-            keyFor('replaceOrderLines', 'purchase-order', po.id, version, linesBody),
-          );
+          const linesKey = keyFor('replaceOrderLines', 'purchase-order', po.id, version, linesBody);
+          if (ctx !== undefined) {
+            await api.replaceOrderLines('purchase-order', po.id, version, linesBody, linesKey, ctx);
+          } else {
+            await api.replaceOrderLines('purchase-order', po.id, version, linesBody, linesKey);
+          }
         }
         return {
           type: 'saved',
@@ -693,10 +915,11 @@ export async function saveDocument(
       case 'purchase-quotation': {
         if (mode === 'new') {
           const createBody = bodies.purchaseQuotationCreate(draft);
-          const created = await api.createPurchaseQuotation(
-            createBody,
-            keyFor('createPurchaseQuotation', createBody),
-          );
+          const createKey = keyFor('createPurchaseQuotation', createBody);
+          const created =
+            ctx !== undefined
+              ? await api.createPurchaseQuotation(createBody, createKey, ctx)
+              : await api.createPurchaseQuotation(createBody, createKey);
           return {
             type: 'saved',
             id: created.id,
@@ -707,12 +930,12 @@ export async function saveDocument(
 
         const pq = detail as PurchaseQuotationDetail;
         const updateBody = bodies.purchaseQuotationUpdate(loaded, draft);
-        await api.updatePurchaseQuotation(
-          pq.id,
-          pq.version,
-          updateBody,
-          keyFor('updatePurchaseQuotation', pq.id, pq.version, updateBody),
-        );
+        const updateKey = keyFor('updatePurchaseQuotation', pq.id, pq.version, updateBody);
+        if (ctx !== undefined) {
+          await api.updatePurchaseQuotation(pq.id, pq.version, updateBody, updateKey, ctx);
+        } else {
+          await api.updatePurchaseQuotation(pq.id, pq.version, updateBody, updateKey);
+        }
         return {
           type: 'saved',
           id: pq.id,
@@ -722,6 +945,6 @@ export async function saveDocument(
       }
     }
   } catch (err) {
-    return mapSaveError(err);
+    return mapSaveError(err, draft);
   }
 }

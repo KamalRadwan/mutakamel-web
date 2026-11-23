@@ -247,8 +247,6 @@ function makePurchaseOrder(overrides: Partial<PurchaseOrderDetail> = {}): Purcha
     },
     sourcePurchaseQuotationId: null,
     createdBy: 'usr-1',
-    submittedBy: null,
-    submittedAt: null,
     approvalReady: false,
     delivery: null,
     lines: [
@@ -845,6 +843,208 @@ describe('document-save', () => {
       code: 'generic',
     });
   });
+
+  it('maps 403 forbidden, TRADE.PRICE.*, discount family, customer eligibility, tax default, and inventory errors in saveDocument', async () => {
+    const runSaveErr = async (
+      err: unknown,
+      opts?: { mode?: 'new' | 'edit'; scope?: 'LINE' | 'DOCUMENT' },
+    ) => {
+      const api = makeSaveApi();
+      const so = makeSalesOrder();
+      const draft = toDraft('sales-order', so);
+      if (opts?.scope === 'DOCUMENT') {
+        draft.pricing = { mode: 'DISCOUNT', scope: 'DOCUMENT', value: '10' };
+      }
+      vi.mocked(api.createSalesOrder).mockRejectedValue(err);
+      return saveDocument(
+        {
+          kind: 'sales-order',
+          mode: 'new',
+          draft,
+          loaded: draft,
+          detail: so,
+          sourceId: null,
+          sourceVersion: null,
+          fingerprint: 'fp',
+          confirm: vi.fn().mockResolvedValue(true),
+        },
+        api,
+      );
+    };
+
+    expect(await runSaveErr(new ApiError(403, 'TRADE.AUTH.TARGET_DENIED'))).toEqual({ type: 'forbidden' });
+    expect(await runSaveErr(new ApiError(409, 'TRADE.QUOTE.PRICE_LOCKED'))).toEqual({
+      type: 'pricingChanged',
+      toastKey: 'tdpg.toast.priceLockReload',
+    });
+    expect(await runSaveErr(new ApiError(422, 'TRADE.PRICE.PREVIEW_REQUIRED'))).toEqual({ type: 'pricingChanged' });
+    expect(await runSaveErr(new ApiError(409, 'TRADE.PRICE.PREVIEW_EXPIRED'))).toEqual({ type: 'pricingChanged' });
+    expect(await runSaveErr(new ApiError(422, 'TRADE.PRICE.PREVIEW_EMPTY'))).toEqual({ type: 'pricingChanged' });
+    expect(await runSaveErr(new ApiError(422, 'TRADE.PRICE.COST_UNAVAILABLE'))).toEqual({
+      type: 'costUnavailable',
+      code: 'TRADE.PRICE.COST_UNAVAILABLE',
+    });
+
+    for (const code of ['LOCK_INVALID', 'LOCK_EXPIRED', 'LOCK_CONTEXT_MISMATCH', 'LOCK_DATA_INVALID']) {
+      expect(await runSaveErr(new ApiError(409, `TRADE.PRICE.${code}`))).toEqual({
+        type: 'pricingChanged', toastKey: 'tdpg.toast.priceLockReload',
+      });
+    }
+    expect(await runSaveErr(new ApiError(409, 'TRADE.PRICE.PREVIEW_CHANGED'))).toEqual({ type: 'pricingChanged' });
+    for (const code of ['CURRENCY_INACTIVE', 'FX_UNAVAILABLE']) {
+      expect(await runSaveErr(new ApiError(422, `TRADE.PRICE.${code}`))).toEqual({
+        type: 'invalid', fieldErrors: { currencyCode: `tdpg.errors.TRADE.PRICE.${code}` }, lineErrors: {},
+      });
+    }
+
+    for (const pbCode of [
+      'TRADE.PRICE.BOOK_REQUIRED',
+      'TRADE.PRICE.BOOK_OVERRIDE_FORBIDDEN',
+      'TRADE.PRICE.PRICE_BOOK_REQUIRED',
+      'TRADE.PRICE.PRICE_BOOK_CURRENCY_MISMATCH',
+      'TRADE.PRICE.PRICE_BOOK_NOT_FOUND',
+      'TRADE.PRICE.PRICE_BOOK_INACTIVE',
+    ] as const) {
+      expect(await runSaveErr(new ApiError(422, pbCode))).toEqual({
+        type: 'invalid',
+        fieldErrors: { priceBookId: `tdpg.errors.${pbCode}` },
+        lineErrors: {},
+      });
+    }
+
+    for (const priceLineCode of [
+      'TRADE.PRICE.MARGIN_GUARD',
+      'TRADE.PRICE.OVERRIDE_REJECTED',
+      'TRADE.PRICE.RULE_SELECTION_INVALID',
+      'TRADE.PRICE.NOT_PRICED_IN_CURRENCY',
+      'TRADE.PRICE.NOT_FOUND',
+      'TRADE.PRICE.CATALOG_UNAVAILABLE',
+      'TRADE.PRICE.NO_ACTIVE_VERSION',
+      'TRADE.PRICE.CONFLICTING_ACTIVE_VERSIONS',
+      'TRADE.PRICE.RULE_INACTIVE',
+      'TRADE.PRICE.QUANTITY_MISMATCH',
+      'TRADE.PRICE.INVALID_PRICING_TARGET',
+      'TRADE.PRICE.MULTIPLE_RULES_MATCH',
+    ] as const) {
+      expect(await runSaveErr(new ApiError(422, priceLineCode, { lineIndex: ['0'] }))).toEqual({
+        type: 'invalid',
+        fieldErrors: {},
+        lineErrors: { 'cl-so-1': `tdpg.errors.${priceLineCode}` },
+      });
+    }
+
+    for (const discCode of [
+      'TRADE.QUOTE.DISCOUNT_FREE_NOT_ALLOWED',
+      'TRADE.QUOTE.DISCOUNT_INVALID',
+      'TRADE.QUOTE.DISCOUNT_LIMIT_CONFLICT',
+      'TRADE.QUOTE.DISCOUNT_LIMIT_INVALID',
+      'TRADE.QUOTE.DISCOUNT_LIMIT_NOT_FOUND',
+      'TRADE.QUOTE.DISCOUNT_LIMIT_REQUIRED',
+      'TRADE.QUOTE.DISCOUNT_PERCENT_INVALID',
+      'TRADE.QUOTE.DISCOUNT_AMOUNT_INVALID',
+      'TRADE.QUOTE.DISCOUNT_NOT_POSITIVE',
+      'TRADE.QUOTE.DISCOUNT_BELOW_COST',
+      'TRADE.QUOTE.DISCOUNT_MARGIN_FLOOR',
+    ] as const) {
+      expect(await runSaveErr(new ApiError(422, discCode, { clientLineId: ['cl-so-1'] }))).toEqual({
+        type: 'invalid',
+        fieldErrors: {},
+        lineErrors: { 'cl-so-1': `tdpg.errors.${discCode}` },
+      });
+      expect(await runSaveErr(new ApiError(422, discCode), { scope: 'DOCUMENT' })).toEqual({
+        type: 'invalid',
+        fieldErrors: { pricingValue: `tdpg.errors.${discCode}` },
+        lineErrors: {},
+      });
+    }
+
+    expect(await runSaveErr(new ApiError(422, 'TRADE.QUOTE.DISCOUNT_VALUE_REQUIRED'))).toEqual({
+      type: 'invalid',
+      fieldErrors: { pricingValue: 'tdpg.errors.TRADE.QUOTE.DISCOUNT_VALUE_REQUIRED' },
+      lineErrors: {},
+    });
+    expect(await runSaveErr(new ApiError(422, 'TRADE.QUOTE.DISCOUNT_REASON_INVALID'))).toEqual({
+      type: 'invalid',
+      fieldErrors: { pricingReason: 'tdpg.errors.TRADE.QUOTE.DISCOUNT_REASON_INVALID' },
+      lineErrors: {},
+    });
+    expect(await runSaveErr(new ApiError(422, 'TRADE.QUOTE.DISCOUNT_POLICY_FORBIDDEN'))).toEqual({
+      type: 'error',
+      code: 'TRADE.QUOTE.DISCOUNT_POLICY_FORBIDDEN',
+    });
+    expect(await runSaveErr(new ApiError(409, 'TRADE.QUOTE.DISCOUNT_RULE_CONFLICT'))).toEqual({
+      type: 'error',
+      code: 'TRADE.QUOTE.DISCOUNT_RULE_CONFLICT',
+    });
+
+    for (const custCode of [
+      'TRADE.QUOTE.CUSTOMER_INVALID',
+      'TRADE.QUOTE.CUSTOMER_AMBIGUOUS',
+      'TRADE.QUOTE.CUSTOMER_ELIGIBILITY_UNAVAILABLE',
+      'TRADE.SALES_ORDER.CUSTOMER_BLOCKED',
+      'TRADE.CUSTOMER.NOT_FOUND',
+      'TRADE.CUSTOMER.INACTIVE',
+      'TRADE.CUSTOMER.ELIGIBLE_STATUS_REQUIRED',
+    ] as const) {
+      expect(await runSaveErr(new ApiError(422, custCode))).toEqual({
+        type: 'invalid',
+        fieldErrors: { partyId: `tdpg.errors.${custCode}` },
+        lineErrors: {},
+      });
+    }
+
+    expect(
+      await runSaveErr(new ApiError(422, 'TRADE.QUOTE.TAX_DEFAULT_REQUIRED', { lineIndex: ['0'] })),
+    ).toEqual({
+      type: 'invalid',
+      fieldErrors: {},
+      lineErrors: { 'cl-so-1': 'tdpg.errors.TRADE.QUOTE.TAX_DEFAULT_REQUIRED' },
+    });
+
+    expect(
+      await runSaveErr(new ApiError(422, 'TRADE.INVENTORY.INSUFFICIENT_AVAILABILITY', { clientLineId: ['cl-so-1'] })),
+    ).toEqual({
+      type: 'invalid',
+      fieldErrors: {},
+      lineErrors: { 'cl-so-1': 'tdpg.errors.TRADE.INVENTORY.INSUFFICIENT_AVAILABILITY' },
+    });
+
+    expect(
+      await runSaveErr(new ApiError(422, 'TRADE.INVENTORY.OVER_RECEIPT', { clientLineId: ['cl-so-1'] })),
+    ).toEqual({
+      type: 'invalid',
+      fieldErrors: {},
+      lineErrors: { 'cl-so-1': 'tdpg.errors.TRADE.INVENTORY.OVER_RECEIPT' },
+    });
+  });
+
+  it('forwards explicit ctx from SaveDocumentInput to API writes', async () => {
+    const api = makeSaveApi();
+    const q = makeQuotation();
+    const loaded = toDraft('quotation', q);
+    const edited = undoDraft(loaded);
+    edited.header['draftReference'] = 'REF-UPDATED';
+    const ctx = { companyId: 'c1', branchId: 'b1' };
+    vi.mocked(api.updateQuotation).mockResolvedValue({ ...q, version: 3 });
+
+    await saveDocumentWithKeys(
+      {
+        kind: 'quotation',
+        mode: 'edit',
+        draft: edited,
+        loaded,
+        detail: q,
+        sourceId: null,
+        sourceVersion: null,
+        fingerprint: 'fp',
+        confirm: vi.fn().mockResolvedValue(true),
+        requestKeys: new DocumentRequestKeys(),
+        ctx,
+      },
+      api,
+    );
+    expect(api.updateQuotation).toHaveBeenCalledWith(q.id, q.version, expect.any(Object), ANY_KEY, ctx);
+  });
 });
 
 describe('document-commands', () => {
@@ -901,11 +1101,15 @@ describe('document-commands', () => {
       limit: 100,
     });
     const openFound = await runCommand({ kind: 'quotation', action: 'openSalesOrder', detail: q }, api);
-    expect(api.listDocuments).toHaveBeenCalledWith('sales-order', {
-      page: 1,
-      limit: 100,
-      partyId: 'pty-alnoor',
-    });
+    expect(api.listDocuments).toHaveBeenCalledWith(
+      'sales-order',
+      {
+        page: 1,
+        limit: 100,
+        partyId: 'pty-alnoor',
+      },
+      { companyId: 'c1', branchId: 'b1' },
+    );
     expect(openFound).toEqual({
       type: 'done',
       toastKey: null,
@@ -1174,6 +1378,61 @@ describe('document-commands', () => {
     expect(await runCommand({ kind: 'quotation', action: 'deleteDraft', detail: q }, api)).toEqual({
       type: 'error',
       code: 'generic',
+    });
+  });
+
+  it('maps 403 forbidden, TRADE.QUOTE.EXPIRED, SO/PO CONFIRM_NOT_ALLOWED, inventory/tax errors, and forwards ctx in runCommand', async () => {
+    const api = makeCommandApi();
+    const q = makeQuotation();
+    const so = makeSalesOrder();
+    const po = makePurchaseOrder();
+    const ctx = { companyId: 'c1', branchId: 'b1' };
+
+    vi.mocked(api.quotationAction).mockRejectedValueOnce(new ApiError(403, 'TRADE.AUTH.TARGET_DENIED'));
+    expect(await runCommand({ kind: 'quotation', action: 'send', detail: q, ctx }, api)).toEqual({
+      type: 'forbidden',
+    });
+    expect(api.quotationAction).toHaveBeenCalledWith(q.id, q.version, 'send', undefined, KEY, ctx);
+
+    vi.mocked(api.quotationAction).mockRejectedValueOnce(new ApiError(422, 'TRADE.QUOTE.EXPIRED'));
+    expect(await runCommand({ kind: 'quotation', action: 'accept', detail: q }, api)).toEqual({
+      type: 'error',
+      code: 'TRADE.QUOTE.EXPIRED',
+    });
+
+    vi.mocked(api.confirmSalesOrder).mockRejectedValueOnce(
+      new ApiError(409, 'TRADE.SALES_ORDER.CONFIRM_NOT_ALLOWED'),
+    );
+    expect(await runCommand({ kind: 'sales-order', action: 'confirm', detail: so }, api)).toEqual({
+      type: 'error',
+      code: 'TRADE.SALES_ORDER.CONFIRM_NOT_ALLOWED',
+    });
+
+    vi.mocked(api.purchaseOrderAction).mockRejectedValueOnce(
+      new ApiError(409, 'TRADE.PO.CONFIRM_NOT_ALLOWED'),
+    );
+    expect(await runCommand({ kind: 'purchase-order', action: 'poConfirm', detail: po }, api)).toEqual({
+      type: 'error',
+      code: 'TRADE.PO.CONFIRM_NOT_ALLOWED',
+    });
+
+    vi.mocked(api.confirmSalesOrder).mockRejectedValueOnce(
+      new ApiError(422, 'TRADE.INVENTORY.INSUFFICIENT_AVAILABILITY', { lineIndex: ['0'] }),
+    );
+    expect(await runCommand({ kind: 'sales-order', action: 'confirm', detail: so, ctx }, api)).toEqual({
+      type: 'error',
+      code: 'TRADE.INVENTORY.INSUFFICIENT_AVAILABILITY',
+      details: { lineIndex: ['0'] },
+    });
+    expect(api.confirmSalesOrder).toHaveBeenLastCalledWith(so.id, so.version, undefined, KEY, ctx);
+
+    vi.mocked(api.retryPurchaseDelivery).mockRejectedValueOnce(
+      new ApiError(422, 'TRADE.INVENTORY.OVER_RECEIPT', { clientLineId: ['cl-po-1'] }),
+    );
+    expect(await runCommand({ kind: 'purchase-order', action: 'retryDelivery', detail: po }, api)).toEqual({
+      type: 'error',
+      code: 'TRADE.INVENTORY.OVER_RECEIPT',
+      details: { clientLineId: ['cl-po-1'] },
     });
   });
 });

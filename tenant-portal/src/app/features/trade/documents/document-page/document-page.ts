@@ -7,6 +7,7 @@ import {
   computed,
   effect,
   inject,
+  runInInjectionContext,
   signal,
   untracked,
   viewChild,
@@ -33,6 +34,7 @@ import { filter } from 'rxjs';
 import { CurrentUser } from '../../../../core/auth/current-user';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
+import { ScopeState } from '../../../../core/scope/scope';
 import { NotFoundPage } from '../../../../layout/not-found/not-found-page';
 import { Badge } from '../../../../shared/ui/badge/badge';
 import { Button } from '../../../../shared/ui/button/button';
@@ -45,6 +47,7 @@ import { Field } from '../../../../shared/ui/field/field';
 import { Modal } from '../../../../shared/ui/modal/modal';
 import { SectionBar } from '../../../../shared/ui/section-bar/section-bar';
 import { UnsavedDialog } from '../../../../shared/ui/unsaved-dialog/unsaved-dialog';
+import { branchGrants } from '../../shared/trade-access';
 import { ApiError } from '../../shared/trade-api';
 import { formatDate } from '../../shared/trade-format';
 import { itemName, listReasons } from '../../shared/trade-foundation.api';
@@ -77,6 +80,7 @@ import type {
 } from '../shared/document.model';
 import {
   type ReceivingNodeOption,
+  embeddedSourceOpportunityOf,
   getDocument,
   injectDiscountPolicy,
   injectDocument,
@@ -84,8 +88,7 @@ import {
   listReceivingNodes,
 } from '../shared/documents.api';
 import { DocumentRequestKeys } from '../shared/document-request-keys';
-import { TRADE_DOCUMENT_PERMS } from './document-commands';
-import { runCommand } from './document-commands';
+import { DOCUMENT_ACTION_PERMISSION_KEYS, runCommand } from './document-commands';
 import {
   type DocumentDraft,
   type PageMode,
@@ -108,23 +111,6 @@ import { TotalsPanel } from './totals-panel/totals-panel';
 import { smoothScrollBehavior } from '../../../../shared/ui/scroll/scroll-into-view';
 import { translationEvents } from '../../../../core/i18n/translation-events';
 
-// later from the session permissions
-const PERMS: ReadonlySet<string> = TRADE_DOCUMENT_PERMS;
-
-const UPDATE_PERM_BY_KIND: Readonly<Record<DocumentKind, string>> = {
-  quotation: 'trade.quotations.update',
-  'sales-order': 'trade.sales_orders.update',
-  'purchase-order': 'trade.purchase_orders.update',
-  'purchase-quotation': 'trade.purchase_quotations.update',
-};
-
-const CREATE_PERM_BY_KIND: Readonly<Record<DocumentKind, string>> = {
-  quotation: 'trade.quotations.create',
-  'sales-order': 'trade.sales_orders.create',
-  'purchase-order': 'trade.purchase_orders.create',
-  'purchase-quotation': 'trade.purchase_quotations.create',
-};
-
 const NOT_FOUND_CODES = new Set([
   'TRADE.QUOTE.NOT_FOUND',
   'TRADE.SALES_ORDER.SOURCE_NOT_FOUND',
@@ -137,6 +123,7 @@ const FIELD_ORDER: readonly string[] = [
   'supplierPartyId',
   'supplierAccountId',
   'currencyCode',
+  'priceBookId',
   'validUntil',
   'receivingNodeId',
   'pricingValue',
@@ -251,6 +238,7 @@ export class DocumentPage implements CanLeaveDocumentPage {
   private readonly injector = inject(Injector);
   private readonly destroyRef = inject(DestroyRef);
   private readonly notify = inject(Notify);
+  private readonly scope = inject(ScopeState);
   private readonly currentUser = inject(CurrentUser);
   private readonly transloco = inject(TranslocoService);
   // Deferred so a synchronous scope load never writes the signal while Angular renders (NG0600).
@@ -294,10 +282,36 @@ export class DocumentPage implements CanLeaveDocumentPage {
     return { customerProfileId, opportunityId };
   });
 
-  protected readonly docQuery = injectDocument(this.kind, this.docId);
-  protected readonly sourceQuotationQuery = injectDocument('quotation', this.fromQuotationId);
-  protected readonly sourcePqQuery = injectDocument('purchase-quotation', this.fromPurchaseQuotationId);
-  protected readonly discountPolicyQuery = injectDiscountPolicy();
+  protected readonly canRead = computed(() => this.hasBranchGrant(`trade.${this.kindConfig().segment.replaceAll('-', '_')}.read`));
+  protected readonly canCreate = computed(() => this.hasBranchGrant(`trade.${this.kindConfig().segment.replaceAll('-', '_')}.create`));
+  protected readonly canUpdate = computed(() => this.hasBranchGrant(`trade.${this.kindConfig().segment.replaceAll('-', '_')}.update`));
+  protected readonly canConvertQuotation = computed(
+    () =>
+      this.hasBranchGrant('trade.quotations.read') &&
+      this.hasBranchGrant('trade.quotations.convert') &&
+      this.hasBranchGrant('trade.sales_orders.create'),
+  );
+  protected readonly canConvertPurchaseQuotation = computed(
+    () =>
+      this.hasBranchGrant('trade.purchase_quotations.read') &&
+      this.hasBranchGrant('trade.purchase_quotations.convert') &&
+      this.hasBranchGrant('trade.purchase_orders.create'),
+  );
+
+  protected readonly docQuery = injectDocument(this.kind, this.docId, this.canRead);
+  protected readonly sourceQuotationQuery = injectDocument(
+    'quotation',
+    this.fromQuotationId,
+    this.canConvertQuotation,
+  );
+  protected readonly sourcePqQuery = injectDocument(
+    'purchase-quotation',
+    this.fromPurchaseQuotationId,
+    this.canConvertPurchaseQuotation,
+  );
+  protected readonly discountPolicyQuery = injectDiscountPolicy(
+    computed(() => this.kind() === 'quotation' && (this.isNewMode() ? this.canCreate() : this.canRead())),
+  );
 
   private readonly now = signal(new Date());
   /** x-idempotency-keys: one per save or command action, reused on a retry, reset after a success. */
@@ -310,6 +324,8 @@ export class DocumentPage implements CanLeaveDocumentPage {
   protected readonly saving = signal(false);
   protected readonly commandBusy = signal<DocAction | null>(null);
   protected readonly showValidationErrors = signal(false);
+  private readonly actionForbidden = signal(false);
+  private readonly costUnavailable = signal(false);
   private readonly rawFieldErrors = signal<Record<string, string>>({});
   private readonly rawLineErrors = signal<Record<string, string>>({});
   private readonly rawLineErrorParams = signal<Record<string, Record<string, string>>>({});
@@ -387,7 +403,7 @@ export class DocumentPage implements CanLeaveDocumentPage {
     const d = this.detail();
     if (!d) return 'readonly';
     const kind = this.kind();
-    if (!PERMS.has(UPDATE_PERM_BY_KIND[kind])) return 'readonly';
+    if (!this.canUpdate()) return 'readonly';
 
     switch (kind) {
       case 'quotation':
@@ -429,9 +445,21 @@ export class DocumentPage implements CanLeaveDocumentPage {
   });
 
   protected readonly loadErrorKind = computed<'not-found' | 'forbidden' | 'failed' | null>(() => {
+    if (this.actionForbidden()) {
+      return 'forbidden';
+    }
     const err = this.activeLoadError();
     if (!err) {
-      if (this.isNewMode() && !this.isConvertMode() && !PERMS.has(CREATE_PERM_BY_KIND[this.kind()])) {
+      if (this.docId() && !this.canRead()) {
+        return 'forbidden';
+      }
+      if (this.fromQuotationId() && !this.canConvertQuotation()) {
+        return 'forbidden';
+      }
+      if (this.fromPurchaseQuotationId() && !this.canConvertPurchaseQuotation()) {
+        return 'forbidden';
+      }
+      if (this.isNewMode() && !this.isConvertMode() && !this.canCreate()) {
         return 'forbidden';
       }
       return null;
@@ -449,17 +477,40 @@ export class DocumentPage implements CanLeaveDocumentPage {
 
   protected readonly currentUserId = computed(() => this.currentUser.user().email);
 
+  protected readonly grantedActionPerms = computed<ReadonlySet<string>>(() => {
+    const granted = new Set<string>();
+    for (const key of DOCUMENT_ACTION_PERMISSION_KEYS) {
+      if (this.hasBranchGrant(key)) {
+        granted.add(key);
+      }
+    }
+    for (const segment of ['quotations', 'sales_orders', 'purchase_orders', 'purchase_quotations'] as const) {
+      if (granted.has(`trade.${segment}.update`)) {
+        granted.add(`trade.${segment}.delete`);
+      }
+    }
+    return granted;
+  });
+
   protected readonly headerActions = computed<ResolvedAction[]>(() => {
     const d = this.effectiveDetail();
     if (this.isNewMode() || !d) return [];
     const dirty = this.dirty();
-    const resolved = resolveActions(this.kind(), d, {
+    const perms = this.grantedActionPerms();
+    let resolved = resolveActions(this.kind(), d, {
       dirty,
       isNew: false,
       currentUserId: this.currentUserId(),
-      perms: PERMS,
+      perms,
       now: this.now(),
     });
+    if (this.kind() === 'purchase-quotation' && !perms.has('trade.purchase_quotations.convert')) {
+      resolved = resolved.filter(
+        (item) =>
+          item.action !== 'convertToPurchaseOrder' &&
+          item.action !== 'createPurchaseOrderDirect',
+      );
+    }
     return dirty ? resolved.map((item) => ({ ...item, primary: false })) : resolved;
   });
 
@@ -492,6 +543,10 @@ export class DocumentPage implements CanLeaveDocumentPage {
       validateRevision,
     });
   });
+
+  protected readonly paymentTermsMissing = computed(
+    () => this.termsSection()?.paymentTermsMissing() ?? false,
+  );
 
   protected readonly isDraftInvalid = computed(() => {
     if (this.pageMode() === 'readonly') return false;
@@ -583,16 +638,37 @@ export class DocumentPage implements CanLeaveDocumentPage {
   });
 
   protected readonly headerOpportunityId = computed<string | null>(() => {
-    if (this.kind() !== 'quotation') return null;
-    const linkedId = this.draft().header['sourceCrmOpportunityId'];
-    return typeof linkedId === 'string' && linkedId.trim().length > 0 ? linkedId.trim() : null;
+    const kind = this.kind();
+    if (kind === 'quotation') {
+      const linkedId = this.draft().header['sourceCrmOpportunityId'];
+      if (typeof linkedId === 'string' && linkedId.trim().length > 0) {
+        return linkedId.trim();
+      }
+      return embeddedSourceOpportunityOf(this.detail())?.id ?? null;
+    }
+    if (kind === 'sales-order') {
+      return embeddedSourceOpportunityOf(this.detail())?.id ?? null;
+    }
+    return null;
   });
 
   protected readonly headerOpportunity = computed<SourceCrmOpportunity | null>(() => {
     const linkedId = this.headerOpportunityId();
     if (!linkedId) return null;
-    const resolved = this.resolvedHeaderOpportunity();
-    return resolved && resolved.id === linkedId ? resolved : null;
+    const embedded = embeddedSourceOpportunityOf(this.detail());
+    if (embedded && embedded.id === linkedId && embedded.available && embedded.name?.trim()) {
+      const lang = this.lang();
+      const stageName = embedded.stageName
+        ? ((lang === 'ar' ? embedded.stageName.ar || embedded.stageName.en : embedded.stageName.en || embedded.stageName.ar) ?? '')
+        : '';
+      return {
+        id: embedded.id,
+        name: embedded.name.trim(),
+        stageName: stageName.trim(),
+        status: embedded.status ?? 'IN_PROGRESS',
+      };
+    }
+    return null;
   });
 
   protected readonly sourceQuotationId = computed<string | null>(
@@ -641,6 +717,9 @@ export class DocumentPage implements CanLeaveDocumentPage {
 
   protected readonly itemsBarNote = computed<string | null>(() => {
     this.i18n();
+    if (this.costUnavailable()) {
+      return this.transloco.translate('tdpg.errors.TRADE.PRICE.COST_UNAVAILABLE');
+    }
     const mode = this.pageMode();
     if (mode === 'convert-quotation') {
       return this.transloco.translate('tdpg.itemsNote.convertQuotation');
@@ -657,8 +736,12 @@ export class DocumentPage implements CanLeaveDocumentPage {
       return this.transloco.translate('tdpg.itemsNote.poResubmitApproval');
     }
     if (this.kind() === 'quotation' && this.discountMode() === 'line' && this.linesEditable()) {
-      const max = this.discountPolicyQuery.data()?.limit.maxPercent ?? '10';
-      return this.transloco.translate('tdpg.itemsNote.lineDiscount', { max });
+      const policy = this.discountPolicyQuery.data();
+      if (!policy) return null;
+      if (policy.limit === null) {
+        return this.transloco.translate('tdpg.itemsNote.lineDiscountNoLimit');
+      }
+      return this.transloco.translate('tdpg.itemsNote.lineDiscount', { max: policy.limit.maxPercent });
     }
     if (po?.sourcePurchaseQuotationId) {
       return this.transloco.translate('tdpg.itemsNote.convertPurchaseQuotation');
@@ -702,7 +785,7 @@ export class DocumentPage implements CanLeaveDocumentPage {
 
   protected readonly activeCurrencyDecimalPlaces = computed<number>(() => {
     const snap = this.activeTotalsSnapshot();
-    if (snap) return snap.currencyDecimalPlaces;
+    if (snap?.currencyDecimalPlaces != null) return snap.currencyDecimalPlaces;
     const rev = this.currentQuotationRevision();
     if (rev) return rev.discountSnapshot.currencyDecimalPlaces;
     const srcQ = this.sourceQuotation();
@@ -712,7 +795,9 @@ export class DocumentPage implements CanLeaveDocumentPage {
       if (accRev) return accRev.discountSnapshot.currencyDecimalPlaces;
     }
     const srcPq = this.sourcePurchaseQuotation();
-    if (srcPq?.totalsSnapshot) return srcPq.totalsSnapshot.currencyDecimalPlaces;
+    if (srcPq?.totalsSnapshot?.currencyDecimalPlaces != null) {
+      return srcPq.totalsSnapshot.currencyDecimalPlaces;
+    }
     return currencyDecimalPlacesOf(this.draftCurrency());
   });
 
@@ -785,6 +870,8 @@ export class DocumentPage implements CanLeaveDocumentPage {
         this.resolvedHeaderOpportunity.set(null);
         this.resolvedSourceNumber.set(null);
         this.showValidationErrors.set(false);
+        this.actionForbidden.set(false);
+        this.costUnavailable.set(false);
         this.rawFieldErrors.set({});
         this.rawLineErrors.set({});
         this.rawLineErrorParams.set({});
@@ -835,6 +922,8 @@ export class DocumentPage implements CanLeaveDocumentPage {
 
         this.draft.set(structuredClone(mapped));
         this.showValidationErrors.set(false);
+        this.actionForbidden.set(false);
+        this.costUnavailable.set(false);
         this.rawFieldErrors.set({});
         this.rawLineErrors.set({});
         this.rawLineErrorParams.set({});
@@ -899,7 +988,7 @@ export class DocumentPage implements CanLeaveDocumentPage {
       const targetKind: DocumentKind = soSrc ? 'quotation' : 'purchase-quotation';
       const targetId = (soSrc ?? poSrc)!;
       untracked(() => {
-        void getDocument(targetKind, targetId)
+        void getDocument(targetKind, targetId, this.scope, this.lang())
           .then((src) => {
             if (seq === this.sourceNumberSeq) {
               this.resolvedSourceNumber.set(src.documentNumber ?? src.id);
@@ -983,6 +1072,14 @@ export class DocumentPage implements CanLeaveDocumentPage {
     }
   }
 
+  protected badgeLabel(labelKey: string): string {
+    this.i18n();
+    const translated = this.transloco.translate(labelKey);
+    return translated && translated !== labelKey
+      ? translated
+      : this.transloco.translate('td.common.unknownStatus');
+  }
+
   protected goBack(): void {
     void this.router.navigate(['/trade/documents', this.kindConfig().segment], {
       queryParams: this.backQueryParams,
@@ -990,6 +1087,8 @@ export class DocumentPage implements CanLeaveDocumentPage {
   }
 
   protected reloadPage(): void {
+    this.actionForbidden.set(false);
+    this.costUnavailable.set(false);
     if (this.docId()) {
       invalidateDocumentQueries(this.kind());
       void this.docQuery.refetch();
@@ -1130,6 +1229,7 @@ export class DocumentPage implements CanLeaveDocumentPage {
         discountReasonRequired: this.headerFields()?.pricingReasonRequired() ?? false,
         confirm: (titleKey, textKey) => this.askConfirm('warning', titleKey, textKey, 'tdpg.save.newRevision'),
         requestKeys: this.saveKeys,
+        ctx: this.scope,
       });
       if (outcome.type === 'saved' || outcome.type === 'redirect') {
         this.saveKeys.reset();
@@ -1177,7 +1277,7 @@ export class DocumentPage implements CanLeaveDocumentPage {
       this.directPoNodeId.set(null);
       this.directPoModal()?.open();
       try {
-        const nodes = await listReceivingNodes();
+        const nodes = await listReceivingNodes(this.scope);
         this.receivingNodes.set(nodes);
         if (nodes.length > 0 && !this.directPoNodeId()) {
           this.directPoNodeId.set(nodes[0].id);
@@ -1262,7 +1362,7 @@ export class DocumentPage implements CanLeaveDocumentPage {
     const id = this.docId();
     if (!id) return;
     try {
-      const fresh = await getDocument(this.kind(), id);
+      const fresh = await getDocument(this.kind(), id, this.scope, this.lang());
       this.detailVersionOverride.set(fresh.version);
     } catch (err) {
       this.showApiErrorToast(err instanceof ApiError ? err.code : 'generic');
@@ -1284,6 +1384,7 @@ export class DocumentPage implements CanLeaveDocumentPage {
         detail: d,
         params,
         idempotencyKey: this.commandKeys.for(action, { kind: this.kind(), id: d.id, version: d.version, params }),
+        ctx: this.scope,
       });
 
       switch (outcome.type) {
@@ -1314,13 +1415,94 @@ export class DocumentPage implements CanLeaveDocumentPage {
           this.conflictOpen.set(true);
           break;
 
+        case 'forbidden':
+          this.actionForbidden.set(true);
+          break;
+
         case 'error':
-          this.showApiErrorToast(outcome.code);
+          this.handleCommandError(outcome.code, outcome.details);
           break;
       }
     } finally {
       this.commandBusy.set(null);
     }
+  }
+
+  private handleCommandError(code: string, details?: Record<string, unknown>): void {
+    if (
+      code === 'TRADE.QUOTE.PRICING_CHANGED' ||
+      code === 'TRADE.PRICE.PREVIEW_CHANGED' ||
+      code === 'TRADE.PRICE.PREVIEW_REQUIRED' ||
+      code === 'TRADE.PRICE.PREVIEW_EXPIRED' ||
+      code === 'TRADE.PRICE.PREVIEW_EMPTY'
+    ) {
+      this.documentLines()?.refreshPricing();
+      this.notify.warning(this.transloco.translate('tdpg.toast.pricingChanged'));
+      return;
+    }
+
+    if (code === 'TRADE.QUOTE.PRICE_LOCKED' || [
+      'TRADE.PRICE.LOCK_INVALID',
+      'TRADE.PRICE.LOCK_EXPIRED',
+      'TRADE.PRICE.LOCK_CONTEXT_MISMATCH',
+      'TRADE.PRICE.LOCK_DATA_INVALID',
+    ].includes(code)) {
+      this.documentLines()?.refreshPricing();
+      this.notify.warning(this.transloco.translate('tdpg.toast.priceLockReload'));
+      return;
+    }
+
+    if (code === 'TRADE.PRICE.COST_UNAVAILABLE') {
+      this.costUnavailable.set(true);
+      this.showApiErrorToast(code);
+      return;
+    }
+
+    const field = ['TRADE.PRICE.CURRENCY_INACTIVE', 'TRADE.PRICE.FX_UNAVAILABLE'].includes(code)
+      ? 'currencyCode'
+      : ['TRADE.PRICE.BOOK_REQUIRED', 'TRADE.PRICE.BOOK_OVERRIDE_FORBIDDEN'].includes(code)
+        ? 'priceBookId'
+        : null;
+    if (field) {
+      const errors = { [field]: this.errorKeyFor(code) };
+      this.rawFieldErrors.set(errors);
+      afterNextRender(() => this.focusFirstError(errors, {}), { injector: this.injector });
+      return;
+    }
+
+    const lineId = this.resolveCommandLineId(details);
+    if (lineId) {
+      const errorKey = this.errorKeyFor(code);
+      this.rawLineErrors.set({ [lineId]: errorKey });
+      afterNextRender(() => this.focusFirstError({}, { [lineId]: errorKey }), { injector: this.injector });
+    }
+    this.showApiErrorToast(code);
+  }
+
+  private resolveCommandLineId(details?: Record<string, unknown>): string | null {
+    if (!details) return null;
+    const direct = details['clientLineId'];
+    if (typeof direct === 'string' && direct.length > 0) return direct;
+    if (Array.isArray(direct) && typeof direct[0] === 'string' && direct[0].length > 0) {
+      return direct[0];
+    }
+    const lines = this.draft().lines;
+    const rawIndex = details['lineIndex'];
+    const rawIdx = Array.isArray(rawIndex) ? rawIndex[0] : rawIndex;
+    if (typeof rawIdx === 'number' && Number.isInteger(rawIdx) && rawIdx >= 0 && rawIdx < lines.length) {
+      return lines[rawIdx]?.clientLineId ?? null;
+    }
+    if (typeof rawIdx === 'string' && /^\d+$/.test(rawIdx)) {
+      const idx = Number(rawIdx);
+      if (idx >= 0 && idx < lines.length) {
+        return lines[idx]?.clientLineId ?? null;
+      }
+    }
+    const itemId = details['itemId'];
+    if (typeof itemId === 'string' && itemId.length > 0) {
+      return lines.find((line) => line.itemId === itemId)?.clientLineId ?? null;
+    }
+    return null;
   }
 
   private async handleSaveOutcome(outcome: SaveOutcome, navigateOnCreate = true): Promise<boolean> {
@@ -1364,9 +1546,18 @@ export class DocumentPage implements CanLeaveDocumentPage {
         this.conflictOpen.set(true);
         return false;
 
+      case 'forbidden':
+        this.actionForbidden.set(true);
+        return false;
+
       case 'pricingChanged':
         this.documentLines()?.refreshPricing();
-        this.notify.warning(this.transloco.translate('tdpg.toast.pricingChanged'));
+        this.notify.warning(this.transloco.translate(outcome.toastKey ?? 'tdpg.toast.pricingChanged'));
+        return false;
+
+      case 'costUnavailable':
+        this.costUnavailable.set(true);
+        this.showApiErrorToast(outcome.code);
         return false;
 
       case 'invalid':
@@ -1390,17 +1581,27 @@ export class DocumentPage implements CanLeaveDocumentPage {
     }
   }
 
-  private showApiErrorToast(code: string): void {
-    const key = `td.errors.${code}`;
-    const translated = this.transloco.translate(key);
-    if (translated && translated !== key) {
-      this.notify.error(translated);
-      return;
+  private errorKeyFor(code: string): string {
+    const tdpgKey = `tdpg.errors.${code}`;
+    const tdpgTranslated = this.transloco.translate(tdpgKey);
+    if (tdpgTranslated && tdpgTranslated !== tdpgKey) {
+      return tdpgKey;
     }
-    this.notify.error(this.transloco.translate('td.errors.generic'));
+    const tdKey = `td.errors.${code}`;
+    const tdTranslated = this.transloco.translate(tdKey);
+    if (tdTranslated && tdTranslated !== tdKey) {
+      return tdKey;
+    }
+    return 'td.errors.generic';
+  }
+
+  private showApiErrorToast(code: string): void {
+    this.notify.error(this.transloco.translate(this.errorKeyFor(code)));
   }
 
   private clearServerErrors(): void {
+    this.actionForbidden.set(false);
+    this.costUnavailable.set(false);
     if (Object.keys(this.rawFieldErrors()).length > 0) this.rawFieldErrors.set({});
     if (Object.keys(this.rawLineErrors()).length > 0) this.rawLineErrors.set({});
     if (Object.keys(this.rawLineErrorParams()).length > 0) this.rawLineErrorParams.set({});
@@ -1454,5 +1655,12 @@ export class DocumentPage implements CanLeaveDocumentPage {
     const resolve = this.confirmResolver;
     this.confirmResolver = null;
     resolve?.(confirmed);
+  }
+
+  private hasBranchGrant(key: string): boolean {
+    const grants = runInInjectionContext(this.injector, () => branchGrants(key));
+    if (grants === 'ALL') return true;
+    const branchId = this.scope.branch()?.id;
+    return Boolean(branchId) && grants.has(branchId);
   }
 }

@@ -331,8 +331,6 @@ function makePurchaseOrderDetail(overrides: Partial<PurchaseOrderDetail> = {}): 
     },
     sourcePurchaseQuotationId: null,
     createdBy: 'usr-1',
-    submittedBy: null,
-    submittedAt: null,
     approvalReady: false,
     delivery: null,
     lines: [
@@ -862,6 +860,20 @@ describe('document-draft', () => {
       const supUpdate = bodies.purchaseQuotationUpdate(draft, supplierChanged);
       expect(supUpdate.supplierPartyId).toBe('pty-09');
       expect(supUpdate.lines).toHaveLength(2);
+    });
+
+    it('omits unset optional term slots from quotation revisions (S-1)', () => {
+      const draft = emptyDraft('quotation');
+      draft.termSelections = { paymentTermId: 'term-pay-1', deliveryTermId: undefined, warrantyTermId: '', clauseIds: [] };
+      expect(bodies.quotationRevision(draft, 'fp-rev').termSelections).toEqual({ paymentTermId: 'term-pay-1' });
+      expect(bodies.quotationCreate(draft)).not.toHaveProperty('termSelections');
+    });
+
+    it('does not attach requestedDeadline on draft sales order creation even if populated on draft header', () => {
+      const soDraft = toDraft('sales-order', makeSalesOrderDetail());
+      soDraft.header['requestedDeadline'] = '2026-12-20';
+      const soCreate = bodies.salesOrderCreate(soDraft, { expectedPricingFingerprint: 'fp-so' });
+      expect((soCreate as unknown as Record<string, unknown>)['requestedDeadline']).toBeUndefined();
     });
   });
 });
