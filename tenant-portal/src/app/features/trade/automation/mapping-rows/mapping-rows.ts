@@ -23,6 +23,7 @@ import {
   SOURCE_COLUMN_PATTERN,
   getImportTarget,
   type ImportLookupCode,
+  type ImportTargetSpec,
   type ImportTransformCode,
 } from '../imports.registry';
 
@@ -31,6 +32,13 @@ export interface TargetFieldMeta {
   required: boolean;
   allowedTransforms: readonly string[];
   lookupCode: string | null;
+}
+
+export interface MappingRowServerError {
+  positionError?: string;
+  columnError?: string;
+  targetError?: string;
+  lookupError?: string;
 }
 
 /** Default file header for each backend target field code (IMPORT_TARGET_FIELDS). */
@@ -182,6 +190,69 @@ export function translateRowError(transloco: TranslocoService, code: string | nu
   return code;
 }
 
+export function extractMappingFieldErrors(
+  error: unknown,
+  fields: readonly MappingField[],
+  transloco: TranslocoService,
+  targetCode: string,
+): Readonly<Record<number, MappingRowServerError>> {
+  if (
+    !(error instanceof ApiError) ||
+    (error.code !== 'TRADE.IMPORT.MAPPING_INVALID' && error.code !== 'TRADE.VALIDATION_FAILED')
+  ) {
+    return {};
+  }
+
+  const out: Record<number, MappingRowServerError> = {};
+  const lookupInvalidMsg =
+    hasTranslation(transloco, 'imports.mappingRows.errors.lookupInvalid') ??
+    'This lookup code is not valid for the selected field.';
+  const details = error.details ?? {};
+
+  for (const [key, messages] of Object.entries(details)) {
+    const match = /^fields\.(\d+)\.(sourceOrdinal|sourceColumnCode|targetFieldCode|lookupCode)$/.exec(key);
+    if (match) {
+      const idx = Number(match[1]);
+      if (Number.isInteger(idx) && idx >= 0 && idx < fields.length) {
+        const entry = (out[idx] ??= {});
+        const msg = messages[0] || translateImportError(transloco, error);
+        if (match[2] === 'sourceOrdinal') entry.positionError = msg;
+        else if (match[2] === 'sourceColumnCode') entry.columnError = msg;
+        else if (match[2] === 'targetFieldCode') entry.targetError = msg;
+        else if (match[2] === 'lookupCode') entry.lookupError = lookupInvalidMsg;
+      }
+      continue;
+    }
+
+    if (key === 'lookupCode') {
+      let matchedAny = false;
+      fields.forEach((row, idx) => {
+        if (row.lookupCode) {
+          out[idx] = { ...(out[idx] ?? {}), lookupError: lookupInvalidMsg };
+          matchedAny = true;
+        }
+      });
+      if (!matchedAny && fields.length > 0) {
+        out[0] = { ...(out[0] ?? {}), lookupError: lookupInvalidMsg };
+      }
+    }
+  }
+
+  if (Object.keys(out).length === 0 && error.code === 'TRADE.IMPORT.MAPPING_INVALID') {
+    const metaByCode = new Map(getTargetFields(targetCode).map((f) => [f.code, f]));
+    fields.forEach((row, idx) => {
+      const meta = metaByCode.get(row.targetFieldCode);
+      const expected = meta?.lookupCode ?? null;
+      const actual = row.lookupCode ?? null;
+      if (actual && actual !== expected) {
+        out[idx] = { ...(out[idx] ?? {}), lookupError: lookupInvalidMsg };
+      }
+    });
+  }
+
+  return out;
+}
+
 export function normalizePage<T>(raw: unknown, page = 1, limit = 25): Page<T> {
   if (Array.isArray(raw)) {
     const items = raw as T[];
@@ -267,10 +338,24 @@ export class MappingRows {
   readonly fields = model.required<MappingField[]>();
   readonly readonly = input(false);
   readonly showErrors = input(false);
+  readonly serverErrors = input<Readonly<Record<number, MappingRowServerError>>>({});
+  readonly targetSpecs = input<readonly ImportTargetSpec[] | null>(null);
 
   protected readonly maxRows = FILE_LIMITS.columns;
 
-  protected readonly targetFields = computed(() => getTargetFields(this.targetCode()));
+  protected readonly targetFields = computed(() => {
+    const specs = this.targetSpecs();
+    const match = specs?.find((t) => t.code === this.targetCode());
+    if (match) {
+      return match.fields.map((f) => ({
+        code: f.code,
+        required: f.required,
+        allowedTransforms: f.allowedTransforms,
+        lookupCode: f.lookupCode,
+      }));
+    }
+    return getTargetFields(this.targetCode());
+  });
   protected readonly targetFieldMap = computed(() => new Map(this.targetFields().map((f) => [f.code, f])));
 
   protected readonly rowValidations = computed<RowValidation[]>(() => {
@@ -382,10 +467,18 @@ export class MappingRows {
   }
 
   protected rowErrorMessage(index: number): string | null {
-    if (!this.showErrors()) return null;
-    const validation = this.rowValidations()[index];
-    if (!validation) return null;
-    return validation.positionError ?? validation.columnError ?? validation.targetError;
+    const srv = this.serverErrors()[index];
+    const validation = this.showErrors() ? this.rowValidations()[index] : null;
+    return (
+      validation?.positionError ??
+      validation?.columnError ??
+      validation?.targetError ??
+      srv?.positionError ??
+      srv?.columnError ??
+      srv?.targetError ??
+      srv?.lookupError ??
+      null
+    );
   }
 
   protected onOrdinalInput(index: number, event: Event): void {

@@ -10,7 +10,7 @@ import { Dropdown, type DropdownOption } from '../../../../shared/ui/dropdown/dr
 import { Field } from '../../../../shared/ui/field/field';
 import { Modal } from '../../../../shared/ui/modal/modal';
 import { Segmented, type SegmentedOption } from '../../../../shared/ui/segmented/segmented';
-import { ApiError } from '../../shared/trade-api';
+import { ApiError, errorCodeOf, tradeContext } from '../../shared/trade-api';
 import { ActionKeys } from '../automation-shared/action-keys';
 import { createMapping } from '../imports.api';
 import type { CreateImportMappingInput, ImportMapping, MappingFieldInput } from '../imports.model';
@@ -21,6 +21,7 @@ import {
   type ImportTargetCode,
   type ImportTransformCode,
 } from '../imports.registry';
+import { isForbiddenError, isIdempotencyMismatch } from '../mapping-rows/import-access';
 import {
   defaultTransformForField,
   englishSourceColumnName,
@@ -48,6 +49,7 @@ export class ImportMappingModal {
   protected readonly targetCodes: ImportTargetCode[] = IMPORT_TARGETS.map((t) => t.code);
 
   readonly created = output<ImportMapping>();
+  readonly forbidden = output<void>();
 
   protected readonly code = signal('');
   protected readonly targetCode = signal<ImportTargetCode>(this.targetCodes[0]);
@@ -153,12 +155,22 @@ export class ImportMappingModal {
         executionMode: 'PER_ROW',
         fields,
       };
-      const mapping = await createMapping(body, this.keys.for('create', body));
+      const ctx = tradeContext(this.scopeState, selectedLevel);
+      const mapping = await createMapping(body, this.keys.for('create', body), ctx);
       this.keys.done('create');
       this.notify.success(this.transloco.translate('imports.mappingModal.createdToast'));
       this.modal().close();
       this.created.emit(mapping);
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.keys.done('create');
+        this.modal().close();
+        this.forbidden.emit();
+        return;
+      }
+      if (isIdempotencyMismatch(errorCodeOf(error))) {
+        this.keys.done('create');
+      }
       // The backend reports a taken code as 422 MAPPING_INVALID; the seeded columns are always valid here.
       if (error instanceof ApiError && error.status === 422 && error.code === 'TRADE.IMPORT.MAPPING_INVALID') {
         this.keys.done('create');

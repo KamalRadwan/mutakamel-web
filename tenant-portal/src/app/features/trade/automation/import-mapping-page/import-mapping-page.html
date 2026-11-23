@@ -1,3 +1,14 @@
+@if (isForbidden()) {
+  <div class="flex flex-1 rounded-10 border border-border bg-surface shadow-card">
+    <ui-full-state
+      kind="forbidden"
+      [title]="'errors.forbidden.title' | transloco"
+      [text]="'errors.forbidden.text' | transloco"
+      [actionLabel]="'errors.notFound.action' | transloco"
+      (action)="goHome()"
+    />
+  </div>
+} @else {
 <header class="shrink-0 overflow-hidden rounded-10 border border-border bg-surface shadow-card">
   @if (loading()) {
     <div aria-busy="true">
@@ -52,7 +63,7 @@
       <span class="flex-1"></span>
 
       <div class="flex flex-wrap items-center gap-8">
-        @if (can.manage && dirty()) {
+        @if (canManage() && dirty()) {
           <button
             type="button"
             uiButton
@@ -78,7 +89,7 @@
           </button>
         }
 
-        @if (can.publish && savedDraftVersion()) {
+        @if (canManage() && savedDraftVersion()) {
           <button
             type="button"
             uiButton
@@ -145,9 +156,12 @@
     >
       <app-mapping-rows
         [targetCode]="current.targetCode"
-        [(fields)]="draftFields"
-        [readonly]="!can.manage"
+        [fields]="draftFields()"
+        (fieldsChange)="onDraftFieldsChange($event)"
+        [readonly]="!canManage()"
         [showErrors]="saveAttempted()"
+        [serverErrors]="serverRowErrors()"
+        [targetSpecs]="liveTargets()"
       />
     </div>
 
@@ -283,3 +297,4 @@
   (reload)="onConflictReload()"
   (keep)="onConflictKeep()"
 />
+}

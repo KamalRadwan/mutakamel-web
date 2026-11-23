@@ -1,4 +1,4 @@
-import { Component, computed, inject, input, resource, signal, viewChild } from '@angular/core';
+import { Component, Injector, computed, inject, input, resource, signal, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../core/i18n/translation-events';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
@@ -17,12 +17,20 @@ import { LanguageState } from '../../../../core/i18n/language';
 import { ScopeState } from '../../../../core/scope/scope';
 import { ActionsMenu, type ActionItem, type ActionSelection } from '../../../../shared/ui/actions-menu/actions-menu';
 import { Button } from '../../../../shared/ui/button/button';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { Pagination } from '../../../../shared/ui/pagination/pagination';
 import { AutomationBadge } from '../automation-shared/automation-badge/automation-badge';
 import { ScopeChip } from '../automation-shared/scope-chip/scope-chip';
 import { ImportMappingModal } from '../import-mapping-modal/import-mapping-modal';
 import { listMappings } from '../imports.api';
 import type { ImportMapping } from '../imports.model';
+import {
+  IMPORT_PERMISSIONS,
+  hasImportReadGrant,
+  hasImportScopeGrant,
+  importContext,
+  isForbiddenError,
+} from '../mapping-rows/import-access';
 import {
   currentScopeTarget,
   formatDateTime,
@@ -32,7 +40,6 @@ import {
   targetLabel,
 } from '../mapping-rows/mapping-rows';
 
-const CAN = { manage: true, test: true, approve: true, publish: true }; // later from the session
 const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = 24;
 const PAGE_SIZES = [12, 24, 48, 96];
@@ -50,6 +57,7 @@ function parsePositiveInt(raw: string | undefined, fallback: number): number {
     TranslocoPipe,
     ActionsMenu,
     Button,
+    FullState,
     Pagination,
     AutomationBadge,
     ScopeChip,
@@ -79,13 +87,15 @@ function parsePositiveInt(raw: string | undefined, fallback: number): number {
 export class ImportMappingsPage {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly injector = inject(Injector);
   private readonly scopeState = inject(ScopeState);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly createModal = viewChild(ImportMappingModal);
 
   protected readonly lang = inject(LanguageState).current;
-  protected readonly can = CAN;
+  protected readonly forbidden = signal(false);
+  protected readonly canRead = computed(() => hasImportReadGrant(this.injector));
   protected readonly pageSizes = PAGE_SIZES;
   protected readonly skeletonRows = [1, 2, 3, 4, 5];
 
@@ -113,32 +123,53 @@ export class ImportMappingsPage {
 
   private readonly mappingsResource = resource({
     params: () => {
-      if (this.tenantBlockedByScope()) return undefined;
+      if (!this.canRead() || this.forbidden() || this.tenantBlockedByScope()) return undefined;
       return {
-        companyId: this.scopeState.company()?.id ?? '',
-        branchId: this.scopeState.branch()?.id ?? '',
+        ctx: importContext(this.scopeState),
         status: this.statusFilter(),
         tick: this.refreshTick(),
       };
     },
     loader: async ({ params }) => {
       // The backend list has no search; one page of 100 is searched and paged here.
-      const res = await listMappings({
-        ...(params.status !== 'ALL' ? { status: params.status } : {}),
-        limit: 100,
-      });
+      const res = await listMappings(
+        {
+          ...(params.status !== 'ALL' ? { status: params.status } : {}),
+          limit: 100,
+        },
+        params.ctx,
+      );
       return normalizePage<ImportMapping>(res, 1, 100).items;
     },
   });
+
+  private readonly listForbidden = computed(
+    () => this.mappingsResource.status() === 'error' && isForbiddenError(this.mappingsResource.error()),
+  );
+  protected readonly isForbidden = computed(
+    () => !this.canRead() || this.forbidden() || this.listForbidden(),
+  );
+  protected readonly canManage = computed(
+    () =>
+      !this.isForbidden() &&
+      hasImportScopeGrant(this.injector, this.scopeState, IMPORT_PERMISSIONS.manage),
+  );
+  protected readonly canExecute = computed(
+    () =>
+      !this.isForbidden() &&
+      hasImportScopeGrant(this.injector, this.scopeState, IMPORT_PERMISSIONS.execute),
+  );
 
   protected readonly tenantBlocked = computed(
     () => this.tenantBlockedByScope() || isScopeMismatchError(this.mappingsResource.error()),
   );
   protected readonly loading = computed(
-    () => !this.tenantBlocked() && this.mappingsResource.isLoading() && !this.mappingsResource.hasValue(),
+    () => !this.isForbidden() && !this.tenantBlocked() && this.mappingsResource.isLoading() && !this.mappingsResource.hasValue(),
   );
   protected readonly refreshing = computed(() => this.mappingsResource.isLoading());
-  protected readonly failed = computed(() => !this.tenantBlocked() && !!this.mappingsResource.error());
+  protected readonly failed = computed(
+    () => !this.isForbidden() && !this.tenantBlocked() && !!this.mappingsResource.error(),
+  );
 
   protected readonly filteredMappings = computed<ImportMapping[]>(() => {
     this.i18n();
@@ -168,8 +199,16 @@ export class ImportMappingsPage {
 
   protected readonly hasFilters = computed(() => this.statusFilter() !== 'ALL' || this.search().trim() !== '');
 
+  protected goHome(): void {
+    void this.router.navigateByUrl('/workspace/home');
+  }
+
+  protected onForbidden(): void {
+    this.forbidden.set(true);
+  }
+
   protected openCreate(): void {
-    if (!this.can.manage || this.tenantBlocked()) return;
+    if (!this.canManage() || this.tenantBlocked()) return;
     this.createModal()?.open();
   }
 
@@ -270,7 +309,7 @@ export class ImportMappingsPage {
   protected menuActions(mapping: ImportMapping): ActionItem[] {
     this.i18n();
     const isActive = mapping.status === 'ACTIVE';
-    return [
+    const items: ActionItem[] = [
       {
         id: 'open',
         title: this.transloco.translate('imports.mappings.menu.open'),
@@ -283,21 +322,24 @@ export class ImportMappingsPage {
         icon: 'tablerEdit',
         tile: 'bg-icon-orange',
       },
-      {
+    ];
+    if (this.canExecute()) {
+      items.push({
         id: 'import',
         title: this.transloco.translate('imports.mappings.menu.importWithMapping'),
         icon: 'tablerFileImport',
         tile: 'bg-icon-teal',
         disabled: !isActive,
         reason: isActive ? undefined : this.transloco.translate('imports.mappings.menu.importNeedsActive'),
-      },
-    ];
+      });
+    }
+    return items;
   }
 
   protected onMenuSelected(mapping: ImportMapping, selection: ActionSelection): void {
     if (selection.id === 'open' || selection.id === 'edit') {
       this.openMapping(mapping);
-    } else if (selection.id === 'import' && mapping.status === 'ACTIVE') {
+    } else if (selection.id === 'import' && this.canExecute() && mapping.status === 'ACTIVE') {
       void this.router.navigate(['/trade/automation/import-runs'], {
         queryParams: { new: '1', mapping: mapping.id },
       });

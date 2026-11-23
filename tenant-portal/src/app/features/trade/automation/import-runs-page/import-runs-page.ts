@@ -1,4 +1,4 @@
-import { Component, DestroyRef, computed, effect, inject, input, resource, signal, untracked, viewChild } from '@angular/core';
+import { Component, DestroyRef, Injector, computed, effect, inject, input, resource, signal, untracked, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../core/i18n/translation-events';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
@@ -6,6 +6,7 @@ import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   tablerAlertTriangle,
   tablerBuilding,
+  tablerCircleX,
   tablerFileSpreadsheet,
   tablerInbox,
   tablerLoader2,
@@ -20,8 +21,10 @@ import { ScopeState } from '../../../../core/scope/scope';
 import { BulkJobsTracker } from '../../../../shared/bulk-jobs/bulk-jobs-tracker';
 import { ActionsMenu, type ActionItem, type ActionSelection } from '../../../../shared/ui/actions-menu/actions-menu';
 import { Button } from '../../../../shared/ui/button/button';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { Pagination } from '../../../../shared/ui/pagination/pagination';
 import { StepFilter, type StepOption } from '../../../../shared/ui/step-filter/step-filter';
+import { errorCodeOf } from '../../shared/trade-api';
 import { ActionKeys } from '../automation-shared/action-keys';
 import { AutomationBadge } from '../automation-shared/automation-badge/automation-badge';
 import { pollWhile } from '../automation-shared/poll';
@@ -30,6 +33,15 @@ import { ImportWizard, type WizardPreset } from '../import-wizard/import-wizard'
 import { execute, getRunCounts, listMappings, listRuns } from '../imports.api';
 import type { ImportMapping, ImportRun } from '../imports.model';
 import { RUN_ACTIVE } from '../imports.registry';
+import {
+  IMPORT_PERMISSIONS,
+  hasImportReadGrant,
+  hasImportScopeGrant,
+  importContext,
+  isForbiddenError,
+  isIdempotencyMismatch,
+  isQueryInvalidError,
+} from '../mapping-rows/import-access';
 import {
   currentScopeTarget,
   formatBytes,
@@ -41,7 +53,6 @@ import {
   translateImportError,
 } from '../mapping-rows/mapping-rows';
 
-const CAN = { manage: true, test: true, approve: true, publish: true }; // later from the session
 const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = 24;
 const PAGE_SIZES = [12, 24, 48, 96];
@@ -92,6 +103,7 @@ function activeRunStatuses(): readonly string[] {
     TranslocoPipe,
     ActionsMenu,
     Button,
+    FullState,
     Pagination,
     StepFilter,
     AutomationBadge,
@@ -108,6 +120,7 @@ function activeRunStatuses(): readonly string[] {
     provideIcons({
       tablerAlertTriangle,
       tablerBuilding,
+      tablerCircleX,
       tablerFileSpreadsheet,
       tablerInbox,
       tablerLoader2,
@@ -124,6 +137,7 @@ export class ImportRunsPage {
   private readonly destroyRef = inject(DestroyRef);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly injector = inject(Injector);
   private readonly scopeState = inject(ScopeState);
   private readonly notify = inject(Notify);
   private readonly bulkJobs = inject(BulkJobsTracker);
@@ -133,7 +147,8 @@ export class ImportRunsPage {
   private readonly wizard = viewChild(ImportWizard);
 
   protected readonly lang = inject(LanguageState).current;
-  protected readonly can = CAN;
+  protected readonly forbidden = signal(false);
+  protected readonly canRead = computed(() => hasImportReadGrant(this.injector));
   protected readonly pageSizes = PAGE_SIZES;
   protected readonly skeletonRows = [1, 2, 3, 4, 5];
 
@@ -172,37 +187,34 @@ export class ImportRunsPage {
 
   private readonly mappingsResource = resource({
     params: () => {
-      if (this.tenantBlockedByScope()) return undefined;
+      if (this.isForbidden() || this.tenantBlockedByScope()) return undefined;
       return {
-        companyId: this.scopeState.company()?.id ?? '',
-        branchId: this.scopeState.branch()?.id ?? '',
+        ctx: importContext(this.scopeState),
       };
     },
-    loader: async () => {
-      const res = await listMappings({ limit: 100 });
+    loader: async ({ params }) => {
+      const res = await listMappings({ limit: 100 }, params.ctx);
       return normalizePage<ImportMapping>(res, 1, 100).items;
     },
   });
 
   private readonly countsResource = resource({
     params: () => {
-      if (this.tenantBlockedByScope()) return undefined;
+      if (!this.canRead() || this.forbidden() || this.tenantBlockedByScope()) return undefined;
       return {
-        companyId: this.scopeState.company()?.id ?? '',
-        branchId: this.scopeState.branch()?.id ?? '',
+        ctx: importContext(this.scopeState),
         q: this.searchQuery(),
         tick: this.refreshTick(),
       };
     },
-    loader: ({ params }) => getRunCounts(params.q ? { q: params.q } : {}),
+    loader: ({ params }) => getRunCounts(params.q ? { q: params.q } : {}, params.ctx),
   });
 
   private readonly runsResource = resource({
     params: () => {
-      if (this.tenantBlockedByScope()) return undefined;
+      if (!this.canRead() || this.forbidden() || this.tenantBlockedByScope()) return undefined;
       return {
-        companyId: this.scopeState.company()?.id ?? '',
-        branchId: this.scopeState.branch()?.id ?? '',
+        ctx: importContext(this.scopeState),
         status: this.stepValue(),
         q: this.searchQuery(),
         page: this.page(),
@@ -211,15 +223,32 @@ export class ImportRunsPage {
       };
     },
     loader: async ({ params }) => {
-      const res = await listRuns({
-        ...(params.status !== 'ALL' ? { status: params.status } : {}),
-        ...(params.q ? { q: params.q } : {}),
-        page: params.page,
-        limit: params.limit,
-      });
+      const res = await listRuns(
+        {
+          ...(params.status !== 'ALL' ? { status: params.status } : {}),
+          ...(params.q ? { q: params.q } : {}),
+          page: params.page,
+          limit: params.limit,
+        },
+        params.ctx,
+      );
       return normalizePage<ImportRun>(res, params.page, params.limit);
     },
   });
+
+  private readonly runsForbidden = computed(
+    () =>
+      (this.runsResource.status() === 'error' && isForbiddenError(this.runsResource.error())) ||
+      (this.countsResource.status() === 'error' && isForbiddenError(this.countsResource.error())),
+  );
+  protected readonly isForbidden = computed(
+    () => !this.canRead() || this.forbidden() || this.runsForbidden(),
+  );
+  protected readonly canExecute = computed(
+    () =>
+      !this.isForbidden() &&
+      hasImportScopeGrant(this.injector, this.scopeState, IMPORT_PERMISSIONS.execute),
+  );
 
   protected readonly mappingCodeMap = computed<ReadonlyMap<string, string>>(() => {
     const items = this.mappingsResource.hasValue() ? this.mappingsResource.value() : [];
@@ -233,11 +262,22 @@ export class ImportRunsPage {
       isScopeMismatchError(this.countsResource.error()),
   );
 
+  protected readonly filterError = computed<string | null>(() => {
+    this.i18n();
+    const runsErr = this.runsResource.error();
+    if (isQueryInvalidError(runsErr)) return translateImportError(this.transloco, runsErr);
+    const countsErr = this.countsResource.error();
+    if (isQueryInvalidError(countsErr)) return translateImportError(this.transloco, countsErr);
+    return null;
+  });
+
   protected readonly loading = computed(
-    () => !this.tenantBlocked() && this.runsResource.isLoading() && !this.runsResource.hasValue(),
+    () => !this.isForbidden() && !this.tenantBlocked() && this.runsResource.isLoading() && !this.runsResource.hasValue(),
   );
   protected readonly refreshing = computed(() => this.runsResource.isLoading());
-  protected readonly failed = computed(() => !this.tenantBlocked() && !!this.runsResource.error());
+  protected readonly failed = computed(
+    () => !this.isForbidden() && !this.tenantBlocked() && !this.filterError() && !!this.runsResource.error(),
+  );
 
   protected readonly loadedRuns = computed<ImportRun[]>(
     () => this.liveRunsOverride() ?? (this.runsResource.hasValue() ? this.runsResource.value().items : []),
@@ -302,21 +342,21 @@ export class ImportRunsPage {
     this.destroyRef.onDestroy(() => this.stopPolling());
 
     effect(() => {
-      this.runsResource.value();
+      if (this.runsResource.hasValue()) this.runsResource.value();
       untracked(() => {
         this.liveRunsOverride.set(null);
       });
     });
 
     effect(() => {
-      this.countsResource.value();
+      if (this.countsResource.hasValue()) this.countsResource.value();
       untracked(() => {
         this.liveCountsOverride.set(null);
       });
     });
 
     effect(() => {
-      const blocked = this.tenantBlocked();
+      const blocked = this.tenantBlocked() || this.isForbidden();
       const rows = this.loadedRuns();
       const status = this.stepValue();
       const page = this.page();
@@ -337,7 +377,7 @@ export class ImportRunsPage {
       const mappingId = this.mappingParam() ?? null;
       const predecessorRunId = this.predecessorParam() ?? null;
       const wiz = this.wizard();
-      const blocked = this.tenantBlocked();
+      const blocked = this.tenantBlocked() || !this.canExecute();
 
       if (isNew && wiz && !blocked && !this.handledNewTrigger) {
         this.handledNewTrigger = true;
@@ -348,8 +388,17 @@ export class ImportRunsPage {
     });
   }
 
+  protected goHome(): void {
+    void this.router.navigateByUrl('/workspace/home');
+  }
+
+  protected onForbidden(): void {
+    this.stopPolling();
+    this.forbidden.set(true);
+  }
+
   protected openWizard(preset: WizardPreset = {}): void {
-    if (!this.can.manage || this.tenantBlocked()) return;
+    if (!this.canExecute() || this.tenantBlocked()) return;
     this.wizard()?.open(preset);
   }
 
@@ -475,7 +524,7 @@ export class ImportRunsPage {
       },
     ];
     if (
-      this.can.manage &&
+      this.canExecute() &&
       run.status === 'PREVIEWED' &&
       Number(run.invalidCount) === 0 &&
       Number(run.validCount) > 0
@@ -487,7 +536,7 @@ export class ImportRunsPage {
         tile: 'bg-icon-green',
       });
     }
-    if (this.can.manage && TERMINAL_STATUSES.has(run.status)) {
+    if (this.canExecute() && TERMINAL_STATUSES.has(run.status)) {
       items.push({
         id: 'runAgain',
         title: this.transloco.translate('imports.runs.menu.runAgain'),
@@ -503,14 +552,19 @@ export class ImportRunsPage {
       this.openRun(run);
       return;
     }
-    if (selection.id === 'runAgain') {
+    if (selection.id === 'runAgain' && this.canExecute()) {
       this.openWizard({ mappingId: run.mappingId, predecessorRunId: run.id });
       return;
     }
-    if (selection.id === 'importNow') {
+    if (selection.id === 'importNow' && this.canExecute()) {
+      const action = `execute:${run.id}`;
       try {
-        const action = `execute:${run.id}`;
-        const res: unknown = await execute(run.id, run.version, this.keys.for(action, { ifMatch: run.version }));
+        const res: unknown = await execute(
+          run.id,
+          run.version,
+          this.keys.for(action, { ifMatch: run.version }),
+          importContext(this.scopeState),
+        );
         this.keys.done(action);
         if (res && typeof res === 'object' && 'jobId' in res) {
           void this.bulkJobs.loadRecent();
@@ -518,6 +572,14 @@ export class ImportRunsPage {
         this.notify.success(this.transloco.translate('imports.runs.startedToast'));
         this.refreshTick.update((n) => n + 1);
       } catch (error) {
+        if (isForbiddenError(error)) {
+          this.keys.done(action);
+          this.onForbidden();
+          return;
+        }
+        if (isIdempotencyMismatch(errorCodeOf(error))) {
+          this.keys.done(action);
+        }
         this.notify.error(translateImportError(this.transloco, error));
       }
     }
@@ -526,12 +588,13 @@ export class ImportRunsPage {
   private startPolling(status: string, page: number, limit: number): void {
     this.stopPolling();
     this.pollDisposed = false;
-    const handle: unknown = pollWhile(
+    const ctx = importContext(this.scopeState);
+    const handle = pollWhile(
       async () => {
         const q = this.searchQuery();
         const [runsRes, countsRes] = await Promise.all([
-          listRuns({ ...(status !== 'ALL' ? { status } : {}), ...(q ? { q } : {}), page, limit }),
-          getRunCounts(q ? { q } : {}),
+          listRuns({ ...(status !== 'ALL' ? { status } : {}), ...(q ? { q } : {}), page, limit }, ctx),
+          getRunCounts(q ? { q } : {}, ctx),
         ]);
         if (this.pollDisposed) return runsRes;
         const normalized = normalizePage<ImportRun>(runsRes, page, limit);
@@ -550,10 +613,14 @@ export class ImportRunsPage {
       },
       3000,
       this.destroyRef,
+      undefined,
+      (err) => {
+        if (isForbiddenError(err)) {
+          this.onForbidden();
+        }
+      },
     );
-    if (typeof handle === 'function') {
-      this.stopPollFn = handle as () => void;
-    }
+    this.stopPollFn = () => handle.stop();
   }
 
   private stopPolling(): void {

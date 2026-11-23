@@ -1,538 +1,624 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getBulkJob } from '../../../shared/bulk-jobs/bulk-jobs.api';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, newIdempotencyKey } from '../shared/trade-api';
-import { FAKE_ME, setFakeActor } from './automation-fake-actors';
-import * as api from './imports.api';
-import { getImportTargets, getMapping, getRun, getRunCounts, listMappings, listResults, listRuns } from './imports.api';
-import { fakeImportVersion, setFakeImportContext } from './imports.fake';
+import { bindTradeHttpForTest } from '../shared/trade-http';
+import { TradeHttpStub } from '../shared/testing/trade-http-testing';
+import {
+  cancelRun,
+  createMapping,
+  discardMappingDraft,
+  execute,
+  getImportTargets,
+  getMapping,
+  getRun,
+  getRunCounts,
+  listMappings,
+  listResults,
+  listRuns,
+  preview,
+  publishMapping,
+  readResultsCsv,
+  releaseSource,
+  resultsCsvUrl,
+  toMappingFieldInput,
+  updateMapping,
+  uploadSource,
+} from './imports.api';
 import type {
-  CreateImportMappingInput,
+  CreateImportMappingResult,
+  DiscardMappingDraftResult,
+  ImportMapping,
+  ImportMappingDetail,
   ImportRun,
+  ImportRunCommandResult,
+  ImportRunCounts,
+  ImportSource,
   MappingFieldInput,
-  PreviewImportInput,
-  UpdateImportMappingInput,
+  PreviewImportResult,
+  PublishImportMappingResult,
+  ReleaseSourceResult,
+  RowResult,
+  UpdateImportMappingResult,
 } from './imports.model';
+import type { ImportTargetsResponse } from './imports.registry';
 
-// Write wrappers: each call is a new user action (fresh UUIDv7 key) and sends the stored version as If-Match,
-// unless a test pins its own key or version.
-const key = () => newIdempotencyKey();
-const uploadSource = (f: File, onProgress?: (percent: number) => void, k = key()) => api.uploadSource(f, k, onProgress);
-const releaseSource = (sourceId: string, k = key()) => api.releaseSource(sourceId, k);
-const preview = (input: PreviewImportInput, k = key()) => api.preview(input, k);
-const execute = (runId: string, ifMatch = fakeImportVersion(runId), k = key()) => api.execute(runId, ifMatch, k);
-const cancelRun = (runId: string, ifMatch = fakeImportVersion(runId), k = key()) => api.cancelRun(runId, ifMatch, k);
-const createMapping = (input: CreateImportMappingInput, k = key()) => api.createMapping(input, k);
-const updateMapping = (id: string, input: UpdateImportMappingInput, ifMatch = fakeImportVersion(id), k = key()) =>
-  api.updateMapping(id, input, ifMatch, k);
-const publishMapping = (id: string, ifMatch = fakeImportVersion(id), k = key()) => api.publishMapping(id, ifMatch, k);
-const discardMappingDraft = (id: string, ifMatch = fakeImportVersion(id), k = key()) =>
-  api.discardMappingDraft(id, ifMatch, k);
+const COMPANY_ID = '018f0000-0000-7000-8000-000000000010';
+const BRANCH_ID = '018f0000-0000-7000-8000-000000000001';
+const MAPPING_ID = '0193b000-0000-7000-8000-000000000001';
+const SOURCE_ID = '0193b000-0000-7000-8000-000000000002';
+const RUN_ID = '0193b000-0000-7000-8000-000000000003';
 
-/** Runs the fake timers to completion and returns (or rethrows) the settled result. */
-async function settle<T>(promise: Promise<T>): Promise<T> {
-  const guarded = promise.then(
-    (value) => ({ ok: true as const, value }),
-    (error: unknown) => ({ ok: false as const, error }),
-  );
-  await vi.runAllTimersAsync();
-  const result = await guarded;
-  if (!result.ok) throw result.error;
-  return result.value;
-}
+const COMPANY_CTX = { companyId: COMPANY_ID };
+const BRANCH_CTX = { companyId: COMPANY_ID, branchId: BRANCH_ID };
 
-/** Advances the fake clock by a fixed time (so background worker timers do not all run) and settles the call. */
-async function settleFor<T>(promise: Promise<T>, ms: number): Promise<T> {
-  const guarded = promise.then(
-    (value) => ({ ok: true as const, value }),
-    (error: unknown) => ({ ok: false as const, error }),
-  );
-  await vi.advanceTimersByTimeAsync(ms);
-  const result = await guarded;
-  if (!result.ok) throw result.error;
-  return result.value;
-}
-
-async function rejection(promise: Promise<unknown>): Promise<ApiError> {
-  try {
-    await settle(promise);
-  } catch (error) {
-    expect(error).toBeInstanceOf(ApiError);
-    return error as ApiError;
-  }
-  throw new Error('expected the call to reject');
-}
-
-const MAPPING_ID = 'map-item-settings';
-const SEEDED_SOURCE = '0193b000-0000-7000-8000-000000000003';
-const CSV = 'text/csv';
-
-function file(name: string, content: BlobPart = 'ItemCode,CanSell\nA1,yes\n', type = CSV): File {
-  return new File([content], name, { type });
-}
-
-function sizedFile(name: string, size: number, content: BlobPart = 'ItemCode\nA1\n'): File {
-  const f = file(name, content);
-  Object.defineProperty(f, 'size', { value: size });
-  return f;
-}
-
-const XLSX_BYTES = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x14, 0x00]);
-
-const COMPANY_FIELDS: MappingFieldInput[] = [
-  { sourceColumnCode: 'ItemCode', sourceOrdinal: 0, targetFieldCode: 'ITEM_CODE', transformCode: 'NORMALIZE_CODE', isRequired: true },
-  { sourceColumnCode: 'CanSell', sourceOrdinal: 1, targetFieldCode: 'CAN_SELL', transformCode: 'ENUM_MAP', lookupCode: 'BOOLEAN_V1', isRequired: true },
-  { sourceColumnCode: 'CanPurchase', sourceOrdinal: 2, targetFieldCode: 'CAN_PURCHASE', transformCode: 'ENUM_MAP', lookupCode: 'BOOLEAN_V1', isRequired: true },
-  { sourceColumnCode: 'TrackInventory', sourceOrdinal: 3, targetFieldCode: 'TRACK_INVENTORY', transformCode: 'ENUM_MAP', lookupCode: 'BOOLEAN_V1', isRequired: true },
-  { sourceColumnCode: 'TrackingMode', sourceOrdinal: 4, targetFieldCode: 'TRACKING_MODE', transformCode: 'NORMALIZE_CODE', lookupCode: 'TRACKING_MODE_V1', isRequired: true },
+const BASE_FIELDS: MappingFieldInput[] = [
+  {
+    sourceColumnCode: ' ItemCode ',
+    sourceOrdinal: 0,
+    targetFieldCode: 'ITEM_CODE',
+    transformCode: 'NORMALIZE_CODE',
+    isRequired: true,
+  },
+  {
+    sourceColumnCode: 'CanSell',
+    sourceOrdinal: 1,
+    targetFieldCode: 'CAN_SELL',
+    transformCode: 'ENUM_MAP',
+    lookupCode: 'CUSTOM_LOOKUP_V2',
+    isRequired: true,
+  },
 ];
 
-/** Uploads a file and previews it, then lets the fake preview worker finish (PENDING -> PREVIEWING -> PREVIEWED/FAILED). */
-async function previewedRun(name: string, predecessorRunId?: string): Promise<ImportRun> {
-  const source = await settle(uploadSource(file(name)));
-  const accepted = await settleFor(
-    preview({ mappingId: MAPPING_ID, sourceId: source.fileId, ...(predecessorRunId ? { predecessorRunId } : {}) }),
-    300,
-  );
-  await vi.advanceTimersByTimeAsync(3200);
-  return settle(getRun(accepted.runId));
+function makeMapping(overrides: Partial<ImportMapping> = {}): ImportMapping {
+  return {
+    id: MAPPING_ID,
+    code: 'ITEM_SETTINGS',
+    targetCode: 'CATALOG_COMPANY_PROFILE',
+    scopeTarget: 'COMPANY',
+    companyId: COMPANY_ID,
+    branchId: null,
+    currentPublishedVersionId: null,
+    status: 'DRAFT',
+    version: 1,
+    createdAt: '2026-11-23T10:00:00.000Z',
+    updatedAt: '2026-11-23T10:00:00.000Z',
+    ...overrides,
+  };
 }
 
-beforeEach(() => {
-  vi.useFakeTimers();
-  vi.setSystemTime(new Date('2026-11-21T12:00:00.000Z'));
-  setFakeActor(FAKE_ME);
-  setFakeImportContext({ companyId: 'c1', branchId: null });
-});
-
-afterEach(async () => {
-  await vi.advanceTimersByTimeAsync(60_000);
-  setFakeActor(FAKE_ME);
-  setFakeImportContext({ companyId: 'c1', branchId: null });
-  vi.useRealTimers();
-});
-
-describe('import targets', () => {
-  it('returns the registry object with uppercase field codes, transforms and lookups', async () => {
-    const res = await settle(getImportTargets());
-
-    expect(res.registryVersion).toBe(1);
-    expect(Object.keys(res.lookups)).toEqual(['BOOLEAN_V1', 'TRACKING_MODE_V1']);
-    const company = res.targets.find((t) => t.code === 'CATALOG_COMPANY_PROFILE')!;
-    expect(company.dtoCode).toBe('trade.catalog.company-profile.import-row');
-    expect(company.fields.filter((f) => f.required).map((f) => f.code)).toEqual([
-      'ITEM_CODE',
-      'CAN_SELL',
-      'CAN_PURCHASE',
-      'TRACK_INVENTORY',
-      'TRACKING_MODE',
-    ]);
-    expect(company.fields.find((f) => f.code === 'TAX_CLASSIFICATION_KEY')?.allowedTransforms).toEqual(['TRIM']);
-  });
-});
-
-describe('import source upload and release', () => {
-  it('stores a csv source and returns the backend projection', async () => {
-    const source = await settle(uploadSource(file('items.csv')));
-
-    expect(source.fileName).toBe('items.csv');
-    expect(source.mediaType).toBe(CSV);
-    expect(source.sha256).toHaveLength(64);
-    expect(source.sourceObjectRef).toBeTruthy();
-    expect(source.storedSize).toBeGreaterThan(0);
-  });
-
-  it('detects xlsx from the bytes, not from the name', async () => {
-    const source = await settle(uploadSource(file('named.csv', XLSX_BYTES)));
-
-    expect(source.mediaType).toBe('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  });
-
-  it('replays the same idempotency key to the same source', async () => {
-    const key = newIdempotencyKey();
-    const first = await settle(uploadSource(file('again.csv'), undefined, key));
-    const again = await settle(uploadSource(file('again.csv'), undefined, key));
-
-    expect(again.fileId).toBe(first.fileId);
-  });
-
-  it('requires a UUIDv7 idempotency key', async () => {
-    const error = await rejection(uploadSource(file('key.csv'), undefined, 'not-a-key'));
-
-    expect(error.status).toBe(422);
-    expect(error.code).toBe('TRADE.IDEMPOTENCY.KEY_REQUIRED');
-    expect(error.details?.['reason']).toEqual(['import_source_idempotencykey_invalid']);
-  });
-
-  it('rejects an empty file with 400 FILE_UNSAFE and binary non-zip bytes with 415', async () => {
-    const empty = await rejection(uploadSource(sizedFile('empty.csv', 0)));
-    const binary = await rejection(uploadSource(file('bin.csv', new Uint8Array([1, 0, 2, 0]))));
-
-    expect([empty.status, empty.code]).toEqual([400, 'TRADE.IMPORT.FILE_UNSAFE']);
-    expect([binary.status, binary.code]).toEqual([415, 'TRADE.IMPORT.FILE_TYPE_UNSUPPORTED']);
-  });
-
-  it('rejects a csv above sixteen megabytes and an xlsx above eight megabytes with 413', async () => {
-    const csv = await rejection(uploadSource(sizedFile('big.csv', 16 * 1024 * 1024 + 1)));
-    const xlsx = await rejection(uploadSource(sizedFile('big.xlsx', 8 * 1024 * 1024 + 1, XLSX_BYTES)));
-
-    expect([csv.status, csv.code]).toEqual([413, 'TRADE.IMPORT.FILE_TOO_LARGE']);
-    expect(csv.details).toBeUndefined();
-    expect(xlsx.details?.['reason']).toEqual(['xlsx_over_8_mib']);
-  });
-
-  it('releases an unused source, replays a repeated release and then rejects previews of it', async () => {
-    const source = await settle(uploadSource(file('release.csv')));
-
-    const released = await settle(releaseSource(source.fileId));
-    const again = await settle(releaseSource(source.fileId));
-    const previewError = await rejection(preview({ mappingId: MAPPING_ID, sourceId: source.fileId }));
-
-    expect(released).toMatchObject({ sourceId: source.fileId, storageState: 'PURGED', idempotentReplay: false });
-    expect(again.idempotentReplay).toBe(true);
-    expect([previewError.status, previewError.code]).toEqual([422, 'TRADE.IMPORT.FILE_REJECTED']);
-  });
-
-  it('answers 403 SOURCE_RELEASE_FORBIDDEN for an unknown source', async () => {
-    const error = await rejection(releaseSource(newIdempotencyKey()));
-
-    expect([error.status, error.code]).toEqual([403, 'TRADE.IMPORT.SOURCE_RELEASE_FORBIDDEN']);
-  });
-
-  it('refuses to release a source that a previewed run still holds', async () => {
-    const run = await previewedRun('release-in-use.csv');
-
-    const error = await rejection(releaseSource(run.sourceId));
-
-    expect([error.status, error.code]).toEqual([409, 'TRADE.IMPORT.SOURCE_IN_USE']);
-  });
-});
-
-describe('import preview', () => {
-  it('answers 202 with the queued run id, then the run moves to PREVIEWED with row counts', async () => {
-    const source = await settle(uploadSource(file('preview.csv')));
-
-    const accepted = await settleFor(preview({ mappingId: MAPPING_ID, sourceId: source.fileId }), 300);
-    const pending = await settleFor(getRun(accepted.runId), 200);
-    await vi.advanceTimersByTimeAsync(3200);
-    const done = await settle(getRun(accepted.runId));
-
-    expect(accepted).toMatchObject({ status: 'PENDING', dispatchStatus: 'QUEUED', sourceId: source.fileId, mappingVersionId: 'mapv-item-1' });
-    expect(pending.progress.phase).toBe('PREVIEW');
-    expect(done.status).toBe('PREVIEWED');
-    expect(done.totalCount).toBe('660');
-    expect(done.targetDtoCode).toBe('trade.catalog.company-profile.import-row');
-    expect(done.fileName).toBe('preview.csv');
-  });
-
-  it('reports invalid rows with uppercase field codes', async () => {
-    const run = await previewedRun('rows-error.csv');
-    const invalid = await settle(listResults(run.id, { status: 'INVALID' }));
-
-    expect(run.invalidCount).toBe('6');
-    expect(invalid.items[0]).toMatchObject({ errorFieldCode: 'CAN_SELL', ownerAggregateType: null });
-  });
-
-  it('fails the run with a PREVIEW failure code for a file whose header does not match', async () => {
-    const run = await previewedRun('header-fail.csv');
-
-    expect(run.status).toBe('FAILED');
-    expect(run.failure).toEqual({ phase: 'PREVIEW', code: 'WORKER.TRADE_IMPORT.MAPPING_HEADER_MISMATCH' });
-  });
-
-  it('marks the rows that a predecessor run already imported as SKIPPED', async () => {
-    const run = await previewedRun('again.csv', 'run-completed-3');
-    const skipped = await settle(listResults(run.id, { status: 'SKIPPED', limit: 1 }));
-
-    expect(run.validCount).toBe('0');
-    expect(skipped.total).toBe(660);
-  });
-
-  it('refuses a predecessor that is still active with 422 MAPPING_INVALID', async () => {
-    const error = await rejection(preview({ mappingId: MAPPING_ID, sourceId: SEEDED_SOURCE, predecessorRunId: 'run-previewed-2' }));
-
-    expect([error.status, error.code]).toEqual([422, 'TRADE.IMPORT.MAPPING_INVALID']);
-  });
-
-  it('refuses an unknown source with 422 FILE_REJECTED', async () => {
-    const error = await rejection(preview({ mappingId: MAPPING_ID, sourceId: newIdempotencyKey() }));
-
-    expect([error.status, error.code]).toEqual([422, 'TRADE.IMPORT.FILE_REJECTED']);
-  });
-
-  it('refuses a tenant context with 422 SCOPE_MISMATCH', async () => {
-    setFakeImportContext({ companyId: null, branchId: null });
-
-    const error = await rejection(preview({ mappingId: MAPPING_ID, sourceId: SEEDED_SOURCE }));
-
-    expect([error.status, error.code]).toEqual([422, 'TRADE.IMPORT.SCOPE_MISMATCH']);
-  });
-
-  it('replays the same idempotency key without creating a second run', async () => {
-    const source = await settle(uploadSource(file('idem.csv')));
-    const input = { mappingId: MAPPING_ID, sourceId: source.fileId };
-
-    const k = key();
-    const first = await settleFor(preview(input, k), 300);
-    const again = await settleFor(preview(input, k), 300);
-
-    expect(again.runId).toBe(first.runId);
-  });
-});
-
-describe('import execute as a worker job', () => {
-  it('answers 202 with run id, status and job id, then completes through the worker', async () => {
-    const run = await previewedRun('exec-clean.csv');
-
-    const started = await settleFor(execute(run.id, run.version), 650);
-    const executing = await settleFor(getRun(run.id), 400);
-    await vi.advanceTimersByTimeAsync(10_000);
-    const done = await settle(getRun(run.id));
-    const job = await settle(getBulkJob('trading', started.jobId!));
-
-    expect(Object.keys(started).sort()).toEqual(['jobId', 'runId', 'status']);
-    expect(started.status).toBe('EXECUTING');
-    expect(executing.bulkJobId).toBe(started.jobId);
-    expect(executing.progress.phase).toBe('EXECUTE');
-    expect(done.status).toBe('COMPLETED');
-    expect(done.succeededCount).toBe('660');
-    expect(job.status).toBe('COMPLETED');
-  });
-
-  it('records SUCCEEDED rows with the owner aggregate', async () => {
-    const run = await previewedRun('exec-rows.csv');
-    await settleFor(execute(run.id), 650);
-    await vi.advanceTimersByTimeAsync(10_000);
-
-    const results = await settle(listResults(run.id, { status: 'SUCCEEDED', limit: 100 }));
-
-    expect(results.total).toBe(660);
-    expect(results.items.every((r) => r.ownerAggregateId && r.ownerAggregateType && r.completedAt)).toBe(true);
-  });
-
-  it('refuses a second execute while a worker job is active with 409 BULK_JOB_ACTIVE', async () => {
-    const first = await previewedRun('exec-first.csv');
-    const second = await previewedRun('exec-second.csv');
-    await settleFor(execute(first.id), 650);
-
-    const error = await rejection(execute(second.id));
-    const after = await settle(getRun(second.id));
-
-    expect([error.status, error.code]).toEqual([409, 'BULK_JOB_ACTIVE']);
-    expect(error.details).toEqual({ reason: ['active_job_exists'] });
-    expect(after.status).toBe('PREVIEWED');
-    expect(after.bulkJobId).toBeNull();
-  });
-
-  it('refuses a run that is not previewed, has invalid rows, or has no valid rows', async () => {
-    const notPreviewed = await rejection(execute('run-completed-3'));
-    const invalid = await rejection(execute((await previewedRun('exec-error.csv')).id));
-    const noValid = await rejection(execute((await previewedRun('exec-skip.csv', 'run-completed-3')).id));
-
-    expect([notPreviewed.status, notPreviewed.code]).toEqual([409, 'TRADE.IMPORT.RUN_NOT_EXECUTABLE']);
-    expect(notPreviewed.details?.['reason']).toEqual(['run_not_previewed']);
-    expect(invalid.details?.['reason']).toEqual(['has_invalid_rows']);
-    expect(noValid.details?.['reason']).toEqual(['no_valid_rows']);
-  });
-
-  it('rejects a stale If-Match on execute with 409 STALE_VERSION', async () => {
-    const run = await previewedRun('exec-stale.csv');
-
-    const error = await rejection(execute(run.id, run.version + 7));
-
-    expect([error.status, error.code]).toEqual([409, 'TRADE.CONCURRENCY.STALE_VERSION']);
-  });
-
-  it('replays the same idempotency key to the same job id', async () => {
-    const run = await previewedRun('exec-idem.csv');
-
-    const k = key();
-    const first = await settleFor(execute(run.id, run.version, k), 650);
-    const again = await settleFor(execute(run.id, run.version, k), 350);
-
-    expect(again.jobId).toBe(first.jobId);
-  });
-});
-
-describe('import cancel', () => {
-  it('cancels a pending run at once', async () => {
-    const source = await settle(uploadSource(file('cancel-pending.csv')));
-    const accepted = await settleFor(preview({ mappingId: MAPPING_ID, sourceId: source.fileId }), 300);
-
-    const cancelled = await settleFor(cancelRun(accepted.runId), 200);
-    await vi.advanceTimersByTimeAsync(4000);
-    const after = await settle(getRun(accepted.runId));
-
-    expect(cancelled).toEqual({ runId: accepted.runId, status: 'CANCELLED', jobId: null });
-    expect(after.status).toBe('CANCELLED');
-  });
-
-  it('requests cancellation of an executing job; the run stays EXECUTING until the job reports back', async () => {
-    const run = await previewedRun('cancel-queued.csv');
-    await settleFor(execute(run.id), 650);
-
-    const requested = await settleFor(cancelRun(run.id), 400);
-    const repeated = await settleFor(cancelRun(run.id), 400);
-    const after = await settle(getRun(run.id));
-
-    expect(requested.status).toBe('EXECUTING');
-    expect(requested.jobId).toBeTruthy();
-    expect(repeated).toEqual(requested);
-    expect(after.status).toBe('CANCELLED');
-    expect(Number(after.succeededCount) + Number(after.cancelledCount)).toBe(660);
-  });
-
-  it('frees the worker slot after a cancellation', async () => {
-    const first = await previewedRun('cancel-free-a.csv');
-    const second = await previewedRun('cancel-free-b.csv');
-    await settleFor(execute(first.id), 650);
-    await settleFor(cancelRun(first.id), 400);
-
-    const started = await settleFor(execute(second.id), 650);
-
-    expect(started.status).toBe('EXECUTING');
-  });
-
-  it('refuses an executing run without a job with reason bulk_job_missing', async () => {
-    const error = await rejection(cancelRun('run-executing-1'));
-
-    expect([error.status, error.code]).toEqual([409, 'TRADE.IMPORT.RUN_NOT_EXECUTABLE']);
-    expect(error.details?.['reason']).toEqual(['bulk_job_missing']);
-  });
-
-  it('refuses to cancel a finished run with 409 RUN_FINISHED', async () => {
-    const error = await rejection(cancelRun('run-completed-3'));
-
-    expect([error.status, error.code]).toEqual([409, 'TRADE.IMPORT.RUN_FINISHED']);
-  });
-});
-
-describe('import run lists and counts', () => {
-  it('reports total and byStatus that add up', async () => {
-    const counts = await settle(getRunCounts());
-
-    expect(Object.keys(counts.byStatus)).toHaveLength(8);
-    expect(Object.values(counts.byStatus).reduce((a, b) => a + b, 0)).toBe(counts.total);
-    expect(counts.byStatus.COMPLETED_WITH_ERRORS).toBeGreaterThanOrEqual(1);
-  });
-
-  it('accepts a comma separated status filter and rejects an unknown status', async () => {
-    const page = await settle(listRuns({ status: 'COMPLETED,FAILED' }));
-    const error = await rejection(listRuns({ status: 'DONE' }));
-
-    expect(page.items.every((r) => r.status === 'COMPLETED' || r.status === 'FAILED')).toBe(true);
-    expect([error.status, error.code]).toEqual([400, 'TRADE.VALIDATION_FAILED']);
-  });
-
-  it('searches runs by file name with q and returns the run projection', async () => {
-    const page = await settle(listRuns({ q: 'PARTIAL' }));
-    const run = page.items[0];
-
-    expect(page.items).toHaveLength(1);
-    expect(run).not.toHaveProperty('mappingCode');
-    expect(run).not.toHaveProperty('skippedCount');
-    expect(run).toMatchObject({ mode: 'PER_ROW', companyId: 'c1', branchId: null, bulkJobId: null });
-  });
-
-  it('defaults to fifty per page and rejects page 0 and a limit above 100', async () => {
-    const page = await settle(listRuns());
-    const zero = await rejection(listRuns({ page: 0 }));
-    const big = await rejection(listResults('run-completed-3', { limit: 101 }));
-
-    expect(page.limit).toBe(50);
-    expect(zero.code).toBe('TRADE.VALIDATION_FAILED');
-    expect(big.code).toBe('TRADE.VALIDATION_FAILED');
-  });
-
-  it('hides company runs from a branch context', async () => {
-    setFakeImportContext({ companyId: 'c1', branchId: 'b1' });
-
-    const page = await settle(listRuns());
-    const error = await rejection(getRun('run-completed-3'));
-
-    expect(page.total).toBe(0);
-    expect([error.status, error.code]).toEqual([404, 'TRADE.IMPORT.RUN_NOT_FOUND']);
-  });
-});
-
-describe('import mappings', () => {
-  it('lists projected mappings without versions, newest first', async () => {
-    const page = await settle(listMappings());
-
-    expect(page.limit).toBe(50);
-    expect(page.items[0].id).toBe('map-branch-assortment');
-    expect(page.items[0]).not.toHaveProperty('versions');
-  });
-
-  it('returns the detail with versions and backend field codes', async () => {
-    const detail = await settle(getMapping(MAPPING_ID));
-
-    expect(detail.versions[0]).toMatchObject({ targetDtoCode: 'trade.catalog.company-profile.import-row', executionMode: 'PER_ROW' });
-    expect(detail.versions[0].fields[0]).toMatchObject({ targetFieldCode: 'ITEM_CODE', lookupCode: null });
-  });
-
-  it('creates a DRAFT mapping and answers the entity with its draft version and fields', async () => {
-    const created = await settle(createMapping({ code: 'NEW_ITEMS', targetCode: 'CATALOG_COMPANY_PROFILE', scopeTarget: 'COMPANY', fields: COMPANY_FIELDS }));
-
-    expect(created.status).toBe('DRAFT');
-    expect(created.draftVersion).toMatchObject({ versionNumber: 1, status: 'DRAFT', mappingId: created.id });
-    expect(created.fields).toHaveLength(5);
-    expect(created.fields[0].lookupCode).toBeNull();
-  });
-
-  it('rejects a branch mapping outside a branch context with 422 SCOPE_MISMATCH', async () => {
-    const error = await rejection(
-      createMapping({ code: 'BRANCH_X', targetCode: 'CATALOG_BRANCH_ASSIGNMENT', scopeTarget: 'BRANCH', branchId: 'b1', fields: COMPANY_FIELDS }),
-    );
-
-    expect([error.status, error.code]).toEqual([422, 'TRADE.IMPORT.SCOPE_MISMATCH']);
-  });
-
-  it('answers a duplicate code with 422 MAPPING_INVALID (no conflict code in the backend)', async () => {
-    const error = await rejection(
-      createMapping({ code: 'ITEM_SETTINGS', targetCode: 'CATALOG_COMPANY_PROFILE', scopeTarget: 'COMPANY', fields: COMPANY_FIELDS }),
-    );
-
-    expect([error.status, error.code]).toEqual([422, 'TRADE.IMPORT.MAPPING_INVALID']);
-  });
-
-  it('rejects a missing required field, a transform the field does not allow and a duplicate column', async () => {
-    const make = (fields: MappingFieldInput[]) =>
-      rejection(updateMapping(MAPPING_ID, { fields: fields as MappingFieldInput[] }));
-    const missing = await make(COMPANY_FIELDS.slice(0, 4));
-    const badTransform = await make(COMPANY_FIELDS.map((f, i) => (i === 1 ? { ...f, transformCode: 'TRIM' as const } : f)));
-    const dupColumn = await make(COMPANY_FIELDS.map((f, i) => (i === 1 ? { ...f, sourceColumnCode: 'itemcode' } : f)));
-
-    for (const error of [missing, badTransform, dupColumn]) {
-      expect([error.status, error.code]).toEqual([422, 'TRADE.IMPORT.MAPPING_INVALID']);
+function makeRun(overrides: Partial<ImportRun> = {}): ImportRun {
+  return {
+    id: RUN_ID,
+    mappingId: MAPPING_ID,
+    mappingVersionId: '0193b000-0000-7000-8000-000000000011',
+    predecessorRunId: null,
+    companyId: COMPANY_ID,
+    branchId: null,
+    sourceId: SOURCE_ID,
+    fileName: 'items.csv',
+    bulkJobId: null,
+    cancelledCount: '0',
+    failure: null,
+    progress: { phase: null, processed: 0, total: null },
+    mediaType: 'text/csv',
+    fileSizeBytes: '256',
+    targetDtoCode: 'trade.catalog.company-profile.import-row',
+    targetDtoVersion: 1,
+    mode: 'PER_ROW',
+    status: 'PREVIEWED',
+    totalCount: '10',
+    validCount: '10',
+    invalidCount: '0',
+    succeededCount: '0',
+    failedCount: '0',
+    version: 3,
+    createdAt: '2026-11-23T10:00:00.000Z',
+    updatedAt: '2026-11-23T10:00:00.000Z',
+    ...overrides,
+  };
+}
+
+describe('imports.api', () => {
+  const key = newIdempotencyKey();
+  const input = { code: 'ITEM_SETTINGS', targetCode: 'CATALOG_COMPANY_PROFILE', scopeTarget: 'COMPANY', fields: BASE_FIELDS } as const;
+  const filters = { mappingId: MAPPING_ID, createdFrom: '2026-11-01', createdTo: '2026-11-23' };
+  const file = new File(['ItemCode\nA1\n'], 'items.csv', { type: 'text/csv' });
+  const cases = [
+    { name: 'getImportTargets', method: 'GET', path: '/import-mappings/targets', call: () => getImportTargets(BRANCH_CTX) },
+    { name: 'listMappings', method: 'GET', path: '/import-mappings', query: { page: 2, limit: 12 }, call: () => listMappings({ page: 2, limit: 12 }, BRANCH_CTX) },
+    { name: 'getMapping', method: 'GET', path: `/import-mappings/${MAPPING_ID}`, call: () => getMapping(MAPPING_ID, BRANCH_CTX) },
+    { name: 'createMapping', method: 'POST', path: '/import-mappings', body: { ...input, executionMode: 'PER_ROW', fields: BASE_FIELDS.map(toMappingFieldInput) }, call: () => createMapping({ ...input, fields: BASE_FIELDS }, key, BRANCH_CTX) },
+    { name: 'updateMapping', method: 'PATCH', path: `/import-mappings/${MAPPING_ID}`, body: { executionMode: 'PER_ROW', fields: BASE_FIELDS.map(toMappingFieldInput) }, ifMatch: '"3"', call: () => updateMapping(MAPPING_ID, { fields: BASE_FIELDS }, 3, key, BRANCH_CTX) },
+    { name: 'publishMapping', method: 'POST', path: `/import-mappings/${MAPPING_ID}/publish`, ifMatch: '"3"', call: () => publishMapping(MAPPING_ID, 3, key, BRANCH_CTX) },
+    { name: 'discardMappingDraft', method: 'DELETE', path: `/import-mappings/${MAPPING_ID}/draft`, ifMatch: '"3"', call: () => discardMappingDraft(MAPPING_ID, 3, key, BRANCH_CTX) },
+    { name: 'uploadSource', method: 'POST', path: '/imports/sources', call: () => uploadSource(file, key, undefined, BRANCH_CTX) },
+    { name: 'releaseSource', method: 'POST', path: `/imports/sources/${SOURCE_ID}/release`, call: () => releaseSource(SOURCE_ID, key, BRANCH_CTX) },
+    { name: 'preview', method: 'POST', path: '/imports/preview', body: { mappingId: MAPPING_ID, sourceId: SOURCE_ID }, call: () => preview({ mappingId: MAPPING_ID, sourceId: SOURCE_ID }, key, BRANCH_CTX) },
+    { name: 'execute', method: 'POST', path: `/imports/${RUN_ID}/execute`, ifMatch: '"3"', call: () => execute(RUN_ID, 3, key, BRANCH_CTX) },
+    { name: 'cancelRun', method: 'POST', path: `/imports/${RUN_ID}/cancel`, ifMatch: '"3"', call: () => cancelRun(RUN_ID, 3, key, BRANCH_CTX) },
+    { name: 'getRunCounts', method: 'GET', path: '/imports/counts', query: filters, call: () => getRunCounts(filters, BRANCH_CTX) },
+    { name: 'listRuns', method: 'GET', path: '/imports', query: { ...filters, page: 2, limit: 12 }, call: () => listRuns({ ...filters, page: 2, limit: 12 }, BRANCH_CTX) },
+    { name: 'getRun', method: 'GET', path: `/imports/${RUN_ID}`, call: () => getRun(RUN_ID, BRANCH_CTX) },
+    { name: 'listResults', method: 'GET', path: `/imports/${RUN_ID}/results`, query: { status: 'INVALID', page: 2, limit: 12 }, call: () => listResults(RUN_ID, { status: 'INVALID', page: 2, limit: 12 }, BRANCH_CTX) },
+    { name: 'resultsCsvUrl', method: 'GET', path: `/imports/${RUN_ID}/results.csv`, query: { status: 'INVALID' }, call: () => resultsCsvUrl(RUN_ID, 'INVALID', BRANCH_CTX) },
+  ];
+
+  it.each(cases)('$name preserves field errors and sends the scoped contract without retrying', async (test) => {
+    const error = new ApiError(422, 'TRADE.IMPORT.MAPPING_INVALID', { lookupCode: ['invalid_lookup'] });
+    const stub = new TradeHttpStub({ [`${test.method} ${test.path}`]: error });
+    const dispose = bindTradeHttpForTest(stub);
+    try {
+      await expect(test.call()).rejects.toMatchObject({
+        status: 422, code: error.code, details: { lookupCode: ['invalid_lookup'] },
+      });
+      if (test.method === 'GET') {
+        expect(stub.recordedReads()).toEqual([{ path: test.path, query: test.query, scope: BRANCH_CTX }]);
+      } else {
+        expect(stub.recordedWrites()).toHaveLength(1);
+        const write = stub.recordedWrites()[0];
+        expect(write).toMatchObject({ method: test.method, path: test.path, key, scope: BRANCH_CTX, ifMatch: test.ifMatch });
+        if (test.name === 'uploadSource') {
+          expect((write.body as FormData).get('file')).toBeInstanceOf(File);
+        } else {
+          expect(write.body).toEqual(test.body);
+        }
+      }
+    } finally {
+      dispose();
     }
   });
 
-  it('opens a new draft when a published mapping is edited, publishes it and discards a draft', async () => {
-    const before = await settle(getMapping(MAPPING_ID));
-
-    const updated = await settle(updateMapping(MAPPING_ID, { fields: COMPANY_FIELDS }, before.version));
-    const published = await settle(publishMapping(MAPPING_ID, updated.version));
-    const reopened = await settle(updateMapping(MAPPING_ID, { fields: COMPANY_FIELDS }, published.version));
-    const discarded = await settle(discardMappingDraft(MAPPING_ID, reopened.version));
-    const missingDraft = await rejection(publishMapping(MAPPING_ID, discarded.version));
-
-    expect(updated.createdDraftVersion).toBe(true);
-    expect(updated.draftVersion.versionNumber).toBe(2);
-    expect(published.currentPublishedVersionId).toBe(updated.draftVersion.id);
-    expect(published.publishedVersion.status).toBe('PUBLISHED');
-    expect(discarded).toEqual({ id: MAPPING_ID, version: reopened.version + 1, discardedVersionId: reopened.draftVersion.id });
-    expect([missingDraft.status, missingDraft.code]).toEqual([422, 'TRADE.IMPORT.MAPPING_INVALID']);
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
-  it('rejects a stale If-Match on update with 409', async () => {
-    const error = await rejection(updateMapping('map-branch-assortment', { fields: COMPANY_FIELDS }, 999));
-
-    expect([error.status, error.code]).toEqual([409, 'TRADE.CONCURRENCY.STALE_VERSION']);
+  it('targets: getImportTargets calls GET /import-mappings/targets with OPTIONAL scope and unwraps response', async () => {
+    const targets: ImportTargetsResponse = {
+      registryVersion: 1,
+      targets: [
+        {
+          code: 'CATALOG_COMPANY_PROFILE',
+          dtoCode: 'trade.catalog.company-profile.import-row',
+          dtoVersion: 1,
+          fields: [
+            { code: 'ITEM_CODE', required: true, allowedTransforms: ['NORMALIZE_CODE'], lookupCode: null },
+          ],
+        },
+      ],
+      lookups: {
+        BOOLEAN_V1: { TRUE: true, FALSE: false },
+        TRACKING_MODE_V1: { NONE: 'NONE', LOT: 'LOT', SERIAL: 'SERIAL' },
+      },
+    };
+    const stub = new TradeHttpStub({ 'GET /import-mappings/targets': targets });
+    const dispose = bindTradeHttpForTest(stub);
+    try {
+      const res = await getImportTargets(COMPANY_CTX);
+      expect(res).toEqual(targets);
+      expect(stub.recordedReads()).toEqual([
+        { path: '/import-mappings/targets', query: undefined, scope: COMPANY_CTX },
+      ]);
+    } finally {
+      dispose();
+    }
   });
 
-  it('returns 404 MAPPING_NOT_FOUND for an unknown mapping', async () => {
-    const error = await rejection(getMapping('nope'));
+  it('mappings CRUD: listMappings, getMapping, createMapping, updateMapping, publishMapping, discardMappingDraft send exact paths, keys, If-Match, and scope', async () => {
+    const mapping = makeMapping();
+    const detail: ImportMappingDetail = {
+      ...mapping,
+      versions: [
+        {
+          id: 'ver-1',
+          versionNumber: 1,
+          targetDtoCode: 'trade.catalog.company-profile.import-row',
+          targetDtoVersion: 1,
+          transformRegistryVersion: 1,
+          mappingHash: 'hash',
+          executionMode: 'PER_ROW',
+          status: 'DRAFT',
+          publishedAt: null,
+          version: 1,
+          createdAt: '2026-11-23T10:00:00.000Z',
+          updatedAt: '2026-11-23T10:00:00.000Z',
+          fields: [
+            {
+              sourceColumnCode: 'ItemCode',
+              sourceOrdinal: 0,
+              targetFieldCode: 'ITEM_CODE',
+              transformCode: 'NORMALIZE_CODE',
+              lookupCode: null,
+              isRequired: true,
+            },
+          ],
+        },
+      ],
+    };
+    const created: CreateImportMappingResult = {
+      ...mapping,
+      draftVersion: {
+        ...detail.versions[0],
+        mappingId: mapping.id,
+        publishedBy: null,
+      },
+      fields: detail.versions[0].fields,
+    };
+    const updated: UpdateImportMappingResult = { ...created, version: 2, createdDraftVersion: false };
+    const published: PublishImportMappingResult = {
+      ...mapping,
+      status: 'ACTIVE',
+      version: 3,
+      currentPublishedVersionId: 'ver-1',
+      publishedVersion: { ...created.draftVersion, status: 'PUBLISHED', publishedAt: '2026-11-23T10:05:00.000Z' },
+    };
+    const discarded: DiscardMappingDraftResult = {
+      id: mapping.id,
+      version: 4,
+      discardedVersionId: 'ver-2',
+    };
 
-    expect([error.status, error.code]).toEqual([404, 'TRADE.IMPORT.MAPPING_NOT_FOUND']);
+    const stub = new TradeHttpStub({
+      'GET /import-mappings': { items: [mapping], total: 1, page: 1, limit: 50 },
+      'GET /import-mappings/:id': detail,
+      'POST /import-mappings': created,
+      'PATCH /import-mappings/:id': updated,
+      'POST /import-mappings/:id/publish': published,
+      'DELETE /import-mappings/:id/draft': discarded,
+    });
+    const dispose = bindTradeHttpForTest(stub);
+    try {
+      const page = await listMappings({ page: 1, limit: 50, status: 'DRAFT', targetCode: 'CATALOG_COMPANY_PROFILE' }, COMPANY_CTX);
+      expect(page.items).toEqual([mapping]);
+
+      const fetched = await getMapping(MAPPING_ID, BRANCH_CTX);
+      expect(fetched.versions[0].fields[0].lookupCode).toBeNull();
+
+      const createKey = newIdempotencyKey();
+      const createRes = await createMapping(
+        {
+          code: 'ITEM_SETTINGS',
+          targetCode: 'CATALOG_COMPANY_PROFILE',
+          scopeTarget: 'COMPANY',
+          fields: BASE_FIELDS,
+        },
+        createKey,
+        COMPANY_CTX,
+      );
+      expect(createRes.id).toBe(MAPPING_ID);
+
+      const updateKey = newIdempotencyKey();
+      const updateRes = await updateMapping(MAPPING_ID, { fields: BASE_FIELDS }, 1, updateKey, COMPANY_CTX);
+      expect(updateRes.version).toBe(2);
+
+      const publishKey = newIdempotencyKey();
+      const publishRes = await publishMapping(MAPPING_ID, 2, publishKey, COMPANY_CTX);
+      expect(publishRes.status).toBe('ACTIVE');
+
+      const discardKey = newIdempotencyKey();
+      const discardRes = await discardMappingDraft(MAPPING_ID, 3, discardKey, COMPANY_CTX);
+      expect(discardRes).toEqual(discarded);
+
+      expect(stub.recordedReads()).toEqual([
+        {
+          path: '/import-mappings',
+          query: { page: 1, limit: 50, status: 'DRAFT', targetCode: 'CATALOG_COMPANY_PROFILE' },
+          scope: COMPANY_CTX,
+        },
+        {
+          path: `/import-mappings/${MAPPING_ID}`,
+          query: undefined,
+          scope: BRANCH_CTX,
+        },
+      ]);
+
+      expect(stub.recordedWrites()).toEqual([
+        {
+          method: 'POST',
+          path: '/import-mappings',
+          body: {
+            code: 'ITEM_SETTINGS',
+            targetCode: 'CATALOG_COMPANY_PROFILE',
+            scopeTarget: 'COMPANY',
+            executionMode: 'PER_ROW',
+            fields: [
+              {
+                sourceColumnCode: 'ItemCode',
+                sourceOrdinal: 0,
+                targetFieldCode: 'ITEM_CODE',
+                transformCode: 'NORMALIZE_CODE',
+                isRequired: true,
+              },
+              {
+                sourceColumnCode: 'CanSell',
+                sourceOrdinal: 1,
+                targetFieldCode: 'CAN_SELL',
+                transformCode: 'ENUM_MAP',
+                lookupCode: 'CUSTOM_LOOKUP_V2',
+                isRequired: true,
+              },
+            ],
+          },
+          key: createKey,
+          ifMatch: undefined,
+          scope: COMPANY_CTX,
+          query: undefined,
+        },
+        {
+          method: 'PATCH',
+          path: `/import-mappings/${MAPPING_ID}`,
+          body: {
+            executionMode: 'PER_ROW',
+            fields: BASE_FIELDS.map(toMappingFieldInput),
+          },
+          key: updateKey,
+          ifMatch: '"1"',
+          scope: COMPANY_CTX,
+          query: undefined,
+        },
+        {
+          method: 'POST',
+          path: `/import-mappings/${MAPPING_ID}/publish`,
+          body: undefined,
+          key: publishKey,
+          ifMatch: '"2"',
+          scope: COMPANY_CTX,
+          query: undefined,
+        },
+        {
+          method: 'DELETE',
+          path: `/import-mappings/${MAPPING_ID}/draft`,
+          body: undefined,
+          key: discardKey,
+          ifMatch: '"3"',
+          scope: COMPANY_CTX,
+          query: undefined,
+        },
+      ]);
+    } finally {
+      dispose();
+    }
+  });
+
+  it('mappings CRUD rejects missing/non-UUIDv7 key and invalid If-Match before sending', async () => {
+    const stub = new TradeHttpStub();
+    const dispose = bindTradeHttpForTest(stub);
+    try {
+      await expect(
+        createMapping(
+          { code: 'X', targetCode: 'CATALOG_COMPANY_PROFILE', scopeTarget: 'COMPANY', fields: BASE_FIELDS },
+          'bad-key',
+          COMPANY_CTX,
+        ),
+      ).rejects.toMatchObject({ status: 422, code: 'TRADE.IDEMPOTENCY.KEY_REQUIRED' });
+
+      await expect(
+        updateMapping(MAPPING_ID, { fields: BASE_FIELDS }, 0, newIdempotencyKey(), COMPANY_CTX),
+      ).rejects.toMatchObject({ status: 400, code: 'TRADE.CONCURRENCY.IF_MATCH_REQUIRED' });
+
+      await expect(
+        discardMappingDraft(MAPPING_ID, -1, newIdempotencyKey(), COMPANY_CTX),
+      ).rejects.toMatchObject({ status: 400, code: 'TRADE.CONCURRENCY.IF_MATCH_REQUIRED' });
+
+      expect(stub.recordedWrites()).toEqual([]);
+    } finally {
+      dispose();
+    }
+  });
+
+  it('mappings CRUD surfaces 422 TRADE.IMPORT.MAPPING_INVALID with field details', async () => {
+    const err = new ApiError(422, 'TRADE.IMPORT.MAPPING_INVALID', {
+      lookupCode: ['invalid_lookup_code'],
+    });
+    const stub = new TradeHttpStub({ 'PATCH /import-mappings/:id': err });
+    const dispose = bindTradeHttpForTest(stub);
+    try {
+      await expect(
+        updateMapping(MAPPING_ID, { fields: BASE_FIELDS }, 1, newIdempotencyKey(), COMPANY_CTX),
+      ).rejects.toMatchObject({
+        status: 422,
+        code: 'TRADE.IMPORT.MAPPING_INVALID',
+        details: { lookupCode: ['invalid_lookup_code'] },
+      });
+    } finally {
+      dispose();
+    }
+  });
+
+  it('sources & start / cancel run: uploadSource, releaseSource, preview, execute, cancelRun, getRunCounts, listRuns, getRun, listResults', async () => {
+    const source: ImportSource = {
+      fileId: SOURCE_ID,
+      fileName: 'items.csv',
+      sourceObjectRef: 'obj://items.csv',
+      sha256: 'a'.repeat(64),
+      mediaType: 'text/csv',
+      storedSize: 128,
+    };
+    const released: ReleaseSourceResult = {
+      sourceId: SOURCE_ID,
+      lifecycleCommandId: 'cmd-1',
+      storageState: 'PURGED',
+      idempotentReplay: false,
+    };
+    const previewRes: PreviewImportResult = {
+      runId: RUN_ID,
+      status: 'PENDING',
+      dispatchStatus: 'QUEUED',
+      sourceId: SOURCE_ID,
+      mappingVersionId: 'ver-1',
+      message: 'Preview queued',
+    };
+    const execRes: ImportRunCommandResult = {
+      runId: RUN_ID,
+      status: 'EXECUTING',
+      jobId: 'job-1',
+    };
+    const cancelRes: ImportRunCommandResult = {
+      runId: RUN_ID,
+      status: 'CANCELLED',
+      jobId: null,
+    };
+    const counts: ImportRunCounts = {
+      total: 1,
+      byStatus: {
+        PENDING: 0,
+        PREVIEWING: 0,
+        PREVIEWED: 1,
+        EXECUTING: 0,
+        COMPLETED: 0,
+        COMPLETED_WITH_ERRORS: 0,
+        FAILED: 0,
+        CANCELLED: 0,
+      },
+    };
+    const run = makeRun();
+    const wireRow = {
+      rowNumber: '42',
+      stableRowKey: 'ITEM-42',
+      status: 'INVALID',
+      errorCode: 'TRADE.IMPORT.VALUE_INVALID',
+      errorFieldCode: 'CAN_SELL',
+      ownerAggregateType: null,
+      ownerAggregateId: null,
+      ownerAggregateVersion: null,
+      completedAt: null,
+    } as unknown as RowResult;
+
+    const stub = new TradeHttpStub({
+      'POST /imports/sources': source,
+      'POST /imports/sources/:id/release': released,
+      'POST /imports/preview': previewRes,
+      'POST /imports/:runId/execute': execRes,
+      'POST /imports/:runId/cancel': cancelRes,
+      'GET /imports/counts': counts,
+      'GET /imports': { items: [run], total: 1, page: 1, limit: 24 },
+      'GET /imports/:runId': run,
+      'GET /imports/:runId/results': { items: [wireRow], total: 1, page: 1, limit: 25 },
+    });
+    const dispose = bindTradeHttpForTest(stub);
+    try {
+      const progressSpy = vi.fn();
+      const file = new File(['ItemCode\nA1\n'], 'items.csv', { type: 'text/csv' });
+      const uploadKey = newIdempotencyKey();
+      const uploaded = await uploadSource(file, uploadKey, progressSpy, COMPANY_CTX);
+      expect(uploaded).toEqual(source);
+      expect(progressSpy).toHaveBeenCalledWith(100);
+
+      const releaseKey = newIdempotencyKey();
+      expect(await releaseSource(SOURCE_ID, releaseKey, COMPANY_CTX)).toEqual(released);
+
+      const previewKey = newIdempotencyKey();
+      expect(
+        await preview({ mappingId: MAPPING_ID, sourceId: SOURCE_ID, predecessorRunId: 'pred-1' }, previewKey, COMPANY_CTX),
+      ).toEqual(previewRes);
+
+      const execKey = newIdempotencyKey();
+      expect(await execute(RUN_ID, 3, execKey, BRANCH_CTX)).toEqual(execRes);
+
+      const cancelKey = newIdempotencyKey();
+      expect(await cancelRun(RUN_ID, 4, cancelKey, BRANCH_CTX)).toEqual(cancelRes);
+
+      expect(await getRunCounts({ status: ['PENDING', 'PREVIEWED'], q: '  items  ' }, COMPANY_CTX)).toEqual(counts);
+      expect(await listRuns({ status: 'PREVIEWED', q: '  items  ', page: 1, limit: 24 }, COMPANY_CTX)).toEqual({
+        items: [run],
+        total: 1,
+        page: 1,
+        limit: 24,
+      });
+      expect(await getRun(RUN_ID, COMPANY_CTX)).toEqual(run);
+
+      const results = await listResults(RUN_ID, { status: 'INVALID', page: 1, limit: 25 }, COMPANY_CTX);
+      expect(results.items[0].rowNumber).toBe(42);
+      expect(typeof results.items[0].rowNumber).toBe('number');
+
+      const writes = stub.recordedWrites();
+      expect(writes[0].method).toBe('POST');
+      expect(writes[0].path).toBe('/imports/sources');
+      expect(writes[0].key).toBe(uploadKey);
+      expect(writes[0].scope).toEqual(COMPANY_CTX);
+      expect((writes[0].body as FormData).get('file')).toBeTruthy();
+
+      expect(writes.slice(1)).toEqual([
+        {
+          method: 'POST',
+          path: `/imports/sources/${SOURCE_ID}/release`,
+          body: undefined,
+          key: releaseKey,
+          ifMatch: undefined,
+          scope: COMPANY_CTX,
+          query: undefined,
+        },
+        {
+          method: 'POST',
+          path: '/imports/preview',
+          body: { mappingId: MAPPING_ID, sourceId: SOURCE_ID, predecessorRunId: 'pred-1' },
+          key: previewKey,
+          ifMatch: undefined,
+          scope: COMPANY_CTX,
+          query: undefined,
+        },
+        {
+          method: 'POST',
+          path: `/imports/${RUN_ID}/execute`,
+          body: undefined,
+          key: execKey,
+          ifMatch: '"3"',
+          scope: BRANCH_CTX,
+          query: undefined,
+        },
+        {
+          method: 'POST',
+          path: `/imports/${RUN_ID}/cancel`,
+          body: undefined,
+          key: cancelKey,
+          ifMatch: '"4"',
+          scope: BRANCH_CTX,
+          query: undefined,
+        },
+      ]);
+
+      expect(stub.recordedReads()).toEqual([
+        { path: '/imports/counts', query: { status: 'PENDING,PREVIEWED', q: 'items' }, scope: COMPANY_CTX },
+        { path: '/imports', query: { status: 'PREVIEWED', q: 'items', page: 1, limit: 24 }, scope: COMPANY_CTX },
+        { path: `/imports/${RUN_ID}`, query: undefined, scope: COMPANY_CTX },
+        { path: `/imports/${RUN_ID}/results`, query: { status: 'INVALID', page: 1, limit: 25 }, scope: COMPANY_CTX },
+      ]);
+    } finally {
+      dispose();
+    }
+  });
+
+  it('results.csv: readResultsCsv and resultsCsvUrl use readBlob with scope headers and create an object URL', async () => {
+    const csvBlob = new Blob(['\ufeffrow_number,status,field,error_code,owner_id\r\n'], { type: 'text/csv' });
+    const stub = new TradeHttpStub({ 'GET /imports/:runId/results.csv': csvBlob });
+    const dispose = bindTradeHttpForTest(stub);
+    const createUrlSpy = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:results-csv');
+    try {
+      const blob = await readResultsCsv(RUN_ID, 'INVALID', BRANCH_CTX);
+      expect(blob.size).toBe(csvBlob.size);
+
+      const url = await resultsCsvUrl(RUN_ID, 'FAILED', BRANCH_CTX);
+      expect(url).toBe('blob:results-csv');
+      expect(createUrlSpy).toHaveBeenCalledTimes(1);
+      expect(stub.recordedReads()).toEqual([
+        { path: `/imports/${RUN_ID}/results.csv`, query: { status: 'INVALID' }, scope: BRANCH_CTX },
+        { path: `/imports/${RUN_ID}/results.csv`, query: { status: 'FAILED' }, scope: BRANCH_CTX },
+      ]);
+    } finally {
+      dispose();
+    }
+  });
+
+  it('runs filter error: propagates TRADE.CONTROL_TOWER.QUERY_INVALID with field details', async () => {
+    const err = new ApiError(400, 'TRADE.CONTROL_TOWER.QUERY_INVALID', { q: ['invalid_filter'] });
+    const stub = new TradeHttpStub({ 'GET /imports': err });
+    const dispose = bindTradeHttpForTest(stub);
+    try {
+      await expect(listRuns({ q: 'bad' }, COMPANY_CTX)).rejects.toMatchObject({
+        status: 400,
+        code: 'TRADE.CONTROL_TOWER.QUERY_INVALID',
+        details: { q: ['invalid_filter'] },
+      });
+    } finally {
+      dispose();
+    }
   });
 });

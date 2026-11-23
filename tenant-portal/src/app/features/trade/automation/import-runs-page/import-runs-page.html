@@ -1,5 +1,16 @@
+@if (isForbidden()) {
+  <div class="flex flex-1 rounded-10 border border-border bg-surface shadow-card">
+    <ui-full-state
+      kind="forbidden"
+      [title]="'errors.forbidden.title' | transloco"
+      [text]="'errors.forbidden.text' | transloco"
+      [actionLabel]="'errors.notFound.action' | transloco"
+      (action)="goHome()"
+    />
+  </div>
+} @else {
 <div class="flex shrink-0 flex-wrap items-center gap-8 rounded-10 bg-surface p-8 shadow-card">
-  @if (can.manage) {
+  @if (canExecute()) {
     <button
       type="button"
       uiButton
@@ -12,32 +23,43 @@
     </button>
   }
 
-  <div
-    class="flex h-field min-w-0 flex-1 items-center gap-4 overflow-hidden rounded-8 border border-border-field bg-surface-field ps-8 pe-2 text-12 text-text transition-colors duration-fast hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo"
-  >
-    <span class="inline-flex shrink-0 text-text-muted">
-      <ng-icon name="tablerSearch" size="14" aria-hidden="true" />
-    </span>
-    <input
-      #searchInput
-      type="text"
-      autocomplete="off"
-      class="h-full min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
-      [placeholder]="'imports.runs.toolbar.searchPlaceholder' | transloco"
-      [attr.aria-label]="'imports.runs.toolbar.searchPlaceholder' | transloco"
-      [value]="search()"
-      (input)="onSearchInput($event)"
-      (keydown.escape)="clearSearch()"
-    />
-    @if (search()) {
-      <button
-        type="button"
-        class="inline-flex size-icon-tile-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
-        [attr.aria-label]="'settings.common.clearSearch' | transloco"
-        (click)="clearSearch(); searchInput.focus()"
-      >
-        <ng-icon name="tablerX" size="12" aria-hidden="true" />
-      </button>
+  <div class="flex min-w-0 flex-1 flex-col gap-2">
+    <div
+      class="flex h-field min-w-0 items-center gap-4 overflow-hidden rounded-8 border bg-surface-field ps-8 pe-2 text-12 text-text transition-colors duration-fast"
+      [class]="filterError() ? 'border-danger-border ring-2 ring-danger-halo' : 'border-border-field hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo'"
+    >
+      <span class="inline-flex shrink-0 text-text-muted">
+        <ng-icon name="tablerSearch" size="14" aria-hidden="true" />
+      </span>
+      <input
+        #searchInput
+        type="text"
+        autocomplete="off"
+        class="h-full min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [placeholder]="'imports.runs.toolbar.searchPlaceholder' | transloco"
+        [attr.aria-label]="'imports.runs.toolbar.searchPlaceholder' | transloco"
+        [attr.aria-invalid]="filterError() ? true : null"
+        [attr.aria-describedby]="filterError() ? 'import-runs-filter-error' : null"
+        [value]="search()"
+        (input)="onSearchInput($event)"
+        (keydown.escape)="clearSearch()"
+      />
+      @if (search()) {
+        <button
+          type="button"
+          class="inline-flex size-icon-tile-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [attr.aria-label]="'settings.common.clearSearch' | transloco"
+          (click)="clearSearch(); searchInput.focus()"
+        >
+          <ng-icon name="tablerX" size="12" aria-hidden="true" />
+        </button>
+      }
+    </div>
+    @if (filterError(); as err) {
+      <p id="import-runs-filter-error" class="flex items-center gap-4 text-11 leading-16 text-danger-text" role="alert">
+        <ng-icon name="tablerCircleX" size="11" aria-hidden="true" />
+        <span>{{ err }}</span>
+      </p>
     }
   </div>
 
@@ -100,7 +122,7 @@
       </button>
     } @else {
       <p class="text-13 leading-18 font-medium text-text">{{ 'imports.runs.empty.title' | transloco }}</p>
-      @if (can.manage) {
+      @if (canExecute()) {
         <button type="button" uiButton variant="primary" (click)="openWizard()">
           <ng-icon name="tablerUpload" size="15" aria-hidden="true" />
           <span>{{ 'imports.runs.toolbar.new' | transloco }}</span>
@@ -271,4 +293,6 @@
   class="contents"
   (started)="onWizardStarted()"
   (closed)="onWizardClosed()"
+  (forbidden)="onForbidden()"
 />
+}

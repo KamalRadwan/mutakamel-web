@@ -4,9 +4,11 @@
   <div class="min-w-doc-table-min flex flex-col gap-6">
     @for (row of fields(); track $index; let idx = $index; let first = $first) {
       @let rv = rowValidations()[idx];
-      @let posError = showErrors() ? rv.positionError : null;
-      @let colError = showErrors() ? rv.columnError : null;
-      @let tgtError = showErrors() ? rv.targetError : null;
+      @let srv = serverErrors()[idx];
+      @let posError = (showErrors() ? rv.positionError : null) ?? srv?.positionError ?? null;
+      @let colError = (showErrors() ? rv.columnError : null) ?? srv?.columnError ?? null;
+      @let tgtError = (showErrors() ? rv.targetError : null) ?? srv?.targetError ?? null;
+      @let lookupError = srv?.lookupError ?? null;
       @let rowMeta = targetFieldMap().get(row.targetFieldCode);
       @let lookupText = lookupLabel(row.lookupCode ?? rowMeta?.lookupCode);
 
@@ -160,6 +162,7 @@
               size="bare"
               [label]="'imports.mappingRows.lookup' | transloco"
               [hint]="'imports.mappingRows.lookupHint' | transloco"
+              [error]="lookupError"
             >
               <div class="flex h-field min-w-0 items-center">
                 @if (lookupText) {

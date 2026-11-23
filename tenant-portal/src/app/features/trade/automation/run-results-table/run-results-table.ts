@@ -1,13 +1,15 @@
-import { Component, computed, effect, inject, input, resource, signal, untracked } from '@angular/core';
+import { Component, computed, effect, inject, input, output, resource, signal, untracked } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerAlertTriangle, tablerInbox, tablerLink, tablerRefresh } from '@ng-icons/tabler-icons';
+import { ScopeState } from '../../../../core/scope/scope';
 import { Button } from '../../../../shared/ui/button/button';
 import { Pagination } from '../../../../shared/ui/pagination/pagination';
 import { AutomationBadge } from '../automation-shared/automation-badge/automation-badge';
 import { listResults } from '../imports.api';
 import type { RowResult } from '../imports.model';
+import { importContext, isForbiddenError } from '../mapping-rows/import-access';
 import { fieldLabel, formatInt, normalizePage, translateRowError } from '../mapping-rows/mapping-rows';
 
 const DEFAULT_PAGE_SIZE = 25;
@@ -21,12 +23,14 @@ const PAGE_SIZES = [25, 50, 100];
   host: { class: 'flex min-w-0 flex-col gap-8' },
 })
 export class RunResultsTable {
+  private readonly scopeState = inject(ScopeState);
   private readonly transloco = inject(TranslocoService);
 
   readonly runId = input.required<string>();
   readonly targetCode = input('');
   readonly status = input<RowResult['status'] | 'ALL'>('ALL');
   readonly refreshToken = input(0);
+  readonly forbidden = output<void>();
 
   protected readonly page = signal(1);
   protected readonly pageSize = signal(DEFAULT_PAGE_SIZE);
@@ -36,6 +40,7 @@ export class RunResultsTable {
   private readonly resultsResource = resource({
     params: () => ({
       runId: this.runId(),
+      ctx: importContext(this.scopeState),
       status: this.status(),
       page: this.page(),
       limit: Math.min(100, this.pageSize()),
@@ -45,17 +50,23 @@ export class RunResultsTable {
       if (!params.runId) {
         return normalizePage<RowResult>([], 1, params.limit);
       }
-      const res = await listResults(params.runId, {
-        page: params.page,
-        limit: params.limit,
-        ...(params.status !== 'ALL' ? { status: params.status } : {}),
-      });
+      const res = await listResults(
+        params.runId,
+        {
+          page: params.page,
+          limit: params.limit,
+          ...(params.status !== 'ALL' ? { status: params.status } : {}),
+        },
+        params.ctx,
+      );
       return normalizePage<RowResult>(res, params.page, params.limit);
     },
   });
 
   protected readonly loading = computed(() => this.resultsResource.isLoading() && !this.resultsResource.hasValue());
-  protected readonly failed = computed(() => !!this.resultsResource.error());
+  protected readonly failed = computed(
+    () => !!this.resultsResource.error() && !isForbiddenError(this.resultsResource.error()),
+  );
   protected readonly items = computed<RowResult[]>(() =>
     this.resultsResource.hasValue() ? this.resultsResource.value().items : [],
   );
@@ -73,6 +84,12 @@ export class RunResultsTable {
       prevRunId = id;
       prevStatus = status;
       untracked(() => this.page.set(1));
+    });
+
+    effect(() => {
+      if (this.resultsResource.status() === 'error' && isForbiddenError(this.resultsResource.error())) {
+        untracked(() => this.forbidden.emit());
+      }
     });
   }
 

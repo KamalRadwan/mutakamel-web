@@ -1,3 +1,14 @@
+@if (isForbidden()) {
+  <div class="flex flex-1 rounded-10 border border-border bg-surface shadow-card">
+    <ui-full-state
+      kind="forbidden"
+      [title]="'errors.forbidden.title' | transloco"
+      [text]="'errors.forbidden.text' | transloco"
+      [actionLabel]="'errors.notFound.action' | transloco"
+      (action)="goHome()"
+    />
+  </div>
+} @else {
 <header class="shrink-0 overflow-hidden rounded-10 border border-border bg-surface shadow-card">
   @if (loading()) {
     <div class="flex items-center gap-8 px-10 py-8" aria-busy="true">
@@ -62,7 +73,7 @@
           </button>
         }
 
-        @if (can.manage && isTerminal()) {
+        @if (canExecute() && isTerminal()) {
           <button
             type="button"
             uiButton
@@ -75,7 +86,7 @@
           </button>
         }
 
-        @if (can.manage && isActive()) {
+        @if (canExecute() && isActive()) {
           <button
             type="button"
             uiButton
@@ -215,15 +226,17 @@
             (valueChange)="onFilterChange($event)"
           />
 
-          <a
+          <button
+            type="button"
             uiButton
             variant="secondary"
-            [href]="downloadUrl()"
-            [attr.download]="downloadFilename()"
+            [loading]="downloadingCsv()"
+            [disabled]="downloadingCsv()"
+            (click)="downloadResults()"
           >
             <ng-icon name="tablerDownload" size="15" aria-hidden="true" />
             <span>{{ 'imports.runPage.downloadResults' | transloco }}</span>
-          </a>
+          </button>
         </div>
 
         <app-run-results-table
@@ -231,6 +244,7 @@
           [targetCode]="current.targetDtoCode"
           [status]="resultStatus()"
           [refreshToken]="resultsTick()"
+          (forbidden)="onForbidden()"
         />
       </div>
     </div>
@@ -256,3 +270,4 @@
   [confirmLabel]="'imports.runPage.releaseConfirm.confirm' | transloco"
   [cancelLabel]="'imports.common.cancel' | transloco"
 />
+}

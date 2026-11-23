@@ -3,7 +3,7 @@
     <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
       <ng-icon name="tablerAlertTriangle" size="18" aria-hidden="true" />
     </span>
-    <p class="text-12 leading-18 text-text-muted">{{ 'results.loadFailed' | transloco }}</p>
+    <p class="text-12 leading-18 text-text-muted">{{ 'imports.results.loadFailed' | transloco }}</p>
     <button type="button" uiButton variant="primary" (click)="retry()">
       <ng-icon name="tablerRefresh" size="15" aria-hidden="true" />
       <span>{{ 'imports.common.retry' | transloco }}</span>
@@ -14,14 +14,14 @@
     <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
       <ng-icon name="tablerInbox" size="18" aria-hidden="true" />
     </span>
-    <p class="text-13 leading-18 font-medium text-text">{{ 'results.empty' | transloco }}</p>
+    <p class="text-13 leading-18 font-medium text-text">{{ 'imports.results.empty' | transloco }}</p>
   </div>
 } @else {
   <div class="overflow-x-auto pb-4">
     <div
       role="table"
       class="min-w-doc-table-min"
-      [attr.aria-label]="'results.tableLabel' | transloco"
+      [attr.aria-label]="'imports.results.tableLabel' | transloco"
       [attr.aria-busy]="loading()"
     >
       <div
@@ -29,19 +29,19 @@
         class="bg-nav-gradient grid h-table-head rounded-10 text-13 leading-18 font-medium text-on-nav grid-cols-auto-import-result-row"
       >
         <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
-          {{ 'results.colRow' | transloco }}
+          {{ 'imports.results.colRow' | transloco }}
         </span>
         <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
-          {{ 'results.colStatus' | transloco }}
+          {{ 'imports.results.colStatus' | transloco }}
         </span>
         <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
-          {{ 'results.colField' | transloco }}
+          {{ 'imports.results.colField' | transloco }}
         </span>
         <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
-          {{ 'results.colProblem' | transloco }}
+          {{ 'imports.results.colProblem' | transloco }}
         </span>
         <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
-          {{ 'results.colRecord' | transloco }}
+          {{ 'imports.results.colRecord' | transloco }}
         </span>
       </div>
 
@@ -97,7 +97,7 @@
                   class="inline-flex items-center gap-4 truncate font-medium text-accent outline-none hover:underline focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
                 >
                   <ng-icon name="tablerLink" size="12" class="shrink-0" aria-hidden="true" />
-                  <span class="truncate">{{ 'results.openItem' | transloco }}</span>
+                  <span class="truncate">{{ 'imports.results.openItem' | transloco }}</span>
                 </a>
               } @else {
                 <span class="text-text-muted">{{ 'imports.common.none' | transloco }}</span>
@@ -115,7 +115,7 @@
     <ui-pagination
       [total]="total()"
       [pageSizes]="pageSizes"
-      [label]="'results.paginationLabel' | transloco"
+      [label]="'imports.results.paginationLabel' | transloco"
       [page]="page()"
       [pageSize]="pageSize()"
       (pageChange)="page.set($event)"

@@ -13,6 +13,7 @@ import {
 } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
+import { ScopeState } from '../../../../core/scope/scope';
 import { BulkJobsTracker } from '../../../../shared/bulk-jobs/bulk-jobs-tracker';
 import { Button } from '../../../../shared/ui/button/button';
 import { Dropdown, type DropdownOption } from '../../../../shared/ui/dropdown/dropdown';
@@ -21,6 +22,7 @@ import { FileDrop } from '../../../../shared/ui/file-drop/file-drop';
 import { Modal } from '../../../../shared/ui/modal/modal';
 import { Pagination } from '../../../../shared/ui/pagination/pagination';
 import { Stepper, type StepItem, type StepState, type StepStateLabels } from '../../../../shared/ui/stepper/stepper';
+import { errorCodeOf } from '../../shared/trade-api';
 import { ActionKeys } from '../automation-shared/action-keys';
 import { ImportRunsWatch } from '../automation-shared/import-runs-watch';
 import { pollWhile } from '../automation-shared/poll';
@@ -44,6 +46,7 @@ import type {
   RowResult,
 } from '../imports.model';
 import { FILE_LIMITS, RUN_ACTIVE } from '../imports.registry';
+import { importContext, isForbiddenError, isIdempotencyMismatch } from '../mapping-rows/import-access';
 import {
   fieldLabel,
   formatBytes,
@@ -96,6 +99,7 @@ export class ImportWizard {
   private readonly modal = viewChild.required(Modal);
   private readonly destroyRef = inject(DestroyRef);
   private readonly router = inject(Router);
+  private readonly scopeState = inject(ScopeState);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly lang = inject(LanguageState).current;
@@ -110,6 +114,7 @@ export class ImportWizard {
 
   readonly closed = output<void>();
   readonly started = output<string>();
+  readonly forbidden = output<void>();
 
   protected readonly step = signal<WizardStepId>('file');
   protected readonly fileError = signal<string | null>(null);
@@ -348,15 +353,26 @@ export class ImportWizard {
     this.uploadProgress.set(0);
     this.uploading.set(true);
 
+    const fileRequest = { name: file.name, size: file.size, lastModified: file.lastModified };
     try {
-      const fileRequest = { name: file.name, size: file.size, lastModified: file.lastModified };
-      const source = await uploadSource(file, this.keys.for('upload', fileRequest), (pct) =>
-        this.uploadProgress.set(Math.min(100, Math.max(0, pct))),
+      const source = await uploadSource(
+        file,
+        this.keys.for('upload', fileRequest),
+        (pct) => this.uploadProgress.set(Math.min(100, Math.max(0, pct))),
+        importContext(this.scopeState),
       );
       this.keys.done('upload');
       this.uploadedSource.set(source);
       this.uploadProgress.set(100);
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.keys.done('upload');
+        this.handleForbidden();
+        return;
+      }
+      if (isIdempotencyMismatch(errorCodeOf(error))) {
+        this.keys.done('upload');
+      }
       this.notify.error(translateImportError(this.transloco, error));
       this.selectedFile.set(null);
       this.uploadedSource.set(null);
@@ -444,9 +460,14 @@ export class ImportWizard {
     const run = this.currentRun();
     if (!run || this.executing()) return;
     this.executing.set(true);
+    const action = `execute:${run.id}`;
     try {
-      const action = `execute:${run.id}`;
-      const res: unknown = await execute(run.id, run.version, this.keys.for(action, { ifMatch: run.version }));
+      const res: unknown = await execute(
+        run.id,
+        run.version,
+        this.keys.for(action, { ifMatch: run.version }),
+        importContext(this.scopeState),
+      );
       this.keys.done(action);
       if (res && typeof res === 'object' && 'jobId' in res) {
         void this.bulkJobs.loadRecent();
@@ -458,6 +479,14 @@ export class ImportWizard {
       this.started.emit(run.id);
       void this.router.navigate(['/trade/automation/import-runs', run.id]);
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.keys.done(action);
+        this.handleForbidden();
+        return;
+      }
+      if (isIdempotencyMismatch(errorCodeOf(error))) {
+        this.keys.done(action);
+      }
       this.notify.error(translateImportError(this.transloco, error));
     } finally {
       this.executing.set(false);
@@ -489,7 +518,10 @@ export class ImportWizard {
   private async loadActiveMappings(presetMappingId: string | null, presetPredecessorId: string | null): Promise<void> {
     this.mappingsLoading.set(true);
     try {
-      const res = await listMappings({ status: 'ACTIVE', limit: 100 });
+      const res = await listMappings(
+        { status: 'ACTIVE', limit: 100 },
+        importContext(this.scopeState),
+      );
       const items = normalizePage<ImportMapping>(res, 1, 100).items.filter((m) => m.status === 'ACTIVE');
       this.activeMappings.set(items);
 
@@ -502,6 +534,10 @@ export class ImportWizard {
         await this.loadMappingDetailsAndPredecessors(chosenId, presetPredecessorId);
       }
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.handleForbidden();
+        return;
+      }
       this.notify.error(translateImportError(this.transloco, error));
     } finally {
       this.mappingsLoading.set(false);
@@ -513,9 +549,10 @@ export class ImportWizard {
     presetPredecessorId: string | null,
   ): Promise<void> {
     try {
+      const ctx = importContext(this.scopeState);
       const [detail, runsRes] = await Promise.all([
-        getMapping(mappingId),
-        listRuns({ mappingId, limit: 50 }),
+        getMapping(mappingId, ctx),
+        listRuns({ mappingId, limit: 50 }, ctx),
       ]);
       if (this.selectedMappingId() !== mappingId) return;
       this.selectedMappingDetail.set(detail);
@@ -526,7 +563,10 @@ export class ImportWizard {
       if (presetPredecessorId && terminalRuns.some((r) => r.id === presetPredecessorId)) {
         this.selectedPredecessorId.set(presetPredecessorId);
       }
-    } catch {
+    } catch (error) {
+      if (isForbiddenError(error)) {
+        this.handleForbidden();
+      }
       // Keep list fallback if detail or predecessors fail transiently.
     }
   }
@@ -541,6 +581,7 @@ export class ImportWizard {
     this.invalidTotal.set(0);
     this.invalidPage.set(1);
 
+    const ctx = importContext(this.scopeState);
     try {
       const predecessorId = this.selectedPredecessorId().trim();
       const input: PreviewImportInput = {
@@ -548,11 +589,11 @@ export class ImportWizard {
         sourceId: source.fileId,
         ...(predecessorId ? { predecessorRunId: predecessorId } : {}),
       };
-      const accepted = await preview(input, this.keys.for('preview', input));
+      const accepted = await preview(input, this.keys.for('preview', input), ctx);
       this.keys.done('preview');
       this.previewStarted = true;
       // The preview answer (202) only names the queued run; the run itself is read next.
-      const run = await getRun(accepted.runId);
+      const run = await getRun(accepted.runId, ctx);
       this.currentRun.set(run);
       this.step.set('check');
       if (activePollStatuses().includes(run.status)) {
@@ -561,6 +602,14 @@ export class ImportWizard {
         void this.loadInvalidRows(run.id, 1, this.invalidPageSize());
       }
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.keys.done('preview');
+        this.handleForbidden();
+        return;
+      }
+      if (isIdempotencyMismatch(errorCodeOf(error))) {
+        this.keys.done('preview');
+      }
       this.notify.error(translateImportError(this.transloco, error));
     } finally {
       this.startingPreview.set(false);
@@ -570,9 +619,10 @@ export class ImportWizard {
   private beginPolling(runId: string): void {
     this.stopPolling();
     this.pollingDisposed = false;
-    const handle: unknown = pollWhile(
+    const ctx = importContext(this.scopeState);
+    const handle = pollWhile(
       async () => {
-        const fresh = await getRun(runId);
+        const fresh = await getRun(runId, ctx);
         if (this.pollingDisposed || !this.modalOpen || this.currentRun()?.id !== runId) {
           return fresh;
         }
@@ -585,10 +635,21 @@ export class ImportWizard {
       (run) => !this.pollingDisposed && this.modalOpen && (run.status === 'PENDING' || run.status === 'PREVIEWING'),
       3000,
       this.destroyRef,
+      undefined,
+      (err) => {
+        if (isForbiddenError(err)) {
+          this.handleForbidden();
+        }
+      },
     );
-    if (typeof handle === 'function') {
-      this.stopPollFn = handle as () => void;
-    }
+    this.stopPollFn = () => handle.stop();
+  }
+
+  private handleForbidden(): void {
+    this.completedCleanly = true;
+    this.stopPolling();
+    this.modal().close();
+    this.forbidden.emit();
   }
 
   private stopPolling(): void {
@@ -601,12 +662,20 @@ export class ImportWizard {
     const seq = ++this.invalidSeq;
     this.invalidLoading.set(true);
     try {
-      const res = await listResults(runId, { status: 'INVALID', page, limit });
+      const res = await listResults(
+        runId,
+        { status: 'INVALID', page, limit },
+        importContext(this.scopeState),
+      );
       if (seq !== this.invalidSeq) return;
       const normalized = normalizePage<RowResult>(res, page, limit);
       this.invalidRows.set(normalized.items);
       this.invalidTotal.set(normalized.total);
-    } catch {
+    } catch (error) {
+      if (isForbiddenError(error)) {
+        this.handleForbidden();
+        return;
+      }
       if (seq === this.invalidSeq) {
         this.invalidRows.set([]);
       }

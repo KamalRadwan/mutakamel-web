@@ -4,7 +4,11 @@ export type ImportTargetCode = 'CATALOG_COMPANY_PROFILE' | 'CATALOG_BRANCH_ASSIG
 
 export type ImportTransformCode = 'TRIM' | 'NORMALIZE_CODE' | 'ENUM_MAP';
 
-export type ImportLookupCode = 'BOOLEAN_V1' | 'TRACKING_MODE_V1';
+export const KNOWN_IMPORT_LOOKUP_CODES = ['BOOLEAN_V1', 'TRACKING_MODE_V1'] as const;
+
+export type KnownImportLookupCode = (typeof KNOWN_IMPORT_LOOKUP_CODES)[number];
+
+export type ImportLookupCode = KnownImportLookupCode | (string & {});
 
 export interface ImportTargetFieldSpec {
   code: string;
@@ -24,7 +28,7 @@ export interface ImportTargetSpec {
 export interface ImportTargetsResponse {
   registryVersion: number;
   targets: ImportTargetSpec[];
-  lookups: Record<ImportLookupCode, Record<string, boolean | string>>;
+  lookups: Record<string, Record<string, boolean | string>>;
 }
 
 export const OFFERED_TRANSFORMS: readonly ImportTransformCode[] = [
@@ -33,7 +37,7 @@ export const OFFERED_TRANSFORMS: readonly ImportTransformCode[] = [
   'ENUM_MAP',
 ];
 
-export const IMPORT_LOOKUPS: ImportTargetsResponse['lookups'] = {
+export const IMPORT_LOOKUPS: Record<KnownImportLookupCode, Record<string, boolean | string>> = {
   BOOLEAN_V1: { TRUE: true, YES: true, Y: true, '1': true, FALSE: false, NO: false, N: false, '0': false },
   TRACKING_MODE_V1: { NONE: 'NONE', LOT: 'LOT', SERIAL: 'SERIAL' },
 };
