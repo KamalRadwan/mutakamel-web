@@ -533,7 +533,7 @@ export class PolicyVersionPage {
       this.detail.set(ver);
       this.definition.set(def);
       this.metadata.set(meta);
-      this.seedDraftFromDetail(ver);
+      this.resetDraftFromDetail(ver);
     } catch (err) {
       if (isForbiddenError(err)) {
         this.forbidden.set(true);
@@ -626,7 +626,7 @@ export class PolicyVersionPage {
   protected undoChanges(): void {
     const d = this.detail();
     if (!d) return;
-    this.seedDraftFromDetail(d);
+    this.resetDraftFromDetail(d);
     this.showClientErrors.set(false);
     this.diagnostics.set({});
   }
@@ -674,7 +674,7 @@ export class PolicyVersionPage {
       )) as GovernedVersionRecord;
       const updated = (await getVersion('policy', saved.id, ctx)) as GovernedVersionDetail<PolicyContent, PolicyTestCase>;
       this.detail.set(updated);
-      this.seedDraftFromDetail(updated);
+      this.resetDraftFromDetail(updated);
       this.showClientErrors.set(false);
       this.diagnostics.set({});
       this.testError.set(null);
@@ -806,7 +806,7 @@ export class PolicyVersionPage {
       )) as GovernedVersionRecord;
       const updated = (await getVersion('policy', saved.id, ctx)) as GovernedVersionDetail<PolicyContent, PolicyTestCase>;
       this.detail.set(updated);
-      this.seedDraftFromDetail(updated);
+      this.resetDraftFromDetail(updated);
       this.notify.success(this.transloco.translate('policy.version.toasts.submitted'));
       await this.refreshDefinitionQuietly();
     } catch (err) {
@@ -833,7 +833,7 @@ export class PolicyVersionPage {
       )) as GovernedVersionRecord;
       const updated = (await getVersion('policy', saved.id, ctx)) as GovernedVersionDetail<PolicyContent, PolicyTestCase>;
       this.detail.set(updated);
-      this.seedDraftFromDetail(updated);
+      this.resetDraftFromDetail(updated);
       this.notify.success(this.transloco.translate('policy.version.toasts.approved'));
       await this.refreshDefinitionQuietly();
     } catch (err) {
@@ -866,7 +866,7 @@ export class PolicyVersionPage {
       const updated = (await getVersion('policy', saved.id, ctx)) as GovernedVersionDetail<PolicyContent, PolicyTestCase>;
       this.rejectDialog()?.close();
       this.detail.set(updated);
-      this.seedDraftFromDetail(updated);
+      this.resetDraftFromDetail(updated);
       this.notify.success(this.transloco.translate('policy.version.toasts.rejected'));
       await this.refreshDefinitionQuietly();
     } catch (err) {
@@ -902,7 +902,7 @@ export class PolicyVersionPage {
       const updated = (await getVersion('policy', saved.id, ctx)) as GovernedVersionDetail<PolicyContent, PolicyTestCase>;
       this.publishModal()?.close();
       this.detail.set(updated);
-      this.seedDraftFromDetail(updated);
+      this.resetDraftFromDetail(updated);
       this.notify.success(
         this.transloco.translate(
           updated.status === 'SCHEDULED'
@@ -965,7 +965,7 @@ export class PolicyVersionPage {
       const updated = (await getVersion('policy', saved.id, ctx)) as GovernedVersionDetail<PolicyContent, PolicyTestCase>;
       this.retireDialog()?.close();
       this.detail.set(updated);
-      this.seedDraftFromDetail(updated);
+      this.resetDraftFromDetail(updated);
       this.notify.success(this.transloco.translate('policy.version.toasts.retired'));
       await this.refreshDefinitionQuietly();
     } catch (err) {
@@ -1050,7 +1050,7 @@ export class PolicyVersionPage {
       this.detail.set(ver);
       this.definition.set(def);
       if (!this.dirty()) {
-        this.seedDraftFromDetail(ver);
+        this.resetDraftFromDetail(ver);
       }
     } catch {
       // ignore background refresh failures
@@ -1067,7 +1067,7 @@ export class PolicyVersionPage {
     }
   }
 
-  private seedDraftFromDetail(ver: GovernedVersionDetail<PolicyContent, PolicyTestCase>): void {
+  private resetDraftFromDetail(ver: GovernedVersionDetail<PolicyContent, PolicyTestCase>): void {
     const contentCopy: PolicyContent = structuredClone(ver.content ?? EMPTY_CONTENT);
     const testsCopy: PolicyTestCase[] = structuredClone(ver.testCases ?? []);
     const fromParts = isoToLocalParts(ver.effectiveFrom);

@@ -1,7 +1,5 @@
-import { provideEnvironmentInitializer } from '@angular/core';
 import type { Routes } from '@angular/router';
 import { provideTranslocoScope } from '@jsverse/transloco';
-import { seedGovernanceReasons } from './governance-reasons.seed';
 
 export const governanceRoutes: Routes = [
   {
@@ -11,9 +9,6 @@ export const governanceRoutes: Routes = [
         { scope: 'trade-governance', alias: 'governance' },
         { scope: 'trade-shared', alias: 'tradeShared' },
       ),
-      provideEnvironmentInitializer(() => {
-        seedGovernanceReasons();
-      }),
     ],
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'price-books' },

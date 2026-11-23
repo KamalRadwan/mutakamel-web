@@ -13,7 +13,7 @@ import {
   tablerSend,
 } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../core/i18n/language';
-import { actorName } from '../governance-fake-actors';
+import { TenantScopeState } from '../../../../core/scope/tenant-scope';
 import type { GovernedVersion, GovernedVersionDetail } from '../policy.model';
 import { formatDateTime } from '../pricing.service';
 
@@ -125,6 +125,7 @@ export class GovernedReview {
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly lang = inject(LanguageState).current;
+  private readonly tenantScope = inject(TenantScopeState);
 
   readonly detail = input.required<GovernedVersionDetail<unknown, unknown>>();
   readonly versions = input<readonly GovernedVersion[]>([]);
@@ -137,15 +138,22 @@ export class GovernedReview {
 
     const rawActions = [...(d.actions ?? [])];
     const hasAction = (code: string) => rawActions.some((item) => item.action === code);
+    const me = this.tenantScope.me();
+    const actorNames = new Map<string, string>();
+    for (const entry of rawActions) {
+      if (entry.actorUserId && entry.actorDisplayName?.trim() && actorNames.has(entry.actorUserId) === false) {
+        actorNames.set(entry.actorUserId, entry.actorDisplayName.trim());
+      }
+    }
 
     const resolveActor = (actorId: string | null | undefined, fallbackName?: string | null): string => {
-      if (actorId) {
-        const names = actorName(actorId);
-        const localized = currentLang === 'ar' ? names['ar'] : names['en'];
-        if (localized && localized !== actorId) return localized;
+      if (fallbackName?.trim()) return fallbackName.trim();
+      if (actorId && me?.id === actorId) {
+        const name = `${me.firstName} ${me.lastName}`.trim();
+        if (name) return name;
+        if (me.email) return me.email;
       }
-      if (fallbackName && fallbackName.trim()) return fallbackName;
-      return actorId ?? '—';
+      return (actorId && actorNames.get(actorId)) || actorId || '—';
     };
 
     const newestTestIndex = rawActions.findIndex((item) => item.action === 'TEST');

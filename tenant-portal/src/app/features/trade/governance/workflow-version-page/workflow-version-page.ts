@@ -553,7 +553,7 @@ export class WorkflowVersionPage {
       const ver = verRaw as GovernedVersionDetail<WorkflowContent, WorkflowTestCase>;
       this.detail.set(ver);
       this.definition.set(def);
-      this.seedDraftFromDetail(ver);
+      this.resetDraftFromDetail(ver);
     } catch (err) {
       if (isForbiddenError(err)) {
         this.forbidden.set(true);
@@ -650,7 +650,7 @@ export class WorkflowVersionPage {
   protected undoChanges(): void {
     const d = this.detail();
     if (!d) return;
-    this.seedDraftFromDetail(d);
+    this.resetDraftFromDetail(d);
     this.showClientErrors.set(false);
     this.diagnostics.set({});
   }
@@ -696,7 +696,7 @@ export class WorkflowVersionPage {
       )) as GovernedVersionRecord;
       const updated = (await getVersion('workflow', saved.id, ctx)) as GovernedVersionDetail<WorkflowContent, WorkflowTestCase>;
       this.detail.set(updated);
-      this.seedDraftFromDetail(updated);
+      this.resetDraftFromDetail(updated);
       this.showClientErrors.set(false);
       this.diagnostics.set({});
       this.testError.set(null);
@@ -821,7 +821,7 @@ export class WorkflowVersionPage {
       )) as GovernedVersionRecord;
       const updated = (await getVersion('workflow', saved.id, ctx)) as GovernedVersionDetail<WorkflowContent, WorkflowTestCase>;
       this.detail.set(updated);
-      this.seedDraftFromDetail(updated);
+      this.resetDraftFromDetail(updated);
       this.notify.success(this.transloco.translate('workflows.version.toasts.submitted'));
       await this.refreshDefinitionQuietly();
     } catch (err) {
@@ -848,7 +848,7 @@ export class WorkflowVersionPage {
       )) as GovernedVersionRecord;
       const updated = (await getVersion('workflow', saved.id, ctx)) as GovernedVersionDetail<WorkflowContent, WorkflowTestCase>;
       this.detail.set(updated);
-      this.seedDraftFromDetail(updated);
+      this.resetDraftFromDetail(updated);
       this.notify.success(this.transloco.translate('workflows.version.toasts.approved'));
       await this.refreshDefinitionQuietly();
     } catch (err) {
@@ -881,7 +881,7 @@ export class WorkflowVersionPage {
       const updated = (await getVersion('workflow', saved.id, ctx)) as GovernedVersionDetail<WorkflowContent, WorkflowTestCase>;
       this.rejectDialog()?.close();
       this.detail.set(updated);
-      this.seedDraftFromDetail(updated);
+      this.resetDraftFromDetail(updated);
       this.notify.success(this.transloco.translate('workflows.version.toasts.rejected'));
       await this.refreshDefinitionQuietly();
     } catch (err) {
@@ -917,7 +917,7 @@ export class WorkflowVersionPage {
       const updated = (await getVersion('workflow', saved.id, ctx)) as GovernedVersionDetail<WorkflowContent, WorkflowTestCase>;
       this.publishModal()?.close();
       this.detail.set(updated);
-      this.seedDraftFromDetail(updated);
+      this.resetDraftFromDetail(updated);
       this.notify.success(
         this.transloco.translate(
           updated.status === 'SCHEDULED'
@@ -980,7 +980,7 @@ export class WorkflowVersionPage {
       const updated = (await getVersion('workflow', saved.id, ctx)) as GovernedVersionDetail<WorkflowContent, WorkflowTestCase>;
       this.retireDialog()?.close();
       this.detail.set(updated);
-      this.seedDraftFromDetail(updated);
+      this.resetDraftFromDetail(updated);
       this.notify.success(this.transloco.translate('workflows.version.toasts.retired'));
       await this.refreshDefinitionQuietly();
     } catch (err) {
@@ -1061,7 +1061,7 @@ export class WorkflowVersionPage {
       this.detail.set(ver);
       this.definition.set(def);
       if (!this.dirty()) {
-        this.seedDraftFromDetail(ver);
+        this.resetDraftFromDetail(ver);
       }
     } catch {
       // ignore background refresh failures
@@ -1078,7 +1078,7 @@ export class WorkflowVersionPage {
     }
   }
 
-  private seedDraftFromDetail(ver: GovernedVersionDetail<WorkflowContent, WorkflowTestCase>): void {
+  private resetDraftFromDetail(ver: GovernedVersionDetail<WorkflowContent, WorkflowTestCase>): void {
     const contentCopy: WorkflowContent = structuredClone(ver.content ?? EMPTY_WORKFLOW_CONTENT);
     const testsCopy: WorkflowTestCase[] = structuredClone(ver.testCases ?? []);
     const fromParts = isoToLocalParts(ver.effectiveFrom);
