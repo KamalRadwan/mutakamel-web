@@ -1,4 +1,6 @@
-import { Injectable } from '@angular/core';
+import { DOCUMENT, Injectable } from '@angular/core';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { type ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { TranslocoLoader, provideTransloco } from '@jsverse/transloco';
@@ -7,7 +9,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../../../../core/api/api-errors';
 import { Notify } from '../../../../../core/notify/notify';
 import { SeatCascadeConfirm } from '../../../seats/cascade-confirm/cascade-confirm';
-import { fakeGetSeatUsage, resetSeatsFake, setFakeMigrationShort, setFakeSeatMode } from '../../../seats/seats.fake';
+import { fakeGetSeatUsage, fakeListSeatHolders, fakeSwitchToDerived, resetSeatsFake, setFakeMigrationShort, setFakeSeatMode } from '../../../seats/seats.fake';
+import { SeatPreviewApi } from '../../../seats/seats.api';
+import { OrganizationReadApi } from '../../../staff/shared/organization-read.api';
+import { BillingApi } from '../../billing.api';
 import { SeatUsage } from '../../../seats/seats.model';
 import { StaffSession } from '../../../staff/shared/staff-session';
 import { resetStaffFake, setFakeOverCapacity } from '../../../staff/shared/staff.fake';
@@ -29,7 +34,7 @@ class EmptyLoader implements TranslocoLoader {
 }
 
 // Protected members are reached through this view on purpose: the spec reads the page state directly.
-type Internals = Record<string, any>;
+type Internals = SeatMigrationPage;
 
 interface RowView {
   module: string;
@@ -85,7 +90,7 @@ function toasts(type: string): string[] {
 async function render(owner = true): Promise<void> {
   fixtureOwner = owner;
   fixture = TestBed.createComponent(SeatMigrationPage);
-  c = fixture.componentInstance as unknown as Internals;
+  c = fixture.componentInstance;
   await flush();
 }
 
@@ -103,6 +108,10 @@ beforeEach(() => {
   cascadeConfirm = vi.fn(async () => true);
   TestBed.configureTestingModule({
     providers: [
+      provideHttpClient(), provideHttpClientTesting(),
+      { provide: SeatPreviewApi, useValue: { getSeatUsage: fakeGetSeatUsage, listSeatHolders: fakeListSeatHolders, switchToDerived: fakeSwitchToDerived } },
+      { provide: OrganizationReadApi, useValue: { listCompanies: async () => ({ data: [], meta: { hasNext: false } }), listBranches: async () => ({ data: [], meta: { hasNext: false } }) } },
+      { provide: BillingApi, useValue: { getSubscription: async () => ({ baseItems: ['crm', 'trade'].map((applicationKey) => ({ applicationKey, id: `base-${applicationKey}` })) }) } },
       { provide: StaffSession, useValue: { isOwner: () => fixtureOwner } },
       provideRouter([]),
       provideTransloco({
@@ -120,6 +129,67 @@ afterEach(() => {
   resetStaffFake();
   resetSeatsFake();
   vi.useRealTimers();
+  vi.restoreAllMocks();
+});
+
+describe('SeatMigrationPage HTTP contract', () => {
+  const base = '/api/tenant/core/v1/seats';
+  const usage = { mode: 'MANUAL', revision: 4, modules: [] };
+  let http: HttpTestingController;
+  beforeEach(() => {
+    TestBed.overrideProvider(SeatPreviewApi, { useFactory: () => new SeatPreviewApi() });
+    TestBed.overrideComponent(SeatMigrationPage, { set: { template: '', imports: [] } });
+    const document = TestBed.inject(DOCUMENT);
+    vi.spyOn(document, 'cookie', 'get').mockReturnValue(`${document.location.protocol === 'https:' ? '__Host-mutakamel-tenant-csrf' : 'mutakamel-http-tenant-csrf'}=csrf`);
+    fixtureOwner = true;
+    fixture = TestBed.createComponent(SeatMigrationPage); c = fixture.componentInstance;
+    http = TestBed.inject(HttpTestingController);
+    http.expectOne(`${base}/usage`).flush({ success: true, data: usage });
+  });
+  afterEach(() => http.verify());
+
+  it('switches through HTTP with no body, a UUIDv7 key, and the returned revision', async () => {
+    await flush(0);
+    const pending = c['switchNow']();
+    const request = http.expectOne(`${base}/switch-to-derived`);
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toBeNull();
+    expect(request.request.headers.get('x-idempotency-key')).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(request.request.headers.get('x-csrf-token')).toBe('csrf');
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    request.flush({ success: true, data: { ...usage, mode: 'DERIVED', revision: 5 } });
+    await pending;
+    expect(c['usage']()?.revision).toBe(5);
+    expect(navigate).toHaveBeenCalledWith(['/workspace/billing/subscription']);
+  });
+
+  it('confirms a cascade with a fresh key and explicit confirmation query', async () => {
+    await flush(0);
+    const pending = c['switchNow']();
+    const first = http.expectOne(`${base}/switch-to-derived`);
+    const key = first.request.headers.get('x-idempotency-key');
+    first.flush({ errorCode: 'SEAT_ADDON_CASCADE_REQUIRED', details: { userIds: ['user'], userNames: ['User'], addonKeys: ['addon'], addonNames: ['Addon'] } }, { status: 409, statusText: 'Conflict' });
+    await flush(0);
+    const second = http.expectOne((req) => req.url === `${base}/switch-to-derived`);
+    expect(cascadeConfirm).toHaveBeenCalledOnce();
+    expect(second.request.params.get('confirmAddonCascade')).toBe('true');
+    expect(second.request.headers.get('x-idempotency-key')).not.toBe(key);
+    vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    second.flush({ success: true, data: { ...usage, mode: 'DERIVED', revision: 5 } });
+    await pending;
+  });
+
+  it('maps live migration shortfall details without pretending the switch succeeded', async () => {
+    await flush(0);
+    const pending = c['switchNow']();
+    http.expectOne(`${base}/switch-to-derived`).flush({ errorCode: 'SEAT_MIGRATION_NOT_READY', details: {
+      moduleKey: ['crm'], needed: ['3'], free: ['1'], capacity: ['4'], usedAfter: ['6'], shortfall: ['2'],
+    } }, { status: 409, statusText: 'Conflict' });
+    await pending;
+    expect(c['migrationNotReady']()).toBe(true);
+    expect(c['rows']()).toEqual([{ moduleKey: 'crm', nameI18n: null, holders: 6, seats: 4, shortBy: 2 }]);
+    expect(c['usage']()?.mode).toBe('MANUAL');
+  });
 });
 
 describe('SeatMigrationPage', () => {
@@ -164,7 +234,7 @@ describe('SeatMigrationPage', () => {
     );
     // Untranslated in the spec, seatErrorMessage falls back to the code itself.
     expect(toasts('error')).toEqual(['SEAT_MIGRATION_NOT_READY']);
-    expect(c['usage']().mode).toBe('MANUAL');
+    expect(c['usage']()?.mode).toBe('MANUAL');
   });
 
   it('reads the detail arrays by index, ignores empty module keys and treats bad counts as 0', async () => {
@@ -234,7 +304,7 @@ describe('SeatMigrationPage', () => {
 
     expect(toasts('success')).toEqual(['sb.mig.done']);
     expect(navigate).toHaveBeenCalledWith(['/workspace/billing/subscription']);
-    expect(c['usage']().mode).toBe('DERIVED');
+    expect(c['usage']()?.mode).toBe('DERIVED');
     expect(c['hasShortfall']()).toBe(false);
   });
 

@@ -9,7 +9,7 @@ import { Button } from '../../../../../shared/ui/button/button';
 import { errorCodeOf, errorMessage, newIdempotencyKey } from '../../../staff/shared/staff.api';
 import { SeatCascadeConfirm } from '../../../seats/cascade-confirm/cascade-confirm';
 import { isCascadeRequired, seatErrorMessage, seatShortfallDetails } from '../../../seats/seat-errors';
-import { getSeatUsage, switchToDerived } from '../../../seats/seats.api';
+import { SeatPreviewApi } from '../../../seats/seats.api';
 import { SeatUsage } from '../../../seats/seats.model';
 import { StaffSession } from '../../../staff/shared/staff-session';
 import { loadSeatsChangeQueries } from '../../shared/change-link';
@@ -43,6 +43,7 @@ export class SeatMigrationPage {
   private readonly transloco = inject(TranslocoService);
   private readonly notify = inject(Notify);
   private readonly session = inject(StaffSession);
+  private readonly seatsApi = inject(SeatPreviewApi);
   private readonly cascadeConfirm = inject(SeatCascadeConfirm);
   protected readonly language = inject(LanguageState).current;
   private readonly holdersModal = viewChild.required(HoldersModal);
@@ -94,7 +95,7 @@ export class SeatMigrationPage {
     this.loading.set(true);
     this.loadFailed.set(false);
     try {
-      const data = await getSeatUsage();
+      const data = await this.seatsApi.getSeatUsage();
       if (seq !== this.loadSeq) return;
       this.usage.set(data);
       this.shortfallRows.set([]);
@@ -135,7 +136,7 @@ export class SeatMigrationPage {
 
   private async executeSwitch(confirmAddonCascade: boolean): Promise<void> {
     try {
-      const updated = await switchToDerived(
+      const updated = await this.seatsApi.switchToDerived(
         confirmAddonCascade ? { confirmAddonCascade: true } : {},
         newIdempotencyKey(),
       );

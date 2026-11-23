@@ -7,7 +7,7 @@ import { LanguageState } from '../../../../../core/i18n/language';
 import { Notify } from '../../../../../core/notify/notify';
 import { Button } from '../../../../../shared/ui/button/button';
 import { seatErrorMessage } from '../../../seats/seat-errors';
-import { getSeatUsage } from '../../../seats/seats.api';
+import { SeatPreviewApi } from '../../../seats/seats.api';
 import { ModuleUsage, SeatUsage } from '../../../seats/seats.model';
 import { UsageBars } from '../../../seats/usage-bars/usage-bars';
 import { errorMessage } from '../../../staff/shared/staff.api';
@@ -33,6 +33,7 @@ export class SeatsSection {
   private readonly transloco = inject(TranslocoService);
   private readonly notify = inject(Notify);
   private readonly session = inject(StaffSession);
+  private readonly seatsApi = inject(SeatPreviewApi);
   protected readonly language = inject(LanguageState).current;
   private readonly holdersModal = viewChild.required(HoldersModal);
 
@@ -63,7 +64,7 @@ export class SeatsSection {
     this.loading.set(true);
     this.failed.set(false);
     try {
-      const data = await getSeatUsage();
+      const data = await this.seatsApi.getSeatUsage();
       if (seq !== this.loadSeq) return;
       this.usage.set(data);
     } catch (error) {

@@ -7,9 +7,10 @@ import { LanguageState } from '../../../../../core/i18n/language';
 import { Button } from '../../../../../shared/ui/button/button';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { Pagination } from '../../../../../shared/ui/pagination/pagination';
-import { listSeatHolders } from '../../../seats/seats.api';
+import { SeatPreviewApi } from '../../../seats/seats.api';
 import { SeatHolder, SeatHolderRole, holderRoleLabel } from '../../../seats/seats.model';
-import { listAllPages, listBranches, listCompanies } from '../../../staff/shared/staff.api';
+import { listAllPages } from '../../../staff/shared/staff.api';
+import { OrganizationReadApi } from '../../../staff/shared/organization-read.api';
 import { formatBillingDate } from '../../overview/overview-dates';
 
 const SKELETON_ROWS = [1, 2, 3, 4, 5] as const;
@@ -33,6 +34,8 @@ const STATUS_BADGE: Record<SeatHolder['status'], string> = {
 })
 export class HoldersModal {
   private readonly transloco = inject(TranslocoService);
+  private readonly seatsApi = inject(SeatPreviewApi);
+  private readonly organizationApi = inject(OrganizationReadApi);
   private readonly seatsTranslation = toSignal(this.transloco.selectTranslation('seats'));
   private readonly language = inject(LanguageState).current;
   private readonly modal = viewChild.required(Modal);
@@ -79,6 +82,8 @@ export class HoldersModal {
   }
 
   close(): void {
+    this.loadSeq++;
+    this.loading.set(false);
     this.modal().close();
   }
 
@@ -131,8 +136,8 @@ export class HoldersModal {
     if (this.lookupsLoaded) return;
     this.lookupsLoaded = true;
     const [companiesRes, branchesRes] = await Promise.allSettled([
-      listAllPages((q) => listCompanies(q)),
-      listAllPages((q) => listBranches(q)),
+      listAllPages((q) => this.organizationApi.listCompanies(q)),
+      listAllPages((q) => this.organizationApi.listBranches(q)),
     ]);
     if (companiesRes.status === 'fulfilled') {
       this.companyNames.set(new Map(companiesRes.value.map((c) => [c.id, c.name])));
@@ -140,6 +145,7 @@ export class HoldersModal {
     if (branchesRes.status === 'fulfilled') {
       this.branchNames.set(new Map(branchesRes.value.map((b) => [b.id, b.name])));
     }
+    this.lookupsLoaded = companiesRes.status === 'fulfilled' && branchesRes.status === 'fulfilled';
   }
 
   protected async load(): Promise<void> {
@@ -150,7 +156,7 @@ export class HoldersModal {
     this.failed.set(false);
     try {
       const term = this.search().trim();
-      const result = await listSeatHolders(key, {
+      const result = await this.seatsApi.listSeatHolders(key, {
         page: this.page(),
         limit: this.pageSize(),
         ...(term ? { search: term } : {}),

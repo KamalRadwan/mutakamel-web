@@ -46,7 +46,6 @@ describe('UserAppsTab live access', () => {
     fixture.componentRef.setInput('user', user);
     Object.defineProperty(tab, 'removeAppConfirm', { value: () => confirm });
     Object.defineProperty(tab, 'addonsModal', { value: () => addons });
-    Object.defineProperty(tab, 'findHolderForUser', { value: async () => null });
     tab.changed.subscribe(changed); http = TestBed.inject(HttpTestingController);
   });
   afterEach(() => { http.verify(); vi.restoreAllMocks(); });
@@ -54,7 +53,10 @@ describe('UserAppsTab live access', () => {
   async function reads(mode = 'MANUAL') {
     for (let i = 0; i < 4; i++) {
       await settle();
-      for (const req of http.match((r) => r.method === 'GET')) req.flush({ success: true, data: req.request.url === usagePath ? { mode, revision: 1, modules } : [assignment] });
+      for (const req of http.match((r) => r.method === 'GET')) {
+        if (req.request.url.includes('/holders')) req.flush({ success: true, data: [], meta: { page: 1, limit: 100, total: 0, totalPages: 0, hasNext: false, hasPrev: false } });
+        else req.flush({ success: true, data: req.request.url === usagePath ? { mode, revision: 1, modules } : [assignment] });
+      }
     }
     await settle();
   }
@@ -131,6 +133,34 @@ describe('UserAppsTab live access', () => {
     http.expectOne(usagePath).flush({ errorCode: 'MISSING_REQUIRED_PERMISSIONS' }, { status: 403, statusText: 'Forbidden' }); await settle();
     expect(tab['loadFailed']()).toBe(true); expect(tab['effectiveReadonly']()).toBe(true);
     tab['reload'](); await reads(); expect(tab['loadFailed']()).toBe(false);
+  });
+  it('finds a derived holder beyond ten pages using the server pagination', async () => {
+    const pending = tab['findHolderForUser']('crm', 'target');
+    for (let page = 1; page <= 11; page++) {
+      const request = http.expectOne((req) => req.url.endsWith('/seats/usage/crm/holders'));
+      expect(request.request.params.get('page')).toBe(String(page));
+      expect(request.request.params.get('limit')).toBe('100');
+      request.flush({ success: true, data: [{ userId: page === 11 ? 'target' : `other-${page}`,
+        name: 'Live holder', email: 'live@example.invalid', status: 'ACTIVE', accessState: 'OVER_CAPACITY',
+        grantedAt: stamp, cause: null, roles: [] }],
+        meta: { page, limit: 100, total: 1100, totalPages: 11, hasNext: page < 11, hasPrev: page > 1 } });
+      await settle();
+    }
+    expect(await pending).toMatchObject({ userId: 'target', accessState: 'OVER_CAPACITY' });
+  });
+  it('fails closed when a derived holder request is rejected', async () => {
+    fixture.detectChanges();
+    http.expectOne(base).flush({ success: true, data: [assignment] });
+    http.expectOne(usagePath).flush({ success: true, data: { mode: 'DERIVED', revision: 1, modules } });
+    await settle();
+    for (const request of http.match((req) => req.url.endsWith('/holders'))) {
+      request.flush({ errorCode: 'MISSING_REQUIRED_PERMISSIONS' }, { status: 403, statusText: 'Forbidden' });
+    }
+    await settle();
+    expect(tab['loadFailed']()).toBe(true);
+    expect(tab['effectiveReadonly']()).toBe(true);
+    expect(tab['assignments']()).toEqual([]);
+    expect(notify.error).toHaveBeenCalled();
   });
 });
 

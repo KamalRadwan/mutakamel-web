@@ -1,6 +1,6 @@
 import { DOCUMENT, DestroyRef, Service, computed, effect, inject, signal, untracked } from '@angular/core';
 import { StaffSession } from '../../staff/shared/staff-session';
-import { getMySeatStates, getSeatUsage } from '../seats.api';
+import { SeatPreviewApi } from '../seats.api';
 import { ModuleUsage, SeatAccessState, SeatUsage } from '../seats.model';
 
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
@@ -42,6 +42,7 @@ export class OverCapacityNotice {
   private readonly document = inject(DOCUMENT);
   private readonly destroyRef = inject(DestroyRef);
   private readonly session = inject(StaffSession);
+  private readonly seatsApi = inject(SeatPreviewApi);
 
   get isOwner(): boolean {
     return this.session.isOwner();
@@ -92,6 +93,7 @@ export class OverCapacityNotice {
       if (actorId === this.lastActorId) return;
       this.lastActorId = actorId;
       untracked(() => {
+        this.usage.set(null);
         this.myStates.set([]);
         void this.refresh();
       });
@@ -118,13 +120,14 @@ export class OverCapacityNotice {
 
   async refresh(): Promise<void> {
     const seq = ++this.refreshSeq;
-    try {
-      const [usage, myStates] = await Promise.all([getSeatUsage(), getMySeatStates()]);
-      if (seq !== this.refreshSeq) return;
-      this.usage.set(usage);
-      this.myStates.set(myStates);
-    } catch {
-      // Background status polling stays silent when the endpoint is temporarily unreachable.
-    }
+    const [usage, myStates] = await Promise.allSettled([
+      this.session.can('users.user.read') ? this.seatsApi.getSeatUsage() : Promise.resolve(null),
+      this.seatsApi.getMySeatStates(),
+    ]);
+    if (seq !== this.refreshSeq) return;
+    // Self-service seat states remain available even without tenant user-read access.
+    // Background polling stays silent, and failed reads clear stale status.
+    this.usage.set(usage.status === 'fulfilled' ? usage.value : null);
+    this.myStates.set(myStates.status === 'fulfilled' ? myStates.value : []);
   }
 }

@@ -23,8 +23,7 @@ import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { ApiError, errorCodeOf, newIdempotencyKey, staffErrorMessage } from '../../shared/staff.api';
 import { StaffUserAccessApi } from '../user-access.api';
-import { StaffUsersApi } from '../users.api';
-import { listSeatHolders } from '../../../seats/seats.api';
+import { SeatPreviewApi } from '../../../seats/seats.api';
 import { SeatAccessState, SeatHolder, SeatMode } from '../../../seats/seats.model';
 import { StaffSession } from '../../shared/staff-session';
 import { ModuleAssignment, TenantUser } from '../../shared/staff.model';
@@ -75,7 +74,7 @@ export class UserAppsTab {
 
   private readonly session = inject(StaffSession);
   private readonly api = inject(StaffUserAccessApi);
-  private readonly usersApi = inject(StaffUsersApi);
+  private readonly seatsApi = inject(SeatPreviewApi);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
@@ -275,7 +274,7 @@ export class UserAppsTab {
     try {
       const [rawModules, usage] = await Promise.all([
         this.api.listModules(userId),
-        this.usersApi.getSeatUsage(),
+        this.seatsApi.getSeatUsage(),
       ]);
       if (seq !== this.loadSeq) return;
 
@@ -350,12 +349,8 @@ export class UserAppsTab {
     userId: string,
   ): Promise<SeatHolder | null> {
     let page = 1;
-    while (page <= 10) {
-      // FAKE, used by Users apps tab until Seats links GET /seats/usage/:moduleKey/holders
-      const res = await listSeatHolders(moduleKey, { page, limit: 100 }).catch(
-        () => null,
-      );
-      if (!res) return null;
+    while (true) {
+      const res = await this.seatsApi.listSeatHolders(moduleKey, { page, limit: 100 });
       const match = res.data.find((item) => item.userId === userId);
       if (match) return match;
       if (!res.meta.hasNext || res.data.length === 0) break;

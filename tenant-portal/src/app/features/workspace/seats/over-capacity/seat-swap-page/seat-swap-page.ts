@@ -21,10 +21,11 @@ import { Field } from '../../../../../shared/ui/field/field';
 import { errorMessage } from '../../../../../core/api/api-errors';
 import { newIdempotencyKey } from '../../../../../core/api/idempotency';
 import { SettingsNotice } from '../../../../../shared/ui/settings-notice/settings-notice';
-import { listAllPages, listBranches, listCompanies } from '../../../staff/shared/staff.api';
+import { listAllPages } from '../../../staff/shared/staff.api';
+import { OrganizationReadApi } from '../../../staff/shared/organization-read.api';
 import { StaffSession } from '../../../staff/shared/staff-session';
 import { seatErrorMessage } from '../../seat-errors';
-import { getSeatUsage, listSeatHolders, swapSeat } from '../../seats.api';
+import { SeatPreviewApi } from '../../seats.api';
 import { ModuleUsage, SeatHolder, SeatHolderRole, SeatUsage, holderRoleLabel } from '../../seats.model';
 import {
   OverCapacityNotice,
@@ -88,6 +89,8 @@ export class SeatSwapPage {
   private readonly seatsTranslation = toSignal(this.transloco.selectTranslation('seats'));
   private readonly notice = inject(OverCapacityNotice);
   private readonly session = inject(StaffSession);
+  private readonly seatsApi = inject(SeatPreviewApi);
+  private readonly organizationApi = inject(OrganizationReadApi);
   protected readonly language = inject(LanguageState).current;
 
   private readonly companyNames = signal<ReadonlyMap<string, string>>(new Map());
@@ -264,8 +267,8 @@ export class SeatSwapPage {
 
   private async loadScopeLookups(): Promise<void> {
     const [companiesRes, branchesRes] = await Promise.allSettled([
-      listAllPages((q) => listCompanies(q)),
-      listAllPages((q) => listBranches(q)),
+      listAllPages((q) => this.organizationApi.listCompanies(q)),
+      listAllPages((q) => this.organizationApi.listBranches(q)),
     ]);
     if (companiesRes.status === 'fulfilled') {
       this.companyNames.set(new Map(companiesRes.value.map((c) => [c.id, c.name])));
@@ -287,7 +290,7 @@ export class SeatSwapPage {
 
     this.swapping.set(true);
     try {
-      const updatedUsage = await swapSeat(moduleKey, { keepUserId, releaseUserId }, newIdempotencyKey());
+      const updatedUsage = await this.seatsApi.swapSeat(moduleKey, { keepUserId, releaseUserId }, newIdempotencyKey());
       this.usage.set(updatedUsage);
       this.usageVersion.update((version) => version + 1);
       this.notify.success(this.transloco.translate('oc.swap.done'));
@@ -304,7 +307,7 @@ export class SeatSwapPage {
     this.loadingUsage.set(true);
     this.usageError.set(false);
     try {
-      const usage = await getSeatUsage();
+      const usage = await this.seatsApi.getSeatUsage();
       if (seq !== this.usageSeq) return;
       this.usage.set(usage);
       this.usageVersion.update((version) => version + 1);
@@ -326,7 +329,7 @@ export class SeatSwapPage {
       const all: SeatHolder[] = [];
       let page = 1;
       while (true) {
-        const result = await listSeatHolders(moduleKey, { page, limit: HOLDER_PAGE_SIZE });
+        const result = await this.seatsApi.listSeatHolders(moduleKey, { page, limit: HOLDER_PAGE_SIZE });
         if (seq !== this.holdersSeq) return;
         all.push(...result.data);
         if (!result.meta.hasNext) break;

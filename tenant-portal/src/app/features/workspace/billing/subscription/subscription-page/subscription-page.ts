@@ -7,7 +7,7 @@ import { tablerArrowRight, tablerRefresh, tablerRepeat } from '@ng-icons/tabler-
 import { LanguageState } from '../../../../../core/i18n/language';
 import { Field } from '../../../../../shared/ui/field/field';
 import { Button } from '../../../../../shared/ui/button/button';
-import { getSeatUsage } from '../../../seats/seats.api';
+import { SeatPreviewApi } from '../../../seats/seats.api';
 import { SeatUsage } from '../../../seats/seats.model';
 import {
   ApiError,
@@ -59,6 +59,7 @@ export class SubscriptionPage {
 
   private readonly router = inject(Router);
   private readonly api = inject(BillingApi);
+  private readonly seatsApi = inject(SeatPreviewApi);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly session = inject(BillingSession);
@@ -162,7 +163,7 @@ export class SubscriptionPage {
       const [sub, sum, usage] = await Promise.all([
         this.api.getSubscription(),
         this.api.getBillingSummary(),
-        getSeatUsage().catch(() => null),
+        this.seatsApi.getSeatUsage().catch(() => null),
       ]);
       if (seq !== this.loadSeq) return;
       this.subscription.set(sub);

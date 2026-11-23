@@ -1,4 +1,6 @@
-import { Injectable } from '@angular/core';
+import { DOCUMENT, Injectable } from '@angular/core';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { type ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { TranslocoLoader, provideTransloco } from '@jsverse/transloco';
@@ -6,7 +8,10 @@ import { map, timer } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Notify } from '../../../../../core/notify/notify';
 import { SeatCascadeConfirm } from '../../../seats/cascade-confirm/cascade-confirm';
-import { fakeFreeUp, fakeGetSeatUsage, fakeListSeatHolders, resetSeatsFake } from '../../../seats/seats.fake';
+import { fakeFreeUp, fakeFreeUpPreview, fakeGetSeatUsage, fakeListSeatHolders, resetSeatsFake } from '../../../seats/seats.fake';
+import { SeatPreviewApi } from '../../../seats/seats.api';
+import { OrganizationReadApi } from '../../../staff/shared/organization-read.api';
+import { BillingApi } from '../../billing.api';
 import { CascadeAddonItem, SeatHolder, SeatUsage } from '../../../seats/seats.model';
 import { StaffSession } from '../../../staff/shared/staff-session';
 import { resetStaffFake } from '../../../staff/shared/staff.fake';
@@ -30,7 +35,7 @@ const dialogProto = HTMLDialogElement.prototype as unknown as Record<string, unk
 const originalDialog = { showModal: dialogProto['showModal'], close: dialogProto['close'] };
 
 // Protected members are reached through this view on purpose: the spec reads the page state directly.
-type Internals = Record<string, any>;
+type Internals = SeatDowngradePage;
 
 let fixture: ComponentFixture<SeatDowngradePage>;
 let c: Internals;
@@ -93,7 +98,7 @@ async function render(opts: { owner?: boolean; url?: string } = {}): Promise<voi
     await navigating;
   }
   fixture = TestBed.createComponent(SeatDowngradePage);
-  c = fixture.componentInstance as unknown as Internals;
+  c = fixture.componentInstance;
   await flush();
 }
 
@@ -139,6 +144,10 @@ beforeEach(() => {
   cascadeConfirm = vi.fn(async () => true);
   TestBed.configureTestingModule({
     providers: [
+      provideHttpClient(), provideHttpClientTesting(),
+      { provide: SeatPreviewApi, useValue: { getSeatUsage: fakeGetSeatUsage, listSeatHolders: fakeListSeatHolders, freeUpPreview: fakeFreeUpPreview, freeUp: fakeFreeUp } },
+      { provide: OrganizationReadApi, useValue: { listCompanies: async () => ({ data: [], meta: { hasNext: false } }), listBranches: async () => ({ data: [], meta: { hasNext: false } }) } },
+      { provide: BillingApi, useValue: { getSubscription: async () => ({ baseItems: ['crm', 'trade'].map((applicationKey) => ({ applicationKey, id: `base-${applicationKey}` })) }) } },
       { provide: StaffSession, useValue: { isOwner: () => fixtureOwner } },
       provideRouter([]),
       provideTransloco({
@@ -158,6 +167,98 @@ afterEach(() => {
   dialogProto['showModal'] = originalDialog.showModal;
   dialogProto['close'] = originalDialog.close;
   vi.useRealTimers();
+  vi.restoreAllMocks();
+});
+
+describe('SeatDowngradePage HTTP contract', () => {
+  const base = '/api/tenant/core/v1/seats';
+  const usage = { mode: 'DERIVED', revision: 31, modules: [{ moduleKey: 'crm', kind: 'ROLE_DERIVED',
+    nameI18n: { en: 'CRM', ar: 'CRM' }, capacity: 2, used: 2, overCapacity: 0,
+    graceUntil: null, overCapacitySince: null, pendingCapacity: null }] };
+  const holder = { userId: 'oldest', name: 'Oldest', email: 'oldest@example.invalid', status: 'ACTIVE',
+    accessState: 'ACTIVE', grantedAt: '2026-01-01T00:00:00Z', cause: null, roles: [] };
+  const meta = { page: 1, limit: 100, total: 2, totalPages: 2, hasNext: true, hasPrev: false };
+  let http: HttpTestingController;
+  beforeEach(() => {
+    TestBed.overrideProvider(SeatPreviewApi, { useFactory: () => new SeatPreviewApi() });
+    TestBed.overrideComponent(SeatDowngradePage, { set: { template: '', imports: [] } });
+    const document = TestBed.inject(DOCUMENT);
+    vi.spyOn(document, 'cookie', 'get').mockReturnValue(`${document.location.protocol === 'https:' ? '__Host-mutakamel-tenant-csrf' : 'mutakamel-http-tenant-csrf'}=csrf`);
+    fixtureOwner = true;
+    fixture = TestBed.createComponent(SeatDowngradePage); c = fixture.componentInstance;
+    Object.defineProperty(c, 'confirmFreeDialog', { value: () => ({ open: async () => true }) });
+    Object.defineProperty(c, 'conflictModal', { value: () => ({ open: vi.fn(), close: vi.fn() }), configurable: true });
+    http = TestBed.inject(HttpTestingController);
+    http.expectOne(`${base}/usage`).flush({ success: true, data: usage });
+  });
+  afterEach(() => http.verify());
+
+  async function selectKeepers(): Promise<void> {
+    await flush(0);
+    const pending = c['goToStep2']();
+    http.expectOne((req) => req.url.endsWith('/holders')).flush({ success: true, data: [holder], meta });
+    await flush(0);
+    const next = http.expectOne((req) => req.url.endsWith('/holders'));
+    expect(next.request.params.get('page')).toBe('2');
+    next.flush({ success: true, data: [{ ...holder, userId: 'newest', grantedAt: '2026-11-01T00:00:00Z' }], meta: { ...meta, page: 2, hasNext: false } });
+    await flush(0);
+    const preview = http.expectOne(`${base}/free-up/preview`);
+    expect(preview.request.body).toEqual({ moduleKey: 'crm', targetSeats: 1, keepUserIds: ['oldest'] });
+    expect(preview.request.headers.has('x-idempotency-key')).toBe(false);
+    preview.flush({ success: true, data: { fits: true, removals: [] } });
+    await pending;
+  }
+
+  it('paginates live holders, previews, and frees seats with the usage revision', async () => {
+    await selectKeepers();
+    await c['goToStep3']();
+    expect(c['step']()).toBe(3);
+    const pending = c['submitFreeUp'](); await flush(0);
+    const request = http.expectOne(`${base}/free-up`);
+    expect(request.request.body).toEqual({ moduleKey: 'crm', targetSeats: 1, keepUserIds: ['oldest'], expectedUsageRevision: 31 });
+    expect(request.request.headers.get('x-idempotency-key')).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    request.flush({ success: true, data: { ...usage, revision: 32 } });
+    await pending;
+    expect(c['usage']()?.revision).toBe(32);
+    expect(c['freed']()).toBe(true);
+  });
+
+  it('does not advance or free seats after a failed preview', async () => {
+    await selectKeepers();
+    const preview = c['refreshPreview']('crm', 1, ['oldest']);
+    http.expectOne(`${base}/free-up/preview`).flush({ errorCode: 'SEAT_CAPACITY_INSUFFICIENT' }, { status: 422, statusText: 'Invalid' });
+    await preview;
+    expect(c['preview']()).toBeNull();
+    const review = c['goToStep3']();
+    http.expectOne(`${base}/free-up/preview`).flush({ errorCode: 'COMMON.GENERIC.INTERNAL_ERROR' }, { status: 503, statusText: 'Unavailable' });
+    await review;
+    expect(c['step']()).toBe(2);
+    await c['submitFreeUp']();
+    http.expectNone(`${base}/free-up`);
+  });
+
+  it('opens the conflict dialog on stale usage without marking seats freed', async () => {
+    await selectKeepers();
+    const open = vi.fn();
+    Object.defineProperty(c, 'conflictModal', { value: () => ({ open }), configurable: true });
+    const pending = c['submitFreeUp'](); await flush(0);
+    http.expectOne(`${base}/free-up`).flush({ errorCode: 'SEAT_USAGE_STALE' }, { status: 409, statusText: 'Conflict' });
+    await pending;
+    expect(open).toHaveBeenCalledOnce();
+    expect(c['freed']()).toBe(false);
+  });
+  it('discards an old preview after usage is reloaded', async () => {
+    await selectKeepers();
+    const pending = c['refreshPreview']('crm', 1, ['oldest']);
+    const old = http.expectOne(`${base}/free-up/preview`);
+    const reload = c['loadUsage']();
+    http.expectOne(`${base}/usage`).flush({ success: true, data: { ...usage, revision: 32 } });
+    old.flush({ success: true, data: { fits: true, removals: [] } });
+    await Promise.all([pending, reload]);
+    expect(c['usage']()?.revision).toBe(32);
+    expect(c['preview']()).toBeNull();
+    expect(c['step']()).toBe(1);
+  });
 });
 
 describe('SeatDowngradePage, step 1', () => {
@@ -205,7 +306,7 @@ describe('SeatDowngradePage, step 1', () => {
     c['onModuleChange']('trade');
     await flush(0);
 
-    expect(c['selectedModule']().moduleKey).toBe('trade');
+    expect(c['selectedModule']()?.moduleKey).toBe('trade');
     expect(targetInput().value).toBe(String(trade.capacity - 1));
     expect(c['choicesMade']()).toBe(true);
   });
@@ -296,7 +397,7 @@ describe('SeatDowngradePage, steps 2 and 3', () => {
 
     expect(conflict.hasAttribute('open')).toBe(false);
     expect(c['step']()).toBe(1);
-    expect(c['usage']().revision).toBe(usage.revision + 1);
+    expect(c['usage']()?.revision).toBe(usage.revision + 1);
   });
 
   it('asks about lost add-ons on SEAT_ADDON_CASCADE_REQUIRED, then frees the seats with confirmAddonCascade', async () => {
@@ -327,7 +428,7 @@ describe('SeatDowngradePage, steps 2 and 3', () => {
     expect(root().textContent).toContain('sb.down.done');
     const after = (await usageNow()).modules.find((m) => m.moduleKey === 'crm')!;
     expect(after.used).toBe(keep.length);
-    expect(c['usage']().modules.find((m: { moduleKey: string }) => m.moduleKey === 'crm').used).toBe(keep.length);
+    expect(c['usage']()?.modules.find((m: { moduleKey: string }) => m.moduleKey === 'crm')?.used).toBe(keep.length);
     expect(await fixture.componentInstance.canDeactivate()).toBe(true);
   });
 });

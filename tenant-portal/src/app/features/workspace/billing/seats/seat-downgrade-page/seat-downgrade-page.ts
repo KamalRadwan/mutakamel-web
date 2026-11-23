@@ -20,10 +20,11 @@ import { Dropdown, DropdownOption } from '../../../../../shared/ui/dropdown/drop
 import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { UnsavedDialog } from '../../../../../shared/ui/unsaved-dialog/unsaved-dialog';
-import { errorCodeOf, errorMessage, listAllPages, listBranches, listCompanies, newIdempotencyKey } from '../../../staff/shared/staff.api';
+import { errorCodeOf, errorMessage, listAllPages, newIdempotencyKey } from '../../../staff/shared/staff.api';
+import { OrganizationReadApi } from '../../../staff/shared/organization-read.api';
 import { SeatCascadeConfirm } from '../../../seats/cascade-confirm/cascade-confirm';
 import { isCascadeRequired, seatErrorMessage } from '../../../seats/seat-errors';
-import { freeUp, freeUpPreview, getSeatUsage, listSeatHolders } from '../../../seats/seats.api';
+import { SeatPreviewApi } from '../../../seats/seats.api';
 import {
   FreeUpPreview,
   HolderRoleLookups,
@@ -86,6 +87,8 @@ export class SeatDowngradePage {
   private readonly notify = inject(Notify);
   private readonly cascadeConfirm = inject(SeatCascadeConfirm);
   private readonly session = inject(StaffSession);
+  private readonly seatsApi = inject(SeatPreviewApi);
+  private readonly organizationApi = inject(OrganizationReadApi);
   protected readonly language = inject(LanguageState).current;
 
   private readonly companyNames = signal<ReadonlyMap<string, string>>(new Map());
@@ -238,6 +241,10 @@ export class SeatDowngradePage {
 
   protected onModuleChange(nextKey: string): void {
     if (nextKey === this.moduleKey()) return;
+    this.holdersSeq++;
+    this.previewSeq++;
+    this.holdersLoading.set(false);
+    this.previewLoading.set(false);
     this.moduleKey.set(nextKey);
     const mod = this.modules().find((m) => m.moduleKey === nextKey);
     this.targetInput.set(mod && mod.capacity > 1 ? String(mod.capacity - 1) : '');
@@ -248,6 +255,9 @@ export class SeatDowngradePage {
   }
 
   protected onTargetInput(event: Event): void {
+    this.previewSeq++;
+    this.preview.set(null);
+    this.previewLoading.set(false);
     this.targetInput.set((event.target as HTMLInputElement).value);
     this.targetTouched.set(true);
   }
@@ -329,11 +339,11 @@ export class SeatDowngradePage {
 
   protected async goToStep3(): Promise<void> {
     const mod = this.selectedModule();
-    if (!mod || this.tooManySelected() || this.holdersLoading()) return;
+    if (!mod || this.tooManySelected() || this.holdersLoading() || this.previewLoading()) return;
     if (!this.preview()) {
       await this.refreshPreview(mod.moduleKey, this.targetSeats(), this.keptUserIds());
     }
-    this.step.set(3);
+    if (this.preview()?.fits) this.step.set(3);
   }
 
   protected roleLabel(role: SeatHolderRole): string {
@@ -376,8 +386,8 @@ export class SeatDowngradePage {
 
   private async loadScopeLookups(): Promise<void> {
     const [companiesRes, branchesRes] = await Promise.allSettled([
-      listAllPages((q) => listCompanies(q)),
-      listAllPages((q) => listBranches(q)),
+      listAllPages((q) => this.organizationApi.listCompanies(q)),
+      listAllPages((q) => this.organizationApi.listBranches(q)),
     ]);
     if (companiesRes.status === 'fulfilled') {
       this.companyNames.set(new Map(companiesRes.value.map((c) => [c.id, c.name])));
@@ -395,7 +405,8 @@ export class SeatDowngradePage {
   protected async submitFreeUp(): Promise<void> {
     const mod = this.selectedModule();
     const currentUsage = this.usage();
-    if (!this.isOwner || !mod || !currentUsage || this.freeing() || this.freed()) return;
+    if (!this.isOwner || !mod || !currentUsage || this.freeing() || this.freed() ||
+      this.previewLoading() || !this.preview()?.fits || this.tooManySelected()) return;
 
     const confirmed = await this.confirmFreeDialog().open();
     if (!confirmed) return;
@@ -436,7 +447,7 @@ export class SeatDowngradePage {
     confirmAddonCascade: boolean,
   ): Promise<void> {
     try {
-      const updated = await freeUp(
+      const updated = await this.seatsApi.freeUp(
         {
           moduleKey,
           targetSeats,
@@ -475,10 +486,15 @@ export class SeatDowngradePage {
 
   private async loadUsage(): Promise<void> {
     const seq = ++this.loadSeq;
+    this.holdersSeq++;
+    this.previewSeq++;
+    this.preview.set(null);
+    this.holdersLoading.set(false);
+    this.previewLoading.set(false);
     this.loading.set(true);
     this.loadFailed.set(false);
     try {
-      const data = await getSeatUsage();
+      const data = await this.seatsApi.getSeatUsage();
       if (seq !== this.loadSeq) return;
       this.usage.set(data);
       this.step.set(1);
@@ -514,9 +530,9 @@ export class SeatDowngradePage {
     let page = 1;
     const limit = 100;
     while (true) {
-      const res = await listSeatHolders(moduleKey, { page, limit });
+      const res = await this.seatsApi.listSeatHolders(moduleKey, { page, limit });
       all.push(...res.data);
-      if (all.length >= res.meta.total || res.data.length < limit) break;
+      if (!res.meta.hasNext) break;
       page += 1;
     }
     return all;
@@ -537,9 +553,10 @@ export class SeatDowngradePage {
 
   private async refreshPreview(moduleKey: string, targetSeats: number, keepUserIds: string[]): Promise<void> {
     const seq = ++this.previewSeq;
+    this.preview.set(null);
     this.previewLoading.set(true);
     try {
-      const res = await freeUpPreview({ moduleKey, targetSeats, keepUserIds });
+      const res = await this.seatsApi.freeUpPreview({ moduleKey, targetSeats, keepUserIds });
       if (seq !== this.previewSeq) return;
       this.preview.set(res);
     } catch (error) {

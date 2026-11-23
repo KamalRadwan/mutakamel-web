@@ -21,7 +21,7 @@ import {
 @Component({ selector: 'app-seats-section', template: '' })
 class SeatsStub {}
 let fixture: ComponentFixture<SubscriptionPage>;
-let c: Record<string, any>;
+let c: SubscriptionPage;
 let http: HttpTestingController;
 beforeEach(() => {
   vi.useFakeTimers();
@@ -39,9 +39,12 @@ afterEach(() => {
   TestBed.resetTestingModule();
   vi.useRealTimers();
 });
-function create(): void {
+function create(seatUsageFails = false): void {
   fixture = TestBed.createComponent(SubscriptionPage);
-  c = fixture.componentInstance as unknown as Record<string, any>;
+  c = fixture.componentInstance;
+  const usage = http.expectOne(`${BASE}/seats/usage`);
+  if (seatUsageFails) fail(usage, 403, 'MISSING_REQUIRED_PERMISSIONS');
+  else respond(usage, { mode: 'DERIVED', revision: 17, modules: [] });
 }
 async function loaded(summary = SUMMARY): Promise<void> {
   create();
@@ -56,12 +59,23 @@ function root(): HTMLElement {
   return fixture.nativeElement;
 }
 describe('subscription detail HTTP contract', () => {
+  it('keeps subscription details available when the optional seat usage read is forbidden', async () => {
+    create(true);
+    respond(http.expectOne(`${BASE}/subscription`), SUBSCRIPTION);
+    respond(http.expectOne(`${BASE}/billing/summary`), SUMMARY);
+    await tick(1000);
+    fixture.detectChanges();
+    expect(c['failed']()).toBe(false);
+    expect(c['subscription']()?.subscription.id).toBe(SUBSCRIPTION.subscription.id);
+    expect(c['seatUsage']()).toBeNull();
+  });
   it('subscription detail renders server values', async () => {
     await loaded();
     expect(root().textContent).toContain('USD 123.46');
     expect(root().textContent).toContain('CRM');
-    expect(c['subscription']().totals).toEqual(SUBSCRIPTION.totals);
-    expect(c['subscription']().projection).toEqual(SUBSCRIPTION.projection);
+    expect(c['subscription']()?.totals).toEqual(SUBSCRIPTION.totals);
+    expect(c['subscription']()?.projection).toEqual(SUBSCRIPTION.projection);
+    expect(c['seatUsage']()).toEqual({ mode: 'DERIVED', revision: 17, modules: [] });
   });
   it('no subscription empty state', async () => {
     create();
@@ -96,6 +110,7 @@ describe('subscription detail HTTP contract', () => {
     expect(root().querySelector('app-billing-failed button')).toBeTruthy();
     if (status === 0) expect(notify).toHaveBeenCalled();
     c['reload']();
+    respond(http.expectOne(`${BASE}/seats/usage`), { mode: 'DERIVED', revision: 18, modules: [] });
     respond(http.expectOne(`${BASE}/subscription`), SUBSCRIPTION);
     respond(http.expectOne(`${BASE}/billing/summary`), SUMMARY);
     await tick(1000);
