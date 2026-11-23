@@ -38,6 +38,14 @@ export interface GeoCity {
 
 export type GeoDistrictKind = 'VILLAGE' | 'DISTRICT';
 
+/** POST cities/lookup: picker metadata only; no zone membership or timestamps. */
+export interface GeoCityLookup extends Pick<GeoCity, 'id' | 'stateId' | 'nameEn' | 'nameAr' | 'isActive'> {
+  stateNameEn: string;
+  stateNameAr: string;
+  countryId: string;
+  countryIso2: string;
+}
+
 export interface GeoDistrict {
   id: string;
   cityId: string;
