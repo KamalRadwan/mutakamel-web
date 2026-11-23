@@ -103,7 +103,7 @@ function sortTerms(list: readonly TradeTerm[]): TradeTerm[] {
     }),
   ],
   templateUrl: './terms-page.html',
-  host: { class: 'flex min-h-0 flex-1 flex-col' },
+  host: { class: 'flex flex-1 shrink-0 flex-col' },
 })
 export class TermsPage {
   private static nextId = 0;

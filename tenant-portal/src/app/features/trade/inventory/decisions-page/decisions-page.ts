@@ -103,7 +103,7 @@ function parsePageSize(raw: string | null): number {
     provideIcons({ tablerGavel, tablerAlertTriangle, tablerCircleX }),
   ],
   templateUrl: './decisions-page.html',
-  host: { class: 'flex min-h-0 flex-1 flex-col' },
+  host: { class: 'flex flex-1 shrink-0 flex-col' },
 })
 export class DecisionsPage {
   private readonly route = inject(ActivatedRoute);

@@ -33,7 +33,7 @@ interface MigrationModuleRow {
     provideIcons({ tablerArrowLeft, tablerCloudOff }),
   ],
   templateUrl: './seat-migration-page.html',
-  host: { class: 'flex min-h-0 flex-1 flex-col gap-10 overflow-y-auto p-12' },
+  host: { class: 'flex flex-1 shrink-0 flex-col gap-10 p-12' },
 })
 export class SeatMigrationPage {
   private static nextId = 0;

@@ -118,7 +118,7 @@ function activeRunStatuses(): readonly string[] {
     }),
   ],
   templateUrl: './import-runs-page.html',
-  host: { class: 'flex min-h-0 flex-1 flex-col gap-8 p-12' },
+  host: { class: 'flex flex-1 shrink-0 flex-col gap-8 p-12' },
 })
 export class ImportRunsPage {
   private readonly destroyRef = inject(DestroyRef);

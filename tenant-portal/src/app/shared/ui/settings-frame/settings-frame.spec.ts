@@ -60,6 +60,14 @@ async function setup() {
 }
 
 describe('SettingsFrame', () => {
+  it('grows with its content while filling the available page space', async () => {
+    const { el } = await setup();
+    const frame = el.querySelector('app-settings-frame') as HTMLElement;
+    expect(frame.classList.contains('shrink-0')).toBe(true);
+    expect(frame.classList.contains('flex-1')).toBe(true);
+    expect(frame.classList.contains('min-h-0')).toBe(false);
+  });
+
   it('renders the add button with its label', async () => {
     const { addBtn } = await setup();
     expect(addBtn().textContent).toContain('Add item');

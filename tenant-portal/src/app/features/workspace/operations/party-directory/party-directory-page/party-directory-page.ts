@@ -151,7 +151,7 @@ function parsePageSize(raw: string | null): number {
   ],
   templateUrl: './party-directory-page.html',
   host: {
-    class: 'flex min-h-0 flex-1 flex-col gap-8 p-12',
+    class: 'flex flex-1 shrink-0 flex-col gap-8 p-12',
     '(document:click)': 'onDocumentClick($event)',
     '(window:resize)': 'closeNewMenu()',
     '(keydown)': 'onHostKeydown($event)',

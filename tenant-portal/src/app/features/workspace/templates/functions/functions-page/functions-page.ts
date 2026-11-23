@@ -100,7 +100,7 @@ interface FilterChip {
     }),
   ],
   templateUrl: './functions-page.html',
-  host: { class: 'flex min-h-0 flex-1 flex-col gap-8 p-12' },
+  host: { class: 'flex flex-1 shrink-0 flex-col gap-8 p-12' },
 })
 export class FunctionsPage {
   private static nextId = 0;

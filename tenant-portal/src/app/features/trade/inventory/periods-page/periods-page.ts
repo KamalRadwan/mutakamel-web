@@ -125,7 +125,7 @@ function parseSizeParam(raw: string | undefined): number {
     }),
   ],
   templateUrl: './periods-page.html',
-  host: { class: 'flex min-h-0 flex-1 flex-col' },
+  host: { class: 'flex flex-1 shrink-0 flex-col' },
 })
 export class PeriodsPage {
   private static nextId = 0;

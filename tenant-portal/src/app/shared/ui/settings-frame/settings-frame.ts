@@ -10,7 +10,7 @@ let nextFrameId = 0;
   imports: [NgIcon, TranslocoPipe],
   providers: [provideIcons({ tablerPlus, tablerRefresh, tablerSearch, tablerX })],
   templateUrl: './settings-frame.html',
-  host: { class: 'flex min-h-0 flex-1 flex-col gap-8 p-12' },
+  host: { class: 'flex flex-1 shrink-0 flex-col gap-8 p-12' },
 })
 export class SettingsFrame {
   protected readonly uid = `settings-frame-${++nextFrameId}`;

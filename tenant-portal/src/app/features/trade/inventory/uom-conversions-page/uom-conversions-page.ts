@@ -144,7 +144,7 @@ function formatItemLabel(code: string, localizedNames: Record<string, string>, l
     }),
   ],
   templateUrl: './uom-conversions-page.html',
-  host: { class: 'flex min-h-0 flex-1 flex-col' },
+  host: { class: 'flex flex-1 shrink-0 flex-col' },
 })
 export class UomConversionsPage {
   private readonly route = inject(ActivatedRoute);
