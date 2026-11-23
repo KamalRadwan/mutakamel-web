@@ -1,7 +1,9 @@
-import { Component, computed, inject, signal, viewChild } from '@angular/core';
+import { Component, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerArrowBackUp, tablerChevronLeft, tablerChevronRight, tablerStack2 } from '@ng-icons/tabler-icons';
+import { ApiError, isRetryableWriteError, writeErrorMessage } from '../../../../../core/api/api-errors';
+import { newIdempotencyKey } from '../../../../../core/api/idempotency';
 import { LanguageState } from '../../../../../core/i18n/language';
 import { Notify } from '../../../../../core/notify/notify';
 import { ActionItem, ActionSelection, ActionsMenu } from '../../../../../shared/ui/actions-menu/actions-menu';
@@ -11,14 +13,9 @@ import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-d
 import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import {
-  TemplateVersionDetail,
-  TemplateVersionItem,
-  getTemplate,
-  getVersion,
-  listRecoverySnapshots,
-  listVersions,
-  restoreVersion,
-  retireVersion,
+  TemplatesApi,
+  type TemplateVersionDetail,
+  type TemplateVersionItem,
 } from '../../templates.api';
 import { TemplatePageService, errorDetailsOf } from '../template-page.service';
 
@@ -35,6 +32,7 @@ export class VersionsTab {
 
   private readonly transloco = inject(TranslocoService);
   private readonly notify = inject(Notify);
+  private readonly api = inject(TemplatesApi);
   protected readonly language = inject(LanguageState).current;
   protected readonly service = inject(TemplatePageService);
 
@@ -51,6 +49,50 @@ export class VersionsTab {
   protected readonly loadingView = signal(false);
 
   private viewSeq = 0;
+  private templateEpoch = 0;
+  private pendingRestore: { signature: string; key: string } | null = null;
+  private pendingRetire: { signature: string; key: string } | null = null;
+
+  constructor() {
+    let previousId: string | undefined;
+    effect(() => {
+      const id = this.service.definition()?.templateId;
+      if (id === previousId) return;
+      previousId = id;
+      this.templateEpoch++;
+      this.viewSeq++;
+      this.viewingVersion.set(null);
+      this.loadingView.set(false);
+      this.cursorStack.set([]);
+      this.currentCursor.set(null);
+      this.paging.set(false);
+      this.restoring.set(false);
+      this.retiring.set(false);
+      this.restoringTarget.set(null);
+      this.retiringTarget.set(null);
+      this.pendingRestore = null;
+      this.pendingRetire = null;
+      this.viewModal().close();
+      this.restoreModal().close();
+    });
+  }
+
+  private isCurrent(templateId: string, epoch: number): boolean {
+    return this.service.definition()?.templateId === templateId && this.templateEpoch === epoch;
+  }
+
+  private capabilityReason(reason: string | null | undefined): string | undefined {
+    if (!reason) return undefined;
+    const key = `templatesPage.header.capabilities.${reason}`;
+    const translated = this.transloco.translate(key);
+    return translated && translated !== key ? translated : undefined;
+  }
+
+  private writeMessage(error: unknown): string {
+    return error instanceof ApiError && error.status === 401
+      ? writeErrorMessage(error, 'templatesPage', this.transloco)
+      : this.service.translateError(this.transloco, error);
+  }
 
   protected readonly restoringTarget = signal<TemplateVersionItem | null>(null);
   protected readonly restoreReason = signal('');
@@ -91,6 +133,8 @@ export class VersionsTab {
       retireReason = this.transloco.translate('templatesPage.versions.actions.alreadyRetiredReason');
     } else if (this.service.isReadOnly()) {
       retireReason = this.transloco.translate('templatesPage.header.capabilities.ACCESS_POLICY_READ_ONLY');
+    } else {
+      retireReason = this.capabilityReason(def?.capabilities.retireVersion.reason);
     }
 
     let restoreReason: string | undefined;
@@ -101,7 +145,7 @@ export class VersionsTab {
     } else if (this.service.isReadOnly()) {
       restoreReason = this.transloco.translate('templatesPage.header.capabilities.ACCESS_POLICY_READ_ONLY');
     } else if (def && def.capabilities.restoreVersion.state !== 'ENABLED' && def.capabilities.restoreVersion.reason) {
-      restoreReason = this.transloco.translate(`templatesPage.header.capabilities.${def.capabilities.restoreVersion.reason}`);
+      restoreReason = this.capabilityReason(def.capabilities.restoreVersion.reason);
     }
 
     return [
@@ -148,16 +192,23 @@ export class VersionsTab {
     const def = this.service.definition();
     if (!def) return;
     const seq = ++this.viewSeq;
+    const epoch = this.templateEpoch;
     this.viewingVersion.set(null);
     this.viewingVersionNumber.set(row.versionNumber);
     this.loadingView.set(true);
     this.viewModal().open();
     try {
-      const detail = await getVersion(def.templateId, row.templateVersionId);
-      if (seq !== this.viewSeq) return;
+      const detail = await this.api.getVersion(def.templateId, row.templateVersionId);
+      if (seq !== this.viewSeq || !this.isCurrent(def.templateId, epoch)) return;
+      if (!detail.editorDocument || detail.editorSchemaVersion !== 1 ||
+          typeof detail.nodeRegistryVersion !== 'string' || typeof detail.compilerVersion !== 'string' ||
+          typeof detail.validationRunId !== 'string' || !Array.isArray(detail.rendererTargets) ||
+          !Array.isArray(detail.bindingManifest) || !Array.isArray(detail.assetManifest)) {
+        throw new ApiError(502, 'COMMON.GENERIC.INTERNAL_ERROR');
+      }
       this.viewingVersion.set(detail);
     } catch (error) {
-      if (seq !== this.viewSeq) return;
+      if (seq !== this.viewSeq || !this.isCurrent(def.templateId, epoch)) return;
       this.viewModal().close();
       this.notify.error(this.service.translateError(this.transloco, error));
     } finally {
@@ -170,6 +221,7 @@ export class VersionsTab {
   protected openRestoreModal(row: TemplateVersionItem): void {
     if (row.templateVersionId === this.currentPublishedVersionId()) return;
     this.restoringTarget.set(row);
+    this.pendingRestore = null;
     this.restoreReason.set('');
     this.restoreDiscardDraft.set(false);
     this.restoreReasonError.set(null);
@@ -210,23 +262,36 @@ export class VersionsTab {
     if (invalid) return;
 
     const draftEtag = this.service.draft()?.etag ?? def.currentDraft.etag;
+    const epoch = this.templateEpoch;
+    const signature = JSON.stringify([def.templateId, target.templateVersionId, draftEtag, reason]);
+    if (this.pendingRestore?.signature !== signature) {
+      this.pendingRestore = { signature, key: newIdempotencyKey() };
+    }
     this.restoring.set(true);
     try {
-      const res = await restoreVersion(
+      const result = await this.api.restoreVersion(
         def.templateId,
         target.templateVersionId,
         { reason, discardCurrentDraft: true },
         draftEtag,
+        this.pendingRestore.key,
       );
-      this.service.syncExternalDraft(res.draft);
-      const [freshDef, snapshotsPage] = await Promise.all([
-        getTemplate(def.templateId),
-        listRecoverySnapshots(def.templateId, { limit: 20 }).catch(() => null),
+      if (!this.isCurrent(def.templateId, epoch)) return;
+      this.pendingRestore = null;
+      this.service.syncExternalDraft({ ...result.data.draft, etag: result.etag ?? result.data.draft.etag });
+      const [freshDef, snapshotsPage] = await Promise.allSettled([
+        this.api.getTemplate(def.templateId),
+        this.api.listRecoverySnapshots(def.templateId, { limit: 20 }),
       ]);
-      this.service.syncFromDefinition(freshDef, this.service.overviewDirty());
-      if (snapshotsPage) {
-        this.service.snapshots.set(snapshotsPage.items);
+      if (!this.isCurrent(def.templateId, epoch)) return;
+      if (freshDef.status === 'fulfilled') {
+        this.service.syncFromDefinition(freshDef.value, this.service.overviewDirty());
       }
+      if (snapshotsPage.status === 'fulfilled') {
+        this.service.snapshots.set(snapshotsPage.value.items);
+      }
+      const failed = [freshDef, snapshotsPage].find(item => item.status === 'rejected');
+      if (failed?.status === 'rejected') this.notify.error(this.service.translateError(this.transloco, failed.reason));
       this.restoreModal().close();
       this.notify.success(
         this.transloco.translate('templatesPage.versions.restoreModal.restoredToast', {
@@ -234,15 +299,17 @@ export class VersionsTab {
         }),
       );
     } catch (error) {
+      if (!this.isCurrent(def.templateId, epoch)) return;
+      if (!isRetryableWriteError(error) && !(error instanceof ApiError && error.status === 401)) this.pendingRestore = null;
       const { status, code } = errorDetailsOf(error);
       if (status === 409 && code === 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION') {
         this.restoreModal().close();
         this.service.openConflict();
       } else {
-        this.notify.error(this.service.translateError(this.transloco, error));
+        this.notify.error(this.writeMessage(error));
       }
     } finally {
-      this.restoring.set(false);
+      if (this.isCurrent(def.templateId, epoch)) this.restoring.set(false);
     }
   }
 
@@ -252,31 +319,46 @@ export class VersionsTab {
     if (row.templateVersionId === this.currentPublishedVersionId() || row.lifecycleStatus === 'RETIRED') return;
 
     this.retiringTarget.set(row);
+    const epoch = this.templateEpoch;
     const confirmed = await this.retireConfirm().open();
-    if (!confirmed) return;
+    if (!confirmed || !this.isCurrent(def.templateId, epoch) || this.retiring()) return;
 
+    const signature = JSON.stringify([def.templateId, row.templateVersionId, def.etag]);
+    if (this.pendingRetire?.signature !== signature) this.pendingRetire = { signature, key: newIdempotencyKey() };
     this.retiring.set(true);
     try {
-      const res = await retireVersion(def.templateId, row.templateVersionId, def.etag);
+      const result = await this.api.retireVersion(def.templateId, row.templateVersionId, def.etag, this.pendingRetire.key);
+      if (!this.isCurrent(def.templateId, epoch)) return;
+      this.pendingRetire = null;
+      const res = result.data;
       this.service.versions.update((list) =>
         list.map((item) => (item.templateVersionId === res.version.templateVersionId ? res.version : item)),
       );
-      const freshDef = await getTemplate(def.templateId);
-      this.service.syncFromDefinition(freshDef, this.service.overviewDirty());
+      this.service.syncFromDefinition({ ...def, revision: res.definitionRevision, etag: result.etag ?? res.definitionEtag }, this.service.overviewDirty());
+      try {
+        const freshDef = await this.api.getTemplate(def.templateId);
+        if (!this.isCurrent(def.templateId, epoch)) return;
+        this.service.syncFromDefinition(freshDef, this.service.overviewDirty());
+      } catch (error) {
+        if (!this.isCurrent(def.templateId, epoch)) return;
+        this.notify.error(this.service.translateError(this.transloco, error));
+      }
       this.notify.success(
         this.transloco.translate('templatesPage.versions.retireConfirm.retiredToast', {
           version: row.versionNumber,
         }),
       );
     } catch (error) {
+      if (!this.isCurrent(def.templateId, epoch)) return;
+      if (!isRetryableWriteError(error) && !(error instanceof ApiError && error.status === 401)) this.pendingRetire = null;
       const { status, code } = errorDetailsOf(error);
       if (status === 409 && code === 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION') {
         this.service.openConflict();
       } else {
-        this.notify.error(this.service.translateError(this.transloco, error));
+        this.notify.error(this.writeMessage(error));
       }
     } finally {
-      this.retiring.set(false);
+      if (this.isCurrent(def.templateId, epoch)) this.retiring.set(false);
     }
   }
 
@@ -299,18 +381,24 @@ export class VersionsTab {
   }
 
   private async loadPage(templateId: string, cursor: string | null, nextStack: (string | null)[]): Promise<void> {
+    const epoch = this.templateEpoch;
     this.paging.set(true);
     try {
-      const page = await listVersions(templateId, { cursor, limit: 25 });
+      const page = await this.api.listVersions(templateId, { cursor, limit: 25 });
+      if (!this.isCurrent(templateId, epoch)) return;
       this.service.versions.set(page.items);
       this.service.versionsHasNext.set(page.pageInfo.hasNextPage);
       this.service.versionsNextCursor.set(page.pageInfo.nextCursor);
       this.currentCursor.set(cursor);
       this.cursorStack.set(nextStack);
     } catch (error) {
+      if (!this.isCurrent(templateId, epoch)) return;
       this.notify.error(this.service.translateError(this.transloco, error));
+      if (cursor && error instanceof ApiError && error.code === 'CORE.TEMPLATE.CURSOR.INVALID') {
+        await this.loadPage(templateId, null, []);
+      }
     } finally {
-      this.paging.set(false);
+      if (this.isCurrent(templateId, epoch)) this.paging.set(false);
     }
   }
 }
