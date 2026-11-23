@@ -1,6 +1,7 @@
 import { Component, computed, inject, input } from '@angular/core';
-import { TranslocoPipe, provideTranslocoScope } from '@jsverse/transloco';
+import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { LanguageState } from '../../../../../core/i18n/language';
+import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { Badge } from '../../../../../shared/ui/badge/badge';
 import { formatDate, formatMoney } from '../../../shared/trade-format';
 import { STATUS_TONE_CLASSES, statusBadge } from '../../shared/document-status';
@@ -17,6 +18,7 @@ interface RevisionRowView {
   readonly revisionNumber: number;
   readonly isCurrent: boolean;
   readonly badgeLabelKey: string;
+  readonly badgeText: string;
   readonly badgeClass: string;
   readonly validUntilDmy: string;
   readonly timestampKey: 'tdpg.revisions.sentAt' | 'tdpg.revisions.createdAt';
@@ -44,6 +46,8 @@ function formatDmy(iso: string): string {
   host: { class: 'block min-w-0' },
 })
 export class RevisionsPanel {
+  private readonly transloco = inject(TranslocoService);
+  private readonly i18n = translationEvents(this.transloco);
   private readonly lang = inject(LanguageState).current;
 
   readonly revisions = input.required<readonly QuotationRevision[]>();
@@ -51,6 +55,7 @@ export class RevisionsPanel {
   readonly currencyCode = input.required<string>();
 
   protected readonly rows = computed<RevisionRowView[]>(() => {
+    this.i18n();
     const currentId = this.currentRevisionId();
     const currency = this.currencyCode();
     const language = this.lang();
@@ -63,6 +68,11 @@ export class RevisionsPanel {
         const badge = isCurrent
           ? statusBadge('quotation', 'lifecycle', rev.status)
           : { labelKey: 'tdpg.revisions.replaced', tone: 'none' as const };
+        const rawText = this.transloco.translate(badge.labelKey);
+        const badgeText =
+          rawText && rawText !== badge.labelKey
+            ? rawText
+            : this.transloco.translate('td.common.unknownStatus');
         const timeIso = rev.sentAt ?? rev.createdAt;
         const timeMs = Date.parse(timeIso);
         const datePart = formatDate(timeIso, language);
@@ -74,6 +84,7 @@ export class RevisionsPanel {
           revisionNumber: rev.revisionNumber,
           isCurrent,
           badgeLabelKey: badge.labelKey,
+          badgeText,
           badgeClass: STATUS_TONE_CLASSES[badge.tone],
           validUntilDmy: `\u2066${formatDmy(rev.validUntil)}\u2069`,
           timestampKey: rev.sentAt ? 'tdpg.revisions.sentAt' : 'tdpg.revisions.createdAt',

@@ -1,5 +1,6 @@
 import { Component, Injectable, signal, viewChild } from '@angular/core';
 import { type ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { TranslocoLoader, type Translation, provideTransloco } from '@jsverse/transloco';
 import { of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -91,6 +92,7 @@ describe('TermsSection notes max length (§3)', () => {
 
     TestBed.configureTestingModule({
       providers: [
+        provideRouter([]),
         provideTransloco({
           config: { availableLangs: ['ar', 'en'], defaultLang: 'en', reRenderOnLangChange: true },
           loader: TestTranslocoLoader,
@@ -154,6 +156,7 @@ describe('TermsSection notes max length (§3)', () => {
 
     TestBed.configureTestingModule({
       providers: [
+        provideRouter([]),
         provideTransloco({
           config: { availableLangs: ['ar', 'en'], defaultLang: 'ar', reRenderOnLangChange: true },
           loader: TestTranslocoLoader,

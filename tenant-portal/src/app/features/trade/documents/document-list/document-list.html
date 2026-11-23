@@ -1,7 +1,16 @@
+@if (forbidden()) {
+  <ui-full-state
+    kind="forbidden"
+    [title]="'tdl.errors.forbiddenTitle' | transloco"
+    [text]="'tdl.errors.forbiddenText' | transloco"
+    [actionLabel]="'tdl.errors.backHome' | transloco"
+    (action)="goHome()"
+  />
+} @else {
 @let cfg = kindConfig();
 
 <div class="flex shrink-0 items-center gap-8 rounded-10 bg-surface p-8 shadow-card">
-  @if (canCreate) {
+  @if (canCreate()) {
     <button type="button" uiButton class="shrink-0" (click)="openNew()">
       <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
       <span>{{ cfg.newKey | transloco }}</span>
@@ -87,7 +96,7 @@
         <ng-icon [name]="cfg.icon" size="18" aria-hidden="true" />
       </span>
       <p class="text-13 leading-18 font-medium text-text">{{ emptyTitle() }}</p>
-      @if (canCreate) {
+      @if (canCreate()) {
         <button type="button" uiButton variant="primary" (click)="openNew()">
           <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
           <span>{{ cfg.newKey | transloco }}</span>
@@ -101,7 +110,7 @@
       [kind]="kind()"
       [items]="items()"
       [loading]="listQuery.isLoading()"
-      [perms]="rowPerms"
+      [perms]="rowPerms()"
       (open)="openDocument($event)"
       (action)="onRowAction($event.row, $event.action)"
     />
@@ -112,7 +121,7 @@
       [loading]="listQuery.isLoading()"
       [sort]="sort()"
       [order]="order()"
-      [perms]="rowPerms"
+      [perms]="rowPerms()"
       (open)="openDocument($event)"
       (action)="onRowAction($event.row, $event.action)"
       (sortChange)="toggleSort($event)"
@@ -132,4 +141,5 @@
       (pageSizeChange)="setPageSize($event)"
     />
   </footer>
+}
 }

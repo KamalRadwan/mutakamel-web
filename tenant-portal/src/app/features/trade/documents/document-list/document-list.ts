@@ -2,10 +2,12 @@ import {
   Component,
   DestroyRef,
   ElementRef,
+  Injector,
   computed,
   effect,
   inject,
   linkedSignal,
+  runInInjectionContext,
   signal,
   untracked,
 } from '@angular/core';
@@ -29,9 +31,12 @@ import { LanguageState } from '../../../../core/i18n/language';
 import { ScopeState } from '../../../../core/scope/scope';
 import { BulkJobsTracker } from '../../../../shared/bulk-jobs/bulk-jobs-tracker';
 import { Button } from '../../../../shared/ui/button/button';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { Pagination } from '../../../../shared/ui/pagination/pagination';
 import { StepFilter, StepOption } from '../../../../shared/ui/step-filter/step-filter';
 import { ViewOption, ViewSwitcher } from '../../../../shared/ui/view-switcher/view-switcher';
+import { branchGrants } from '../../shared/trade-access';
+import { ApiError } from '../../shared/trade-api';
 import { DocumentBulkBar } from '../document-bulk/bulk-bar/bulk-bar';
 import { KIND_CONFIG, KindConfig } from '../shared/document-kinds';
 import { DocumentSelection } from '../shared/document-selection';
@@ -44,16 +49,23 @@ import {
   invalidateDocumentQueries,
 } from '../shared/documents.api';
 import { DocumentCards } from './document-cards/document-cards';
-import {
-  DEFAULT_DOCUMENT_ROW_PERMS,
-  DocumentRowActionId,
-  DocumentRowMenuPerms,
-} from './document-row-menu';
+import { DocumentRowActionId, DocumentRowMenuPerms } from './document-row-menu';
 import { DocumentSortField, DocumentTable } from './document-table/document-table';
 import { translationEvents } from '../../../../core/i18n/translation-events';
 
-const CAN_CREATE = true; // later from the session permissions
-const ROW_PERMS: DocumentRowMenuPerms = DEFAULT_DOCUMENT_ROW_PERMS;
+const READ_PERM_BY_KIND: Readonly<Record<DocumentKind, string>> = {
+  quotation: 'trade.quotations.read',
+  'sales-order': 'trade.sales_orders.read',
+  'purchase-order': 'trade.purchase_orders.read',
+  'purchase-quotation': 'trade.purchase_quotations.read',
+};
+
+const CREATE_PERM_BY_KIND: Readonly<Record<DocumentKind, string>> = {
+  quotation: 'trade.quotations.create',
+  'sales-order': 'trade.sales_orders.create',
+  'purchase-order': 'trade.purchase_orders.create',
+  'purchase-quotation': 'trade.purchase_quotations.create',
+};
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = 25;
@@ -95,6 +107,7 @@ function parseKind(raw: unknown): DocumentKind {
     NgIcon,
     TranslocoPipe,
     Button,
+    FullState,
     Pagination,
     StepFilter,
     ViewSwitcher,
@@ -129,6 +142,7 @@ export class DocumentList {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly injector = inject(Injector);
   private readonly destroyRef = inject(DestroyRef);
   private readonly scope = inject(ScopeState);
   private readonly tracker = inject(BulkJobsTracker);
@@ -141,12 +155,25 @@ export class DocumentList {
   private readonly routeData = toSignal(this.route.data);
   private readonly queryParams = toSignal(this.route.queryParamMap);
 
-  protected readonly canCreate = CAN_CREATE;
-  protected readonly rowPerms = ROW_PERMS;
   protected readonly pageSizes: number[] = [...ALLOWED_PAGE_SIZES];
 
   protected readonly kind = computed<DocumentKind>(() => parseKind(this.routeData()?.['kind']));
   protected readonly kindConfig = computed<KindConfig>(() => KIND_CONFIG[this.kind()]);
+
+  protected readonly canRead = computed(() => this.hasBranchGrant(READ_PERM_BY_KIND[this.kind()]));
+  protected readonly canCreate = computed(
+    () => this.canRead() && this.hasBranchGrant(CREATE_PERM_BY_KIND[this.kind()]),
+  );
+  protected readonly rowPerms = computed<DocumentRowMenuPerms>(() => {
+    const kind = this.kind();
+    const canConvert =
+      kind === 'quotation'
+        ? this.hasBranchGrant('trade.quotations.convert') && this.hasBranchGrant('trade.sales_orders.create')
+        : kind === 'purchase-quotation'
+          ? this.hasBranchGrant('trade.purchase_quotations.convert') && this.hasBranchGrant('trade.purchase_orders.create')
+          : false;
+    return { canPrint: this.canRead(), canConvert };
+  });
 
   protected readonly view = computed<'table' | 'cards'>(() =>
     this.queryParams()?.get('view') === 'cards' ? 'cards' : 'table',
@@ -186,8 +213,14 @@ export class DocumentList {
     return search ? { search } : {};
   });
 
-  protected readonly listQuery = injectDocumentList(this.kind, this.query);
-  protected readonly countsQuery = injectStatusCounts(this.kind, this.countFilters);
+  protected readonly listQuery = injectDocumentList(this.kind, this.query, this.canRead);
+  protected readonly countsQuery = injectStatusCounts(this.kind, this.countFilters, this.canRead);
+
+  protected readonly forbidden = computed<boolean>(() => {
+    if (!this.canRead()) return true;
+    const err = this.listQuery.error();
+    return err instanceof ApiError && (err.status === 403 || err.code === 'TRADE.AUTH.TARGET_DENIED');
+  });
 
   protected readonly items = computed<readonly AnyDocument[]>(() => this.listQuery.data()?.items ?? []);
 
@@ -473,8 +506,19 @@ export class DocumentList {
   }
 
   protected openNew(): void {
-    if (!this.canCreate) return;
+    if (!this.canCreate()) return;
     void this.router.navigate(['new'], { relativeTo: this.route });
+  }
+
+  protected goHome(): void {
+    void this.router.navigateByUrl('/');
+  }
+
+  private hasBranchGrant(key: string): boolean {
+    const grants = runInInjectionContext(this.injector, () => branchGrants(key));
+    if (grants === 'ALL') return true;
+    const branchId = this.scope.branch()?.id;
+    return Boolean(branchId) && grants.has(branchId);
   }
 
   protected openDocument(row: AnyDocument): void {

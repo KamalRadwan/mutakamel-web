@@ -175,10 +175,10 @@
               @case ('status') {
                 @let badge = lifecycleBadge(row);
                 <span role="cell" class="flex min-w-0 items-center gap-4 border-s border-border px-10">
-                  <span [class]="badgeClass(badge)">{{ badge.labelKey | transloco }}</span>
+                  <span [class]="badgeClass(badge)">{{ badgeLabel(badge.labelKey) }}</span>
                   @if (isSalesOrderHeld(row)) {
                     @let hold = holdBadge();
-                    <span [class]="badgeClass(hold)">{{ hold.labelKey | transloco }}</span>
+                    <span [class]="badgeClass(hold)">{{ badgeLabel(hold.labelKey) }}</span>
                   }
                 </span>
               }
@@ -186,7 +186,7 @@
               @case ('approval') {
                 <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
                   @if (approvalBadge(row); as approval) {
-                    <span [class]="badgeClass(approval)">{{ approval.labelKey | transloco }}</span>
+                    <span [class]="badgeClass(approval)">{{ badgeLabel(approval.labelKey) }}</span>
                   }
                 </span>
               }
@@ -194,7 +194,7 @@
               @case ('dispatch') {
                 <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
                   @if (dispatchBadge(row); as dispatch) {
-                    <span [class]="badgeClass(dispatch)">{{ dispatch.labelKey | transloco }}</span>
+                    <span [class]="badgeClass(dispatch)">{{ badgeLabel(dispatch.labelKey) }}</span>
                   }
                 </span>
               }

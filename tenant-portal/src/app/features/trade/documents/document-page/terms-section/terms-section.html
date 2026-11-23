@@ -301,6 +301,16 @@
         [idPrefix]="uid"
         [showErrors]="showErrors() || !!(paymentError())"
       />
+      @if (paymentTermsMissing()) {
+        <p class="col-span-full text-12 leading-18 text-text-muted">
+          <a
+            routerLink="/trade/settings/terms"
+            class="font-medium text-brand-text outline-none hover:underline focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          >
+            {{ 'tdpg.terms.addPaymentTermsLink' | transloco }}
+          </a>
+        </p>
+      }
     </div>
   }
 

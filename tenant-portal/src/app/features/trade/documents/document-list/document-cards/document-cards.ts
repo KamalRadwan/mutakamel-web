@@ -109,6 +109,14 @@ export class DocumentCards {
     return `${BADGE_BASE} ${STATUS_TONE_CLASSES[badge.tone]}`;
   }
 
+  protected badgeLabel(labelKey: string): string {
+    this.i18n();
+    const translated = this.transloco.translate(labelKey);
+    return translated && translated !== labelKey
+      ? translated
+      : this.transloco.translate('td.common.unknownStatus');
+  }
+
   protected isPriceLockExpired(row: AnyDocument): boolean {
     if (this.kind() !== 'quotation' || row.lifecycleStatus !== 'SENT') return false;
     const expiresAt = (row as Quotation).currentRevision?.priceLockExpiresAt;

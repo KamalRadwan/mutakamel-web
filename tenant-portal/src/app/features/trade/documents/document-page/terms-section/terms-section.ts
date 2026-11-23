@@ -1,4 +1,5 @@
 import { Component, ElementRef, computed, effect, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { TranslocoPipe, provideTranslocoScope } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerLock, tablerX } from '@ng-icons/tabler-icons';
@@ -107,7 +108,7 @@ function resolveSnapshotView(
 
 @Component({
   selector: 'app-terms-section',
-  imports: [NgIcon, TranslocoPipe, Field, Dropdown, TradeTermsSelect],
+  imports: [RouterLink, NgIcon, TranslocoPipe, Field, Dropdown, TradeTermsSelect],
   providers: [
     provideTranslocoScope({ scope: 'trade-shared', alias: 'tradeShared' }, { scope: 'trade-documents-page', alias: 'tdpg' }),
     provideIcons({ tablerLock, tablerX }),
@@ -141,7 +142,9 @@ export class TermsSection {
   private pendingApplyDefaults = false;
   private expectingDefaults = false;
   private optionsLoadSeq = 0;
+  private paymentCheckSeq = 0;
   private readonly termOptions = signal<TermOptions | null>(null);
+  private readonly quotationPaymentTermsEmpty = signal(false);
   protected readonly clausePick = signal<string | null>(null);
 
   protected readonly termDocumentType = computed<TermDocumentType>(() => TERM_DOC_TYPE_BY_KIND[this.kind()]);
@@ -213,6 +216,7 @@ export class TermsSection {
   readonly valid = computed<boolean>(() => {
     if (this.isReadonly()) return true;
     if (this.notesTooLong()) return false;
+    if (this.paymentTermsMissing()) return false;
     const select = this.termsSelect();
     if (select) {
       return select.valid();
@@ -222,6 +226,13 @@ export class TermsSection {
     }
     return true;
   });
+
+  readonly paymentTermsMissing = computed<boolean>(
+    () =>
+      !this.isReadonly() &&
+      this.kind() === 'quotation' &&
+      this.quotationPaymentTermsEmpty(),
+  );
 
   constructor() {
     effect(() => {
@@ -235,10 +246,21 @@ export class TermsSection {
     effect(() => {
       const needOptions = this.useSelectiveConvertLayout();
       const docType = this.termDocumentType();
-      const companyId = this.scope.company().id;
+      const companyId = this.scope.company()?.id;
       this.lang();
-      if (!needOptions) return;
+      if (!needOptions || !companyId) return;
       untracked(() => void this.loadConvertOptions(docType, companyId));
+    });
+
+    effect(() => {
+      const checkPayment = !this.isReadonly() && this.kind() === 'quotation';
+      const companyId = this.scope.company()?.id;
+      this.lang();
+      if (!checkPayment || !companyId) {
+        untracked(() => this.quotationPaymentTermsEmpty.set(false));
+        return;
+      }
+      untracked(() => void this.checkQuotationPaymentTerms(companyId));
     });
   }
 
@@ -332,6 +354,19 @@ export class TermsSection {
     } catch {
       if (seq !== this.optionsLoadSeq) return;
       this.termOptions.set(null);
+    }
+  }
+
+  private async checkQuotationPaymentTerms(companyId: string): Promise<void> {
+    const seq = ++this.paymentCheckSeq;
+    try {
+      const opts = await listTermOptions('QUOTATION', { companyId });
+      if (seq !== this.paymentCheckSeq) return;
+      const paymentOpts = opts?.byType?.PAYMENT;
+      this.quotationPaymentTermsEmpty.set(Array.isArray(paymentOpts) && paymentOpts.length === 0);
+    } catch {
+      if (seq !== this.paymentCheckSeq) return;
+      this.quotationPaymentTermsEmpty.set(false);
     }
   }
 }

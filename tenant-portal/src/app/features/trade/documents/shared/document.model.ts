@@ -1,4 +1,4 @@
-import type { TermSelections } from '../../shared/terms/terms.model';
+import type { TermSelections, TermType } from '../../shared/terms/terms.model';
 
 export type { TermSelections };
 
@@ -47,7 +47,7 @@ export interface TermsSnapshotLocale {
 }
 
 export interface TermsSnapshotSelection {
-  type: string;
+  type: TermType | (string & {});
   id: string;
   code: string;
   version: number;
@@ -57,6 +57,7 @@ export interface TermsSnapshotV2 {
   schemaVersion: 2;
   paymentTerms?: string;
   paymentTermCode?: string;
+  dueDays?: number;
   deliveryTerms?: string;
   incotermCode?: string;
   warrantyTerms?: string;
@@ -129,7 +130,7 @@ export interface TotalsEvidence {
 }
 
 export interface TotalsSnapshot extends TotalsEvidence {
-  currencyDecimalPlaces: number;
+  currencyDecimalPlaces?: number;
 }
 
 export interface LineEvidence {
@@ -293,11 +294,15 @@ export interface SalesOrderLine {
   id: string;
   clientLineId: string;
   itemCompanyProfileId: string;
-  /** pending backend run documents-order-line-item-id: the SO detail returns itemCompanyProfileId only (the PQ detail maps itemId). */
-  itemId?: string;
+  /** Optional item identifiers/names resolved when backend TR-D15 provides them. */
+  itemId?: string | null;
+  itemCode?: string | null;
+  itemLocalizedNames?: { en?: string; ar?: string } | null;
   printLineNumber: number | null;
   descriptionSnapshot: string | null;
   uomId: string;
+  uomCode?: string | null;
+  uomLocalizedNames?: { en?: string; ar?: string } | null;
   uomLabel: string;
   orderedQuantity: Dec;
   allocatedQuantity: Dec;
@@ -305,12 +310,12 @@ export interface SalesOrderLine {
   invoicedQuantity: Dec;
   cancelledQuantity: Dec;
   unitPrice: Dec;
-  discountTotal: Dec;
-  chargeTotal: Dec;
-  taxTotal: Dec;
+  discountTotal: Dec | null;
+  chargeTotal: Dec | null;
+  taxTotal: Dec | null;
   lineTotal: Dec;
   taxSnapshot: TaxSnapshot | null;
-  /** Display-only ("SKU · name"). Phase 5 resolves from the snapshot or item lookup. */
+  /** Display-only ("SKU · name"). Empty string when the backend omits item labels (D-1). */
   itemLabel: string;
 }
 
@@ -334,42 +339,43 @@ export interface DeliveryInfo {
 export interface PurchaseOrder extends DocumentHeaderBase {
   lifecycleStatus: PurchaseOrderStatus;
   approvalStatus: ApprovalStatus;
-  supplierAccountId: string;
-  receivingNodeId: string;
+  supplierAccountId: string | null;
+  receivingNodeId: string | null;
   dispatchStatus: DispatchStatus;
   fulfillmentStatus: string;
   billingStatus: string;
   termsSnapshot: TermsSnapshot | null;
   totalsSnapshot: TotalsSnapshot | null;
   sourcePurchaseQuotationId: string | null;
-  createdBy: string;
-  /** Fake-only convenience; real API has no such fields, and Phase 5 gets them from the approval receipt. */
-  submittedBy: string | null;
-  /** Fake-only convenience; real API has no such fields, and Phase 5 gets them from the approval receipt. */
-  submittedAt: string | null;
+  createdBy: string | null;
 }
 
 export interface PurchaseOrderLine {
   id: string;
   clientLineId: string;
   itemCompanyProfileId: string;
-  /** pending backend run documents-order-line-item-id: the PO detail returns itemCompanyProfileId only (the PQ detail maps itemId). */
-  itemId?: string;
+  /** Optional item identifiers/names resolved when backend TR-D15 provides them. */
+  itemId?: string | null;
+  itemCode?: string | null;
+  itemLocalizedNames?: { en?: string; ar?: string } | null;
   printLineNumber: number | null;
   descriptionSnapshot: string | null;
   uomId: string;
+  uomCode?: string | null;
+  uomLocalizedNames?: { en?: string; ar?: string } | null;
   uomLabel: string;
   orderedQuantity: Dec;
   receivedQuantity: Dec;
   cancelledQuantity: Dec;
   unitPrice: Dec;
-  chargeTotal: Dec;
-  taxTotal: Dec;
+  discountTotal?: Dec | null;
+  chargeTotal: Dec | null;
+  taxTotal: Dec | null;
   lineTotal: Dec;
   taxSnapshot: TaxSnapshot | null;
   expectedDate: string | null;
   receivingNodeId: string | null;
-  /** Display-only ("SKU · name"). Phase 5 resolves from the snapshot or item lookup. */
+  /** Display-only ("SKU · name"). Empty string when the backend omits item labels (D-1). */
   itemLabel: string;
 }
 
@@ -394,7 +400,7 @@ export interface PurchaseQuotation extends DocumentHeaderCore {
   lifecycleStatus: PurchaseQuotationStatus;
   reference: string | null;
   notes: string | null;
-  validUntil: string;
+  validUntil: string | null;
   finalizedAt: string | null;
   convertedPurchaseOrderId: string | null;
   termsSnapshot: TermsSnapshot | null;
@@ -412,7 +418,7 @@ export interface PurchaseQuotationLine {
   uomLabel: string;
   unitPrice: Dec;
   lineTotal: Dec;
-  descriptionSnapshot: string;
+  descriptionSnapshot: string | null;
   /** Display-only ("SKU · name"). Phase 5 resolves from the snapshot or item lookup. */
   itemLabel: string;
 }

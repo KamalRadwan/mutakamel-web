@@ -274,15 +274,23 @@ export class DocumentTable {
     return `${BADGE_BASE} ${STATUS_TONE_CLASSES[badge.tone]}`;
   }
 
+  protected badgeLabel(labelKey: string): string {
+    this.i18n();
+    const translated = this.transloco.translate(labelKey);
+    return translated && translated !== labelKey
+      ? translated
+      : this.transloco.translate('td.common.unknownStatus');
+  }
+
   protected validUntilText(row: AnyDocument): string {
     const kind = this.kind();
     const iso =
       kind === 'quotation'
         ? ((row as Quotation).currentRevision?.validUntil ?? '')
         : kind === 'purchase-quotation'
-          ? (row as PurchaseQuotation).validUntil
+          ? ((row as PurchaseQuotation).validUntil ?? '')
           : '';
-    return formatDate(iso, this.language());
+    return iso ? formatDate(iso, this.language()) : '—';
   }
 
   protected isPriceLockExpired(row: AnyDocument): boolean {

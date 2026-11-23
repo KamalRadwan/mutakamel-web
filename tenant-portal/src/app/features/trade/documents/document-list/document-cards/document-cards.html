@@ -82,10 +82,10 @@
 
         <div class="flex shrink-0 flex-col items-end justify-center gap-4">
           <div class="flex items-center gap-4">
-            <span [class]="badgeClass(badge)">{{ badge.labelKey | transloco }}</span>
+            <span [class]="badgeClass(badge)">{{ badgeLabel(badge.labelKey) }}</span>
             @if (isSalesOrderHeld(row)) {
               @let hold = holdBadge();
-              <span [class]="badgeClass(hold)">{{ hold.labelKey | transloco }}</span>
+              <span [class]="badgeClass(hold)">{{ badgeLabel(hold.labelKey) }}</span>
             }
             @if (isPriceLockExpired(row)) {
               <span
