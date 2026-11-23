@@ -14,7 +14,8 @@ export const FAKE_ME: AuthMe = {
   mfaEnabled: false,
   mfaUpdatedAt: null,
   status: 'ACTIVE',
+  workspace: { timezone: FAKE_TIME_ZONE, defaultLanguage: 'en' },
 };
 
-// FAKE-ONLY: /me has no time zone; the real source is still open.
-export const FAKE_USER = userFromMe(FAKE_ME, FAKE_TIME_ZONE);
+// Retained for feature fixtures until their owners retire the remaining imports.
+export const FAKE_USER = userFromMe(FAKE_ME);

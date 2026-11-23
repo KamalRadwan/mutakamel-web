@@ -340,6 +340,82 @@ describe('AuthSession', () => {
     expect(fakeSessionCallCounts()).toEqual({ me: 1, refresh: 0, logout: 0 });
   });
 
+  it('propagates authenticated identity and workspace settings through bootstrap and profile reload', async () => {
+    const profile: TenantMe = {
+      ...FAKE_TENANT_ME,
+      id: '019af27b-5e00-7000-8000-000000000001',
+      email: 'noura@example.com',
+      firstName: 'Noura',
+      lastName: 'Saleh',
+      workspace: { timezone: 'Pacific/Auckland', defaultLanguage: 'en' },
+    };
+    api.getMe.mockResolvedValueOnce(profile);
+    const session = TestBed.inject(AuthSession);
+    const current = TestBed.inject(CurrentUser);
+    expect(await settle(session.ensureLoaded())).toBe('signed-in');
+    expect(current.userId()).toBe(profile.id);
+    expect(current.timeZone()).toBe('Pacific/Auckland');
+    expect(session.me()?.workspace).toEqual(profile.workspace);
+
+    api.getMe.mockResolvedValueOnce({ ...profile, workspace: { timezone: 'Asia/Riyadh', defaultLanguage: 'ar' } });
+    await settle(session.reloadProfile(session.requestVersion()));
+    expect(current.timeZone()).toBe('Asia/Riyadh');
+    expect(session.me()?.workspace.defaultLanguage).toBe('ar');
+    expect(api.refreshSession).not.toHaveBeenCalled();
+    session.clearLocal();
+    expect(session.me()).toBeNull();
+    expect(current.userId()).toBe('');
+    expect(current.timeZone()).toBe('');
+  });
+
+  it('fails bootstrap on malformed workspace data and allows a real profile retry', async () => {
+    api.getMe.mockResolvedValueOnce({ ...FAKE_TENANT_ME, workspace: { timezone: 'Invalid/Zone', defaultLanguage: 'en' } });
+    const session = TestBed.inject(AuthSession);
+    const current = TestBed.inject(CurrentUser);
+    expect(await settle(session.ensureLoaded())).toBe('failed');
+    expect(session.me()).toBeNull();
+    expect(current.userId()).toBe('');
+    expect(current.timeZone()).toBe('');
+    expect(api.refreshSession).not.toHaveBeenCalled();
+    expect(await settle(session.ensureLoaded())).toBe('signed-in');
+    expect(current.timeZone()).toBe(FAKE_TENANT_ME.workspace.timezone);
+  });
+
+  it('keeps verified identity and timezone while retrying a malformed /me after renewal', async () => {
+    const session = TestBed.inject(AuthSession);
+    const current = TestBed.inject(CurrentUser);
+    await settle(session.ensureLoaded());
+    const previous = session.me();
+    const previousUser = current.user();
+    api.getMe.mockResolvedValueOnce({ ...FAKE_TENANT_ME, workspace: { timezone: '', defaultLanguage: 'en' } });
+    await expect(settle(session.refresh())).rejects.toMatchObject({ status: 502, code: 'COMMON.GENERIC.INTERNAL_ERROR' });
+    expect(session.status()).toBe('signed-in');
+    expect(session.renewal()).toBe('retrying');
+    expect(session.me()).toBe(previous);
+    expect(current.user()).toBe(previousUser);
+    const refreshCount = api.refreshSession.mock.calls.length;
+
+    api.getMe.mockResolvedValueOnce({ ...FAKE_TENANT_ME, workspace: { timezone: 'Asia/Dubai', defaultLanguage: 'en' } });
+    expect(await settle(session.refresh())).toBe('ok');
+    expect(current.timeZone()).toBe('Asia/Dubai');
+    expect(session.renewal()).toBe('ok');
+    expect(api.refreshSession).toHaveBeenCalledTimes(refreshCount);
+  });
+
+  it('does not restore identity or timezone when an in-flight /me finishes after logout', async () => {
+    let finish: ((me: TenantMe) => void) | undefined;
+    api.getMe.mockReturnValueOnce(new Promise<TenantMe>((resolve) => { finish = resolve; }));
+    const session = TestBed.inject(AuthSession);
+    const current = TestBed.inject(CurrentUser);
+    const loading = session.ensureLoaded();
+    session.clearLocal();
+    finish?.({ ...FAKE_TENANT_ME, workspace: { timezone: 'Asia/Dubai', defaultLanguage: 'en' } });
+    expect(await settle(loading)).toBe('signed-out');
+    expect(session.me()).toBeNull();
+    expect(current.userId()).toBe('');
+    expect(current.timeZone()).toBe('');
+  });
+
   it('refreshes once on 401 COMMON.AUTH.TOKEN_EXPIRED and succeeds', async () => {
     setFakeSessionNext('TOKEN_EXPIRED');
     const session = TestBed.inject(AuthSession);

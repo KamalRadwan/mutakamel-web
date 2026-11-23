@@ -1,6 +1,5 @@
 import { Service, computed, signal } from '@angular/core';
 import { type AuthMe, userFromMe } from './auth-me';
-import { FAKE_TIME_ZONE, FAKE_USER_ID } from './current-user.fake';
 
 export interface User {
   id?: string;
@@ -14,8 +13,9 @@ const UNVERIFIED_USER: User = { displayName: '', email: '' };
 @Service()
 export class CurrentUser {
   readonly user = signal<User>(UNVERIFIED_USER);
-  readonly userId = computed(() => this.user().id ?? FAKE_USER_ID);
-  readonly timeZone = computed(() => this.user().timeZone ?? FAKE_TIME_ZONE);
+  /** Empty means unavailable; never substitute another user's identity or timezone. */
+  readonly userId = computed(() => this.user().id ?? '');
+  readonly timeZone = computed(() => this.user().timeZone ?? '');
   readonly initials = computed(() =>
     this.user()
       .displayName.trim()
@@ -26,7 +26,7 @@ export class CurrentUser {
   );
 
   set(me: AuthMe): void {
-    this.user.set(userFromMe(me, FAKE_TIME_ZONE));
+    this.user.set(userFromMe(me));
   }
 
   reset(): void {

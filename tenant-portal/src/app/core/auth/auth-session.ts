@@ -401,8 +401,8 @@ export class AuthSession {
       return false;
     }
 
-    this._me.set(me);
     this.currentUser.set(me);
+    this._me.set(me);
     this.revision += 1;
     this.meNeedsRefresh = false;
     this.retryAt = 0;
