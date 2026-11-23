@@ -1,10 +1,16 @@
-<main class="relative flex min-h-screen items-center justify-center bg-bg p-16">
-  <ui-preferences class="absolute end-16 top-16" />
+<main class="login relative isolate grid items-center">
+  <ui-preferences class="login-preferences absolute z-2" />
 
-  <section class="flex w-login-card flex-col gap-16 rounded-14 border border-border bg-surface p-16 shadow-card">
-    <img [src]="logo()" [alt]="'auth.brand' | transloco" class="mx-auto h-login-logo w-auto" />
+  <section class="login-card grid bg-surface" aria-labelledby="auth-title">
+    @if (theme.current() === 'dark') {
+      <img class="login-logo w-auto max-w-full justify-self-center object-contain" ngSrc="assets/brand/logo-horizontal-light.png" width="775" height="239"
+        [alt]="'auth.brand' | transloco" priority />
+    } @else {
+      <img class="login-logo w-auto max-w-full justify-self-center object-contain" ngSrc="assets/brand/logo-horizontal-dark.png" width="780" height="258"
+        [alt]="'auth.brand' | transloco" priority />
+    }
 
-    <h1 class="text-center text-16 leading-24 font-medium text-text">{{ title() }}</h1>
+    <h1 id="auth-title" class="login-title text-center font-medium text-text">{{ title() }}</h1>
 
     @if (subtitle()) {
       <p class="text-center text-12 leading-18 text-text-muted">{{ subtitle() }}</p>
@@ -12,4 +18,20 @@
 
     <ng-content />
   </section>
+
+  <div class="login-intro self-start">
+    <p class="login-headline">
+      <span class="block">{{ 'auth.login.headline' | transloco }}</span>
+      <span class="block">{{ 'auth.login.headlineAccent' | transloco }}</span>
+    </p>
+    <p class="login-description">{{ 'auth.login.description' | transloco }}</p>
+  </div>
+
+  <div class="login-artwork pointer-events-none relative -z-10 self-stretch overflow-clip" aria-hidden="true">
+    <div class="login-ribbon">
+      <img [ngSrc]="ribbon()" alt="" fill priority />
+    </div>
+  </div>
+
+  <footer class="login-footer absolute text-12 text-text-muted">{{ 'auth.login.copyright' | transloco: { year: copyrightYear() } }}</footer>
 </main>

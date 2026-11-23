@@ -1,0 +1,9 @@
+.login-preferences {
+  --spacing-btn: 39px;
+  --spacing-8: 10px;
+  --text-12: 14px;
+  --surface: light-dark(#e6edfc, var(--surface-muted));
+  --border-field: light-dark(#bbc8e1, #37496b);
+  inset-block-start: clamp(16px, 2.6dvh, 25px);
+  inset-inline-end: clamp(16px, 2.5vw, 38px);
+}

@@ -89,7 +89,9 @@
       "upper": "A capital letter",
       "digit": "A number",
       "symbol": "A symbol, such as ! or #",
-      "match": "The two passwords match"
+      "match": "The two passwords match",
+      "met": "Met",
+      "notMet": "Not met"
     },
     "throttle": "Too many attempts. Try again in {{s}} seconds.",
     "throttleDone": "You can try again now.",

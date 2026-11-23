@@ -1,7 +1,8 @@
-import { Component, computed, input } from '@angular/core';
+import { Component, computed, input, signal, type OnChanges, type OnInit } from '@angular/core';
 import { provideTranslocoScope, TranslocoPipe } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { tablerCircle, tablerCircleCheck } from '@ng-icons/tabler-icons';
+import { tablerCircle } from '@ng-icons/tabler-icons';
+import { tablerCircleCheckFill } from '@ng-icons/tabler-icons/fill';
 import { passwordChecks } from '../password-policy';
 
 interface RuleRow {
@@ -13,13 +14,37 @@ interface RuleRow {
 @Component({
   selector: 'app-auth-password-rules',
   imports: [NgIcon, TranslocoPipe],
-  providers: [provideIcons({ tablerCircleCheck, tablerCircle })],
+  providers: [provideIcons({ tablerCircleCheckFill, tablerCircle })],
   viewProviders: [provideTranslocoScope('auth')],
   templateUrl: './password-rules.html',
+  styleUrl: './password-rules.css',
 })
-export class PasswordRules {
+export class PasswordRules implements OnChanges, OnInit {
   readonly password = input('');
   readonly confirm = input('');
+  protected readonly animating = signal<ReadonlySet<RuleRow['key']>>(new Set());
+  private previousMet: ReadonlySet<RuleRow['key']> | undefined;
+
+  ngOnInit(): void {
+    this.previousMet = new Set(this.rows().filter(row => row.met).map(row => row.key));
+  }
+
+  ngOnChanges(): void {
+    const met = this.rows().filter(row => row.met).map(row => row.key);
+    const previous = this.previousMet;
+    this.animating.update(active => new Set(met.filter(key =>
+      active.has(key) || previous?.has(key) === false,
+    )));
+    this.previousMet = new Set(met);
+  }
+
+  protected finishAnimation(key: RuleRow['key']): void {
+    this.animating.update(active => {
+      const remaining = new Set(active);
+      remaining.delete(key);
+      return remaining;
+    });
+  }
 
   protected readonly rows = computed<readonly RuleRow[]>(() => {
     const value = this.password();
