@@ -8,6 +8,8 @@ import { LanguageState } from '../../../../../../core/i18n/language';
 import { Button } from '../../../../../../shared/ui/button/button';
 import { Checkbox } from '../../../../../../shared/ui/checkbox/checkbox';
 import { Dropdown, DropdownOption } from '../../../../../../shared/ui/dropdown/dropdown';
+import { ColorPicker } from '../../../../../../shared/ui/color-picker/color-picker';
+import { designerColorSwatches } from '../../designer-color-swatches';
 import { Field } from '../../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../../shared/ui/modal/modal';
 import { Switch } from '../../../../../../shared/ui/switch/switch';
@@ -129,7 +131,17 @@ function finiteOrNull(val: number | undefined): number | null {
 
 @Component({
   selector: 'app-tpl-properties-modal',
-  imports: [FormField, TranslocoPipe, Button, Checkbox, Dropdown, Field, Modal, Switch],
+  imports: [
+    ColorPicker,
+    FormField,
+    TranslocoPipe,
+    Button,
+    Checkbox,
+    Dropdown,
+    Field,
+    Modal,
+    Switch,
+  ],
   providers: [provideIcons({ tablerAdjustmentsHorizontal, tablerCheck })],
   templateUrl: './properties-modal.html',
   host: { class: 'contents' },
@@ -189,7 +201,10 @@ export class PropertiesModal {
   private preservedGapPx: number | undefined;
   private preservedMargin: TemplateBoxSpacing | undefined;
 
+  protected readonly colorSwatches = signal<readonly string[] | null>(null);
+
   open(nodeId: string): void {
+    this.colorSwatches.set(designerColorSwatches(this.state.document()));
     const doc = this.state.document();
     const node = doc?.nodes[nodeId];
     if (!node) return;
@@ -232,9 +247,9 @@ export class PropertiesModal {
       padEnd: finiteOrNull(s.padding?.inlineEnd),
       padBottom: finiteOrNull(s.padding?.blockEnd),
       padStart: finiteOrNull(s.padding?.inlineStart),
-      lineThickness: node.type === 'divider' ? finiteOrNull(node.props.thicknessPx) ?? 1 : 1,
+      lineThickness: node.type === 'divider' ? (finiteOrNull(node.props.thicknessPx) ?? 1) : 1,
       lineColor: node.type === 'divider' ? node.props.color : DEFAULT_STROKE_COLOR,
-      spacerHeight: node.type === 'spacer' ? finiteOrNull(node.props.heightPx) ?? 0 : 12,
+      spacerHeight: node.type === 'spacer' ? (finiteOrNull(node.props.heightPx) ?? 0) : 12,
     });
 
     this.modal().open();
@@ -434,12 +449,19 @@ export class PropertiesModal {
     return true;
   });
 
-  protected swatchBg(raw: string): string | null {
-    const norm = normalizeSafeColor(raw);
-    return isValidSafeColor(norm) ? norm : null;
+  protected onColorInput(
+    key: 'textColor' | 'backgroundColor' | 'borderColor' | 'lineColor',
+    value: string | null,
+  ): void {
+    if (this.state.readOnly()) return;
+    this.propModel.update((m) => ({ ...m, [key]: value ?? '' }));
   }
 
   protected onColorBlur(target: 'text' | 'bg' | 'border' | 'line'): void {
+    if (this.state.readOnly()) return;
+    if (target === 'border' && this.propModel().borderColor.trim() === '') {
+      this.borderStyle.set('NONE');
+    }
     this.propModel.update((m) => {
       switch (target) {
         case 'text':

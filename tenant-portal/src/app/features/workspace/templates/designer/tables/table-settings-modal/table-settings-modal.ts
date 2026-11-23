@@ -20,6 +20,8 @@ import { Button } from '../../../../../../shared/ui/button/button';
 import { Checkbox } from '../../../../../../shared/ui/checkbox/checkbox';
 import { ConfirmDialog } from '../../../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { Dropdown, DropdownOption } from '../../../../../../shared/ui/dropdown/dropdown';
+import { ColorPicker } from '../../../../../../shared/ui/color-picker/color-picker';
+import { designerColorSwatches } from '../../designer-color-swatches';
 import { Field } from '../../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../../shared/ui/modal/modal';
 import type {
@@ -181,7 +183,18 @@ function fromStyleDraft(draft: EditableCellStyleDraft): TemplateTableCellStyle |
 
 @Component({
   selector: 'app-tpl-table-settings-modal',
-  imports: [NgTemplateOutlet, NgIcon, TranslocoPipe, Modal, Button, Dropdown, Field, Checkbox, ConfirmDialog],
+  imports: [
+    ColorPicker,
+    NgTemplateOutlet,
+    NgIcon,
+    TranslocoPipe,
+    Modal,
+    Button,
+    Dropdown,
+    Field,
+    Checkbox,
+    ConfirmDialog,
+  ],
   providers: [
     provideIcons({
       tablerTable,
@@ -482,7 +495,10 @@ export class TableSettingsModal {
     return true;
   });
 
+  protected readonly colorSwatches = signal<readonly string[] | null>(null);
+
   open(nodeId: string): void {
+    this.colorSwatches.set(designerColorSwatches(this.state.document()));
     const doc = this.state.document();
     const node = doc?.nodes[nodeId];
     if (!doc || !node || (node.type !== 'staticTable' && node.type !== 'dynamicTable')) return;
@@ -1131,6 +1147,11 @@ export class TableSettingsModal {
     key: 'color' | 'backgroundColor' | 'borderColor',
   ): void {
     const draft = target === 'header' ? this.headerStyleDraft() : this.cellStyleDraft();
+    if (this.readOnly()) return;
+    if (key === 'borderColor' && draft.borderColor.trim() === '') {
+      if (target === 'header') this.updateHeaderStyle('borderWidthPx', '');
+      else this.updateCellStyle('borderWidthPx', '');
+    }
     const norm = normalizeSafeColor(draft[key]);
     if (norm && norm !== draft[key]) {
       if (target === 'header') this.updateHeaderStyle(key, norm);
@@ -1188,8 +1209,13 @@ export class TableSettingsModal {
       : this.transloco.translate('tplTables.options.fontSizeError');
   }
 
-  protected swatchBackground(val: string): string | null {
-    return normalizeSafeColor(val) ?? null;
+  protected onStyleColorInput(
+    target: 'header' | 'cell',
+    key: 'color' | 'backgroundColor' | 'borderColor',
+    value: string | null,
+  ): void {
+    if (target === 'header') this.updateHeaderStyle(key, value ?? '');
+    else this.updateCellStyle(key, value ?? '');
   }
 
   protected cellSummary(val: TemplateTableCellValue): string {

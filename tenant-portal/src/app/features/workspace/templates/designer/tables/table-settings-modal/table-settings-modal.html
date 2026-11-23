@@ -986,50 +986,62 @@
     </ui-field>
 
     <ui-field
+      size="bare"
       [for]="prefix + '-color'"
       [label]="'tplTables.options.colorLabel' | transloco"
       [hint]="'tplTables.options.colorHint' | transloco"
       [error]="colorError(draft.color)"
     >
-      <span
-        class="size-badge shrink-0 rounded-4 border border-border"
-        [style.background-color]="swatchBackground(draft.color)"
-        aria-hidden="true"
-      ></span>
-      <input
+      <ui-color-picker
         [id]="prefix + '-color'"
-        type="text"
-        dir="ltr"
         placeholder="#12141C"
+        [ariaLabel]="'tplTables.options.colorLabel' | transloco"
+        [describedBy]="
+          prefix +
+          '-color' +
+          '-hint' +
+          (colorError(draft.color) ? ' ' + prefix + '-color' + '-error' : '')
+        "
+        [allowAlpha]="true"
+        [nullable]="true"
+        [swatches]="colorSwatches()"
         [readonly]="readOnly()"
-        class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [invalid]="colorError(draft.color) !== null"
+        [suppressInlineError]="true"
         [value]="draft.color"
-        (input)="onStyleInput(target, 'color', $event)"
-        (blur)="normalizeColorField(target, 'color')"
+        (valueChange)="onStyleColorInput(target, 'color', $event)"
+        (rawValueChange)="onStyleColorInput(target, 'color', $event)"
+        (touch)="normalizeColorField(target, 'color')"
       />
     </ui-field>
 
     <ui-field
+      size="bare"
       [for]="prefix + '-bg'"
       [label]="'tplTables.options.backgroundLabel' | transloco"
       [hint]="'tplTables.options.backgroundHint' | transloco"
       [error]="colorError(draft.backgroundColor)"
     >
-      <span
-        class="size-badge shrink-0 rounded-4 border border-border"
-        [style.background-color]="swatchBackground(draft.backgroundColor)"
-        aria-hidden="true"
-      ></span>
-      <input
+      <ui-color-picker
         [id]="prefix + '-bg'"
-        type="text"
-        dir="ltr"
         placeholder="#FFFFFF"
+        [ariaLabel]="'tplTables.options.backgroundLabel' | transloco"
+        [describedBy]="
+          prefix +
+          '-bg' +
+          '-hint' +
+          (colorError(draft.backgroundColor) ? ' ' + prefix + '-bg' + '-error' : '')
+        "
+        [allowAlpha]="true"
+        [nullable]="true"
+        [swatches]="colorSwatches()"
         [readonly]="readOnly()"
-        class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [invalid]="colorError(draft.backgroundColor) !== null"
+        [suppressInlineError]="true"
         [value]="draft.backgroundColor"
-        (input)="onStyleInput(target, 'backgroundColor', $event)"
-        (blur)="normalizeColorField(target, 'backgroundColor')"
+        (valueChange)="onStyleColorInput(target, 'backgroundColor', $event)"
+        (rawValueChange)="onStyleColorInput(target, 'backgroundColor', $event)"
+        (touch)="normalizeColorField(target, 'backgroundColor')"
       />
     </ui-field>
 
@@ -1133,26 +1145,32 @@
     </ui-field>
 
     <ui-field
+      size="bare"
       [for]="prefix + '-bc'"
       [label]="'tplTables.options.borderColorLabel' | transloco"
       [hint]="'tplTables.options.borderColorHint' | transloco"
       [error]="borderColorError(draft)"
     >
-      <span
-        class="size-badge shrink-0 rounded-4 border border-border"
-        [style.background-color]="swatchBackground(draft.borderColor)"
-        aria-hidden="true"
-      ></span>
-      <input
+      <ui-color-picker
         [id]="prefix + '-bc'"
-        type="text"
-        dir="ltr"
         placeholder="#E4E7EC"
+        [ariaLabel]="'tplTables.options.borderColorLabel' | transloco"
+        [describedBy]="
+          prefix +
+          '-bc' +
+          '-hint' +
+          (borderColorError(draft) ? ' ' + prefix + '-bc' + '-error' : '')
+        "
+        [allowAlpha]="true"
+        [nullable]="true"
+        [swatches]="colorSwatches()"
         [readonly]="readOnly()"
-        class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [invalid]="borderColorError(draft) !== null"
+        [suppressInlineError]="true"
         [value]="draft.borderColor"
-        (input)="onStyleInput(target, 'borderColor', $event)"
-        (blur)="normalizeColorField(target, 'borderColor')"
+        (valueChange)="onStyleColorInput(target, 'borderColor', $event)"
+        (rawValueChange)="onStyleColorInput(target, 'borderColor', $event)"
+        (touch)="normalizeColorField(target, 'borderColor')"
       />
     </ui-field>
   </div>

@@ -167,24 +167,31 @@
 
           @if (allowsStyle('color')) {
             <ui-field
+              size="bare"
               for="tpl-prop-text-color"
               [label]="'tplFields.properties.text.color' | transloco"
               [hint]="'tplFields.properties.text.colorHint' | transloco"
               [error]="textColorError()"
             >
-              <span
-                class="size-badge shrink-0 rounded-4 border border-border-field"
-                [style.background-color]="swatchBg(propModel().textColor)"
-                aria-hidden="true"
-              ></span>
-              <input
+              <ui-color-picker
                 id="tpl-prop-text-color"
-                type="text"
-                dir="ltr"
                 placeholder="#12141C"
-                class="min-w-0 flex-1 bg-transparent text-start text-text outline-none placeholder:text-text-placeholder"
-                [formField]="propForm.textColor"
-                (blur)="onColorBlur('text')"
+                [ariaLabel]="'tplFields.properties.text.color' | transloco"
+                [describedBy]="
+                  'tpl-prop-text-color' +
+                  '-hint' +
+                  (textColorError() ? ' ' + 'tpl-prop-text-color' + '-error' : '')
+                "
+                [allowAlpha]="true"
+                [nullable]="true"
+                [swatches]="colorSwatches()"
+                [readonly]="state.readOnly()"
+                [invalid]="textColorError() !== null"
+                [suppressInlineError]="true"
+                [value]="propModel().textColor"
+                (valueChange)="onColorInput('textColor', $event)"
+                (rawValueChange)="onColorInput('textColor', $event)"
+                (touch)="onColorBlur('text')"
               />
             </ui-field>
           }
@@ -278,24 +285,31 @@
         <div class="grid grid-cols-2 items-start gap-10">
           @if (allowsStyle('backgroundColor')) {
             <ui-field
+              size="bare"
               for="tpl-prop-bg-color"
               [label]="'tplFields.properties.box.backgroundColor' | transloco"
               [hint]="'tplFields.properties.box.backgroundColorHint' | transloco"
               [error]="bgColorError()"
             >
-              <span
-                class="size-badge shrink-0 rounded-4 border border-border-field"
-                [style.background-color]="swatchBg(propModel().backgroundColor)"
-                aria-hidden="true"
-              ></span>
-              <input
+              <ui-color-picker
                 id="tpl-prop-bg-color"
-                type="text"
-                dir="ltr"
                 placeholder="#FFFFFF"
-                class="min-w-0 flex-1 bg-transparent text-start text-text outline-none placeholder:text-text-placeholder"
-                [formField]="propForm.backgroundColor"
-                (blur)="onColorBlur('bg')"
+                [ariaLabel]="'tplFields.properties.box.backgroundColor' | transloco"
+                [describedBy]="
+                  'tpl-prop-bg-color' +
+                  '-hint' +
+                  (bgColorError() ? ' ' + 'tpl-prop-bg-color' + '-error' : '')
+                "
+                [allowAlpha]="true"
+                [nullable]="true"
+                [swatches]="colorSwatches()"
+                [readonly]="state.readOnly()"
+                [invalid]="bgColorError() !== null"
+                [suppressInlineError]="true"
+                [value]="propModel().backgroundColor"
+                (valueChange)="onColorInput('backgroundColor', $event)"
+                (rawValueChange)="onColorInput('backgroundColor', $event)"
+                (touch)="onColorBlur('bg')"
               />
             </ui-field>
           }
@@ -356,24 +370,31 @@
             </ui-field>
 
             <ui-field
+              size="bare"
               for="tpl-prop-border-color"
               [label]="'tplFields.properties.box.borderColor' | transloco"
               [hint]="'tplFields.properties.box.borderColorHint' | transloco"
               [error]="borderColorError()"
             >
-              <span
-                class="size-badge shrink-0 rounded-4 border border-border-field"
-                [style.background-color]="swatchBg(propModel().borderColor)"
-                aria-hidden="true"
-              ></span>
-              <input
+              <ui-color-picker
                 id="tpl-prop-border-color"
-                type="text"
-                dir="ltr"
                 placeholder="#E4E7EC"
-                class="min-w-0 flex-1 bg-transparent text-start text-text outline-none placeholder:text-text-placeholder"
-                [formField]="propForm.borderColor"
-                (blur)="onColorBlur('border')"
+                [ariaLabel]="'tplFields.properties.box.borderColor' | transloco"
+                [describedBy]="
+                  'tpl-prop-border-color' +
+                  '-hint' +
+                  (borderColorError() ? ' ' + 'tpl-prop-border-color' + '-error' : '')
+                "
+                [allowAlpha]="true"
+                [nullable]="true"
+                [swatches]="colorSwatches()"
+                [readonly]="state.readOnly()"
+                [invalid]="borderColorError() !== null"
+                [suppressInlineError]="true"
+                [value]="propModel().borderColor"
+                (valueChange)="onColorInput('borderColor', $event)"
+                (rawValueChange)="onColorInput('borderColor', $event)"
+                (touch)="onColorBlur('border')"
               />
             </ui-field>
           }
@@ -576,25 +597,32 @@
           </ui-field>
 
           <ui-field
+            size="bare"
             for="tpl-prop-line-color"
             [label]="'tplFields.properties.line.color' | transloco"
             [hint]="'tplFields.properties.line.colorHint' | transloco"
             [required]="true"
             [error]="lineColorError()"
           >
-            <span
-              class="size-badge shrink-0 rounded-4 border border-border-field"
-              [style.background-color]="swatchBg(propModel().lineColor)"
-              aria-hidden="true"
-            ></span>
-            <input
+            <ui-color-picker
               id="tpl-prop-line-color"
-              type="text"
-              dir="ltr"
               placeholder="#E4E7EC"
-              class="min-w-0 flex-1 bg-transparent text-start text-text outline-none placeholder:text-text-placeholder"
-              [formField]="propForm.lineColor"
-              (blur)="onColorBlur('line')"
+              [ariaLabel]="'tplFields.properties.line.color' | transloco"
+              [describedBy]="
+                'tpl-prop-line-color' +
+                '-hint' +
+                (lineColorError() ? ' ' + 'tpl-prop-line-color' + '-error' : '')
+              "
+              [allowAlpha]="true"
+              [nullable]="false"
+              [swatches]="colorSwatches()"
+              [readonly]="state.readOnly()"
+              [invalid]="lineColorError() !== null"
+              [suppressInlineError]="true"
+              [value]="propModel().lineColor"
+              (valueChange)="onColorInput('lineColor', $event)"
+              (rawValueChange)="onColorInput('lineColor', $event)"
+              (touch)="onColorBlur('line')"
             />
           </ui-field>
         </div>

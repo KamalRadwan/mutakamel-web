@@ -196,24 +196,31 @@
 
         @if (bgMode() === 'SOLID') {
           <ui-field
+            size="bare"
             for="tpl-ps-bg-color"
             [label]="'tplFields.pageSetup.backgroundColor' | transloco"
             [hint]="'tplFields.pageSetup.backgroundColorHint' | transloco"
             [error]="bgColorError()"
           >
-            <span
-              class="size-badge shrink-0 rounded-4 border border-border-field"
-              [style.background-color]="swatchBg()"
-              aria-hidden="true"
-            ></span>
-            <input
+            <ui-color-picker
               id="tpl-ps-bg-color"
-              type="text"
-              dir="ltr"
               placeholder="#FFFFFF"
-              class="min-w-0 flex-1 bg-transparent text-start text-text outline-none placeholder:text-text-placeholder"
-              [formField]="pageForm.bgColor"
-              (blur)="onBgColorBlur()"
+              [ariaLabel]="'tplFields.pageSetup.backgroundColor' | transloco"
+              [describedBy]="
+                'tpl-ps-bg-color' +
+                '-hint' +
+                (bgColorError() ? ' ' + 'tpl-ps-bg-color' + '-error' : '')
+              "
+              [allowAlpha]="true"
+              [nullable]="true"
+              [swatches]="colorSwatches()"
+              [readonly]="state.readOnly()"
+              [invalid]="bgColorError() !== null"
+              [suppressInlineError]="true"
+              [value]="pageModel().bgColor"
+              (valueChange)="onBgColorInput($event)"
+              (rawValueChange)="onBgColorInput($event)"
+              (touch)="onBgColorBlur()"
             />
           </ui-field>
         }

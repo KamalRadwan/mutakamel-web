@@ -8,6 +8,8 @@ import { LanguageState } from '../../../../../../core/i18n/language';
 import { Button } from '../../../../../../shared/ui/button/button';
 import { Checkbox } from '../../../../../../shared/ui/checkbox/checkbox';
 import { Dropdown, DropdownOption } from '../../../../../../shared/ui/dropdown/dropdown';
+import { ColorPicker } from '../../../../../../shared/ui/color-picker/color-picker';
+import { designerColorSwatches } from '../../designer-color-swatches';
 import { Field } from '../../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../../shared/ui/modal/modal';
 import type {
@@ -39,6 +41,7 @@ interface PageSetupFormModel {
 @Component({
   selector: 'app-tpl-page-setup-modal',
   imports: [
+    ColorPicker,
     FormField,
     NgIcon, TranslocoPipe, Button, Checkbox, Dropdown, Field, Modal,
     TemplatePageDiagram,
@@ -113,7 +116,10 @@ export class PageSetupModal {
 
   private preservedAssetBg: TemplatePageBackground | null = null;
 
+  protected readonly colorSwatches = signal<readonly string[] | null>(null);
+
   open(): void {
+    this.colorSwatches.set(designerColorSwatches(this.state.document()));
     const doc = this.state.document();
     const page = this.state.currentPage();
     if (!doc || !page || this.state.channel() !== 'PRINT') return;
@@ -336,9 +342,9 @@ export class PageSetupModal {
     return true;
   });
 
-  protected swatchBg(): string | null {
-    const norm = normalizeSafeColor(this.pageModel().bgColor);
-    return isValidSafeColor(norm) ? norm : null;
+  protected onBgColorInput(value: string | null): void {
+    if (this.state.readOnly()) return;
+    this.pageModel.update((m) => ({ ...m, bgColor: value ?? '' }));
   }
 
   protected onPresetChange(next: TemplatePagePreset): void {
@@ -362,6 +368,8 @@ export class PageSetupModal {
   }
 
   protected onBgColorBlur(): void {
+    if (this.state.readOnly()) return;
+    if (this.pageModel().bgColor.trim() === '') this.bgMode.set('NONE');
     this.pageModel.update((m) => ({ ...m, bgColor: normalizeSafeColor(m.bgColor) }));
   }
 

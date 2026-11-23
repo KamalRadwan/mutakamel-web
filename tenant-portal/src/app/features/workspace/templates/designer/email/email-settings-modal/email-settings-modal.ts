@@ -4,6 +4,8 @@ import { provideIcons } from '@ng-icons/core';
 import { tablerMail } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../../../core/i18n/language';
 import { Button } from '../../../../../../shared/ui/button/button';
+import { ColorPicker } from '../../../../../../shared/ui/color-picker/color-picker';
+import { designerColorSwatches } from '../../designer-color-swatches';
 import { Field } from '../../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../../shared/ui/modal/modal';
 import type { TemplateBinding, TemplateEmailConfig, TemplateTextTemplate } from '../../../templates.model';
@@ -27,7 +29,7 @@ let nextModalId = 0;
 
 @Component({
   selector: 'app-tpl-email-settings-modal',
-  imports: [TranslocoPipe, Button, Field, Modal, TextTemplateInput],
+  imports: [ColorPicker, TranslocoPipe, Button, Field, Modal, TextTemplateInput],
   providers: [provideIcons({ tablerMail })],
   templateUrl: './email-settings-modal.html',
 })
@@ -55,8 +57,6 @@ export class EmailSettingsModal {
   private readonly backgroundTouched = signal(false);
 
   protected readonly readOnly = computed(() => this.state.readOnly());
-
-  protected readonly validSwatchColor = computed(() => normalizeSafeColor(this.backgroundRaw()) ?? null);
 
   protected readonly subjectError = computed(() => {
     this.language();
@@ -101,7 +101,10 @@ export class EmailSettingsModal {
     return isValidSafeColor(trimmed) ? null : this.transloco.translate('tplEmail.background.invalid');
   });
 
+  protected readonly colorSwatches = signal<readonly string[] | null>(null);
+
   open(): void {
+    this.colorSwatches.set(designerColorSwatches(this.state.document()));
     const email = this.state.document()?.email;
     this.subject.set(email?.subject ? structuredClone(email.subject) : null);
     this.preheader.set(email?.preheader ? structuredClone(email.preheader) : null);
@@ -126,9 +129,9 @@ export class EmailSettingsModal {
     this.widthTouched.set(true);
   }
 
-  protected onBackgroundInput(event: Event): void {
+  protected onBackgroundInput(value: string | null): void {
     if (this.readOnly()) return;
-    this.backgroundRaw.set((event.target as HTMLInputElement).value);
+    this.backgroundRaw.set(value ?? '');
   }
 
   protected onBackgroundBlur(): void {

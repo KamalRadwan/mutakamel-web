@@ -68,28 +68,29 @@
 
     <div class="col-span-1 min-w-0">
       <ui-field
+        size="bare"
         [for]="uid + '-bg'"
         [label]="'tplEmail.background.label' | transloco"
         [hint]="'tplEmail.background.hint' | transloco"
         [error]="backgroundError()"
       >
-        <span
-          class="size-badge shrink-0 rounded-4 border border-border"
-          [class.bg-neutral-soft]="!validSwatchColor()"
-          [style.background-color]="validSwatchColor()"
-          aria-hidden="true"
-        ></span>
-        <input
+        <ui-color-picker
           [id]="uid + '-bg'"
-          type="text"
-          dir="ltr"
           placeholder="#F5F7FA"
+          [ariaLabel]="'tplEmail.background.label' | transloco"
+          [describedBy]="
+            uid + '-bg' + '-hint' + (backgroundError() ? ' ' + uid + '-bg' + '-error' : '')
+          "
+          [allowAlpha]="true"
+          [nullable]="true"
+          [swatches]="colorSwatches()"
           [readonly]="readOnly()"
+          [invalid]="backgroundError() !== null"
+          [suppressInlineError]="true"
           [value]="backgroundRaw()"
-          [attr.aria-invalid]="backgroundError() ? 'true' : null"
-          class="min-w-0 flex-1 bg-transparent text-start text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
-          (input)="onBackgroundInput($event)"
-          (blur)="onBackgroundBlur()"
+          (valueChange)="onBackgroundInput($event)"
+          (rawValueChange)="onBackgroundInput($event)"
+          (touch)="onBackgroundBlur()"
         />
       </ui-field>
     </div>
