@@ -28,6 +28,7 @@ import { CRM_LEADS_BULK_MODULE } from './features/crm/leads/lead-bulk/leads-bulk
 import { CRM_OPPORTUNITIES_BULK_MODULE } from './features/crm/opportunities/opportunity-bulk/opportunities-bulk.descriptor';
 import { TRADE_ITEMS_BULK_MODULE } from './features/trade/foundation/items/item-bulk/items-bulk.descriptor';
 import { TRADE_ACCOUNTS_BULK_MODULE } from './features/trade/foundation/commercial-accounts/account-bulk/accounts-bulk.descriptor';
+import { TRADE_DOCUMENT_BULK_MODULES } from './features/trade/documents/document-bulk/documents-bulk.descriptor';
 import { provideAutomationBulkModules } from './features/trade/automation/automation-bulk-modules';
 import { bindBulkJobsApi, BulkJobsApi } from './shared/bulk-jobs/bulk-jobs.api';
 import { bindSeatPreviewApi, SeatPreviewApi } from './features/workspace/seats/seats.api';
@@ -54,6 +55,7 @@ export const appConfig: ApplicationConfig = {
       CRM_CUSTOMERS_BULK_MODULE,
       TRADE_ITEMS_BULK_MODULE,
       TRADE_ACCOUNTS_BULK_MODULE,
+      ...TRADE_DOCUMENT_BULK_MODULES,
     ]),
     provideAutomationBulkModules(),
     provideAppInitializer(() => {

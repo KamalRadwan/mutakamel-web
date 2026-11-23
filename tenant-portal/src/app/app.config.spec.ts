@@ -96,7 +96,7 @@ describe('app infrastructure registration', () => {
     socket.disconnect();
   });
 
-  it('retains Core, CRM, Trade and automation descriptors without registering Accounting', () => {
+  it('retains Core, CRM, Trade document and automation descriptors without registering Accounting', () => {
     const descriptors = TestBed.inject(BULK_JOB_MODULES);
     expect(descriptors.map(({ module }) => module)).toEqual([
       'core.users',
@@ -105,6 +105,10 @@ describe('app infrastructure registration', () => {
       'crm.customer_profiles',
       'trading.items',
       'trading.commercial-accounts',
+      'trading.quotations',
+      'trading.sales-orders',
+      'trading.purchase-orders',
+      'trading.purchase-quotations',
       'trading.catalog-import',
       'trading.control-tower-exceptions',
     ]);
