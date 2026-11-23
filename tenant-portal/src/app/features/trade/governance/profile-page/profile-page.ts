@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component, DestroyRef, computed, inject, signal, viewChild } from '@angular/core';
+import { ChangeDetectorRef, Component, DestroyRef, Injector, computed, inject, signal, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { translationEvents } from '../../../../core/i18n/translation-events';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -16,16 +16,28 @@ import {
 } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
+import { ScopeState } from '../../../../core/scope/scope';
+import { TenantScopeState } from '../../../../core/scope/tenant-scope';
 import { Badge } from '../../../../shared/ui/badge/badge';
 import { Button } from '../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { DateField } from '../../../../shared/ui/date-time/date-field';
 import { TimeField } from '../../../../shared/ui/date-time/time-field';
 import { Field } from '../../../../shared/ui/field/field';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { Modal } from '../../../../shared/ui/modal/modal';
 import { Segmented, type SegmentedOption } from '../../../../shared/ui/segmented/segmented';
-import { ApiError, errorCodeOf, newIdempotencyKey } from '../../shared/trade-api';
-import { actorDisplayName, getFakeActor, governanceErrorKey } from '../governance-fake-actors';
+import { type TradeContext, errorCodeOf, newIdempotencyKey, tradeContext } from '../../shared/trade-api';
+import {
+  PROFILE_PERMISSIONS,
+  hasProfileReadGrant,
+  hasProfileScopeGrant,
+  isActivePointerStaleError,
+  isForbiddenError,
+  isPublicationUnavailableError,
+  profileActorDisplayName,
+  resolveProfileErrorMessage,
+} from '../document-profiles-page/profile-access';
 import { ConflictDialog } from '../governance-shared/conflict-dialog/conflict-dialog';
 import {
   type GovernedRow,
@@ -34,11 +46,21 @@ import {
   GovernedVersionsTable,
 } from '../governance-shared/governed-versions-table/governed-versions-table';
 import { ScopeChip } from '../governance-shared/scope-chip/scope-chip';
+import type { ScopeTarget } from '../policy.model';
 import { formatDateOnly } from '../pricing.service';
 import { deleteVersion, getProfile, publishVersion, validateVersion } from '../profiles.api';
 import type { DocumentProfile, ProfileVersion } from '../profiles.model';
 
-const CAN = { manage: true, test: true, approve: true, publish: true }; // later from the session
+const PARAM_TO_SCOPE: Readonly<Record<string, ScopeTarget>> = {
+  tenant: 'TENANT',
+  company: 'COMPANY',
+  branch: 'BRANCH',
+};
+
+function parseScopeParam(raw: string | null): ScopeTarget {
+  if (!raw) return 'COMPANY';
+  return PARAM_TO_SCOPE[raw.trim().toLowerCase()] ?? 'COMPANY';
+}
 
 function pad2(n: number): string {
   return String(n).padStart(2, '0');
@@ -82,6 +104,7 @@ function localPartsToUtcIso(dateStr: string | null, timeStr: string | null): str
     ConfirmDialog,
     DateField,
     Field,
+    FullState,
     Modal,
     Segmented,
     TimeField,
@@ -112,6 +135,9 @@ export class ProfilePage {
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly injector = inject(Injector);
+  private readonly scopeState = inject(ScopeState);
+  private readonly tenantScope = inject(TenantScopeState);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
@@ -122,12 +148,55 @@ export class ProfilePage {
   private readonly deleteDraftDialog = viewChild.required<ConfirmDialog>('deleteDraftDialog');
   private readonly conflictDialog = viewChild.required(ConflictDialog);
 
-  protected readonly can = CAN;
   protected readonly profileId = signal('');
+  protected readonly scopeParam = signal<ScopeTarget>('COMPANY');
   protected readonly profile = signal<DocumentProfile | null>(null);
   protected readonly loading = signal(true);
   protected readonly loadFailed = signal(false);
   protected readonly busy = signal(false);
+  protected readonly forbidden = signal(false);
+  protected readonly publicationUnavailable = signal(false);
+  protected readonly conflictMode = signal<'versionStale' | 'pointerStale'>('versionStale');
+
+  protected readonly effectiveScopeTarget = computed<ScopeTarget>(
+    () => this.profile()?.scopeTarget ?? this.scopeParam(),
+  );
+  protected readonly ctx = computed<TradeContext>(() =>
+    tradeContext(this.scopeState, this.effectiveScopeTarget()),
+  );
+  protected readonly canRead = computed(() => hasProfileReadGrant(this.injector));
+  protected readonly isForbidden = computed(() => !this.canRead() || this.forbidden());
+  protected readonly canManage = computed(
+    () =>
+      !this.isForbidden() &&
+      hasProfileScopeGrant(
+        this.injector,
+        this.scopeState,
+        PROFILE_PERMISSIONS.manage,
+        this.effectiveScopeTarget(),
+      ),
+  );
+  protected readonly canValidate = computed(
+    () =>
+      !this.isForbidden() &&
+      hasProfileScopeGrant(
+        this.injector,
+        this.scopeState,
+        PROFILE_PERMISSIONS.validate,
+        this.effectiveScopeTarget(),
+      ),
+  );
+  protected readonly canPublish = computed(
+    () =>
+      !this.isForbidden() &&
+      hasProfileScopeGrant(
+        this.injector,
+        this.scopeState,
+        PROFILE_PERMISSIONS.publish,
+        this.effectiveScopeTarget(),
+      ),
+  );
+  protected readonly currentUserId = computed(() => this.tenantScope.me()?.id ?? '');
 
   // New version modal state
   protected readonly fromDate = signal<string | null>(null);
@@ -146,6 +215,8 @@ export class ProfilePage {
   private loadSeq = 0;
   private publishFingerprint = '';
   private publishIdempotencyKey = '';
+  private stalePublishVersionId: string | null = null;
+  private pendingRefetch: Promise<boolean> | null = null;
 
   protected readonly liveVersion = computed<ProfileVersion | null>(() => {
     const p = this.profile();
@@ -159,13 +230,17 @@ export class ProfilePage {
 
   protected readonly versionRows = computed<GovernedRow[]>(() => {
     this.i18n();
-    const language = this.lang();
     const p = this.profile();
     if (!p) return [];
-    const currentActor = getFakeActor();
+    const me = this.tenantScope.me();
+    const currentActor = this.currentUserId();
+    const byId = new Map(p.versions.map((v) => [v.id, v]));
 
     return p.versions.map((ver) => {
-      const isSelf = ver.authorUserId === currentActor;
+      const isSelf = Boolean(currentActor && ver.authorUserId === currentActor);
+      const supersededByVersionNumber = ver.supersededByVersionId
+        ? (byId.get(ver.supersededByVersionId)?.profileVersion ?? null)
+        : null;
       const actions: GovernedRowAction[] = [
         {
           key: 'open',
@@ -175,7 +250,7 @@ export class ProfilePage {
         },
       ];
 
-      if (ver.status === 'DRAFT' && this.can.test) {
+      if (ver.status === 'DRAFT' && this.canValidate()) {
         actions.push({
           key: 'validate',
           title: this.transloco.translate('profiles.actions.validate'),
@@ -185,7 +260,7 @@ export class ProfilePage {
         });
       }
 
-      if (ver.status === 'TESTED' && this.can.publish) {
+      if (ver.status === 'TESTED' && this.canPublish()) {
         actions.push({
           key: 'publish',
           title: this.transloco.translate('governance.versionsTable.actionsList.publish'),
@@ -196,7 +271,7 @@ export class ProfilePage {
         });
       }
 
-      if (ver.status === 'DRAFT' && this.can.manage) {
+      if (ver.status === 'DRAFT' && this.canManage()) {
         actions.push({
           key: 'deleteDraft',
           title: this.transloco.translate('governance.versionsTable.actionsList.deleteDraft'),
@@ -211,9 +286,10 @@ export class ProfilePage {
         id: ver.id,
         versionNumber: ver.profileVersion,
         status: ver.status,
+        supersededByVersionNumber,
         effectiveFrom: ver.effectiveFrom,
-        effectiveTo: ver.effectiveTo,
-        byPrimary: actorDisplayName(ver.authorUserId, language),
+        effectiveTo: ver.supersededAt ?? ver.effectiveTo,
+        byPrimary: profileActorDisplayName(ver.authorUserId, me),
         byIsMe: isSelf,
         actions,
       };
@@ -306,15 +382,19 @@ export class ProfilePage {
     this.i18n();
     const target = this.publishingTarget();
     if (!target) return '';
-    const author = actorDisplayName(target.authorUserId, this.lang());
+    const author = profileActorDisplayName(target.authorUserId, this.tenantScope.me());
     return this.transloco.translate('profiles.publishModal.makerCheckerAuthor', { author });
   });
 
   constructor() {
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((query) => {
+      const nextScope = parseScopeParam(query.get('scope'));
+      if (nextScope !== this.scopeParam()) {
+        this.scopeParam.set(nextScope);
+      }
       if (query.get('newVersion') === '1') {
         this.pendingOpenNewVersion = true;
-        if (this.profile() && !this.loading() && !this.loadFailed() && this.can.manage) {
+        if (this.profile() && !this.loading() && !this.loadFailed() && this.canManage()) {
           this.consumePendingNewVersion();
         }
       }
@@ -334,13 +414,27 @@ export class ProfilePage {
     });
   }
 
+  protected goHome(): void {
+    void this.router.navigate(['/']);
+  }
+
   protected goBack(): void {
-    void this.router.navigate(['/trade/governance/document-profiles']);
+    const scope = this.effectiveScopeTarget() === 'TENANT' ? 'tenant' : undefined;
+    void this.router.navigate(['/trade/governance/document-profiles'], {
+      ...(scope ? { queryParams: { scope } } : {}),
+    });
+  }
+
+  protected retryFromUnavailable(): void {
+    this.publicationUnavailable.set(false);
+    this.reload();
   }
 
   protected reload(): void {
     const id = this.profileId();
-    if (id) {
+    if (id && this.canRead()) {
+      this.forbidden.set(false);
+      this.publicationUnavailable.set(false);
       void this.load(id);
     }
   }
@@ -348,11 +442,14 @@ export class ProfilePage {
   protected openVersion(versionId: string): void {
     const id = this.profileId();
     if (!id) return;
-    void this.router.navigate(['/trade/governance/document-profiles', id, 'versions', versionId]);
+    const scope = this.effectiveScopeTarget() === 'TENANT' ? 'tenant' : undefined;
+    void this.router.navigate(['/trade/governance/document-profiles', id, 'versions', versionId], {
+      ...(scope ? { queryParams: { scope } } : {}),
+    });
   }
 
   protected openNewVersionModal(): void {
-    if (!this.can.manage || !this.profile()) return;
+    if (!this.canManage() || !this.profile()) return;
     this.fromDate.set(localTodayStr());
     this.fromTime.set('00:00');
     this.toDate.set(null);
@@ -411,12 +508,14 @@ export class ProfilePage {
 
     const live = this.liveVersion();
     const fromId = this.startFrom() === 'live' && live ? live.id : null;
+    const scope = this.effectiveScopeTarget() === 'TENANT' ? 'tenant' : undefined;
     this.newVersionModal().close();
     void this.router.navigate(['/trade/governance/document-profiles', p.id, 'versions', 'new'], {
       queryParams: {
         ...(fromId ? { from: fromId } : {}),
         effectiveFrom: fromIso,
         ...(toIso ? { effectiveTo: toIso } : {}),
+        ...(scope ? { scope } : {}),
       },
     });
   }
@@ -456,7 +555,7 @@ export class ProfilePage {
   protected async confirmPublish(): Promise<void> {
     const p = this.profile();
     const target = this.publishingTarget();
-    if (!p || !target || this.publishing() || !this.can.publish) return;
+    if (!p || !target || this.publishing() || !this.canPublish()) return;
 
     const fingerprint = `${target.id}:${target.version}:${p.pointerVersion}`;
     if (fingerprint !== this.publishFingerprint || !this.publishIdempotencyKey) {
@@ -471,6 +570,7 @@ export class ProfilePage {
         p.pointerVersion,
         target.version,
         this.publishIdempotencyKey,
+        this.ctx(),
       );
       this.publishFingerprint = '';
       this.publishIdempotencyKey = '';
@@ -479,20 +579,81 @@ export class ProfilePage {
       this.notify.success(this.transloco.translate(toastKey, { n: result.profileVersion }));
       await this.load(p.id);
     } catch (error) {
-      if (errorCodeOf(error) === 'TRADE.CONCURRENCY.STALE_VERSION') {
+      if (isForbiddenError(error)) {
+        this.publishModal().close();
+        this.forbidden.set(true);
+        return;
+      }
+      if (isPublicationUnavailableError(error)) {
+        this.publishModal().close();
+        this.publicationUnavailable.set(true);
+        return;
+      }
+      if (isActivePointerStaleError(error)) {
+        // Active-pointer stale: never retry silently; show conflict, refetch, and require confirmation.
+        this.publishFingerprint = '';
+        this.publishIdempotencyKey = '';
+        this.stalePublishVersionId = target.id;
+        this.conflictMode.set('pointerStale');
         this.publishModal().close();
         this.conflictDialog().open();
+        this.pendingRefetch = this.refetchProfileQuietly(p.id);
+        return;
+      }
+      if (errorCodeOf(error) === 'TRADE.CONCURRENCY.STALE_VERSION') {
+        this.publishFingerprint = '';
+        this.publishIdempotencyKey = '';
+        this.conflictMode.set('versionStale');
+        this.publishModal().close();
+        this.conflictDialog().open();
+      } else if (errorCodeOf(error) === 'TRADE.DOCUMENT_PROFILE.COMPATIBILITY_CHANGED') {
+        this.publishModal().close();
+        this.notify.error(resolveProfileErrorMessage(this.transloco, error));
+        void this.load(p.id);
       } else {
         this.publishModal().close();
-        this.notify.error(this.resolveErrorMessage(error));
+        this.notify.error(resolveProfileErrorMessage(this.transloco, error));
       }
     } finally {
       this.publishing.set(false);
     }
   }
 
+  protected async onConflictReload(): Promise<void> {
+    if (this.conflictMode() === 'pointerStale') {
+      this.conflictMode.set('versionStale');
+      const targetId = this.stalePublishVersionId;
+      this.stalePublishVersionId = null;
+      let refreshed = false;
+      if (this.pendingRefetch) {
+        refreshed = await this.pendingRefetch;
+        this.pendingRefetch = null;
+      } else if (this.profileId()) {
+        refreshed = await this.refetchProfileQuietly(this.profileId());
+      }
+      if (!refreshed) return;
+      const fresh = targetId ? this.profile()?.versions.find((v) => v.id === targetId) : undefined;
+      if (
+        fresh &&
+        fresh.status === 'TESTED' &&
+        this.canPublish() &&
+        fresh.authorUserId !== this.currentUserId()
+      ) {
+        this.openPublishModal(fresh);
+      }
+      return;
+    }
+    this.reload();
+  }
+
+  protected onConflictKeep(): void {
+    this.conflictMode.set('versionStale');
+    this.stalePublishVersionId = null;
+  }
+
   private openPublishModal(version: ProfileVersion): void {
-    if (!this.can.publish || version.authorUserId === getFakeActor()) return;
+    const actorId = this.currentUserId();
+    if (!this.canPublish() || (actorId && version.authorUserId === actorId)) return;
     this.publishingTarget.set(version);
     this.publishing.set(false);
     this.publishFingerprint = '';
@@ -503,11 +664,11 @@ export class ProfilePage {
 
   private async runValidate(version: ProfileVersion): Promise<void> {
     const p = this.profile();
-    if (!p || this.busy() || !this.can.test) return;
+    if (!p || this.busy() || !this.canValidate()) return;
 
     this.busy.set(true);
     try {
-      const result = await validateVersion(version.id, version.version, newIdempotencyKey());
+      const result = await validateVersion(version.id, version.version, newIdempotencyKey(), this.ctx());
       if (result.passed) {
         this.notify.success(this.transloco.translate('profiles.toasts.validated'));
         await this.load(p.id);
@@ -518,15 +679,27 @@ export class ProfilePage {
             ? this.transloco.translate('profiles.toasts.validationFailedOne')
             : this.transloco.translate('profiles.toasts.validationFailed', { count: failedCount });
         this.notify.warning(msg);
+        const scope = this.effectiveScopeTarget() === 'TENANT' ? 'tenant' : undefined;
         void this.router.navigate(['/trade/governance/document-profiles', p.id, 'versions', version.id], {
-          queryParams: { tab: 'cases' },
+          queryParams: {
+            tab: 'cases',
+            ...(scope ? { scope } : {}),
+          },
         });
       }
     } catch (error) {
-      if (errorCodeOf(error) === 'TRADE.CONCURRENCY.STALE_VERSION') {
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+      } else if (isPublicationUnavailableError(error)) {
+        this.publicationUnavailable.set(true);
+      } else if (errorCodeOf(error) === 'TRADE.CONCURRENCY.STALE_VERSION') {
+        this.conflictMode.set('versionStale');
         this.conflictDialog().open();
+      } else if (errorCodeOf(error) === 'TRADE.DOCUMENT_PROFILE.COMPATIBILITY_CHANGED') {
+        this.notify.error(resolveProfileErrorMessage(this.transloco, error));
+        void this.load(p.id);
       } else {
-        this.notify.error(this.resolveErrorMessage(error));
+        this.notify.error(resolveProfileErrorMessage(this.transloco, error));
       }
     } finally {
       this.busy.set(false);
@@ -535,7 +708,7 @@ export class ProfilePage {
 
   private async runDeleteDraft(version: ProfileVersion): Promise<void> {
     const p = this.profile();
-    if (!p || this.busy() || !this.can.manage) return;
+    if (!p || this.busy() || !this.canManage()) return;
 
     this.deletingTarget.set(version);
     this.cdr.detectChanges();
@@ -545,35 +718,75 @@ export class ProfilePage {
 
     this.busy.set(true);
     try {
-      await deleteVersion(version.id, version.version, newIdempotencyKey());
+      await deleteVersion(version.id, version.version, newIdempotencyKey(), this.ctx());
       this.notify.success(this.transloco.translate('profiles.toasts.draftDeleted', { n: version.profileVersion }));
       await this.load(p.id);
     } catch (error) {
-      if (errorCodeOf(error) === 'TRADE.CONCURRENCY.STALE_VERSION') {
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+      } else if (isPublicationUnavailableError(error)) {
+        this.publicationUnavailable.set(true);
+      } else if (errorCodeOf(error) === 'TRADE.CONCURRENCY.STALE_VERSION') {
+        this.conflictMode.set('versionStale');
         this.conflictDialog().open();
+      } else if (errorCodeOf(error) === 'TRADE.DOCUMENT_PROFILE.COMPATIBILITY_CHANGED') {
+        this.notify.error(resolveProfileErrorMessage(this.transloco, error));
+        void this.load(p.id);
       } else {
-        this.notify.error(this.resolveErrorMessage(error));
+        this.notify.error(resolveProfileErrorMessage(this.transloco, error));
       }
     } finally {
       this.busy.set(false);
     }
   }
 
+  private async refetchProfileQuietly(id: string): Promise<boolean> {
+    const seq = ++this.loadSeq;
+    try {
+      const data = await getProfile(id, this.ctx());
+      if (seq !== this.loadSeq) return false;
+      this.profile.set(data);
+      return true;
+    } catch (error) {
+      if (seq !== this.loadSeq) return false;
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+      } else if (isPublicationUnavailableError(error)) {
+        this.publicationUnavailable.set(true);
+      } else {
+        this.notify.error(resolveProfileErrorMessage(this.transloco, error));
+      }
+      return false;
+    }
+  }
+
   private async load(id: string): Promise<void> {
+    if (!this.canRead()) {
+      this.loading.set(false);
+      return;
+    }
     const seq = ++this.loadSeq;
     this.loading.set(true);
     this.loadFailed.set(false);
     try {
-      const data = await getProfile(id);
+      const data = await getProfile(id, this.ctx());
       if (seq !== this.loadSeq) return;
       this.profile.set(data);
-      if (this.pendingOpenNewVersion && this.can.manage) {
+      if (this.pendingOpenNewVersion && this.canManage()) {
         this.consumePendingNewVersion();
       }
     } catch (error) {
       if (seq !== this.loadSeq) return;
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+        return;
+      }
+      if (isPublicationUnavailableError(error)) {
+        this.publicationUnavailable.set(true);
+        return;
+      }
       this.loadFailed.set(true);
-      this.notify.error(this.resolveErrorMessage(error));
+      this.notify.error(resolveProfileErrorMessage(this.transloco, error));
     } finally {
       if (seq === this.loadSeq) {
         this.loading.set(false);
@@ -590,17 +803,5 @@ export class ProfilePage {
       replaceUrl: true,
     });
     this.openNewVersionModal();
-  }
-
-  private resolveErrorMessage(error: unknown): string {
-    const key = governanceErrorKey(error, 'governance');
-    const translated = this.transloco.translate(key);
-    if (translated !== key) return translated;
-    if (error instanceof ApiError) {
-      const codeKey = `governance.errors.${error.code}`;
-      const codeTranslated = this.transloco.translate(codeKey);
-      if (codeTranslated !== codeKey) return codeTranslated;
-    }
-    return this.transloco.translate('tradeShared.errors.generic');
   }
 }

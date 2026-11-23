@@ -45,7 +45,8 @@ interface ResolvedComponentRow {
 
 interface ResolvedEvidenceRow {
   def: ProfileEvidenceDef;
-  config: ProfileEvidenceConfig;
+  include: boolean;
+  required: boolean;
 }
 
 @Component({
@@ -88,6 +89,7 @@ export class ProfileContentEditor {
   readonly family = input.required<ProfileFamilyRegistry>();
   readonly readonly = input(false);
   readonly tab = input<ProfileContentTab | null>(null);
+  readonly modeErrors = input<Readonly<Record<string, string>>>({});
 
   protected readonly internalTab = signal<ProfileContentTab>('fields');
 
@@ -172,12 +174,9 @@ export class ProfileContentEditor {
     const byCode = new Map(this.content().evidence.map((item) => [item.code, item]));
     return fam.evidence.map((def) => {
       const existing = byCode.get(def.code);
-      const include = existing?.include ?? (existing ? true : def.defaultInclude);
-      const required = include ? (existing?.required ?? def.defaultRequired) : false;
-      return {
-        def,
-        config: { code: def.code, include, required },
-      };
+      const include = existing ? existing.include !== false : false;
+      const required = include ? Boolean(existing?.required) : false;
+      return { def, include, required };
     });
   });
 
@@ -187,33 +186,53 @@ export class ProfileContentEditor {
     }
   }
 
+  protected fieldLabel(code: string): string {
+    return this.translateOrFallback(`profiles.registry.fields.${code}`, code);
+  }
+
+  protected componentLabel(code: string): string {
+    return this.translateOrFallback(`profiles.registry.components.${code}`, code);
+  }
+
+  protected evidenceLabel(code: string): string {
+    return this.translateOrFallback(`profiles.registry.evidence.${code}`, code);
+  }
+
+  protected modeLabel(mode: ProfileModeDef): string {
+    return this.translateOrFallback(`profiles.registry.modes.${mode.key}.label`, mode.key);
+  }
+
+  protected modeHint(mode: ProfileModeDef): string {
+    return this.translateOrFallback(`profiles.registry.modes.${mode.key}.hint`, mode.key);
+  }
+
   protected fieldVisibleAria(code: string): string {
     this.i18n();
-    const fieldLabel = this.transloco.translate(`profiles.registry.fields.${code}`);
+    const fieldLabel = this.fieldLabel(code);
     return this.transloco.translate('profiles.fields.visibleAria', { field: fieldLabel });
   }
 
   protected fieldRequiredAria(code: string): string {
     this.i18n();
-    const fieldLabel = this.transloco.translate(`profiles.registry.fields.${code}`);
+    const fieldLabel = this.fieldLabel(code);
     return this.transloco.translate('profiles.fields.requiredAria', { field: fieldLabel });
   }
 
   protected componentVisibleAria(code: string): string {
     this.i18n();
-    const label = this.transloco.translate(`profiles.registry.components.${code}`);
+    const label = this.componentLabel(code);
     return this.transloco.translate('profiles.layout.visibleAria', { component: label });
   }
 
   protected evidenceIncludeAria(code: string): string {
     this.i18n();
-    const label = this.transloco.translate(`profiles.registry.evidence.${code}`);
+    const label = this.evidenceLabel(code);
     return this.transloco.translate('profiles.evidence.includeAria', { evidence: label });
   }
 
   protected evidenceRequiredAria(code: string): string {
     this.i18n();
-    const label = this.transloco.translate(`profiles.registry.evidence.${code}`);
+    const label = this.evidenceLabel(code);
     return this.transloco.translate('profiles.evidence.requiredAria', { evidence: label });
   }
 
@@ -291,7 +310,7 @@ export class ProfileContentEditor {
     this.i18n();
     return mode.allowedValues.map((val) => ({
       value: val,
-      label: this.transloco.translate(`profiles.registry.modes.${mode.key}.values.${val}`),
+      label: this.translateOrFallback(`profiles.registry.modes.${mode.key}.values.${val}`, val),
     }));
   }
 
@@ -321,28 +340,33 @@ export class ProfileContentEditor {
 
   protected setEvidenceInclude(def: ProfileEvidenceDef, nextInclude: boolean): void {
     if (this.readonly()) return;
-    const rows = this.evidenceRows().map((r) => {
-      if (r.def.code !== def.code) return r.config;
-      return {
-        code: def.code,
-        include: nextInclude,
-        required: nextInclude ? r.config.required : false,
-      };
-    });
+    // G-9: keep `include` as UI state only; emit only included { code, required } items.
+    const rows: ProfileEvidenceConfig[] = this.evidenceRows()
+      .map((r) => {
+        if (r.def.code !== def.code) return r;
+        return { def: r.def, include: nextInclude, required: nextInclude ? r.required : false };
+      })
+      .filter((r) => r.include)
+      .map((r) => ({ code: r.def.code, required: r.required }));
     this.content.update((c) => ({ ...c, evidence: rows }));
   }
 
   protected setEvidenceRequired(def: ProfileEvidenceDef, nextRequired: boolean): void {
     if (this.readonly()) return;
-    const rows = this.evidenceRows().map((r) => {
-      if (r.def.code !== def.code) return r.config;
-      return {
-        code: def.code,
-        include: nextRequired ? true : r.config.include,
-        required: nextRequired,
-      };
-    });
+    const rows: ProfileEvidenceConfig[] = this.evidenceRows()
+      .map((r) => {
+        if (r.def.code !== def.code) return r;
+        return { def: r.def, include: nextRequired ? true : r.include, required: nextRequired };
+      })
+      .filter((r) => r.include)
+      .map((r) => ({ code: r.def.code, required: r.required }));
     this.content.update((c) => ({ ...c, evidence: rows }));
+  }
+
+  private translateOrFallback(key: string, fallback: string): string {
+    this.i18n();
+    const text = this.transloco.translate(key);
+    return text && text !== key ? text : fallback;
   }
 
   private commitComponentOrder(rows: ProfileComponentConfig[]): void {

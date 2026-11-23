@@ -1,3 +1,24 @@
+@if (isForbidden()) {
+  <div class="flex flex-1 rounded-10 border border-border bg-surface shadow-card">
+    <ui-full-state
+      kind="forbidden"
+      [title]="'errors.forbidden.title' | transloco"
+      [text]="'errors.forbidden.text' | transloco"
+      [actionLabel]="'errors.notFound.action' | transloco"
+      (action)="goHome()"
+    />
+  </div>
+} @else if (publicationUnavailable()) {
+  <div class="flex flex-1 rounded-10 border border-border bg-surface shadow-card">
+    <ui-full-state
+      kind="provisioning"
+      [title]="'profiles.errors.publicationUnavailableTitle' | transloco"
+      [text]="'profiles.errors.publicationUnavailableText' | transloco"
+      [actionLabel]="'tradeShared.common.retry' | transloco"
+      (action)="retryFromUnavailable()"
+    />
+  </div>
+} @else {
 <header class="rounded-10 border border-border bg-surface shadow-card">
   @if (loading() && !family()) {
     <div aria-busy="true">
@@ -71,7 +92,7 @@
 
       <div class="ms-auto flex shrink-0 flex-wrap items-center gap-8">
         @if (isNewMode()) {
-          @if (can.manage) {
+          @if (canManage()) {
             <button type="button" uiButton variant="primary" [loading]="saving()" (click)="submitCreateVersion()">
               <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
               {{ 'profiles.version.createVersion' | transloco }}
@@ -81,12 +102,12 @@
             {{ 'governance.common.cancel' | transloco }}
           </button>
         } @else if (versionDetail(); as ver) {
-          @if (ver.status === 'DRAFT' && can.test) {
+          @if (ver.status === 'DRAFT' && canValidate()) {
             <button type="button" uiButton variant="primary" [loading]="validating()" (click)="runValidate()">
               <ng-icon name="tablerCheck" size="15" aria-hidden="true" />
               {{ 'profiles.version.validate' | transloco }}
             </button>
-          } @else if (ver.status === 'TESTED' && can.publish) {
+          } @else if (ver.status === 'TESTED' && canPublish()) {
             <span [attr.title]="isSelfAuthor() ? ('governance.makerChecker.self' | transloco) : null">
               <button
                 type="button"
@@ -136,7 +157,7 @@
     }
   </div>
 } @else if (family(); as fam) {
-  @if (isNewMode() && can.manage) {
+  @if (isNewMode() && canManage()) {
     <section
       class="rounded-10 border border-border bg-surface p-10 shadow-card"
       [attr.aria-label]="'profiles.version.datesCardLabel' | transloco"
@@ -161,7 +182,8 @@
               [nextMonthLabel]="'profiles.version.nextMonth' | transloco"
               [invalid]="!!fromError()"
               [disabled]="saving()"
-              [(value)]="fromDate"
+              [value]="fromDate()"
+              (valueChange)="onFromDateChange($event)"
             />
             <ui-time-field
               class="shrink-0"
@@ -172,7 +194,8 @@
               [minuteLabel]="'profiles.version.minute' | transloco"
               [invalid]="!!fromError()"
               [disabled]="saving()"
-              [(value)]="fromTime"
+              [value]="fromTime()"
+              (valueChange)="onFromTimeChange($event)"
             />
           </div>
         </ui-field>
@@ -252,12 +275,17 @@
         [cases]="activeCases()"
         (casesChange)="onCasesChange($event)"
       />
+    } @else if (versionDetail()?.contentHidden) {
+      <p class="rounded-10 border border-border bg-surface p-16 text-center text-12 text-text-muted shadow-card">
+        {{ 'profiles.version.contentHidden' | transloco }}
+      </p>
     } @else if (activeContent(); as content) {
       <app-profile-content-editor
         [tab]="contentTab()"
         [family]="fam"
         [readonly]="isReadonly()"
         [content]="content"
+        [modeErrors]="serverModeErrors()"
         (contentChange)="onContentChange($event)"
       />
     }
@@ -300,4 +328,12 @@
   [cancelLabel]="'governance.common.cancel' | transloco"
 />
 
-<app-conflict-dialog (reload)="reload()" />
+<app-conflict-dialog
+  [title]="conflictMode() === 'pointerStale' ? ('profiles.errors.activePointerStaleTitle' | transloco) : ''"
+  [text]="conflictMode() === 'pointerStale' ? ('profiles.errors.activePointerStaleText' | transloco) : ''"
+  [reloadLabel]="conflictMode() === 'pointerStale' ? ('profiles.errors.activePointerStaleConfirm' | transloco) : ''"
+  [keepLabel]="conflictMode() === 'pointerStale' ? ('profiles.errors.activePointerStaleDismiss' | transloco) : ''"
+  (reload)="onConflictReload()"
+  (keep)="onConflictKeep()"
+/>
+}

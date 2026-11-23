@@ -1,7 +1,14 @@
+import type { TradeContext } from '../shared/trade-api';
 import type { ScopeTarget } from './policy.model';
 import type { DocumentType } from './profiles.registry';
 
 // Shapes follow trade-app document-platform (document-profile.service.ts, dto/document-profile.dto.ts).
+
+export interface ProfileWriteOptions {
+  idempotencyKey?: string;
+  ifMatch?: number;
+  ctx?: TradeContext;
+}
 
 export type ProfileVersionStatus = 'DRAFT' | 'TESTED' | 'SCHEDULED' | 'PUBLISHED' | 'SUPERSEDED';
 
@@ -22,6 +29,7 @@ export interface ProfileComponentConfig {
 
 export interface ProfileEvidenceConfig {
   code: string;
+  /** UI-only flag in `profile-content-editor`; stripped before sending to the backend (G-9). */
   include?: boolean;
   required: boolean;
 }

@@ -15,7 +15,6 @@ import { Field } from '../../../../shared/ui/field/field';
 import { Modal } from '../../../../shared/ui/modal/modal';
 import { Segmented, type SegmentedOption } from '../../../../shared/ui/segmented/segmented';
 import { TagPicker, type TagOption } from '../../../../shared/ui/tag-picker/tag-picker';
-import { CODE_PATTERN } from '../policy.registry';
 import type {
   ProfileRequiredCaseInput,
   ProfileValidationRun,
@@ -23,6 +22,7 @@ import type {
 } from '../profiles.model';
 import type { ProfileFamilyRegistry } from '../profiles.registry';
 
+const CASE_CODE_PATTERN = /^[A-Z][A-Z0-9_]{1,63}$/;
 const MAX_CUSTOM_CASES = 20;
 const MAX_INLINE_FIELD_CHIPS = 3;
 
@@ -75,7 +75,7 @@ export class ProfileCases {
     this.i18n();
     return this.family().fields.map((f) => ({
       id: f.code,
-      name: this.transloco.translate(`profiles.registry.fields.${f.code}`),
+      name: this.fieldLabel(f.code),
       backgroundColor: null,
       textColor: null,
     }));
@@ -115,7 +115,7 @@ export class ProfileCases {
     if (!normalized) {
       return this.transloco.translate('profiles.cases.modal.codeRequired');
     }
-    if (!CODE_PATTERN.test(normalized)) {
+    if (!CASE_CODE_PATTERN.test(normalized)) {
       return this.transloco.translate('profiles.cases.modal.codeInvalid');
     }
     const editIdx = this.editingIndex();
@@ -145,11 +145,16 @@ export class ProfileCases {
     return Math.max(0, codes.length - MAX_INLINE_FIELD_CHIPS);
   }
 
+  protected fieldLabel(code: string): string {
+    this.i18n();
+    const key = `profiles.registry.fields.${code}`;
+    const text = this.transloco.translate(key);
+    return text && text !== key ? text : code;
+  }
+
   protected allFieldLabelsTitle(codes: readonly string[]): string {
     this.i18n();
-    return codes
-      .map((code) => this.transloco.translate(`profiles.registry.fields.${code}`))
-      .join(', ');
+    return codes.map((code) => this.fieldLabel(code)).join(', ');
   }
 
   protected openAddModal(): void {

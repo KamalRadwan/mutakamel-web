@@ -1,4 +1,4 @@
-import { Component, DestroyRef, computed, inject, signal, viewChild } from '@angular/core';
+import { Component, DestroyRef, Injector, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { translationEvents } from '../../../../core/i18n/translation-events';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -15,13 +15,14 @@ import {
 } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
+import { ScopeState } from '../../../../core/scope/scope';
 import { ActionItem, ActionSelection, ActionsMenu } from '../../../../shared/ui/actions-menu/actions-menu';
 import { Badge } from '../../../../shared/ui/badge/badge';
 import { Button } from '../../../../shared/ui/button/button';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { Pagination } from '../../../../shared/ui/pagination/pagination';
 import { StepFilter, type StepOption } from '../../../../shared/ui/step-filter/step-filter';
-import { ApiError } from '../../shared/trade-api';
-import { governanceErrorKey } from '../governance-fake-actors';
+import { type TradeContext, tradeContext } from '../../shared/trade-api';
 import { ScopeChip } from '../governance-shared/scope-chip/scope-chip';
 import { VersionStatusBadge } from '../governance-shared/version-status-badge/version-status-badge';
 import type { ScopeTarget } from '../policy.model';
@@ -30,8 +31,14 @@ import { ProfileModal } from '../profile-modal/profile-modal';
 import { getProfileCounts, listProfiles } from '../profiles.api';
 import type { DocumentProfile, DocumentProfileRecord, ProfileCounts, ProfileVersion } from '../profiles.model';
 import { DOCUMENT_TYPES, type DocumentType } from '../profiles.registry';
-
-const CAN = { manage: true, test: true, approve: true, publish: true }; // later from the session
+import {
+  PROFILE_PERMISSIONS,
+  hasProfileReadGrant,
+  hasProfileScopeGrant,
+  isForbiddenError,
+  isPublicationUnavailableError,
+  resolveProfileErrorMessage,
+} from './profile-access';
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = 24;
@@ -69,6 +76,7 @@ function parseScopeParam(raw: string | null): ScopeTarget {
     ActionsMenu,
     Badge,
     Button,
+    FullState,
     Pagination,
     StepFilter,
     ScopeChip,
@@ -93,6 +101,8 @@ function parseScopeParam(raw: string | null): ScopeTarget {
 export class DocumentProfilesPage {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly injector = inject(Injector);
+  private readonly scopeState = inject(ScopeState);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
@@ -100,7 +110,6 @@ export class DocumentProfilesPage {
 
   private readonly profileModal = viewChild.required(ProfileModal);
 
-  protected readonly can = CAN;
   protected readonly pageSizes = [...PAGE_SIZES];
   protected readonly skeletonRows = [0, 1, 2, 3, 4];
 
@@ -110,6 +119,17 @@ export class DocumentProfilesPage {
   protected readonly pageSize = signal(DEFAULT_PAGE_SIZE);
   protected readonly scopeTarget = signal<ScopeTarget>('COMPANY');
   private readonly pendingVersionId = signal<string | null>(null);
+
+  protected readonly forbidden = signal(false);
+  protected readonly publicationUnavailable = signal(false);
+  protected readonly canRead = computed(() => hasProfileReadGrant(this.injector));
+  protected readonly isForbidden = computed(() => !this.canRead() || this.forbidden());
+  protected readonly canManage = computed(
+    () =>
+      !this.isForbidden() &&
+      hasProfileScopeGrant(this.injector, this.scopeState, PROFILE_PERMISSIONS.manage, this.scopeTarget()),
+  );
+  protected readonly ctx = computed<TradeContext>(() => tradeContext(this.scopeState, this.scopeTarget()));
 
   protected readonly profiles = signal<DocumentProfile[]>([]);
   protected readonly counts = signal<ProfileCounts | null>(null);
@@ -177,30 +197,66 @@ export class DocumentProfilesPage {
 
       const versionId = query.get('version')?.trim() || null;
       this.pendingVersionId.set(versionId);
-      if (versionId && !this.loading() && !this.loadFailed()) {
+      if (versionId && !this.loading() && !this.loadFailed() && !this.isForbidden()) {
         this.resolveVersionDeepLink(versionId);
       }
+    });
+
+    effect(() => {
+      const canRead = this.canRead();
+      const target = this.scopeTarget();
+      const ctx = this.ctx();
+      void target;
+      untracked(() => {
+        this.forbidden.set(false);
+        this.publicationUnavailable.set(false);
+        if (!canRead) {
+          this.loading.set(false);
+          this.profiles.set([]);
+          this.counts.set(null);
+          return;
+        }
+        void this.load(ctx);
+      });
     });
 
     inject(DestroyRef).onDestroy(() => {
       this.loadSeq += 1;
     });
+  }
 
-    void this.load();
+  protected goHome(): void {
+    void this.router.navigate(['/']);
+  }
+
+  protected onForbidden(): void {
+    this.forbidden.set(true);
+  }
+
+  protected onPublicationUnavailable(): void {
+    this.publicationUnavailable.set(true);
+  }
+
+  protected retryFromUnavailable(): void {
+    this.publicationUnavailable.set(false);
+    this.reload();
   }
 
   protected reload(): void {
-    void this.load();
+    if (!this.canRead()) return;
+    this.forbidden.set(false);
+    this.publicationUnavailable.set(false);
+    void this.load(this.ctx());
   }
 
   protected openCreate(): void {
-    if (!this.can.manage) return;
+    if (!this.canManage()) return;
     const type = this.selectedType();
     this.profileModal().open(type === 'all' ? undefined : type);
   }
 
   protected onProfileCreated(_created: DocumentProfileRecord): void {
-    void this.load();
+    this.reload();
   }
 
   protected onSearchInput(event: Event): void {
@@ -276,7 +332,10 @@ export class DocumentProfilesPage {
   }
 
   protected openProfile(profile: DocumentProfile): void {
-    void this.router.navigate(['/trade/governance/document-profiles', profile.id]);
+    const scopeParam = this.scopeParamFor(profile.scopeTarget);
+    void this.router.navigate(['/trade/governance/document-profiles', profile.id], {
+      ...(scopeParam ? { queryParams: { scope: scopeParam } } : {}),
+    });
   }
 
   protected onRowKeydown(event: KeyboardEvent, profile: DocumentProfile): void {
@@ -329,7 +388,7 @@ export class DocumentProfilesPage {
         tile: 'bg-icon-blue',
       },
     ];
-    if (this.can.manage) {
+    if (this.canManage()) {
       items.push({
         id: 'newVersion',
         title: this.transloco.translate('profiles.list.actions.newVersion'),
@@ -341,21 +400,32 @@ export class DocumentProfilesPage {
   }
 
   protected onRowAction(profile: DocumentProfile, selection: ActionSelection): void {
+    const scopeParam = this.scopeParamFor(profile.scopeTarget);
     if (selection.id === 'open') {
       this.openProfile(profile);
     } else if (selection.id === 'newVersion') {
       void this.router.navigate(['/trade/governance/document-profiles', profile.id], {
-        queryParams: { newVersion: '1' },
+        queryParams: {
+          newVersion: '1',
+          ...(scopeParam ? { scope: scopeParam } : {}),
+        },
       });
     }
   }
 
-  private async load(): Promise<void> {
+  private scopeParamFor(target: ScopeTarget): string | undefined {
+    return target === 'TENANT' ? 'tenant' : undefined;
+  }
+
+  private async load(ctx: TradeContext): Promise<void> {
     const seq = ++this.loadSeq;
     this.loading.set(true);
     this.loadFailed.set(false);
     try {
-      const [list, counts] = await Promise.all([listProfiles({ limit: 100 }), getProfileCounts()]);
+      const [list, counts] = await Promise.all([
+        listProfiles({ limit: 100 }, ctx),
+        getProfileCounts({}, ctx),
+      ]);
       if (seq !== this.loadSeq) return;
       this.profiles.set(list.items);
       this.counts.set(counts);
@@ -365,8 +435,16 @@ export class DocumentProfilesPage {
       }
     } catch (error) {
       if (seq !== this.loadSeq) return;
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+        return;
+      }
+      if (isPublicationUnavailableError(error)) {
+        this.publicationUnavailable.set(true);
+        return;
+      }
       this.loadFailed.set(true);
-      this.notify.error(this.resolveErrorMessage(error));
+      this.notify.error(resolveProfileErrorMessage(this.transloco, error));
     } finally {
       if (seq === this.loadSeq) {
         this.loading.set(false);
@@ -380,7 +458,9 @@ export class DocumentProfilesPage {
 
     const owner = this.profiles().find((profile) => profile.versions.some((v) => v.id === versionId));
     if (owner) {
+      const scopeParam = this.scopeParamFor(owner.scopeTarget);
       void this.router.navigate(['/trade/governance/document-profiles', owner.id, 'versions', versionId], {
+        ...(scopeParam ? { queryParams: { scope: scopeParam } } : {}),
         replaceUrl: true,
       });
       return;
@@ -393,17 +473,5 @@ export class DocumentProfilesPage {
       queryParamsHandling: 'merge',
       replaceUrl: true,
     });
-  }
-
-  private resolveErrorMessage(error: unknown): string {
-    const key = governanceErrorKey(error, 'governance');
-    const translated = this.transloco.translate(key);
-    if (translated !== key) return translated;
-    if (error instanceof ApiError) {
-      const codeKey = `governance.errors.${error.code}`;
-      const codeTranslated = this.transloco.translate(codeKey);
-      if (codeTranslated !== codeKey) return codeTranslated;
-    }
-    return this.transloco.translate('tradeShared.errors.generic');
   }
 }

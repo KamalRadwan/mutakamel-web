@@ -11,8 +11,12 @@ import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dial
 import { Dropdown, type DropdownOption } from '../../../../shared/ui/dropdown/dropdown';
 import { Field } from '../../../../shared/ui/field/field';
 import { Modal } from '../../../../shared/ui/modal/modal';
-import { ApiError, errorCodeOf, newIdempotencyKey } from '../../shared/trade-api';
-import { governanceErrorKey } from '../governance-fake-actors';
+import { errorCodeOf, newIdempotencyKey, tradeContext } from '../../shared/trade-api';
+import {
+  isForbiddenError,
+  isPublicationUnavailableError,
+  resolveProfileErrorMessage,
+} from '../document-profiles-page/profile-access';
 import type { ScopeTarget } from '../policy.model';
 import { CODE_PATTERN } from '../policy.registry';
 import { createProfile } from '../profiles.api';
@@ -40,6 +44,8 @@ export class ProfileModal {
 
   readonly scopeTarget = input<ScopeTarget>('COMPANY');
   readonly created = output<DocumentProfileRecord>();
+  readonly forbidden = output<void>();
+  readonly publicationUnavailable = output<void>();
 
   protected readonly code = signal('');
   protected readonly documentType = signal<DocumentType>('QUOTATION');
@@ -72,12 +78,12 @@ export class ProfileModal {
     }
     const language = this.lang();
     const company = this.scopeState.company();
-    const companyName = language === 'ar' ? company.nameAr : company.nameEn;
+    const companyName = language === 'ar' ? (company?.nameAr ?? '') : (company?.nameEn ?? '');
     if (target === 'COMPANY') {
       return `${scopeName} · ${companyName}`;
     }
     const branch = this.scopeState.branch();
-    const branchName = language === 'ar' ? branch.nameAr : branch.nameEn;
+    const branchName = language === 'ar' ? (branch?.nameAr ?? '') : (branch?.nameEn ?? '');
     const pair = this.transloco.translate('profiles.modal.scopePair', {
       company: companyName,
       branch: branchName,
@@ -175,7 +181,10 @@ export class ProfileModal {
 
     this.saving.set(true);
     try {
-      const created = await createProfile(payload, { idempotencyKey: this.lastIdempotencyKey });
+      const created = await createProfile(payload, {
+        idempotencyKey: this.lastIdempotencyKey,
+        ctx: tradeContext(this.scopeState, this.scopeTarget()),
+      });
       this.lastFingerprint = '';
       this.lastIdempotencyKey = '';
       this.notify.success(this.transloco.translate('profiles.toasts.profileCreated', { code: created.code }));
@@ -183,13 +192,25 @@ export class ProfileModal {
       this.modal().close();
       this.created.emit(created);
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.allowClose = true;
+        this.modal().close();
+        this.forbidden.emit();
+        return;
+      }
+      if (isPublicationUnavailableError(error)) {
+        this.allowClose = true;
+        this.modal().close();
+        this.publicationUnavailable.emit();
+        return;
+      }
       const errCode = errorCodeOf(error);
       if (errCode === 'TRADE.DOCUMENT_PROFILE.IDENTITY_TAKEN') {
         this.serverCodeError.set(this.transloco.translate('governance.errors.TRADE.DOCUMENT_PROFILE.IDENTITY_TAKEN'));
       } else if (errCode === 'TRADE.DOCUMENT_PROFILE.SCOPE_NOT_ALLOWED') {
         this.serverScopeError.set(true);
       } else {
-        this.notify.error(this.resolveErrorMessage(error));
+        this.notify.error(resolveProfileErrorMessage(this.transloco, error));
       }
     } finally {
       this.saving.set(false);
@@ -212,17 +233,5 @@ export class ProfileModal {
     } finally {
       this.confirmingLeave = false;
     }
-  }
-
-  private resolveErrorMessage(error: unknown): string {
-    const key = governanceErrorKey(error, 'governance');
-    const translated = this.transloco.translate(key);
-    if (translated !== key) return translated;
-    if (error instanceof ApiError) {
-      const codeKey = `governance.errors.${error.code}`;
-      const codeTranslated = this.transloco.translate(codeKey);
-      if (codeTranslated !== codeKey) return codeTranslated;
-    }
-    return this.transloco.translate('tradeShared.errors.generic');
   }
 }

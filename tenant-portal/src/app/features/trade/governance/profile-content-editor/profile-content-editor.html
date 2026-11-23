@@ -49,7 +49,7 @@
           >
             <span role="cell" class="flex min-w-0 items-center px-10">
               <span class="truncate font-medium">
-                {{ 'profiles.registry.fields.' + row.def.code | transloco }}
+                {{ fieldLabel(row.def.code) }}
               </span>
             </span>
 
@@ -178,7 +178,7 @@
 
               <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
                 <span class="truncate font-medium">
-                  {{ 'profiles.registry.components.' + row.def.code | transloco }}
+                  {{ componentLabel(row.def.code) }}
                 </span>
               </span>
 
@@ -228,17 +228,18 @@
         @for (mode of family().modes; track mode.key) {
           <ui-field
             size="bare"
-            [label]="'profiles.registry.modes.' + mode.key + '.label' | transloco"
+            [label]="modeLabel(mode)"
             [for]="uid + '-mode-' + mode.key"
-            [hint]="'profiles.registry.modes.' + mode.key + '.hint' | transloco"
+            [hint]="modeHint(mode)"
             [hintText]="modeNote(mode)"
+            [error]="modeErrors()[mode.key] ?? null"
           >
             <ui-dropdown
               class="w-full"
               size="field"
               [id]="uid + '-mode-' + mode.key"
               [describedBy]="uid + '-mode-' + mode.key + '-hint'"
-              [label]="'profiles.registry.modes.' + mode.key + '.label' | transloco"
+              [label]="modeLabel(mode)"
               [options]="modeOptions(mode)"
               [disabled]="readonly() || mode.locked"
               [value]="modeValueAsString(mode)"
@@ -283,13 +284,13 @@
           >
             <span role="cell" class="flex min-w-0 items-center px-10">
               <span class="truncate font-medium">
-                {{ 'profiles.registry.evidence.' + row.def.code | transloco }}
+                {{ evidenceLabel(row.def.code) }}
               </span>
             </span>
 
             <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
               <ui-switch
-                [checked]="!!row.config.include"
+                [checked]="row.include"
                 [disabled]="readonly()"
                 [label]="evidenceIncludeAria(row.def.code)"
                 [describedBy]="uid + '-evidence-include-hint'"
@@ -299,8 +300,8 @@
 
             <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
               <ui-switch
-                [checked]="row.config.required"
-                [disabled]="readonly() || !row.config.include"
+                [checked]="row.required"
+                [disabled]="readonly() || !row.include"
                 [label]="evidenceRequiredAria(row.def.code)"
                 [describedBy]="uid + '-evidence-required-hint'"
                 (checkedChange)="setEvidenceRequired(row.def, $event)"

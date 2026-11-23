@@ -147,7 +147,7 @@
                   <span
                     class="inline-flex h-chip shrink-0 items-center rounded-6 bg-neutral-soft px-6 text-11 font-medium text-on-neutral-soft"
                   >
-                    {{ 'profiles.registry.fields.' + fieldCode | transloco }}
+                    {{ fieldLabel(fieldCode) }}
                   </span>
                 }
                 @if (hiddenFieldsCount(fieldsOf(item)); as extra) {

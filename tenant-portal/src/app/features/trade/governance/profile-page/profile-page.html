@@ -1,3 +1,24 @@
+@if (isForbidden()) {
+  <div class="flex flex-1 rounded-10 border border-border bg-surface shadow-card">
+    <ui-full-state
+      kind="forbidden"
+      [title]="'errors.forbidden.title' | transloco"
+      [text]="'errors.forbidden.text' | transloco"
+      [actionLabel]="'errors.notFound.action' | transloco"
+      (action)="goHome()"
+    />
+  </div>
+} @else if (publicationUnavailable()) {
+  <div class="flex flex-1 rounded-10 border border-border bg-surface shadow-card">
+    <ui-full-state
+      kind="provisioning"
+      [title]="'profiles.errors.publicationUnavailableTitle' | transloco"
+      [text]="'profiles.errors.publicationUnavailableText' | transloco"
+      [actionLabel]="'tradeShared.common.retry' | transloco"
+      (action)="retryFromUnavailable()"
+    />
+  </div>
+} @else {
 <header class="rounded-10 border border-border bg-surface px-10 py-8 shadow-card">
   @if (loading() && !profile()) {
     <div class="flex flex-wrap items-center gap-8" aria-busy="true">
@@ -76,7 +97,7 @@
           <ng-icon name="tablerRefresh" size="15" [class.animate-spin]="loading()" aria-hidden="true" />
         </button>
 
-        @if (can.manage) {
+        @if (canManage()) {
           <button type="button" uiButton variant="primary" (click)="openNewVersionModal()">
             <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
             {{ 'profiles.detail.newVersion' | transloco }}
@@ -268,4 +289,12 @@
   [cancelLabel]="'governance.common.cancel' | transloco"
 />
 
-<app-conflict-dialog (reload)="reload()" />
+<app-conflict-dialog
+  [title]="conflictMode() === 'pointerStale' ? ('profiles.errors.activePointerStaleTitle' | transloco) : ''"
+  [text]="conflictMode() === 'pointerStale' ? ('profiles.errors.activePointerStaleText' | transloco) : ''"
+  [reloadLabel]="conflictMode() === 'pointerStale' ? ('profiles.errors.activePointerStaleConfirm' | transloco) : ''"
+  [keepLabel]="conflictMode() === 'pointerStale' ? ('profiles.errors.activePointerStaleDismiss' | transloco) : ''"
+  (reload)="onConflictReload()"
+  (keep)="onConflictKeep()"
+/>
+}

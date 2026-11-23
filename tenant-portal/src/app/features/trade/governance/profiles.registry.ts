@@ -8,7 +8,7 @@ export const DOCUMENT_TYPES: readonly DocumentType[] = [
   'PURCHASE_ORDER',
 ];
 
-export const PROFILE_REGISTRY_VERSION = '2026.11.1';
+export const PROFILE_REGISTRY_VERSION = 'trade-document-registry.v1';
 
 export interface ProfileFieldDef {
   code: string;
@@ -59,13 +59,22 @@ export interface ProfileRegistry {
 
 const SHARED_COMPONENTS: readonly ProfileComponentDef[] = [
   { code: 'HEADER', mandatory: true, defaultOrder: 10, defaultVisible: true },
-  { code: 'PARTIES', mandatory: false, defaultOrder: 20, defaultVisible: true },
+  { code: 'PARTY_SUMMARY', mandatory: false, defaultOrder: 20, defaultVisible: true },
   { code: 'LINE_ITEMS', mandatory: true, defaultOrder: 30, defaultVisible: true },
   { code: 'TOTALS', mandatory: false, defaultOrder: 40, defaultVisible: true },
   { code: 'TERMS', mandatory: false, defaultOrder: 50, defaultVisible: true },
-  { code: 'DELIVERY', mandatory: false, defaultOrder: 60, defaultVisible: true },
-  { code: 'ATTACHMENTS', mandatory: false, defaultOrder: 70, defaultVisible: true },
-  { code: 'AUDIT_HISTORY', mandatory: false, defaultOrder: 80, defaultVisible: false },
+  { code: 'APPROVAL', mandatory: false, defaultOrder: 60, defaultVisible: true },
+  { code: 'FULFILLMENT', mandatory: false, defaultOrder: 70, defaultVisible: true },
+  { code: 'NOTES', mandatory: false, defaultOrder: 80, defaultVisible: true },
+];
+
+const SERVER_OWNED_FIELDS: readonly ProfileFieldDef[] = [
+  { code: 'GRAND_TOTAL', familyRequired: false, serverOwned: true, defaultVisible: true, defaultRequired: false },
+  { code: 'DOCUMENT_NUMBER', familyRequired: false, serverOwned: true, defaultVisible: true, defaultRequired: false },
+  { code: 'LIFECYCLE_STATUS', familyRequired: false, serverOwned: true, defaultVisible: true, defaultRequired: false },
+  { code: 'APPROVAL_STATUS', familyRequired: false, serverOwned: true, defaultVisible: true, defaultRequired: false },
+  { code: 'FULFILLMENT_STATUS', familyRequired: false, serverOwned: true, defaultVisible: true, defaultRequired: false },
+  { code: 'BILLING_STATUS', familyRequired: false, serverOwned: true, defaultVisible: true, defaultRequired: false },
 ];
 
 const SHARED_EVIDENCE: readonly ProfileEvidenceDef[] = [
@@ -92,26 +101,21 @@ export const PROFILE_REGISTRY: ProfileRegistry = {
     QUOTATION: {
       documentType: 'QUOTATION',
       fields: [
-        { code: 'customerAccountId', familyRequired: true, serverOwned: false, defaultVisible: true, defaultRequired: true },
-        { code: 'contactPartyId', familyRequired: false, serverOwned: false, defaultVisible: true, defaultRequired: false },
-        { code: 'currencyCode', familyRequired: true, serverOwned: false, defaultVisible: true, defaultRequired: true },
-        { code: 'validUntil', familyRequired: true, serverOwned: false, defaultVisible: true, defaultRequired: true },
-        { code: 'paymentTermsId', familyRequired: false, serverOwned: false, defaultVisible: true, defaultRequired: false },
-        { code: 'branchId', familyRequired: false, serverOwned: false, defaultVisible: true, defaultRequired: false },
-        { code: 'channelId', familyRequired: false, serverOwned: false, defaultVisible: true, defaultRequired: false },
-        { code: 'externalReference', familyRequired: false, serverOwned: false, defaultVisible: true, defaultRequired: false },
-        { code: 'notes', familyRequired: false, serverOwned: false, defaultVisible: true, defaultRequired: false },
-        { code: 'documentNumber', familyRequired: false, serverOwned: true, defaultVisible: true, defaultRequired: false },
-        { code: 'grandTotal', familyRequired: false, serverOwned: true, defaultVisible: true, defaultRequired: false },
-        { code: 'approvalStatus', familyRequired: false, serverOwned: true, defaultVisible: false, defaultRequired: false },
+        { code: 'PARTY', familyRequired: true, serverOwned: false, defaultVisible: true, defaultRequired: true },
+        { code: 'CONTACT', familyRequired: false, serverOwned: false, defaultVisible: true, defaultRequired: false },
+        { code: 'CURRENCY', familyRequired: true, serverOwned: false, defaultVisible: true, defaultRequired: true },
+        { code: 'VALID_UNTIL', familyRequired: true, serverOwned: false, defaultVisible: true, defaultRequired: true },
+        { code: 'LINES', familyRequired: true, serverOwned: false, defaultVisible: true, defaultRequired: true },
+        { code: 'TERMS', familyRequired: false, serverOwned: false, defaultVisible: true, defaultRequired: false },
+        ...SERVER_OWNED_FIELDS,
       ],
       components: SHARED_COMPONENTS,
       modes: [
         {
           key: 'acceptanceMode',
           kind: 'enum',
-          allowedValues: ['INTERNAL_AUTHORIZED_ONLY'],
-          defaultValue: 'INTERNAL_AUTHORIZED_ONLY',
+          allowedValues: ['INTERNAL_AUTHORIZED'],
+          defaultValue: 'INTERNAL_AUTHORIZED',
           locked: true,
         },
         {
@@ -128,18 +132,13 @@ export const PROFILE_REGISTRY: ProfileRegistry = {
     SALES_ORDER: {
       documentType: 'SALES_ORDER',
       fields: [
-        { code: 'customerAccountId', familyRequired: true, serverOwned: false, defaultVisible: true, defaultRequired: true },
-        { code: 'contactPartyId', familyRequired: false, serverOwned: false, defaultVisible: true, defaultRequired: false },
-        { code: 'currencyCode', familyRequired: true, serverOwned: false, defaultVisible: true, defaultRequired: true },
-        { code: 'orderDate', familyRequired: true, serverOwned: false, defaultVisible: true, defaultRequired: true },
-        { code: 'requestedDeliveryDate', familyRequired: false, serverOwned: false, defaultVisible: true, defaultRequired: false },
-        { code: 'paymentTermsId', familyRequired: false, serverOwned: false, defaultVisible: true, defaultRequired: false },
-        { code: 'branchId', familyRequired: false, serverOwned: false, defaultVisible: true, defaultRequired: false },
-        { code: 'channelId', familyRequired: false, serverOwned: false, defaultVisible: true, defaultRequired: false },
-        { code: 'notes', familyRequired: false, serverOwned: false, defaultVisible: true, defaultRequired: false },
-        { code: 'documentNumber', familyRequired: false, serverOwned: true, defaultVisible: true, defaultRequired: false },
-        { code: 'grandTotal', familyRequired: false, serverOwned: true, defaultVisible: true, defaultRequired: false },
-        { code: 'confirmationStatus', familyRequired: false, serverOwned: true, defaultVisible: true, defaultRequired: false },
+        { code: 'PARTY', familyRequired: true, serverOwned: false, defaultVisible: true, defaultRequired: true },
+        { code: 'CONTACT', familyRequired: false, serverOwned: false, defaultVisible: true, defaultRequired: false },
+        { code: 'CURRENCY', familyRequired: true, serverOwned: false, defaultVisible: true, defaultRequired: true },
+        { code: 'LINES', familyRequired: true, serverOwned: false, defaultVisible: true, defaultRequired: true },
+        { code: 'FULFILLMENT_NODE', familyRequired: false, serverOwned: false, defaultVisible: true, defaultRequired: false },
+        { code: 'HOLD_REASON', familyRequired: false, serverOwned: false, defaultVisible: true, defaultRequired: false },
+        ...SERVER_OWNED_FIELDS,
       ],
       components: SHARED_COMPONENTS,
       modes: [
@@ -164,18 +163,13 @@ export const PROFILE_REGISTRY: ProfileRegistry = {
     PURCHASE_ORDER: {
       documentType: 'PURCHASE_ORDER',
       fields: [
-        { code: 'supplierAccountId', familyRequired: true, serverOwned: false, defaultVisible: true, defaultRequired: true },
-        { code: 'contactPartyId', familyRequired: false, serverOwned: false, defaultVisible: true, defaultRequired: false },
-        { code: 'currencyCode', familyRequired: true, serverOwned: false, defaultVisible: true, defaultRequired: true },
-        { code: 'orderDate', familyRequired: true, serverOwned: false, defaultVisible: true, defaultRequired: true },
-        { code: 'expectedReceiptDate', familyRequired: false, serverOwned: false, defaultVisible: true, defaultRequired: false },
-        { code: 'paymentTermsId', familyRequired: false, serverOwned: false, defaultVisible: true, defaultRequired: false },
-        { code: 'branchId', familyRequired: false, serverOwned: false, defaultVisible: true, defaultRequired: false },
-        { code: 'externalReference', familyRequired: false, serverOwned: false, defaultVisible: true, defaultRequired: false },
-        { code: 'notes', familyRequired: false, serverOwned: false, defaultVisible: true, defaultRequired: false },
-        { code: 'documentNumber', familyRequired: false, serverOwned: true, defaultVisible: true, defaultRequired: false },
-        { code: 'grandTotal', familyRequired: false, serverOwned: true, defaultVisible: true, defaultRequired: false },
-        { code: 'approvalStatus', familyRequired: false, serverOwned: true, defaultVisible: true, defaultRequired: false },
+        { code: 'SUPPLIER', familyRequired: true, serverOwned: false, defaultVisible: true, defaultRequired: true },
+        { code: 'CURRENCY', familyRequired: true, serverOwned: false, defaultVisible: true, defaultRequired: true },
+        { code: 'LINES', familyRequired: true, serverOwned: false, defaultVisible: true, defaultRequired: true },
+        { code: 'RECEIVING_NODE', familyRequired: true, serverOwned: false, defaultVisible: true, defaultRequired: true },
+        { code: 'EXPECTED_DATE', familyRequired: false, serverOwned: false, defaultVisible: true, defaultRequired: false },
+        { code: 'TERMS', familyRequired: false, serverOwned: false, defaultVisible: true, defaultRequired: false },
+        ...SERVER_OWNED_FIELDS,
       ],
       components: SHARED_COMPONENTS,
       modes: [
@@ -189,8 +183,8 @@ export const PROFILE_REGISTRY: ProfileRegistry = {
         {
           key: 'dispatchMode',
           kind: 'enum',
-          allowedValues: ['IMMEDIATE', 'QUEUED'],
-          defaultValue: 'IMMEDIATE',
+          allowedValues: ['SYNC', 'ASYNC'],
+          defaultValue: 'SYNC',
           locked: false,
         },
       ],
@@ -206,29 +200,30 @@ export const PROFILE_REGISTRY: ProfileRegistry = {
   },
 };
 
-export function defaultProfileContent(type: DocumentType): ProfileContent {
-  const family = PROFILE_REGISTRY.families[type];
+export function defaultProfileContent(type: DocumentType, family?: ProfileFamilyRegistry): ProfileContent {
+  const resolved = family ?? PROFILE_REGISTRY.families[type];
   const modes: Record<string, string | boolean> = {};
-  for (const mode of family.modes) {
+  for (const mode of resolved.modes) {
     modes[mode.key] = mode.defaultValue;
   }
 
   return {
-    fields: family.fields.map((f) => ({
+    fields: resolved.fields.map((f) => ({
       code: f.code,
       visible: f.defaultVisible,
       required: f.familyRequired ? true : f.serverOwned ? false : f.defaultRequired,
     })),
-    components: family.components.map((c) => ({
+    components: resolved.components.map((c) => ({
       code: c.code,
       order: c.defaultOrder,
       visible: c.mandatory ? true : c.defaultVisible,
     })),
     modes,
-    evidence: family.evidence.map((e) => ({
-      code: e.code,
-      include: e.defaultInclude,
-      required: e.defaultRequired,
-    })),
+    evidence: resolved.evidence
+      .filter((e) => e.defaultInclude)
+      .map((e) => ({
+        code: e.code,
+        required: e.defaultRequired,
+      })),
   };
 }

@@ -1,605 +1,536 @@
+import { DOCUMENT } from '@angular/core';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ApiError } from '../shared/trade-api';
-import { FAKE_COLLEAGUE, FAKE_ME, setFakeActor } from './governance-fake-actors';
+import { CoreHttp } from '../../../core/api/core-http';
+import { ApiError, newIdempotencyKey } from '../shared/trade-api';
+import { TradeHttpStub } from '../shared/testing/trade-http-testing';
+import { TradeHttp, bindTradeHttp, bindTradeHttpForTest, tradeQueries } from '../shared/trade-http';
 import {
   createProfile,
   createVersion,
   deleteVersion,
   getProfile,
   getProfileCounts,
+  getRegistry,
   getVersion,
   listProfiles,
   publishVersion,
   validateVersion,
 } from './profiles.api';
-import { resetFakeProfileStore, setFakeProfileScopeTarget } from './profiles.fake';
-import type { ProfileContent, ProfileRequiredCaseInput } from './profiles.model';
-import { PROFILE_REGISTRY, type DocumentType } from './profiles.registry';
+import type {
+  DocumentProfile,
+  DocumentProfileRecord,
+  ProfileContent,
+  ProfileCounts,
+  ProfileDeleteResult,
+  ProfileList,
+  ProfilePublishResult,
+  ProfileValidateResult,
+  ProfileVersionCreated,
+  ProfileVersionDetail,
+} from './profiles.model';
+import { PROFILE_REGISTRY_VERSION, defaultProfileContent } from './profiles.registry';
+import { isEffectiveOverlapError } from './document-profiles-page/profile-access';
 
-/** Behaviour of trade-app document-profile.service.ts and document-profile-activation.service.ts. */
+const UUID_V7_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const PROF_ID = '01900000-0000-7000-8000-000000000010';
+const VER_ID = '01900000-0000-7000-8000-000000000020';
+const COMPANY_CTX = { companyId: 'c1' };
 
-/** Runs the fake timers to completion and returns (or rethrows) the settled result. */
-async function settle<T>(promise: Promise<T>): Promise<T> {
-  const guarded = promise.then(
-    (value) => ({ ok: true as const, value }),
-    (error: unknown) => ({ ok: false as const, error }),
-  );
-  await vi.runAllTimersAsync();
-  const result = await guarded;
-  if (!result.ok) throw result.error;
-  return result.value;
-}
-
-async function rejection(promise: Promise<unknown>): Promise<ApiError> {
-  try {
-    await settle(promise);
-  } catch (error) {
-    expect(error).toBeInstanceOf(ApiError);
-    return error as ApiError;
-  }
-  throw new Error('expected the call to reject');
-}
-
-const NOW = '2026-11-21T12:00:00.000Z';
-const PAST = '2026-11-01T00:00:00.000Z';
-const FUTURE = '2026-12-01T00:00:00.000Z';
-let seq = 0;
-
-function defaultContent(type: DocumentType): ProfileContent {
-  const family = PROFILE_REGISTRY.families[type];
+function makeProfileRecord(overrides: Partial<DocumentProfileRecord> = {}): DocumentProfileRecord {
   return {
-    fields: family.fields.map((f) => ({ code: f.code, visible: f.defaultVisible || f.familyRequired, required: f.defaultRequired })),
-    components: family.components.map((c) => ({ code: c.code, order: c.defaultOrder, visible: c.defaultVisible })),
-    modes: Object.fromEntries(family.modes.map((m) => [m.key, m.defaultValue])),
-    evidence: family.evidence.map((e) => ({ code: e.code, include: e.defaultInclude, required: e.defaultRequired })),
+    id: PROF_ID,
+    scopeTarget: 'COMPANY',
+    companyId: 'c1',
+    companyScopeKey: 'c1',
+    code: 'DEFAULT',
+    documentType: 'QUOTATION',
+    currentPublishedVersionId: null,
+    pointerVersion: 0,
+    version: 1,
+    createdBy: 'u1',
+    updatedBy: 'u1',
+    createdAt: '2026-11-23T10:00:00.000Z',
+    updatedAt: '2026-11-23T10:00:00.000Z',
+    ...overrides,
   };
 }
 
-async function newProfile(type: DocumentType = 'QUOTATION'): Promise<string> {
-  seq += 1;
-  return (await settle(createProfile({ code: `SPEC_PROFILE_${seq}`, documentType: type, scopeTarget: 'COMPANY' }))).id;
+function makeProfile(overrides: Partial<DocumentProfile> = {}): DocumentProfile {
+  return {
+    ...makeProfileRecord(),
+    versions: [
+      {
+        id: VER_ID,
+        profileVersion: 1,
+        schemaVersion: 'trade-document-profile.v1',
+        registryVersion: PROFILE_REGISTRY_VERSION,
+        runtimeVersion: 'trade-document-runtime.v1',
+        checksum: 'chk-1',
+        status: 'DRAFT',
+        effectiveFrom: '2026-12-01T00:00:00.000Z',
+        effectiveTo: null,
+        supersededAt: null,
+        supersededByVersionId: null,
+        version: 1,
+        authorUserId: 'u1',
+        validatedBy: null,
+        publishedBy: null,
+      },
+    ],
+    ...overrides,
+  };
 }
 
-async function newVersion(
-  profileId: string,
-  effectiveFrom = FUTURE,
-  extra: { content?: ProfileContent; cases?: ProfileRequiredCaseInput[]; effectiveTo?: string | null; type?: DocumentType } = {},
-): Promise<string> {
-  const created = await settle(
-    createVersion(profileId, {
-      content: extra.content ?? defaultContent(extra.type ?? 'QUOTATION'),
-      requiredCases: extra.cases ?? [],
-      effectiveFrom,
-      effectiveTo: extra.effectiveTo ?? null,
-    }),
-  );
-  return created.id;
-}
+describe('profiles.api (TradeHttpStub)', () => {
+  it('recognizes the backend uppercase overlap reason and the direct field code', () => {
+    expect(isEffectiveOverlapError(new ApiError(409, 'TRADE.DOCUMENT_PROFILE.PUBLISH_NOT_READY', {
+      reason: ['EFFECTIVE_OVERLAP'],
+    }))).toBe(true);
+    expect(isEffectiveOverlapError(new ApiError(409, 'TRADE.DOCUMENT_PROFILE.EFFECTIVE_OVERLAP'))).toBe(true);
+    expect(isEffectiveOverlapError(new ApiError(409, 'TRADE.DOCUMENT_PROFILE.PUBLISH_NOT_READY', {
+      reason: ['NO_PASSING_RUN'],
+    }))).toBe(false);
+  });
+  let stub: TradeHttpStub;
+  let dispose: () => void;
 
-/** Draft (author) -> validated -> published by a colleague against the current pointer version. */
-async function publishNew(profileId: string, effectiveFrom: string, effectiveTo: string | null = null): Promise<string> {
-  setFakeActor(FAKE_ME);
-  const id = await newVersion(profileId, effectiveFrom, { effectiveTo });
-  await settle(validateVersion(id));
-  const profile = await settle(getProfile(profileId));
-  setFakeActor(FAKE_COLLEAGUE);
-  await settle(publishVersion(id, profile.pointerVersion));
-  setFakeActor(FAKE_ME);
-  return id;
-}
-
-beforeEach(() => {
-  resetFakeProfileStore();
-  vi.useFakeTimers();
-  vi.setSystemTime(new Date(NOW));
-  setFakeActor(FAKE_ME);
-});
-
-afterEach(() => {
-  setFakeActor(FAKE_ME);
-  vi.useRealTimers();
-});
-
-describe('document profiles', () => {
-  it('creates a profile in the operating scope with a zero pointer', async () => {
-    seq += 1;
-    const created = await settle(
-      createProfile({ code: `SPEC_NEW_${seq}`, documentType: 'SALES_ORDER', scopeTarget: 'COMPANY' }),
-    );
-
-    expect(created.code).toBe(`SPEC_NEW_${seq}`);
-    expect(created.scopeTarget).toBe('COMPANY');
-    expect(created.pointerVersion).toBe(0);
-    expect(created.currentPublishedVersionId).toBeNull();
+  beforeEach(() => {
+    stub = new TradeHttpStub();
+    dispose = bindTradeHttpForTest(stub);
   });
 
-  it('rejects a lower-case code with 400 (DTO pattern)', async () => {
-    const error = await rejection(createProfile({ code: 'spec_lower', documentType: 'QUOTATION', scopeTarget: 'COMPANY' }));
-
-    expect(error.status).toBe(400);
-    expect(error.code).toBe('TRADE.VALIDATION_FAILED');
+  afterEach(() => {
+    dispose();
   });
 
-  it('rejects a scopeTarget other than the operating scope with 422 SCOPE_NOT_ALLOWED', async () => {
-    const error = await rejection(createProfile({ code: 'SPEC_BRANCH', documentType: 'QUOTATION', scopeTarget: 'BRANCH' }));
-
-    expect(error.status).toBe(422);
-    expect(error.code).toBe('TRADE.DOCUMENT_PROFILE.SCOPE_NOT_ALLOWED');
-  });
-
-  it('rejects every profile call from a branch context with 422 SCOPE_NOT_ALLOWED', async () => {
-    setFakeProfileScopeTarget('BRANCH');
-
-    const error = await rejection(listProfiles());
-
-    expect(error.status).toBe(422);
-    expect(error.code).toBe('TRADE.DOCUMENT_PROFILE.SCOPE_NOT_ALLOWED');
-  });
-
-  it('hides a profile of another scope with 404', async () => {
-    const id = await newProfile();
-    setFakeProfileScopeTarget('TENANT');
-
-    const error = await rejection(getProfile(id));
-
-    expect(error.status).toBe(404);
-    expect(error.code).toBe('TRADE.DOCUMENT_PROFILE.NOT_FOUND');
-  });
-
-  it('rejects a duplicate document type, code and scope with 409', async () => {
-    const id = await newProfile('QUOTATION');
-    const existing = await settle(getProfile(id));
-
-    const error = await rejection(createProfile({ code: existing.code, documentType: 'QUOTATION', scopeTarget: 'COMPANY' }));
-
-    expect(error.status).toBe(409);
-    expect(error.code).toBe('TRADE.DOCUMENT_PROFILE.IDENTITY_TAKEN');
-  });
-
-  it('allows the same code under a different document type', async () => {
-    const id = await newProfile('QUOTATION');
-    const existing = await settle(getProfile(id));
-
-    const other = await settle(createProfile({ code: existing.code, documentType: 'PURCHASE_ORDER', scopeTarget: 'COMPANY' }));
-
-    expect(other.documentType).toBe('PURCHASE_ORDER');
-  });
-
-  it('lists { items, total, page, limit } filtered by document type and q', async () => {
-    const id = await newProfile('PURCHASE_ORDER');
-    const created = await settle(getProfile(id));
-
-    const hits = await settle(listProfiles({ documentType: 'PURCHASE_ORDER', q: created.code.toLowerCase() }));
-    const misses = await settle(listProfiles({ documentType: 'QUOTATION', q: created.code.toLowerCase() }));
-
-    expect(hits.items.map((p) => p.id)).toEqual([id]);
-    expect(hits.total).toBe(1);
-    expect(hits.page).toBe(1);
-    expect(hits.limit).toBe(25);
-    expect(misses.items).toEqual([]);
-  });
-
-  it('counts profiles by document type, every family a key', async () => {
-    await newProfile('SALES_ORDER');
-
-    const counts = await settle(getProfileCounts());
-
-    expect(Object.keys(counts.byDocumentType)).toContain('POS_SALE');
-    expect(counts.total).toBe(Object.values(counts.byDocumentType).reduce((sum, n) => sum + n, 0));
-    expect(counts.byDocumentType['SALES_ORDER']).toBe(2);
-  });
-
-  it('omits draft content from list rows unless include=content', async () => {
-    const profileId = await newProfile();
-    await newVersion(profileId);
-
-    const plain = await settle(listProfiles({ q: 'SPEC_PROFILE' }));
-    const withContent = await settle(listProfiles({ q: 'SPEC_PROFILE', include: 'content' }));
-
-    expect(plain.items[0].versions[0].content).toBeUndefined();
-    expect(withContent.items[0].versions[0].content).toBeDefined();
-  });
-});
-
-describe('document profile version lifecycle', () => {
-  it('creates a DRAFT version numbered from 1 and does not bump the profile version', async () => {
-    const profileId = await newProfile();
-    const before = await settle(getProfile(profileId));
-
-    const first = await settle(getVersion(await newVersion(profileId)));
-    const second = await settle(getVersion(await newVersion(profileId)));
-    const after = await settle(getProfile(profileId));
-
-    expect(first.status).toBe('DRAFT');
-    expect(first.profileVersion).toBe(1);
-    expect(second.profileVersion).toBe(2);
-    expect(first.profile.id).toBe(profileId);
-    expect(after.version).toBe(before.version);
-  });
-
-  it('moves a draft to TESTED when the validation run passes', async () => {
-    const id = await newVersion(await newProfile());
-
-    const run = await settle(validateVersion(id));
-    const detail = await settle(getVersion(id));
-
-    expect(run.passed).toBe(true);
-    expect(run.status).toBe('TESTED');
-    expect(detail.status).toBe('TESTED');
-    expect(detail.latestValidationRun?.id).toBe(run.validationRunId);
-    expect(detail.version).toBe(run.version);
-  });
-
-  it('stores the four server cases before the author cases', async () => {
-    const id = await newVersion(await newProfile(), FUTURE, {
-      cases: [{ code: 'AUTHOR_CASE', input: {}, expectedValid: false }],
+  it('getRegistry calls GET /document-profiles/registry with OPTIONAL scope and maps wire family metadata', async () => {
+    stub.register('GET', '/document-profiles/registry', {
+      families: {
+        QUOTATION: {
+          fields: ['PARTY', 'CONTACT', 'CURRENCY', 'VALID_UNTIL', 'LINES', 'GRAND_TOTAL'],
+          requiredFields: ['PARTY', 'CURRENCY', 'VALID_UNTIL', 'LINES'],
+          serverOwnedFields: ['GRAND_TOTAL'],
+          components: ['HEADER', 'LINE_ITEMS', 'TOTALS'],
+          requiredComponents: ['HEADER', 'LINE_ITEMS'],
+          modes: {
+            acceptanceMode: { allowedValues: ['INTERNAL_AUTHORIZED'] },
+            priceLockRequired: { allowedValues: [true, false] },
+          },
+          evidenceCodes: ['CUSTOMER_ACCEPTANCE', 'APPROVAL_DECISION'],
+          serverCaseCodes: ['MINIMAL_VALID', 'MISSING_REQUIRED_REJECTED', 'SERVER_OWNED_REJECTED', 'QUOTATION_REGISTRY_COMPATIBLE'],
+        },
+        SALES_ORDER: {
+          fields: ['PARTY', 'CURRENCY', 'LINES'],
+          requiredFields: ['PARTY', 'CURRENCY', 'LINES'],
+          serverOwnedFields: [],
+          components: ['HEADER', 'LINE_ITEMS'],
+          requiredComponents: ['HEADER', 'LINE_ITEMS'],
+          modes: { confirmationMode: { allowedValues: ['SYNC'] } },
+          evidenceCodes: ['APPROVAL_DECISION'],
+          serverCaseCodes: ['MINIMAL_VALID'],
+        },
+        PURCHASE_ORDER: {
+          fields: ['SUPPLIER', 'CURRENCY', 'LINES', 'RECEIVING_NODE'],
+          requiredFields: ['SUPPLIER', 'CURRENCY', 'LINES', 'RECEIVING_NODE'],
+          serverOwnedFields: [],
+          components: ['HEADER', 'LINE_ITEMS'],
+          requiredComponents: ['HEADER', 'LINE_ITEMS'],
+          modes: { approvalMode: { allowedValues: ['NONE', 'WORKFLOW'] } },
+          evidenceCodes: ['SUPPLIER_ACKNOWLEDGEMENT'],
+          serverCaseCodes: ['MINIMAL_VALID'],
+        },
+      },
     });
 
-    const run = await settle(validateVersion(id));
-    const detail = await settle(getVersion(id));
-
-    expect(run.results.map((r) => r.code)).toEqual([
-      'MINIMAL_VALID',
-      'MISSING_REQUIRED_REJECTED',
-      'SERVER_OWNED_REJECTED',
-      'QUOTATION_REGISTRY_COMPATIBLE',
-      'AUTHOR_CASE',
+    const reg = await getRegistry(COMPANY_CTX);
+    expect(reg.families.QUOTATION.fields.find((f) => f.code === 'PARTY')?.familyRequired).toBe(true);
+    expect(reg.families.QUOTATION.fields.find((f) => f.code === 'GRAND_TOTAL')?.serverOwned).toBe(true);
+    expect(reg.families.QUOTATION.components.find((c) => c.code === 'HEADER')?.mandatory).toBe(true);
+    expect(reg.families.QUOTATION.modes.find((m) => m.key === 'acceptanceMode')).toEqual({
+      key: 'acceptanceMode',
+      kind: 'enum',
+      allowedValues: ['INTERNAL_AUTHORIZED'],
+      defaultValue: 'INTERNAL_AUTHORIZED',
+      locked: true,
+    });
+    expect(reg.families.QUOTATION.modes.find((m) => m.key === 'priceLockRequired')).toEqual({
+      key: 'priceLockRequired',
+      kind: 'boolean',
+      allowedValues: ['true', 'false'],
+      defaultValue: true,
+      locked: false,
+    });
+    expect(stub.recordedReads()).toEqual([
+      { path: '/document-profiles/registry', query: undefined, scope: COMPANY_CTX },
     ]);
-    expect(detail.requiredCases.every((c) => typeof c.id === 'string' && typeof c.expectedHash === 'string')).toBe(true);
   });
 
-  it('keeps the version in DRAFT and its row version when a required case fails', async () => {
-    const id = await newVersion(await newProfile(), FUTURE, {
-      cases: [{ code: 'NO_FIELDS_IS_VALID', input: {}, expectedValid: true }],
-    });
+  it('getProfileCounts calls GET /document-profiles/counts with filter query and OPTIONAL scope', async () => {
+    const counts: ProfileCounts = {
+      total: 3,
+      byDocumentType: { QUOTATION: 1, SALES_ORDER: 1, PURCHASE_ORDER: 1, POS_SALE: 0 },
+    };
+    stub.register('GET', '/document-profiles/counts', counts);
 
-    const run = await settle(validateVersion(id));
-    const detail = await settle(getVersion(id));
-
-    expect(run.passed).toBe(false);
-    expect(run.results.find((r) => r.code === 'NO_FIELDS_IS_VALID')?.passed).toBe(false);
-    expect(detail.status).toBe('DRAFT');
-    expect(detail.version).toBe(1);
-    expect(detail.latestValidationRun?.diagnostics).toEqual([{ caseCode: 'NO_FIELDS_IS_VALID', code: 'OUTCOME_HASH_MISMATCH' }]);
-  });
-
-  it('passes a required case that expects an incomplete input to be invalid', async () => {
-    const id = await newVersion(await newProfile(), FUTURE, {
-      cases: [{ code: 'EMPTY_REJECTED', input: {}, expectedValid: false }],
-    });
-
-    const run = await settle(validateVersion(id));
-
-    expect(run.results.find((r) => r.code === 'EMPTY_REJECTED')?.passed).toBe(true);
-  });
-
-  it('refuses to validate a version that is no longer a draft (not_draft)', async () => {
-    const id = await newVersion(await newProfile());
-    const first = await settle(validateVersion(id));
-
-    const error = await rejection(validateVersion(id, first.version));
-
-    expect(error.status).toBe(409);
-    expect(error.code).toBe('TRADE.DOCUMENT_PROFILE.PUBLISH_NOT_READY');
-    expect(error.details?.['reason']).toEqual(['not_draft']);
-  });
-
-  it('refuses to publish a draft that was never validated (not_tested)', async () => {
-    const profileId = await newProfile();
-    const id = await newVersion(profileId);
-    setFakeActor(FAKE_COLLEAGUE);
-
-    const error = await rejection(publishVersion(id, 0));
-
-    expect(error.status).toBe(409);
-    expect(error.details?.['reason']).toEqual(['not_tested']);
-  });
-
-  it('refuses the author publishing their own version (self_publish)', async () => {
-    const profileId = await newProfile();
-    const id = await newVersion(profileId);
-    await settle(validateVersion(id));
-
-    const error = await rejection(publishVersion(id, 0));
-
-    expect(error.status).toBe(409);
-    expect(error.details?.['reason']).toEqual(['self_publish']);
-  });
-
-  it('checks the pointer before the row version (STALE_VERSION wins)', async () => {
-    const profileId = await newProfile();
-    const id = await newVersion(profileId);
-    setFakeActor(FAKE_COLLEAGUE);
-
-    // Neither tested nor fresh: the stale pointer is reported first.
-    const error = await rejection(publishVersion(id, 7, 99));
-
-    expect(error.status).toBe(409);
-    expect(error.code).toBe('TRADE.CONCURRENCY.STALE_VERSION');
-  });
-
-  it('publishes an immediate version, moves the pointer and returns the publish result', async () => {
-    const profileId = await newProfile();
-    setFakeActor(FAKE_ME);
-    const id = await newVersion(profileId, PAST);
-    await settle(validateVersion(id));
-    setFakeActor(FAKE_COLLEAGUE);
-
-    const result = await settle(publishVersion(id, 0));
-    const profile = await settle(getProfile(profileId));
-
-    expect(result.status).toBe('PUBLISHED');
-    expect(result.active).toBe(true);
-    expect(result.activePointerVersion).toBe(1);
-    expect(result.publishedBy).toBe(FAKE_COLLEAGUE);
-    expect(profile.currentPublishedVersionId).toBe(id);
-    expect(profile.pointerVersion).toBe(1);
-  });
-
-  it('schedules a future-dated version without moving the pointer', async () => {
-    const profileId = await newProfile();
-    setFakeActor(FAKE_ME);
-    const id = await newVersion(profileId, FUTURE);
-    await settle(validateVersion(id));
-    setFakeActor(FAKE_COLLEAGUE);
-
-    const result = await settle(publishVersion(id, 0));
-    const profile = await settle(getProfile(profileId));
-
-    expect(result.status).toBe('SCHEDULED');
-    expect(result.active).toBe(false);
-    expect(result.scheduledExpectedPointerVersion).toBe(0);
-    expect(profile.currentPublishedVersionId).toBeNull();
-    expect(profile.pointerVersion).toBe(0);
-  });
-
-  it('activates a scheduled version and moves the pointer once its start has passed', async () => {
-    const profileId = await newProfile();
-    const id = await publishNew(profileId, FUTURE);
-
-    vi.setSystemTime(new Date('2026-12-01T00:00:01.000Z'));
-    const detail = await settle(getVersion(id));
-    const profile = await settle(getProfile(profileId));
-
-    expect(detail.status).toBe('PUBLISHED');
-    expect(profile.currentPublishedVersionId).toBe(id);
-    expect(profile.pointerVersion).toBe(1);
-  });
-
-  it('leaves a scheduled version SCHEDULED when the pointer moved since it was scheduled', async () => {
-    const profileId = await newProfile();
-    const scheduled = await publishNew(profileId, '2027-01-01T00:00:00.000Z');
-    await publishNew(profileId, PAST, '2026-12-01T00:00:00.000Z');
-
-    vi.setSystemTime(new Date('2027-01-02T00:00:00.000Z'));
-    const detail = await settle(getVersion(scheduled));
-
-    expect(detail.status).toBe('SCHEDULED');
-  });
-
-  describe('predecessor of a publish', () => {
-    it('immediate: cuts the live version at now and marks it SUPERSEDED', async () => {
-      const profileId = await newProfile();
-      const oldId = await publishNew(profileId, PAST);
-
-      const newId = await publishNew(profileId, '2026-11-10T00:00:00.000Z');
-      const old = await settle(getVersion(oldId));
-      const profile = await settle(getProfile(profileId));
-
-      expect(old.status).toBe('SUPERSEDED');
-      // Cut at the publish moment (now, after the fake delays), not at the successor start.
-      expect(Date.parse(old.supersededAt!)).toBeGreaterThanOrEqual(Date.parse(NOW));
-      expect(Date.parse(old.supersededAt!)).toBeLessThanOrEqual(Date.now());
-      expect(old.supersededByVersionId).toBe(newId);
-      expect(old.effectiveTo).toBeNull();
-      expect(profile.currentPublishedVersionId).toBe(newId);
-      expect(profile.pointerVersion).toBe(2);
-    });
-
-    it('immediate across a gap: leaves both supersession fields null', async () => {
-      const profileId = await newProfile();
-      const oldId = await publishNew(profileId, PAST, '2026-11-05T00:00:00.000Z');
-
-      await publishNew(profileId, '2026-11-10T00:00:00.000Z');
-      const old = await settle(getVersion(oldId));
-
-      expect(old.status).toBe('SUPERSEDED');
-      expect(old.supersededAt).toBeNull();
-      expect(old.supersededByVersionId).toBeNull();
-      expect(old.effectiveTo).toBe('2026-11-05T00:00:00.000Z');
-    });
-
-    it('scheduled: reserves the cut at the successor start and keeps the live version PUBLISHED', async () => {
-      const profileId = await newProfile();
-      const oldId = await publishNew(profileId, PAST);
-
-      const newId = await publishNew(profileId, FUTURE);
-      const old = await settle(getVersion(oldId));
-      const profile = await settle(getProfile(profileId));
-
-      expect(old.status).toBe('PUBLISHED');
-      expect(old.supersededAt).toBe(FUTURE);
-      expect(old.supersededByVersionId).toBe(newId);
-      expect(old.effectiveTo).toBeNull();
-      expect(profile.currentPublishedVersionId).toBe(oldId);
-      expect(profile.pointerVersion).toBe(1);
-    });
-
-    it('scheduled: marks the live version SUPERSEDED once the successor activates', async () => {
-      const profileId = await newProfile();
-      const oldId = await publishNew(profileId, PAST);
-      await publishNew(profileId, FUTURE);
-
-      vi.setSystemTime(new Date('2026-12-01T00:00:01.000Z'));
-      const old = await settle(getVersion(oldId));
-
-      expect(old.status).toBe('SUPERSEDED');
-      expect(old.supersededAt).toBe(FUTURE);
-    });
-
-    it('scheduled: leaves a live version that ends before the successor untouched', async () => {
-      const profileId = await newProfile();
-      const oldId = await publishNew(profileId, PAST, '2026-11-30T00:00:00.000Z');
-
-      await publishNew(profileId, FUTURE);
-      const old = await settle(getVersion(oldId));
-
-      expect(old.status).toBe('PUBLISHED');
-      expect(old.supersededAt).toBeNull();
-      expect(old.supersededByVersionId).toBeNull();
+    const res = await getProfileCounts({ documentType: 'QUOTATION', versionStatus: 'PUBLISHED', q: 'DEF' }, {});
+    expect(res).toEqual(counts);
+    expect(stub.recordedReads()[0]).toEqual({
+      path: '/document-profiles/counts',
+      query: { documentType: 'QUOTATION', versionStatus: 'PUBLISHED', q: 'DEF' },
+      scope: {},
     });
   });
 
-  it('rejects a publish whose window overlaps another scheduled version (effective_overlap)', async () => {
-    const profileId = await newProfile();
-    await publishNew(profileId, FUTURE);
+  it('listProfiles calls GET /document-profiles with query params and unwraps list envelope', async () => {
+    const list: ProfileList = { items: [makeProfile()], total: 1, page: 2, limit: 25 };
+    stub.register('GET', '/document-profiles', list);
 
-    setFakeActor(FAKE_ME);
-    const second = await newVersion(profileId, '2026-12-15T00:00:00.000Z');
-    await settle(validateVersion(second));
-    const profile = await settle(getProfile(profileId));
-    setFakeActor(FAKE_COLLEAGUE);
-    const error = await rejection(publishVersion(second, profile.pointerVersion));
-
-    expect(error.status).toBe(409);
-    expect(error.code).toBe('TRADE.DOCUMENT_PROFILE.PUBLISH_NOT_READY');
-    expect(error.details?.['reason']).toEqual(['effective_overlap']);
+    const res = await listProfiles(
+      { documentType: 'QUOTATION', versionStatus: 'DRAFT', q: 'DEF', page: 2, limit: 25, include: 'content' },
+      COMPANY_CTX,
+    );
+    expect(res).toEqual(list);
+    expect(stub.recordedReads()[0]).toEqual({
+      path: '/document-profiles',
+      query: {
+        documentType: 'QUOTATION',
+        versionStatus: 'DRAFT',
+        q: 'DEF',
+        page: 2,
+        limit: 25,
+        include: 'content',
+      },
+      scope: COMPANY_CTX,
+    });
   });
 
-  it('does not change the live version when the publish is rejected', async () => {
-    const profileId = await newProfile();
-    const liveId = await publishNew(profileId, PAST);
-    await publishNew(profileId, '2027-03-01T00:00:00.000Z');
+  it('getProfile calls GET /document-profiles/:id with OPTIONAL scope and unwraps profile', async () => {
+    const profile = makeProfile();
+    stub.register('GET', '/document-profiles/:id', profile);
 
-    setFakeActor(FAKE_ME);
-    const clash = await newVersion(profileId, '2027-02-01T00:00:00.000Z', { effectiveTo: '2027-04-01T00:00:00.000Z' });
-    await settle(validateVersion(clash));
-    const profile = await settle(getProfile(profileId));
-    setFakeActor(FAKE_COLLEAGUE);
-    await rejection(publishVersion(clash, profile.pointerVersion));
-    const live = await settle(getVersion(liveId));
-
-    expect(live.status).toBe('PUBLISHED');
-    expect(live.effectiveTo).toBeNull();
-    expect(live.supersededAt).toBe('2027-03-01T00:00:00.000Z');
+    const res = await getProfile('prof/1', COMPANY_CTX);
+    expect(res).toEqual(profile);
+    expect(stub.recordedReads()[0]).toEqual({
+      path: '/document-profiles/prof%2F1',
+      query: undefined,
+      scope: COMPANY_CTX,
+    });
   });
 
-  it('deletes a draft but refuses to delete a validated version (not_deletable)', async () => {
-    const profileId = await newProfile();
-    const draft = await newVersion(profileId);
-    const tested = await newVersion(profileId);
-    await settle(validateVersion(tested));
+  it('createProfile sends POST /document-profiles with whitelisted body, UUIDv7 key, no If-Match, and propagates field errors', async () => {
+    const created = makeProfileRecord();
+    stub.register('POST', '/document-profiles', created);
 
-    const deleted = await settle(deleteVersion(draft, 1));
-    const error = await rejection(deleteVersion(tested));
-    const profile = await settle(getProfile(profileId));
+    const key = newIdempotencyKey();
+    const res = await createProfile(
+      { code: 'DEFAULT', documentType: 'QUOTATION', scopeTarget: 'COMPANY', extra: 'strip' } as never,
+      { idempotencyKey: key, ctx: COMPANY_CTX },
+    );
+    expect(res).toEqual(created);
+    expect(stub.recordedWrites()[0]).toEqual({
+      method: 'POST',
+      path: '/document-profiles',
+      body: { code: 'DEFAULT', documentType: 'QUOTATION', scopeTarget: 'COMPANY' },
+      key,
+      ifMatch: undefined,
+      scope: COMPANY_CTX,
+      query: undefined,
+    });
+    expect(stub.recordedWrites()[0].key).toMatch(UUID_V7_REGEX);
 
-    expect(deleted.id).toBe(draft);
-    expect(deleted.deleted).toBe(true);
-    expect(error.code).toBe('TRADE.DOCUMENT_PROFILE.PUBLISH_NOT_READY');
-    expect(error.details?.['reason']).toEqual(['not_deletable']);
-    expect(profile.versions.map((v) => v.id)).toEqual([tested]);
+    await expect(
+      createProfile({ code: 'DEFAULT', documentType: 'QUOTATION', scopeTarget: 'COMPANY' }, ''),
+    ).rejects.toMatchObject({ status: 400, code: 'TRADE.IDEMPOTENCY.KEY_MISSING' });
+
+    await expect(
+      createProfile({ code: 'DEFAULT', documentType: 'QUOTATION', scopeTarget: 'COMPANY' }, 'bad-key'),
+    ).rejects.toMatchObject({ status: 422, code: 'TRADE.IDEMPOTENCY.KEY_REQUIRED' });
+
+    const fieldErr = new ApiError(400, 'TRADE.VALIDATION_FAILED', { code: ['invalid'] });
+    stub.register('POST', '/document-profiles', fieldErr);
+    await expect(
+      createProfile({ code: 'bad', documentType: 'QUOTATION', scopeTarget: 'COMPANY' }, newIdempotencyKey()),
+    ).rejects.toMatchObject({
+      status: 400,
+      code: 'TRADE.VALIDATION_FAILED',
+      details: { code: ['invalid'] },
+    });
+  });
+
+  it('createVersion strips UI-only `include` from evidence[] (G-9), enforces S1 booleans, and sends key + If-Match', async () => {
+    const baseContent = defaultProfileContent('QUOTATION');
+    const contentWithInclude: ProfileContent = {
+      ...baseContent,
+      evidence: [
+        { code: 'CUSTOMER_ACCEPTANCE', include: true, required: false },
+        { code: 'APPROVAL_DECISION', include: true, required: true },
+        { code: 'SUPPLIER_ACKNOWLEDGEMENT', include: false, required: false },
+      ],
+    };
+    const created: ProfileVersionCreated = {
+      id: VER_ID,
+      profileId: PROF_ID,
+      profileVersion: 1,
+      schemaVersion: 'trade-document-profile.v1',
+      registryVersion: PROFILE_REGISTRY_VERSION,
+      runtimeVersion: 'trade-document-runtime.v1',
+      checksum: 'chk-1',
+      status: 'DRAFT',
+      effectiveFrom: '2026-12-01T00:00:00.000Z',
+      effectiveTo: null,
+      supersededAt: null,
+      supersededByVersionId: null,
+      version: 1,
+      authorUserId: 'u1',
+      validatedBy: null,
+      publishedBy: null,
+      content: {
+        ...baseContent,
+        evidence: [
+          { code: 'CUSTOMER_ACCEPTANCE', required: false },
+          { code: 'APPROVAL_DECISION', required: true },
+        ],
+      },
+      restoredFromVersionId: null,
+      restorationReason: null,
+      scheduledExpectedPointerVersion: null,
+      requiredCaseCount: 5,
+    };
+    stub.register('POST', '/document-profiles/:id/versions', created);
+
+    await expect(
+      createVersion(
+        PROF_ID,
+        { content: contentWithInclude, effectiveFrom: '2026-12-01T00:00:00.000Z' },
+        undefined,
+        newIdempotencyKey(),
+        COMPANY_CTX,
+      ),
+    ).rejects.toMatchObject({ status: 400, code: 'TRADE.CONCURRENCY.IF_MATCH_REQUIRED' });
+
+    const key = newIdempotencyKey();
+    const res = await createVersion(
+      PROF_ID,
+      {
+        content: contentWithInclude,
+        requiredCases: [{ code: 'MIN_CASE', input: { PARTY: 'p1' }, expectedValid: true }],
+        effectiveFrom: '2026-12-01T00:00:00.000Z',
+        effectiveTo: null,
+      },
+      1,
+      key,
+      COMPANY_CTX,
+    );
+    expect(res.id).toBe(VER_ID);
+
+    const write = stub.recordedWrites()[0];
+    expect(write.method).toBe('POST');
+    expect(write.path).toBe(`/document-profiles/${PROF_ID}/versions`);
+    expect(write.key).toBe(key);
+    expect(write.ifMatch).toBe('"1"');
+    expect(write.scope).toEqual(COMPANY_CTX);
+
+    const sentBody = write.body as { content: ProfileContent };
+    expect(sentBody.content.evidence).toEqual([
+      { code: 'CUSTOMER_ACCEPTANCE', required: false },
+      { code: 'APPROVAL_DECISION', required: true },
+    ]);
+    expect(sentBody.content.evidence.every((item) => !('include' in item))).toBe(true);
+  });
+
+  it('getVersion calls GET /document-profile-versions/:id with OPTIONAL scope and supports contentHidden', async () => {
+    const detail: ProfileVersionDetail = {
+      id: VER_ID,
+      profileVersion: 1,
+      schemaVersion: 'trade-document-profile.v1',
+      registryVersion: PROFILE_REGISTRY_VERSION,
+      runtimeVersion: 'trade-document-runtime.v1',
+      checksum: 'chk-1',
+      status: 'DRAFT',
+      effectiveFrom: '2026-12-01T00:00:00.000Z',
+      effectiveTo: null,
+      supersededAt: null,
+      supersededByVersionId: null,
+      version: 1,
+      authorUserId: 'u1',
+      validatedBy: null,
+      publishedBy: null,
+      contentHidden: true,
+      requiredCases: [],
+      latestValidationRun: null,
+      profile: {
+        id: PROF_ID,
+        code: 'DEFAULT',
+        documentType: 'QUOTATION',
+        scopeTarget: 'COMPANY',
+        pointerVersion: 0,
+        currentPublishedVersionId: null,
+      },
+    };
+    stub.register('GET', '/document-profile-versions/:id', detail);
+
+    const res = await getVersion(VER_ID, COMPANY_CTX);
+    expect(res.contentHidden).toBe(true);
+    expect(res.content).toBeUndefined();
+    expect(stub.recordedReads()[0]).toEqual({
+      path: `/document-profile-versions/${VER_ID}`,
+      query: undefined,
+      scope: COMPANY_CTX,
+    });
+  });
+
+  it('deleteVersion sends DELETE /document-profile-versions/:id with empty body, key, and If-Match', async () => {
+    const deleted: ProfileDeleteResult = { id: VER_ID, deleted: true, version: 2 };
+    stub.register('DELETE', '/document-profile-versions/:id', deleted);
+
+    const key = newIdempotencyKey();
+    const res = await deleteVersion(VER_ID, 1, key, COMPANY_CTX);
+    expect(res).toEqual(deleted);
+    expect(stub.recordedWrites()[0]).toEqual({
+      method: 'DELETE',
+      path: `/document-profile-versions/${VER_ID}`,
+      body: undefined,
+      key,
+      ifMatch: '"1"',
+      scope: COMPANY_CTX,
+      query: undefined,
+    });
+  });
+
+  it('validateVersion sends POST /document-profile-versions/:id/validate with empty body, key, and If-Match', async () => {
+    const result: ProfileValidateResult = {
+      validationRunId: 'run-1',
+      passed: true,
+      status: 'TESTED',
+      checksum: 'chk-1',
+      registryChecksum: 'reg-1',
+      results: [],
+      version: 2,
+    };
+    stub.register('POST', '/document-profile-versions/:id/validate', result);
+
+    const key = newIdempotencyKey();
+    const res = await validateVersion(VER_ID, 1, key, COMPANY_CTX);
+    expect(res).toEqual(result);
+    expect(stub.recordedWrites()[0]).toEqual({
+      method: 'POST',
+      path: `/document-profile-versions/${VER_ID}/validate`,
+      body: undefined,
+      key,
+      ifMatch: '"1"',
+      scope: COMPANY_CTX,
+      query: undefined,
+    });
+  });
+
+  it('publishVersion sends { expectedActivePointerVersion }, key, and If-Match, and propagates ACTIVE_POINTER_STALE without retry', async () => {
+    const published: ProfilePublishResult = {
+      id: VER_ID,
+      profileId: PROF_ID,
+      profileVersion: 2,
+      schemaVersion: 'trade-document-profile.v1',
+      registryVersion: PROFILE_REGISTRY_VERSION,
+      runtimeVersion: 'trade-document-runtime.v1',
+      checksum: 'chk-2',
+      status: 'PUBLISHED',
+      effectiveFrom: '2026-11-01T00:00:00.000Z',
+      effectiveTo: null,
+      supersededAt: null,
+      supersededByVersionId: null,
+      version: 3,
+      authorUserId: 'u1',
+      validatedBy: 'u1',
+      publishedBy: 'u2',
+      content: defaultProfileContent('QUOTATION'),
+      restoredFromVersionId: null,
+      restorationReason: null,
+      scheduledExpectedPointerVersion: null,
+      activePointerVersion: 1,
+      active: true,
+    };
+    stub.register('POST', '/document-profile-versions/:id/publish', published);
+
+    const key = newIdempotencyKey();
+    const res = await publishVersion(VER_ID, 0, 2, key, COMPANY_CTX);
+    expect(res).toEqual(published);
+    expect(stub.recordedWrites()[0]).toEqual({
+      method: 'POST',
+      path: `/document-profile-versions/${VER_ID}/publish`,
+      body: { expectedActivePointerVersion: 0 },
+      key,
+      ifMatch: '"2"',
+      scope: COMPANY_CTX,
+      query: undefined,
+    });
+
+    const stalePointer = new ApiError(409, 'TRADE.DOCUMENT_PROFILE.ACTIVE_POINTER_STALE');
+    stub.register('POST', '/document-profile-versions/:id/publish', stalePointer);
+    await expect(publishVersion(VER_ID, 0, 2, newIdempotencyKey(), COMPANY_CTX)).rejects.toBe(stalePointer);
+    expect(stub.recordedWrites()).toHaveLength(2);
   });
 });
 
-describe('document profile content validation', () => {
-  it('rejects content whose field list does not cover the registry with 422 SCHEMA_INVALID', async () => {
-    const profileId = await newProfile();
-    const content = defaultContent('QUOTATION');
-    content.fields = content.fields.slice(1);
-
-    const error = await rejection(createVersion(profileId, { content, effectiveFrom: FUTURE }));
-
-    expect(error.status).toBe(422);
-    expect(error.code).toBe('TRADE.DOCUMENT_PROFILE.SCHEMA_INVALID');
+describe('profiles.api (TradeHttp wire contract & envelope unwrap)', () => {
+  const base = '/api/tenant/trade/v1';
+  const envelope = (data: unknown) => ({
+    success: true,
+    data,
+    correlationId: 'corr-prof',
+    timestamp: '2026-11-23T12:00:00.000Z',
   });
 
-  it('rejects hiding a family-required field with 422 COMPATIBILITY_FAILED', async () => {
-    const profileId = await newProfile();
-    const content = defaultContent('QUOTATION');
-    const required = PROFILE_REGISTRY.families.QUOTATION.fields.find((f) => f.familyRequired)!;
-    content.fields = content.fields.map((f) => (f.code === required.code ? { ...f, visible: false } : f));
+  let http: HttpTestingController;
+  let dispose: () => void;
 
-    const error = await rejection(createVersion(profileId, { content, effectiveFrom: FUTURE }));
-
-    expect(error.code).toBe('TRADE.DOCUMENT_PROFILE.COMPATIBILITY_FAILED');
+  beforeEach(() => {
+    dispose = bindTradeHttpForTest();
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    const doc = TestBed.inject(DOCUMENT);
+    const cookieName =
+      doc.location.protocol === 'https:' ? '__Host-mutakamel-tenant-csrf' : 'mutakamel-http-tenant-csrf';
+    vi.spyOn(doc, 'cookie', 'get').mockReturnValue(`${cookieName}=csrf-proof`);
+    bindTradeHttp(TestBed.inject(TradeHttp), tradeQueries(), TestBed.inject(CoreHttp));
+    http = TestBed.inject(HttpTestingController);
   });
 
-  it('rejects marking a server-owned field as required', async () => {
-    const profileId = await newProfile();
-    const content = defaultContent('QUOTATION');
-    const serverOwned = PROFILE_REGISTRY.families.QUOTATION.fields.find((f) => f.serverOwned)!;
-    content.fields = content.fields.map((f) => (f.code === serverOwned.code ? { ...f, visible: true, required: true } : f));
-
-    const error = await rejection(createVersion(profileId, { content, effectiveFrom: FUTURE }));
-
-    expect(error.code).toBe('TRADE.DOCUMENT_PROFILE.COMPATIBILITY_FAILED');
+  afterEach(() => {
+    http.verify();
+    vi.restoreAllMocks();
+    dispose();
   });
 
-  it('rejects hiding a mandatory component', async () => {
-    const profileId = await newProfile();
-    const content = defaultContent('QUOTATION');
-    content.components = content.components.map((c) => (c.code === 'LINE_ITEMS' ? { ...c, visible: false } : c));
+  it('unwraps Trade envelope on getProfile and publishVersion with OPTIONAL scope headers', async () => {
+    const prof = makeProfile({ scopeTarget: 'TENANT', companyId: null, companyScopeKey: 'none' });
+    const getPending = getProfile(PROF_ID, {});
+    const getReq = http.expectOne(`${base}/document-profiles/${PROF_ID}`);
+    expect(getReq.request.headers.keys().filter((h) => h.toLowerCase().startsWith('x-mutakamel-'))).toEqual([]);
+    getReq.flush(envelope(prof));
+    await expect(getPending).resolves.toMatchObject({ id: PROF_ID, scopeTarget: 'TENANT' });
 
-    const error = await rejection(createVersion(profileId, { content, effectiveFrom: FUTURE }));
-
-    expect(error.code).toBe('TRADE.DOCUMENT_PROFILE.COMPATIBILITY_FAILED');
-  });
-
-  it('rejects a locked mode that was changed', async () => {
-    const profileId = await newProfile();
-    const content = defaultContent('QUOTATION');
-    content.modes = { ...content.modes, acceptanceMode: 'SOMETHING_ELSE' };
-
-    const error = await rejection(createVersion(profileId, { content, effectiveFrom: FUTURE }));
-
-    expect(error.code).toBe('TRADE.DOCUMENT_PROFILE.COMPATIBILITY_FAILED');
-  });
-
-  it('rejects more than 20 required cases with VALIDATION_LIMIT_EXCEEDED', async () => {
-    const profileId = await newProfile();
-    const cases = Array.from({ length: 21 }, (_, i) => ({ code: `CASE_${i}`, input: {}, expectedValid: false }));
-
-    const error = await rejection(
-      createVersion(profileId, { content: defaultContent('QUOTATION'), requiredCases: cases, effectiveFrom: FUTURE }),
-    );
-
-    expect(error.code).toBe('TRADE.DOCUMENT_PROFILE.VALIDATION_LIMIT_EXCEEDED');
-  });
-
-  it('rejects an author case reusing a server case code with REQUIRED_CASES_FAILED', async () => {
-    const profileId = await newProfile();
-
-    const error = await rejection(
-      createVersion(profileId, {
-        content: defaultContent('QUOTATION'),
-        requiredCases: [{ code: 'MINIMAL_VALID', input: {}, expectedValid: true }],
-        effectiveFrom: FUTURE,
+    const key = newIdempotencyKey();
+    const pubPending = publishVersion(VER_ID, 3, 2, key, COMPANY_CTX);
+    const pubReq = http.expectOne(`${base}/document-profile-versions/${VER_ID}/publish`);
+    expect(pubReq.request.method).toBe('POST');
+    expect(pubReq.request.headers.get('x-idempotency-key')).toBe(key);
+    expect(pubReq.request.headers.get('if-match')).toBe('"2"');
+    expect(pubReq.request.headers.get('x-mutakamel-company-id')).toBe('c1');
+    expect(pubReq.request.body).toEqual({ expectedActivePointerVersion: 3 });
+    pubReq.flush(
+      envelope({
+        ...prof.versions[0],
+        profileId: PROF_ID,
+        status: 'PUBLISHED',
+        content: defaultProfileContent('QUOTATION'),
+        restoredFromVersionId: null,
+        restorationReason: null,
+        scheduledExpectedPointerVersion: null,
+        activePointerVersion: 4,
+        active: true,
       }),
     );
-
-    expect(error.code).toBe('TRADE.DOCUMENT_PROFILE.REQUIRED_CASES_FAILED');
-  });
-
-  it('rejects a window whose end is not after its start', async () => {
-    const profileId = await newProfile();
-
-    const error = await rejection(
-      createVersion(profileId, { content: defaultContent('QUOTATION'), effectiveFrom: FUTURE, effectiveTo: FUTURE }),
-    );
-
-    expect(error.code).toBe('TRADE.DOCUMENT_PROFILE.SCHEMA_INVALID');
-  });
-
-  it('rejects a stale profile If-Match when creating a version', async () => {
-    const profileId = await newProfile();
-    const profile = await settle(getProfile(profileId));
-
-    const error = await rejection(
-      createVersion(profileId, { content: defaultContent('QUOTATION'), effectiveFrom: FUTURE }, profile.version + 3),
-    );
-
-    expect(error.status).toBe(409);
-    expect(error.code).toBe('TRADE.CONCURRENCY.STALE_VERSION');
+    await expect(pubPending).resolves.toMatchObject({ activePointerVersion: 4, active: true });
   });
 });
