@@ -33,7 +33,6 @@ import {
   errorCodeOf,
   staffErrorMessage,
   listAllPages,
-  roleHolderCount,
 } from '../../shared/staff.api';
 import { RolesApi } from '../roles.api';
 import { OrganizationReadApi } from '../../shared/organization-read.api';
@@ -840,12 +839,11 @@ export class AssignPermissionsWizard {
     this.loadFailed.set(false);
 
     try {
-      const [permsData, companiesRaw, branchesRaw, holders] = await Promise.all([
+      const [permsData, companiesRaw, branchesRaw, role] = await Promise.all([
         this.api.getBranchPermissions(roleId),
         listAllPages((q) => this.organization.listCompanies(q), { limit: 100 }),
         listAllPages((q) => this.organization.listBranches(q), { limit: 100 }),
-        // FAKE-ONLY, no backend route: holderCount on GET /roles/:id (BE-S1); FE-S6b swaps it in
-        roleHolderCount(roleId).catch(() => 0),
+        this.api.get(roleId),
       ]);
       if (seq !== this.loadSeq || !this.session.canReadBranchPermissions()) return;
 
@@ -858,7 +856,7 @@ export class AssignPermissionsWizard {
       this.loaded.set(permsData);
       this.companies.set(companies);
       this.branches.set(branches);
-      this.holderCount.set(holders);
+      this.holderCount.set(role.holderCount);
 
       const companyStatusMap = new Map(companies.map((c) => [c.id, c.status]));
       const branchStatusMap = new Map(branches.map((b) => [b.id, b.status]));

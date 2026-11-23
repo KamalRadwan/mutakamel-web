@@ -206,6 +206,8 @@ export interface Role {
 }
 
 export interface RoleDetail extends Role {
+  /** Required and validated by RolesApi; optional only for retained legacy producers. */
+  holderCount?: number;
   permissionIds: string[];
 }
 

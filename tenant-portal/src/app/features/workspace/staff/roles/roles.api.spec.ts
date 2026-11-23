@@ -11,7 +11,7 @@ import { RolesApi } from './roles.api';
 const base = '/api/tenant/core/v1/roles';
 const id = '019f0000-0000-7000-8000-000000000010';
 const permissionId = '019f0000-0000-7000-8000-000000000011';
-const role = { id, permissionIds: [permissionId] };
+const role = { id, permissionIds: [permissionId], holderCount: 7 };
 const branch = { roleId: id, revision: '1', catalogueRevision: 'c1', profiles: [], catalogue: [] };
 const branchBody = {
   expectedRevision: '1',
@@ -198,6 +198,25 @@ describe('RolesApi real Core contract', () => {
       expect(await pending).toEqual({ data: [role], meta });
     }
   });
+
+  it.each([0, 7])('unwraps the role detail holder count: %s', async (holderCount) => {
+    const pending = api.get(id);
+    const data = { ...role, holderCount };
+    http.expectOne({ method: 'GET', url: `${base}/${id}` }).flush({ success: true, data });
+    expect(await pending).toEqual(data);
+  });
+
+  it.each([undefined, null, '7', -1, 1.5, Number.MAX_SAFE_INTEGER + 1])(
+    'rejects an invalid holder count instead of inventing zero: %s',
+    async (holderCount) => {
+      const pending = api.get(id);
+      http.expectOne(`${base}/${id}`).flush({ success: true, data: { ...role, holderCount } });
+      await expect(pending).rejects.toMatchObject({
+        status: 502,
+        code: 'COMMON.GENERIC.INTERNAL_ERROR',
+      });
+    },
+  );
 
   const reads = [
     { name: 'list', path: base, run: (a: RolesApi) => a.list({}) },

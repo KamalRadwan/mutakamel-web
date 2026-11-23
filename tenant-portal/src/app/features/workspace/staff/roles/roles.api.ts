@@ -13,6 +13,7 @@ import type {
 } from '../shared/staff.model';
 
 const ROLES_PATH = '/api/tenant/core/v1/roles';
+type CoreRoleDetail = RoleDetail & { holderCount: number };
 type RoleQuery = Pick<ListQuery, 'page' | 'limit' | 'search' | 'sortBy' | 'sortDir'> & {
   isSystem?: boolean;
 };
@@ -36,7 +37,7 @@ export class RolesApi {
     return this.readPage(ROLES_PATH, this.session.can('roles.role.read'), query);
   }
 
-  async get(id: string): Promise<RoleDetail> {
+  async get(id: string): Promise<CoreRoleDetail> {
     const result = await this.read<RoleDetail>(this.path(id), this.session.can('roles.role.read'));
     return this.roleDetail(result.data);
   }
@@ -181,11 +182,19 @@ export class RolesApi {
     if (scope !== this.session.scopeRevision()) throw new ApiError(403, 'COMMON.GENERIC.FORBIDDEN');
   }
 
-  private roleDetail(value: RoleDetail): RoleDetail {
-    if (!value || typeof value.id !== 'string' || !Array.isArray(value.permissionIds)) {
+  private roleDetail(value: RoleDetail): CoreRoleDetail {
+    const holderCount = value?.holderCount;
+    if (
+      !value ||
+      typeof value.id !== 'string' ||
+      !Array.isArray(value.permissionIds) ||
+      typeof holderCount !== 'number' ||
+      !Number.isSafeInteger(holderCount) ||
+      holderCount < 0
+    ) {
       throw new ApiError(502, 'COMMON.GENERIC.INTERNAL_ERROR');
     }
-    return value;
+    return { ...value, holderCount };
   }
 
   private branchPermissions(value: RoleBranchPermissions): RoleBranchPermissions {

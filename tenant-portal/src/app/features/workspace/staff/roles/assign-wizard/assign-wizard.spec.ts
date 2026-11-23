@@ -19,7 +19,7 @@ import { StaffSession } from '../../shared/staff-session';
 import type { RoleBranchPermissions } from '../../shared/staff.model';
 import { AssignPermissionsWizard } from './assign-wizard';
 
-// The Seats preview remains fake and out of scope; isolate that presentation slot.
+// Isolate the Seats preview presentation while exercising the wizard's HTTP requests.
 @Component({ selector: 'app-seat-impact', template: '' })
 class SeatImpactStub {
   readonly changes = input<unknown>(null);
@@ -95,8 +95,6 @@ describe('Real branch permission wizard', () => {
   beforeEach(async () => {
     owner.set(true);
     cascade.confirm.mockReset().mockResolvedValue(true);
-    // FAKE-ONLY: holderCount remains the sole fixture call until BE-S1 / FE-S6b.
-    // The real test role has no fixture holders, so its count falls back to zero.
     dialog.showModal = function () {
       this.open = true;
     };
@@ -169,7 +167,14 @@ describe('Real branch permission wizard', () => {
       },
     });
   }
+  function roleDetail(holderCount = 7) {
+    http.expectOne({ method: 'GET', url: `${base}/${id}` }).flush({
+      success: true,
+      data: { id, permissionIds: [], holderCount },
+    });
+  }
   function organization() {
+    roleDetail();
     orgPage('companies', [{ id: companyId, name: 'Company', status: 'ACTIVE' }]);
     orgPage('branches', [{ id: branchId, companyId, name: 'Branch', status: 'ACTIVE' }]);
   }
@@ -196,6 +201,7 @@ describe('Real branch permission wizard', () => {
 
   it('loads the wizard from the real branch permissions', async () => {
     component.open(id);
+    roleDetail(12);
     http.expectOne(`${base}/${id}/branch-permissions`).flush({ success: true, data: view });
     orgPage('companies', [{ id: companyId, name: 'Company', status: 'ACTIVE' }], 1, true);
     orgPage('branches', [{ id: branchId, companyId, name: 'Branch', status: 'ACTIVE' }], 1, true);
@@ -205,7 +211,7 @@ describe('Real branch permission wizard', () => {
     });
     await vi.waitFor(() => expect(component['loading']()).toBe(false));
     expect(component['loaded']()?.revision).toBe('1');
-    expect(component['holderCount']()).toBe(0);
+    expect(component['holderCount']()).toBe(12);
     expect(component['selectedBranchIds']()).toEqual([branchId]);
   });
   it('hides the wizard entry for non-owners', () => {
@@ -213,6 +219,39 @@ describe('Real branch permission wizard', () => {
     component.open(id);
     http.expectNone(() => true);
     expect(component['isOpen']()).toBe(false);
+  });
+  it('accepts a real zero holder count', async () => {
+    component.open(id);
+    roleDetail(0);
+    orgPage('companies', [{ id: companyId, name: 'Company', status: 'ACTIVE' }]);
+    orgPage('branches', [{ id: branchId, companyId, name: 'Branch', status: 'ACTIVE' }]);
+    http.expectOne(`${base}/${id}/branch-permissions`).flush({ success: true, data: view });
+    await vi.waitFor(() => expect(component['loading']()).toBe(false));
+    expect(component['loadFailed']()).toBe(false);
+    expect(component['holderCount']()).toBe(0);
+  });
+  it.each([403, 404, 500, 0])('handles role detail failure without a zero fallback: %s', async (status) => {
+    component.open(id);
+    orgPage('companies', [{ id: companyId, name: 'Company', status: 'ACTIVE' }]);
+    orgPage('branches', [{ id: branchId, companyId, name: 'Branch', status: 'ACTIVE' }]);
+    http.expectOne(`${base}/${id}/branch-permissions`).flush({ success: true, data: view });
+    const req = http.expectOne(`${base}/${id}`);
+    if (status) req.flush({}, { status, statusText: 'Failure' });
+    else req.error(new ProgressEvent('error'));
+    await fixture.whenStable();
+    expect(component['loaded']()).toBeNull();
+    if (status === 403) {
+      expect(component['isOpen']()).toBe(false);
+      expect(notify.toasts().at(-1)?.type).toBe('error');
+    } else {
+      expect(component['loadFailed']()).toBe(true);
+      component['retryLoad']();
+      organization();
+      http.expectOne(`${base}/${id}/branch-permissions`).flush({ success: true, data: view });
+      await vi.waitFor(() => expect(component['loading']()).toBe(false));
+      expect(component['loadFailed']()).toBe(false);
+      expect(component['holderCount']()).toBe(7);
+    }
   });
   it('closes the wizard on a 403 load', async () => {
     component.open(id);
