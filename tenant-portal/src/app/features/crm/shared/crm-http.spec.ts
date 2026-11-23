@@ -43,6 +43,15 @@ describe('CrmHttp', () => {
     }
   });
 
+  it('starts the shared realtime adapter when the real app transport is bound', () => {
+    const connect = vi.spyOn(api, 'connectRealtime').mockImplementation(() => undefined);
+    const client = new QueryClient();
+    bindCrmHttp(api, client);
+    expect(connect).toHaveBeenCalledExactlyOnceWith(client);
+    expect(crmHttp()).toBe(api);
+    expect(crmQueries()).toBe(client);
+  });
+
   it('read forwards scope and stays bare', async () => {
     const scope = { companyId: 'Company-ID', branchId: 'Branch-ID' };
     const body = { success: true, data: [{ id: 'one' }] };
@@ -216,11 +225,12 @@ describe('CrmHttp', () => {
     expect(crmQueries()).toBe(queries);
   });
 
-  it('an omitted test stub uses the fixtures and restores both bindings', async () => {
+  it('an omitted test transport reuses the explicit binding and restores both bindings', async () => {
     const previousQueries = new QueryClient();
     const previousHttp = new CrmHttpStub();
     bindCrmHttp(previousHttp, previousQueries);
     const dispose = bindCrmHttpForTest();
+    expect(crmHttp()).toBe(previousHttp);
     await expect(crmHttp().read('/tags')).resolves.toEqual(CRM_SETTINGS_FIXTURES['/tags']);
     expect(crmQueries()).not.toBe(previousQueries);
     dispose();
