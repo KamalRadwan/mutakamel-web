@@ -1,3 +1,14 @@
+@if (isForbidden()) {
+  <div class="flex flex-1 rounded-10 border border-border bg-surface shadow-card">
+    <ui-full-state
+      kind="forbidden"
+      [title]="'errors.forbidden.title' | transloco"
+      [text]="'errors.forbidden.text' | transloco"
+      [actionLabel]="'errors.notFound.action' | transloco"
+      (action)="goHome()"
+    />
+  </div>
+} @else {
 <header class="shrink-0 overflow-hidden rounded-10 border border-border bg-surface shadow-card">
   @if (loading()) {
     <div aria-busy="true">
@@ -82,7 +93,7 @@
       <span class="flex-1"></span>
 
       <div class="flex flex-wrap items-center gap-8">
-        @if (canManage && dirty()) {
+        @if (canManage() && dirty()) {
           <span class="text-12 leading-18 text-text-muted">{{ 'extensions.profile.unsaved' | transloco }}</span>
 
           <button type="button" uiButton variant="ghost" [disabled]="busy()" (click)="undoChanges()">
@@ -102,7 +113,7 @@
           </button>
         }
 
-        @if (canTest && hasEditableDraft()) {
+        @if (canTest() && hasEditableDraft()) {
           <button
             type="button"
             uiButton
@@ -116,7 +127,7 @@
           </button>
         }
 
-        @if (canPublish && hasEditableDraft()) {
+        @if (canPublish() && hasEditableDraft()) {
           <button
             type="button"
             uiButton
@@ -214,7 +225,7 @@
           <span class="text-12 leading-18 text-text-muted">
             {{ 'extensions.profile.noDraftNotice' | transloco }}
           </span>
-          @if (canManage) {
+          @if (canManage() && p.status !== 'RETIRED') {
             <button type="button" uiButton variant="primary" size="small" (click)="startChangeFields()">
               <ng-icon name="tablerEdit" size="14" aria-hidden="true" />
               {{ 'extensions.profile.changeFields' | transloco }}
@@ -441,6 +452,7 @@
     </div>
   }
 </div>
+}
 
 <app-extension-field-modal (saved)="onFieldModalSaved($event)" />
 

@@ -68,7 +68,7 @@ export interface ExtensionFieldInput {
   decimalScale?: number;
   minimumDecimal?: string;
   maximumDecimal?: string;
-  defaultStrategy?: ExtensionDefaultStrategy | 'OWNER_DERIVED';
+  defaultStrategy?: ExtensionDefaultStrategy;
   defaultValue?: unknown;
   constraintPayload?: ExtensionConstraintPayload;
 }

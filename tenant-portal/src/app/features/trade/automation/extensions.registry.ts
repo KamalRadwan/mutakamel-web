@@ -18,7 +18,7 @@ export type ExtensionScalarType =
 
 export type ExtensionVisibility = 'INTERNAL' | 'USER' | 'EXTERNAL_SAFE';
 
-export type ExtensionDefaultStrategy = 'NONE' | 'LITERAL';
+export type ExtensionDefaultStrategy = 'NONE' | 'LITERAL' | 'OWNER_DERIVED';
 
 /** One target as `GET /extensions/targets` returns it (extension-profiles.service.ts targets()). */
 export interface ExtensionTargetDescriptor {

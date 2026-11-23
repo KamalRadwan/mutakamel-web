@@ -1,4 +1,4 @@
-import { Component, computed, inject, input, linkedSignal, resource, signal, viewChild } from '@angular/core';
+import { Component, Injector, computed, inject, input, linkedSignal, resource, signal, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../core/i18n/translation-events';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
@@ -16,11 +16,13 @@ import {
 } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
+import { ScopeState } from '../../../../core/scope/scope';
 import { ActionsMenu, type ActionItem, type ActionSelection } from '../../../../shared/ui/actions-menu/actions-menu';
 import { Button } from '../../../../shared/ui/button/button';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { Pagination } from '../../../../shared/ui/pagination/pagination';
 import { StepFilter, type StepOption } from '../../../../shared/ui/step-filter/step-filter';
-import { ApiError } from '../../shared/trade-api';
+import { ApiError, type TradeContext, tradeContext } from '../../shared/trade-api';
 import { formatDate } from '../../shared/trade-format';
 import { AutomationBadge } from '../automation-shared/automation-badge/automation-badge';
 import { ScopeChip } from '../automation-shared/scope-chip/scope-chip';
@@ -29,11 +31,16 @@ import { getProfileCounts, listProfiles } from '../extensions.api';
 import type { ScopeTarget } from '../automation-fake-actors';
 import type { ExtensionProfile, ExtensionProfileDraftResult } from '../extensions.model';
 import { TARGET_CODES } from '../extensions.registry';
+import {
+  EXTENSION_PERMISSIONS,
+  hasExtensionReadGrant,
+  hasExtensionScopeGrant,
+  isForbiddenError,
+  parseExtensionScope,
+} from './extension-access';
 
 type TargetCode = ExtensionProfile['targetCode'];
 type ProfileStatus = ExtensionProfile['status'];
-
-const CAN = { manage: true, test: true, approve: true, publish: true }; // later from the session
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = 24;
@@ -48,12 +55,6 @@ function parsePositiveInt(raw: string | undefined, fallback: number): number {
 function parsePageSize(raw: string | undefined): number {
   const parsed = parsePositiveInt(raw, DEFAULT_PAGE_SIZE);
   return PAGE_SIZES.includes(parsed) ? parsed : DEFAULT_PAGE_SIZE;
-}
-
-function parseScope(raw: string | undefined): ScopeTarget {
-  const upper = raw?.trim().toUpperCase();
-  if (upper === 'TENANT' || upper === 'BRANCH') return upper;
-  return 'COMPANY';
 }
 
 function parseStatus(raw: string | undefined): 'DRAFT' | 'ACTIVE' | null {
@@ -78,6 +79,7 @@ function parseTarget(raw: string | undefined): 'all' | TargetCode {
     ActionsMenu,
     AutomationBadge,
     Button,
+    FullState,
     Pagination,
     ScopeChip,
     StepFilter,
@@ -103,6 +105,8 @@ function parseTarget(raw: string | undefined): 'all' | TargetCode {
 export class ExtensionProfilesPage {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly injector = inject(Injector);
+  private readonly scopeState = inject(ScopeState);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
@@ -116,14 +120,16 @@ export class ExtensionProfilesPage {
   readonly sizeParam = input<string | undefined>(undefined, { alias: 'size' });
   readonly scopeParam = input<string | undefined>(undefined, { alias: 'scope' });
 
-  protected readonly canManage = CAN.manage;
+  protected readonly forbidden = signal(false);
+  protected readonly canRead = computed(() => hasExtensionReadGrant(this.injector));
   protected readonly pageSizes = [...PAGE_SIZES];
   protected readonly skeletonRows = [1, 2, 3, 4, 5];
 
   protected readonly search = signal('');
   private readonly refreshTick = signal(0);
 
-  protected readonly scopeTarget = computed<ScopeTarget>(() => parseScope(this.scopeParam()));
+  protected readonly scopeTarget = computed<ScopeTarget>(() => parseExtensionScope(this.scopeParam()));
+  protected readonly ctx = computed<TradeContext>(() => tradeContext(this.scopeState, this.scopeTarget()));
 
   protected readonly selectedTarget = linkedSignal<string | undefined, 'all' | TargetCode>({
     source: () => this.targetParam(),
@@ -158,35 +164,74 @@ export class ExtensionProfilesPage {
   });
 
   private readonly countsResource = resource({
-    params: () => ({ tick: this.refreshTick() }),
-    loader: () => getProfileCounts().catch(() => null),
+    params: () => {
+      if (!this.canRead() || this.forbidden()) return undefined;
+      return {
+        ctx: this.ctx(),
+        status: this.statusFilter() ?? undefined,
+        tick: this.refreshTick(),
+      };
+    },
+    loader: ({ params }) =>
+      getProfileCounts(
+        params.status ? { status: params.status as ProfileStatus } : {},
+        params.ctx,
+      ).catch((error) => {
+        if (isForbiddenError(error)) {
+          this.forbidden.set(true);
+        }
+        return null;
+      }),
   });
 
   private readonly listResource = resource({
-    params: () => ({
-      targetCode: this.selectedTarget() === 'all' ? undefined : this.selectedTarget(),
-      status: this.statusFilter() ?? undefined,
-      page: this.page(),
-      limit: this.pageSize(),
-      tick: this.refreshTick(),
-    }),
+    params: () => {
+      if (!this.canRead() || this.forbidden()) return undefined;
+      return {
+        ctx: this.ctx(),
+        targetCode: this.selectedTarget() === 'all' ? undefined : this.selectedTarget(),
+        status: this.statusFilter() ?? undefined,
+        page: this.page(),
+        limit: this.pageSize(),
+        tick: this.refreshTick(),
+      };
+    },
     loader: async ({ params }) => {
       try {
-        return await listProfiles({
-          page: params.page,
-          limit: params.limit,
-          ...(params.targetCode ? { targetCode: params.targetCode as TargetCode } : {}),
-          ...(params.status ? { status: params.status as ProfileStatus } : {}),
-        });
+        return await listProfiles(
+          {
+            page: params.page,
+            limit: params.limit,
+            ...(params.targetCode ? { targetCode: params.targetCode as TargetCode } : {}),
+            ...(params.status ? { status: params.status as ProfileStatus } : {}),
+          },
+          params.ctx,
+        );
       } catch (error) {
+        if (isForbiddenError(error)) {
+          this.forbidden.set(true);
+          throw error;
+        }
         this.notify.error(this.resolveErrorMessage(error));
         throw error;
       }
     },
   });
 
+  private readonly listForbidden = computed(
+    () => this.listResource.status() === 'error' && isForbiddenError(this.listResource.error()),
+  );
+  protected readonly isForbidden = computed(
+    () => !this.canRead() || this.forbidden() || this.listForbidden(),
+  );
+  protected readonly canManage = computed(
+    () =>
+      !this.isForbidden() &&
+      hasExtensionScopeGrant(this.injector, this.scopeState, EXTENSION_PERMISSIONS.manage, this.scopeTarget()),
+  );
+
   protected readonly listLoading = computed(() => this.listResource.isLoading());
-  protected readonly listFailed = computed(() => !!this.listResource.error());
+  protected readonly listFailed = computed(() => !!this.listResource.error() && !this.listForbidden());
 
   private readonly rawItems = computed<ExtensionProfile[]>(() =>
     this.listResource.hasValue() ? this.listResource.value().items : [],
@@ -236,13 +281,22 @@ export class ExtensionProfilesPage {
     ];
   });
 
+  protected goHome(): void {
+    void this.router.navigateByUrl('/workspace/home');
+  }
+
+  protected onForbidden(): void {
+    this.forbidden.set(true);
+  }
+
   protected openCreate(): void {
-    if (!this.canManage) return;
+    if (!this.canManage()) return;
     const target = this.selectedTarget();
     this.createModal().open(target === 'all' ? undefined : target);
   }
 
   protected reload(): void {
+    if (this.isForbidden()) return;
     this.refreshTick.update((n) => n + 1);
   }
 
@@ -327,7 +381,10 @@ export class ExtensionProfilesPage {
   }
 
   protected openProfile(row: ExtensionProfile): void {
-    void this.router.navigate(['/trade/automation/extension-profiles', row.id]);
+    const scope = row.scopeTarget === 'TENANT' ? 'tenant' : undefined;
+    void this.router.navigate(['/trade/automation/extension-profiles', row.id], {
+      ...(scope ? { queryParams: { scope } } : {}),
+    });
   }
 
   protected onRowKeydown(event: KeyboardEvent, row: ExtensionProfile): void {
@@ -338,7 +395,10 @@ export class ExtensionProfilesPage {
 
   protected onProfileCreated(created: ExtensionProfileDraftResult): void {
     this.reload();
-    void this.router.navigate(['/trade/automation/extension-profiles', created.id]);
+    const scope = created.scopeTarget === 'TENANT' ? 'tenant' : undefined;
+    void this.router.navigate(['/trade/automation/extension-profiles', created.id], {
+      ...(scope ? { queryParams: { scope } } : {}),
+    });
   }
 
   protected actionsFor(_row: ExtensionProfile): ActionItem[] {

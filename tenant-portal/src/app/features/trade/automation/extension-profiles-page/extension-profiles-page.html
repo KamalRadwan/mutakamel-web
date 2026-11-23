@@ -1,5 +1,16 @@
+@if (isForbidden()) {
+  <div class="flex flex-1 rounded-10 border border-border bg-surface shadow-card">
+    <ui-full-state
+      kind="forbidden"
+      [title]="'errors.forbidden.title' | transloco"
+      [text]="'errors.forbidden.text' | transloco"
+      [actionLabel]="'errors.notFound.action' | transloco"
+      (action)="goHome()"
+    />
+  </div>
+} @else {
 <div class="flex shrink-0 flex-wrap items-center gap-8 rounded-10 bg-surface p-8 shadow-card">
-  @if (canManage) {
+  @if (canManage()) {
     <button type="button" uiButton class="shrink-0" (click)="openCreate()">
       <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
       {{ 'extensions.list.newProfile' | transloco }}
@@ -119,7 +130,7 @@
       </button>
     } @else {
       <p class="text-13 leading-18 font-medium text-text">{{ 'extensions.list.empty.title' | transloco }}</p>
-      @if (canManage) {
+      @if (canManage()) {
         <button type="button" uiButton variant="primary" (click)="openCreate()">
           <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
           {{ 'extensions.list.newProfile' | transloco }}
@@ -283,8 +294,10 @@
     />
   </footer>
 }
+}
 
 <app-extension-profile-modal
   [scopeTarget]="scopeTarget()"
   (created)="onProfileCreated($event)"
+  (forbidden)="onForbidden()"
 />

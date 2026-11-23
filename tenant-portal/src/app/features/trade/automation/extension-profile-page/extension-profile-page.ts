@@ -1,6 +1,7 @@
 import {
   Component,
   ElementRef,
+  Injector,
   computed,
   effect,
   inject,
@@ -33,24 +34,36 @@ import {
 } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
+import { ScopeState } from '../../../../core/scope/scope';
+import { TenantScopeState } from '../../../../core/scope/tenant-scope';
 import { Button } from '../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { UnsavedDialog } from '../../../../shared/ui/unsaved-dialog/unsaved-dialog';
-import { ApiError, errorCodeOf } from '../../shared/trade-api';
+import { ApiError, type TradeContext, errorCodeOf, tradeContext } from '../../shared/trade-api';
 import { ActionKeys } from '../automation-shared/action-keys';
 import { formatDate } from '../../shared/trade-format';
-import { actorName } from '../automation-fake-actors';
+import type { ScopeTarget } from '../automation-fake-actors';
 import { AutomationBadge } from '../automation-shared/automation-badge/automation-badge';
 import { ConflictDialog } from '../automation-shared/conflict-dialog/conflict-dialog';
 import { ExtensionFieldModal } from '../extension-field-modal/extension-field-modal';
 import { ExtensionFieldsTable } from '../extension-fields-table/extension-fields-table';
+import {
+  EXTENSION_PERMISSIONS,
+  extensionActorDisplayName,
+  hasExtensionReadGrant,
+  hasExtensionScopeGrant,
+  isExtensionConflictError,
+  isExtensionNotFoundError,
+  isForbiddenError,
+  isIdempotencyMismatch,
+  parseExtensionScope,
+} from '../extension-profiles-page/extension-access';
 import { getProfile, getVersion, listVersions, publish, updateFields, validate } from '../extensions.api';
 import type { ExtVersion, ExtensionField, ExtensionProfile } from '../extensions.model';
 import { toFieldInput } from '../extensions.registry';
 
 type ProfileTab = 'fields' | 'versions' | 'published';
-
-const CAN = { manage: true, test: true, approve: true, publish: true }; // later from the session
 
 const TABS: readonly { id: ProfileTab; icon: string; labelKey: string }[] = [
   { id: 'fields', icon: 'tablerAdjustmentsHorizontal', labelKey: 'extensions.profile.tabs.fields' },
@@ -83,6 +96,7 @@ let nextProfilePageId = 0;
     Button,
     ConfirmDialog,
     ConflictDialog,
+    FullState,
     UnsavedDialog,
     ExtensionFieldModal,
     ExtensionFieldsTable,
@@ -118,6 +132,9 @@ export class ExtensionProfilePage {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly injector = inject(Injector);
+  private readonly scopeState = inject(ScopeState);
+  private readonly tenantScope = inject(TenantScopeState);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
@@ -127,19 +144,43 @@ export class ExtensionProfilePage {
   private readonly testedResetDialog = viewChild.required<ConfirmDialog>('testedResetDialog');
   private readonly removeFieldDialog = viewChild.required<ConfirmDialog>('removeFieldDialog');
   private readonly unsavedDialog = viewChild.required<UnsavedDialog>('unsavedDialog');
-  private readonly conflictDialog = viewChild.required<ConflictDialog>('conflictDialog');
+  private readonly conflictDialog = viewChild.required(ConflictDialog);
   private readonly tabButtons = viewChildren<ElementRef<HTMLButtonElement>>('tabBtn');
   private readonly keys = new ActionKeys();
 
   readonly id = input.required<string>();
   readonly tabParam = input<string | undefined>(undefined, { alias: 'tab' });
+  readonly scopeParam = input<string | undefined>(undefined, { alias: 'scope' });
 
-  protected readonly canManage = CAN.manage;
-  protected readonly canTest = CAN.test;
-  protected readonly canPublish = CAN.publish;
+  protected readonly scopeTarget = computed<ScopeTarget>(() => parseExtensionScope(this.scopeParam()));
+  protected readonly ctx = computed<TradeContext>(() => tradeContext(this.scopeState, this.scopeTarget()));
+  protected readonly forbidden = signal(false);
+  protected readonly canRead = computed(() => hasExtensionReadGrant(this.injector));
+  protected readonly isForbidden = computed(() => !this.canRead() || this.forbidden());
   protected readonly tabsDef = TABS;
 
   protected readonly profile = signal<ExtensionProfile | null>(null);
+  protected readonly canManage = computed(
+    () =>
+      !this.isForbidden() &&
+      hasExtensionScopeGrant(
+        this.injector,
+        this.scopeState,
+        EXTENSION_PERMISSIONS.manage,
+        this.profile()?.scopeTarget ?? this.scopeTarget(),
+      ),
+  );
+  protected readonly canTest = this.canManage;
+  protected readonly canPublish = computed(
+    () =>
+      !this.isForbidden() &&
+      hasExtensionScopeGrant(
+        this.injector,
+        this.scopeState,
+        EXTENSION_PERMISSIONS.publish,
+        this.profile()?.scopeTarget ?? this.scopeTarget(),
+      ),
+  );
   protected readonly loading = signal(true);
   protected readonly notFound = signal(false);
   protected readonly loadFailed = signal(false);
@@ -185,7 +226,7 @@ export class ExtensionProfilePage {
   );
 
   protected readonly fieldsTabReadonly = computed(
-    () => !this.canManage || !this.hasEditableDraft(),
+    () => !this.canManage() || !this.hasEditableDraft() || this.profile()?.status === 'RETIRED',
   );
 
   protected readonly displayedFields = computed<readonly ExtensionField[]>(() => {
@@ -253,8 +294,16 @@ export class ExtensionProfilePage {
   constructor() {
     effect(() => {
       const profileId = this.id();
+      const canRead = this.canRead();
+      const ctx = this.ctx();
       untracked(() => {
-        void this.loadAll(profileId);
+        this.forbidden.set(false);
+        if (!canRead) {
+          this.loading.set(false);
+          this.profile.set(null);
+          return;
+        }
+        void this.loadAll(profileId, ctx);
       });
     });
   }
@@ -276,17 +325,26 @@ export class ExtensionProfilePage {
     return this.saveDraft();
   }
 
+  protected goHome(): void {
+    void this.router.navigateByUrl('/workspace/home');
+  }
+
   protected async goBack(): Promise<void> {
     if (!(await this.canDeactivate())) return;
-    void this.router.navigate(['/trade/automation/extension-profiles']);
+    const scope = this.scopeTarget() === 'TENANT' ? 'tenant' : undefined;
+    void this.router.navigate(['/trade/automation/extension-profiles'], {
+      ...(scope ? { queryParams: { scope } } : {}),
+    });
   }
 
   protected retryLoad(): void {
-    void this.loadAll(this.id());
+    if (!this.canRead()) return;
+    void this.loadAll(this.id(), this.ctx());
   }
 
   protected retryVersions(): void {
-    void this.loadVersionsList(this.id());
+    if (!this.canRead()) return;
+    void this.loadVersionsList(this.id(), this.ctx());
   }
 
   protected selectTab(tab: ProfileTab): void {
@@ -318,7 +376,7 @@ export class ExtensionProfilePage {
   }
 
   protected startChangeFields(): void {
-    if (!this.canManage || this.hasEditableDraft()) return;
+    if (!this.canManage() || this.hasEditableDraft() || this.profile()?.status === 'RETIRED') return;
     const seed = cloneFields(this.publishedVersion()?.fields);
     this.baseFields.set(cloneFields(seed));
     this.draftFields.set(seed);
@@ -404,7 +462,7 @@ export class ExtensionProfilePage {
 
   protected async saveDraft(): Promise<boolean> {
     const p = this.profile();
-    if (!p || !this.canManage || !this.dirty() || this.busy()) return false;
+    if (!p || !this.canManage() || !this.dirty() || this.busy()) return false;
     if (this.draftFields().length === 0) {
       this.notify.warning(this.transloco.translate('extensions.profile.toasts.atLeastOneField'));
       return false;
@@ -414,18 +472,32 @@ export class ExtensionProfilePage {
       if (!confirmed) return false;
     }
 
+    const ctx = this.ctx();
     this.busy.set(true);
     try {
       const fields = this.draftFields().map(toFieldInput);
       const action = `save:${p.id}`;
-      await updateFields(p.id, fields, p.version, this.keys.for(action, { fields, ifMatch: p.version }));
+      await updateFields(p.id, fields, p.version, this.keys.for(action, { fields, ifMatch: p.version }), ctx);
       this.keys.done(action);
-      this.applyLoadedProfile(await getProfile(p.id));
-      void this.loadVersionsList(p.id);
+      this.applyLoadedProfile(await getProfile(p.id, ctx));
+      void this.loadVersionsList(p.id, ctx);
       this.notify.success(this.transloco.translate('extensions.profile.toasts.draftSaved'));
       return true;
     } catch (error) {
-      if (errorCodeOf(error) === 'TRADE.CONCURRENCY.STALE_VERSION') {
+      if (isForbiddenError(error)) {
+        this.keys.done(`save:${p.id}`);
+        this.forbidden.set(true);
+        return false;
+      }
+      if (isExtensionNotFoundError(error)) {
+        this.keys.done(`save:${p.id}`);
+        this.notFound.set(true);
+        return false;
+      }
+      if (isIdempotencyMismatch(errorCodeOf(error))) {
+        this.keys.done(`save:${p.id}`);
+      }
+      if (isExtensionConflictError(error)) {
         this.pendingConflictOp = 'save';
         this.conflictDialog().open();
         return false;
@@ -439,12 +511,13 @@ export class ExtensionProfilePage {
 
   protected async runValidate(): Promise<void> {
     const p = this.profile();
-    if (!p || !this.canTest || !this.serverDraft() || this.dirty() || this.busy()) return;
+    if (!p || !this.canTest() || !this.serverDraft() || this.dirty() || this.busy()) return;
 
+    const ctx = this.ctx();
     this.busy.set(true);
     try {
       const action = `validate:${p.id}`;
-      const res = await validate(p.id, p.version, this.keys.for(action, { ifMatch: p.version }));
+      const res = await validate(p.id, p.version, this.keys.for(action, { ifMatch: p.version }), ctx);
       this.keys.done(action);
       const grouped: Record<string, string[]> = {};
       for (const diag of res.diagnostics ?? []) {
@@ -454,9 +527,9 @@ export class ExtensionProfilePage {
       }
       this.diagnosticsByField.set(grouped);
 
-      const fresh = await getProfile(p.id);
+      const fresh = await getProfile(p.id, ctx);
       this.applyLoadedProfile(fresh, grouped);
-      void this.loadVersionsList(fresh.id);
+      void this.loadVersionsList(fresh.id, ctx);
 
       if (res.passed) {
         this.notify.success(this.transloco.translate('extensions.profile.toasts.validatedPassed'));
@@ -465,7 +538,20 @@ export class ExtensionProfilePage {
         this.notify.warning(this.transloco.translate('extensions.profile.toasts.validatedFailed'));
       }
     } catch (error) {
-      if (errorCodeOf(error) === 'TRADE.CONCURRENCY.STALE_VERSION') {
+      if (isForbiddenError(error)) {
+        this.keys.done(`validate:${p.id}`);
+        this.forbidden.set(true);
+        return;
+      }
+      if (isExtensionNotFoundError(error)) {
+        this.keys.done(`validate:${p.id}`);
+        this.notFound.set(true);
+        return;
+      }
+      if (isIdempotencyMismatch(errorCodeOf(error))) {
+        this.keys.done(`validate:${p.id}`);
+      }
+      if (isExtensionConflictError(error)) {
         this.pendingConflictOp = 'validate';
         this.conflictDialog().open();
         return;
@@ -478,18 +564,32 @@ export class ExtensionProfilePage {
 
   protected async runPublish(): Promise<void> {
     const p = this.profile();
-    if (!p || !this.canPublish || this.publishDisabledReason() || this.busy()) return;
+    if (!p || !this.canPublish() || this.publishDisabledReason() || this.busy()) return;
 
+    const ctx = this.ctx();
     this.busy.set(true);
     try {
       const action = `publish:${p.id}`;
-      await publish(p.id, p.version, this.keys.for(action, { ifMatch: p.version }));
+      await publish(p.id, p.version, this.keys.for(action, { ifMatch: p.version }), ctx);
       this.keys.done(action);
-      this.applyLoadedProfile(await getProfile(p.id));
-      void this.loadVersionsList(p.id);
+      this.applyLoadedProfile(await getProfile(p.id, ctx));
+      void this.loadVersionsList(p.id, ctx);
       this.notify.success(this.transloco.translate('extensions.profile.toasts.published'));
     } catch (error) {
-      if (errorCodeOf(error) === 'TRADE.CONCURRENCY.STALE_VERSION') {
+      if (isForbiddenError(error)) {
+        this.keys.done(`publish:${p.id}`);
+        this.forbidden.set(true);
+        return;
+      }
+      if (isExtensionNotFoundError(error)) {
+        this.keys.done(`publish:${p.id}`);
+        this.notFound.set(true);
+        return;
+      }
+      if (isIdempotencyMismatch(errorCodeOf(error))) {
+        this.keys.done(`publish:${p.id}`);
+      }
+      if (isExtensionConflictError(error)) {
         this.pendingConflictOp = 'publish';
         this.conflictDialog().open();
         return;
@@ -502,7 +602,7 @@ export class ExtensionProfilePage {
 
   protected async onConflictReload(): Promise<void> {
     this.pendingConflictOp = null;
-    await this.loadAll(this.id());
+    await this.loadAll(this.id(), this.ctx());
   }
 
   protected async onConflictKeep(): Promise<void> {
@@ -512,9 +612,17 @@ export class ExtensionProfilePage {
     if (!p) return;
     if (op === 'save') {
       try {
-        const fresh = await getProfile(p.id);
+        const fresh = await getProfile(p.id, this.ctx());
         this.profile.set(fresh);
       } catch (error) {
+        if (isForbiddenError(error)) {
+          this.forbidden.set(true);
+          return;
+        }
+        if (isExtensionNotFoundError(error)) {
+          this.notFound.set(true);
+          return;
+        }
         this.notify.error(this.resolveErrorMessage(error));
       }
     }
@@ -547,10 +655,13 @@ export class ExtensionProfilePage {
   }
 
   protected publishedByName(ver: ExtVersion): string {
+    this.i18n();
     this.language();
-    if (!ver.publishedBy) return this.transloco.translate('extensions.profile.versions.none');
-    const names = actorName(ver.publishedBy);
-    return names[this.language()] ?? names['en'] ?? ver.publishedBy;
+    return extensionActorDisplayName(
+      ver.publishedBy,
+      this.tenantScope.me(),
+      this.transloco.translate('extensions.profile.versions.none'),
+    );
   }
 
   protected dateText(iso: string | null | undefined): string {
@@ -569,7 +680,7 @@ export class ExtensionProfilePage {
     }
   }
 
-  private async loadAll(profileId: string): Promise<void> {
+  private async loadAll(profileId: string, ctx: TradeContext = this.ctx()): Promise<void> {
     const seq = ++this.loadSeq;
     this.loading.set(true);
     this.notFound.set(false);
@@ -580,15 +691,17 @@ export class ExtensionProfilePage {
     this.diagnosticsByField.set({});
 
     try {
-      const loaded = await getProfile(profileId);
+      const loaded = await getProfile(profileId, ctx);
       if (seq !== this.loadSeq) return;
       this.applyLoadedProfile(loaded);
       this.loading.set(false);
-      void this.loadVersionsList(profileId);
+      void this.loadVersionsList(profileId, ctx);
     } catch (error) {
       if (seq !== this.loadSeq) return;
       this.loading.set(false);
-      if (error instanceof ApiError && error.status === 404) {
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+      } else if (isExtensionNotFoundError(error)) {
         this.notFound.set(true);
       } else {
         this.loadFailed.set(true);
@@ -597,12 +710,12 @@ export class ExtensionProfilePage {
     }
   }
 
-  private async loadVersionsList(profileId: string): Promise<void> {
+  private async loadVersionsList(profileId: string, ctx: TradeContext = this.ctx()): Promise<void> {
     const seq = ++this.versionsSeq;
     this.versionsLoading.set(true);
     this.versionsFailed.set(false);
     try {
-      const page = await listVersions(profileId, { page: 1, limit: 100 });
+      const page = await listVersions(profileId, { page: 1, limit: 100 }, ctx);
       if (seq !== this.versionsSeq) return;
       const items = [...page.items].sort((a, b) => b.versionNumber - a.versionNumber);
       this.versions.set(items);
@@ -615,6 +728,10 @@ export class ExtensionProfilePage {
       this.versionDetails.set(cached);
     } catch (error) {
       if (seq !== this.versionsSeq) return;
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+        return;
+      }
       this.versionsFailed.set(true);
       this.notify.error(this.resolveErrorMessage(error));
     } finally {
@@ -626,14 +743,19 @@ export class ExtensionProfilePage {
 
   private async fetchVersionDetail(versionId: string): Promise<void> {
     const profileId = this.id();
+    const ctx = this.ctx();
     this.versionLoading.update((map) => ({ ...map, [versionId]: true }));
     this.versionErrors.update((map) => ({ ...map, [versionId]: false }));
     try {
-      const detail = await getVersion(profileId, versionId);
+      const detail = await getVersion(profileId, versionId, ctx);
       if (this.id() !== profileId) return;
       this.versionDetails.update((map) => ({ ...map, [versionId]: detail }));
     } catch (error) {
       if (this.id() !== profileId) return;
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+        return;
+      }
       this.versionErrors.update((map) => ({ ...map, [versionId]: true }));
       this.notify.error(this.resolveErrorMessage(error));
     } finally {

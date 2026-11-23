@@ -65,7 +65,13 @@ export class ExtensionFieldsTable {
   protected defaultDisplay(field: ExtensionField): { text: string; ltr: boolean } {
     this.i18n();
     const lang = this.language();
-    if (field.valueKind === 'OBJECT' || field.defaultStrategy !== 'LITERAL') {
+    if (field.valueKind === 'OBJECT') {
+      return { text: this.transloco.translate('extensions.fields.none'), ltr: false };
+    }
+    if (field.defaultStrategy === 'OWNER_DERIVED') {
+      return { text: this.transloco.translate('extensions.defaultStrategy.OWNER_DERIVED'), ltr: false };
+    }
+    if (field.defaultStrategy !== 'LITERAL') {
       return { text: this.transloco.translate('extensions.fields.none'), ltr: false };
     }
     const val = field.defaultValue;

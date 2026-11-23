@@ -11,9 +11,10 @@ import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dial
 import { Dropdown, type DropdownOption } from '../../../../shared/ui/dropdown/dropdown';
 import { Field } from '../../../../shared/ui/field/field';
 import { Modal } from '../../../../shared/ui/modal/modal';
-import { ApiError, errorCodeOf } from '../../shared/trade-api';
+import { ApiError, errorCodeOf, tradeContext } from '../../shared/trade-api';
 import { ActionKeys } from '../automation-shared/action-keys';
 import { ExtensionFieldModal } from '../extension-field-modal/extension-field-modal';
+import { isForbiddenError, isIdempotencyMismatch } from '../extension-profiles-page/extension-access';
 import { createProfile } from '../extensions.api';
 import type { ScopeTarget } from '../automation-fake-actors';
 import type { CreateExtensionProfileInput, ExtensionProfile, ExtensionProfileDraftResult } from '../extensions.model';
@@ -46,6 +47,7 @@ export class ExtensionProfileModal {
 
   readonly scopeTarget = input<ScopeTarget>('COMPANY');
   readonly created = output<ExtensionProfileDraftResult>();
+  readonly forbidden = output<void>();
 
   protected readonly code = signal('');
   protected readonly targetCode = signal<TargetCode>('CATALOG_ITEM');
@@ -71,11 +73,11 @@ export class ExtensionProfileModal {
     const comp = this.scopeState.company();
     const compName = lang === 'ar' ? comp.nameAr : comp.nameEn;
     if (scope === 'COMPANY') {
-      return `${scopeLabel} · ${compName}`;
+      return [scopeLabel, compName].filter(Boolean).join(' · ');
     }
     const br = this.scopeState.branch();
     const brName = lang === 'ar' ? br.nameAr : br.nameEn;
-    return `${scopeLabel} · ${compName} · ${brName}`;
+    return [scopeLabel, compName, brName].filter(Boolean).join(' · ');
   });
 
   protected readonly scopeError = computed<string | null>(() => {
@@ -164,19 +166,34 @@ export class ExtensionProfileModal {
       fields: [toFieldInput(field)],
     };
 
+    const ctx = tradeContext(this.scopeState, scopeTarget);
     this.saving.set(true);
     try {
-      const created = await createProfile(body, this.keys.for('create', body));
+      const created = await createProfile(body, this.keys.for('create', body), ctx);
       this.keys.done('create');
       this.notify.success(this.transloco.translate('extensions.create.toastCreated'));
       this.allowClose = true;
       this.modal().close();
       this.created.emit(created);
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.keys.done('create');
+        this.allowClose = true;
+        this.modal().close();
+        this.forbidden.emit();
+        return;
+      }
       const code = errorCodeOf(error);
+      if (isIdempotencyMismatch(code)) {
+        this.keys.done('create');
+      }
       if (code === 'TRADE.EXTENSION.DEFINITION_CONFLICT') {
         this.keys.done('create');
         this.serverCodeError.set(this.transloco.translate('extensions.create.errors.codeConflict'));
+        return;
+      }
+      if (error instanceof ApiError && error.details?.['code']?.[0]) {
+        this.serverCodeError.set(this.resolveErrorMessage(error));
         return;
       }
       this.notify.error(this.resolveErrorMessage(error));

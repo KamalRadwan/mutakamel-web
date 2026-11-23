@@ -274,7 +274,11 @@ export class ExtensionFieldModal {
 
   protected readonly defaultStrategyOptions = computed<DropdownOption<DefaultStrategy>[]>(() => {
     this.i18n();
-    return DEFAULT_STRATEGIES.map((value) => ({
+    const strategies: readonly DefaultStrategy[] =
+      this.defaultStrategy() === 'OWNER_DERIVED'
+        ? [...DEFAULT_STRATEGIES, 'OWNER_DERIVED']
+        : DEFAULT_STRATEGIES;
+    return strategies.map((value) => ({
       value,
       label: this.transloco.translate(`extensions.defaultStrategy.${value}`),
     }));
