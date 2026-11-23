@@ -11,12 +11,9 @@ import {
   viewChild,
   viewChildren,
 } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
-import { NavigationEnd, Router } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerBuilding, tablerCheck, tablerChevronDown, tablerMapPin } from '@ng-icons/tabler-icons';
-import { filter, map } from 'rxjs';
 import { LanguageState } from '../../core/i18n/language';
 import { ScopeBranch, ScopeCompany, ScopeState } from '../../core/scope/scope';
 import { TenantScopeState } from '../../core/scope/tenant-scope';
@@ -48,22 +45,13 @@ export class ScopeSwitcher {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
   private readonly language = inject(LanguageState);
-  private readonly router = inject(Router);
   private readonly tenantScope = inject(TenantScopeState);
   protected get scope(): ScopeState {
     return this.injector.get(ScopeState);
   }
-  private readonly routeUrl = toSignal(
-    this.router.events.pipe(
-      filter((event): event is NavigationEnd => event instanceof NavigationEnd),
-      map((event) => event.urlAfterRedirects),
-    ),
-    { initialValue: this.router.url },
-  );
-  private readonly staffRoute = computed(() => /^\/workspace\/staff(?:[/?#;]|$)/u.test(this.routeUrl()));
   protected readonly visible = this.tenantScope.showScopeSwitcher;
   protected readonly canInteract = computed(() =>
-    this.visible() && !this.staffRoute() && this.tenantScope.selectorCompanyIds().length > 0,
+    this.visible() && this.scope.companies().length > 0,
   );
 
   private readonly triggerBtn = viewChild<ElementRef<HTMLButtonElement>>('triggerBtn');

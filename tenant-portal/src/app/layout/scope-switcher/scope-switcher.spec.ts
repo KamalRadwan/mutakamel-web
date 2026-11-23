@@ -19,10 +19,6 @@ class EmptyLoader {
 
 const companyId = 'tenant-company';
 const branchId = 'tenant-branch';
-const legacyBranch = { id: 'legacy-branch', nameEn: 'Legacy branch', nameAr: 'فرع تجريبي' };
-const legacyCompany = {
-  id: 'legacy-company', nameEn: 'Legacy company', nameAr: 'شركة تجريبية', branches: [legacyBranch],
-};
 
 function snapshot(
   companies = [companyId],
@@ -42,18 +38,13 @@ function snapshot(
   };
 }
 
-describe('Company and branch switcher visibility', () => {
+describe('Company and branch switcher availability', () => {
   const me = signal<TenantMe | null>(null);
   const status = signal<SessionStatus>('signed-in');
-  const legacyScope = vi.fn(() => ({
-    company: signal(legacyCompany),
-    companies: signal([legacyCompany]),
-    branch: signal(legacyBranch),
-    branches: signal([legacyBranch]),
-  }));
 
   beforeEach(() => {
-    legacyScope.mockClear();
+    sessionStorage.removeItem('tenant-staff-scope:switcher-test-user');
+    localStorage.removeItem('tenant-staff-scope:switcher-test-user');
     status.set('signed-in');
     me.set(snapshot());
     TestBed.configureTestingModule({
@@ -64,9 +55,14 @@ describe('Company and branch switcher visibility', () => {
           loader: EmptyLoader,
         }),
         { provide: AuthSession, useValue: { status, me } },
-        { provide: ScopeState, useFactory: legacyScope },
       ],
     });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    sessionStorage.removeItem('tenant-staff-scope:switcher-test-user');
+    localStorage.removeItem('tenant-staff-scope:switcher-test-user');
   });
 
   function render(url = '/') {
@@ -80,18 +76,20 @@ describe('Company and branch switcher visibility', () => {
     const host = render(url);
     expect(host.classList.contains('hidden')).toBe(true);
     expect(host.querySelector('button, ng-icon')).toBeNull();
-    expect(legacyScope).not.toHaveBeenCalled();
     expect(TestBed.inject(TenantScopeState).selection()).toEqual({ companyId, branchId });
   });
 
   it.each([
     ['two companies', [companyId, 'second-company'], [branchId]],
     ['two branches', [companyId], [branchId, 'second-branch']],
-  ])('uses real alternatives when there are %s', (_case, companies, branches) => {
+  ])('shows the existing unavailable state when there are %s but no readable names', (_case, companies, branches) => {
     me.set(snapshot(companies, branches));
     const host = render();
     expect(host.classList.contains('hidden')).toBe(false);
-    expect(host.querySelector('button')).not.toBeNull();
+    expect(host.querySelector('button, [role="menu"]')).toBeNull();
+    expect(host.querySelector('[aria-disabled="true"]')).not.toBeNull();
+    expect(host.querySelector('[aria-disabled="true"]')?.getAttribute('title')).toBe('scope.namesUnavailable');
+    expect(TestBed.inject(ScopeState).companies()).toEqual([]);
   });
 
   it.each([
@@ -103,8 +101,7 @@ describe('Company and branch switcher visibility', () => {
     const host = render('/workspace/staff/users');
     expect(host.classList.contains('hidden')).toBe(false);
     expect(host.querySelector('button')).toBeNull();
-    expect(host.textContent).not.toContain(legacyCompany.nameEn);
-    expect(legacyScope).not.toHaveBeenCalled();
+    expect(TestBed.inject(ScopeState).companies()).toEqual([]);
   });
 
   it.each([false, true])('honors the tenant-wide flag %s for a restricted 1+1 projection', (multiple) => {
@@ -113,14 +110,14 @@ describe('Company and branch switcher visibility', () => {
       hasMultipleOrganizationScopes: multiple,
     });
     const host = render();
-    expect(host.querySelector('button') !== null).toBe(multiple);
+    expect(host.querySelector('button')).toBeNull();
+    expect(host.querySelector('[aria-disabled="true"]') !== null).toBe(multiple);
     expect(TestBed.inject(TenantScopeState).selection()).toEqual({ companyId, branchId });
   });
 
   it('hides the control while the session is pending', () => {
     status.set('loading');
     expect(render().querySelector('button, ng-icon')).toBeNull();
-    expect(legacyScope).not.toHaveBeenCalled();
   });
 
   it.each(['/workspace/home', '/workspace/staff/users'])('shows a noninteractive indicator on %s when the tenant has alternatives and the user has no scope', (url) => {
@@ -129,7 +126,6 @@ describe('Company and branch switcher visibility', () => {
     expect(host.classList.contains('hidden')).toBe(false);
     expect(host.querySelector('[aria-disabled="true"] ng-icon')).not.toBeNull();
     expect(host.querySelector('button, [role="menu"]')).toBeNull();
-    expect(legacyScope).not.toHaveBeenCalled();
     expect(TestBed.inject(TenantScopeState).selection()).toBeNull();
   });
 
@@ -138,6 +134,5 @@ describe('Company and branch switcher visibility', () => {
     const host = render();
     expect(host.classList.contains('hidden')).toBe(true);
     expect(host.querySelector('button, ng-icon')).toBeNull();
-    expect(legacyScope).not.toHaveBeenCalled();
   });
 });
