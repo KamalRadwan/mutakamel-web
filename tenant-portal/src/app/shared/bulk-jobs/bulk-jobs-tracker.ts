@@ -4,7 +4,8 @@ import { DestroyRef, Injectable, Signal, computed, inject, signal } from '@angul
 import { TranslocoService } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
 import { Notify } from '../../core/notify/notify';
-import { ApiError, newIdempotencyKey } from '../../features/crm/settings/shared/settings-api';
+import { ApiError, errorMessage } from '../../core/api/api-errors';
+import { newIdempotencyKey } from '../../core/api/idempotency';
 import { BULK_JOB_MODULES, BulkJobActionDescriptor, BulkJobModuleDescriptor } from './bulk-job-modules';
 import { cancelBulkJob, getBulkJob, listBulkJobs, retryBulkJob, submitBulkJob } from './bulk-jobs.api';
 import {
@@ -349,12 +350,16 @@ export class BulkJobsTracker {
           if (translated && translated !== key) return translated;
         }
       }
-      const genericCodeKey = `bulkJobs.codes.${code}`;
-      const genericCodeTranslated = this.transloco.translate(genericCodeKey, mergedParams);
-      if (genericCodeTranslated && genericCodeTranslated !== genericCodeKey) return genericCodeTranslated;
     }
 
-    return this.translateOrFallback('bulkJobs.codes.generic', 'Something went wrong.', mergedParams);
+    return errorMessage(code ?? 'GENERIC', 'bulkJobs', (key) => {
+      if (key.startsWith('bulkJobs.errors.')) {
+        const codeKey = key.replace('bulkJobs.errors.', 'bulkJobs.codes.');
+        const text = this.transloco.translate(codeKey, mergedParams);
+        return text && text !== codeKey ? text : key;
+      }
+      return this.translateOrFallback('bulkJobs.codes.generic', 'Something went wrong.', mergedParams);
+    });
   }
 
   jobTitle(job: BulkJob): string {

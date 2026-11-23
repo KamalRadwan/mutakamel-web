@@ -24,21 +24,11 @@ import { TRADE_ITEMS_BULK_MODULE } from './features/trade/foundation/items/item-
 import { TRADE_ACCOUNTS_BULK_MODULE } from './features/trade/foundation/commercial-accounts/account-bulk/accounts-bulk.descriptor';
 import { provideAutomationBulkModules } from './features/trade/automation/automation-bulk-modules';
 import { registerFakeBulkModuleLoader } from './shared/bulk-jobs/bulk-jobs.fake';
+import { bindBulkJobsApi, BulkJobsApi } from './shared/bulk-jobs/bulk-jobs.api';
+import { bindSeatPreviewApi, SeatPreviewApi } from './features/workspace/seats/seats.api';
 import { routes } from './app.routes';
 
-// Large fake data stays out of the initial bundle: loaded on the first bulk-jobs fake call for this module.
-registerFakeBulkModuleLoader('core', 'core.users', () => import('./features/workspace/staff/users/users-bulk/users-bulk.fake-module'));
-registerFakeBulkModuleLoader('crm', 'crm.leads', () => import('./features/crm/leads/lead-bulk/leads-bulk.fake-module'));
-registerFakeBulkModuleLoader(
-  'crm',
-  CRM_OPPORTUNITIES_BULK_MODULE.module,
-  () => import('./features/crm/opportunities/opportunity-bulk/opportunities-bulk.fake-module'),
-);
-registerFakeBulkModuleLoader(
-  'crm',
-  CRM_CUSTOMERS_BULK_MODULE.module,
-  () => import('./features/crm/customers/customer-bulk/customers-bulk.fake-module'),
-);
+// FAKE-ONLY, no backend route: Trade bulk gateway rows have not landed.
 registerFakeBulkModuleLoader(
   'trading',
   TRADE_ITEMS_BULK_MODULE.module,
@@ -69,6 +59,11 @@ export const appConfig: ApplicationConfig = {
       TRADE_ACCOUNTS_BULK_MODULE,
     ]),
     provideAutomationBulkModules(),
+    provideAppInitializer(() => {
+      const injector = inject(EnvironmentInjector);
+      bindBulkJobsApi(() => injector.get(BulkJobsApi));
+      bindSeatPreviewApi(() => injector.get(SeatPreviewApi));
+    }),
     provideAppInitializer(() => { const session = inject(AuthSession); bindAnalyticsPermissions(() => session.me()?.permissions ?? []); }),
     provideAppInitializer(() => { const injector = inject(EnvironmentInjector); bindCrmHttp(inject(CrmHttp), crmQueries()); bindCrmInjector(() => injector); }),
     provideAppInitializer(() => {

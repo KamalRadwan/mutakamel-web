@@ -1,4 +1,6 @@
-import { ApiError, fakeDelay, fakeId } from '../../features/crm/settings/shared/settings-api';
+import { ApiError } from '../../core/api/api-errors';
+import { fakeDelay, fakeId } from '../../core/fake/fake-utils';
+import type { BulkJobsTransport } from './bulk-jobs.api';
 import {
   BULK_JOB_LIMITS,
   BulkJob,
@@ -13,6 +15,15 @@ import {
   ListBulkJobsQuery,
   isBulkJobActive,
 } from './bulk-jobs.model';
+
+export const fakeBulkJobsTransport: BulkJobsTransport = {
+  submitBulkJob: fakeSubmitBulkJob,
+  getBulkJob: fakeGetBulkJob,
+  listBulkJobItems: fakeListBulkJobItems,
+  listBulkJobs: fakeListBulkJobs,
+  cancelBulkJob: fakeCancelBulkJob,
+  retryBulkJob: fakeRetryBulkJob,
+};
 
 export interface FakeBulkModule {
   module: string;

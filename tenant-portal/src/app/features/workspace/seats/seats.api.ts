@@ -1,4 +1,6 @@
-import { InjectionToken } from '@angular/core';
+import { InjectionToken, Service, inject } from '@angular/core';
+import { QueryClient } from '@tanstack/angular-query';
+import { CoreHttp } from '../../../core/api/core-http';
 import { newIdempotencyKey } from '../../../core/api/idempotency';
 import {
   fakeFreeUp,
@@ -6,7 +8,6 @@ import {
   fakeGetMySeatStates,
   fakeGetSeatUsage,
   fakeListSeatHolders,
-  fakePreviewSeats,
   fakeReleaseSeats,
   fakeSwapSeat,
   fakeSwitchToDerived,
@@ -36,11 +37,36 @@ export function listSeatHolders(
 
 /** POST /api/tenant/core/v1/seats/preview (max 100 changes, no idempotency key) */
 export function previewSeats(changes: SeatChange[]): Promise<SeatPreview> {
-  return fakePreviewSeats(changes);
+  if (!resolveSeatPreview) throw new Error('SeatPreviewApi is not bound');
+  return resolveSeatPreview().previewSeats(changes);
+}
+
+@Service()
+export class SeatPreviewApi {
+  private readonly http = inject(CoreHttp);
+  private readonly queries = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0, networkMode: 'always' } },
+  });
+
+  previewSeats(changes: SeatChange[]): Promise<SeatPreview> {
+    return this.queries.fetchQuery({ queryKey: ['seats', 'preview', changes], queryFn: async () => {
+      const result = await this.http.write<SeatPreview>('POST', '/api/tenant/core/v1/seats/preview', { changes });
+      return result.data;
+    } });
+  }
+}
+
+let resolveSeatPreview: (() => Pick<SeatPreviewApi, 'previewSeats'>) | undefined;
+
+export function bindSeatPreviewApi(resolve: () => Pick<SeatPreviewApi, 'previewSeats'>): void {
+  resolveSeatPreview = resolve;
 }
 
 export const SEAT_PREVIEW = new InjectionToken<typeof previewSeats>('SEAT_PREVIEW', {
-  providedIn: 'root', factory: () => previewSeats,
+  providedIn: 'root', factory: () => {
+    const api = inject(SeatPreviewApi);
+    return (changes) => api.previewSeats(changes);
+  },
 });
 
 // TODO(seats-backend): releaseSeats response has no schema in OpenAPI yet; shape matches Core service code.
