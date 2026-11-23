@@ -89,9 +89,12 @@ export class OrganizationReadApi {
 
   private async readPage<T>(path: string, permission: ReadPermission, query: TeamQuery): Promise<CorePage<T>> {
     const { data, meta } = await this.read<T[]>(path, permission, query);
-    if (!Array.isArray(data) || !meta || !Number.isSafeInteger(meta.total) || meta.total < 0 ||
+    if (!Array.isArray(data) || !meta ||
+      !Number.isSafeInteger(meta.page) || meta.page < 1 ||
+      !Number.isSafeInteger(meta.limit) || meta.limit < 1 ||
+      !Number.isSafeInteger(meta.total) || meta.total < 0 ||
       !Number.isSafeInteger(meta.totalPages) || meta.totalPages < 0 ||
-      typeof meta.hasNext !== 'boolean') {
+      typeof meta.hasNext !== 'boolean' || typeof meta.hasPrev !== 'boolean') {
       throw new ApiError(502, 'COMMON.GENERIC.INTERNAL_ERROR');
     }
     return { data, meta };
