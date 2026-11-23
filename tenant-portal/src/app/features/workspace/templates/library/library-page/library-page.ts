@@ -1,4 +1,4 @@
-import { Component, DestroyRef, computed, effect, inject, input, resource, signal, untracked, viewChild } from '@angular/core';
+import { Component, DestroyRef, computed, effect, inject, input, linkedSignal, resource, signal, untracked, viewChild } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -23,9 +23,11 @@ import {
   tablerTemplate,
   tablerX,
 } from '@ng-icons/tabler-icons';
+import { ApiError, correlationIdOf, isRetryableWriteError, writeErrorMessage } from '../../../../../core/api/api-errors';
+import { newIdempotencyKey } from '../../../../../core/api/idempotency';
 import { LanguageState } from '../../../../../core/i18n/language';
 import { Notify } from '../../../../../core/notify/notify';
-import { ScopeState } from '../../../../../core/scope/scope';
+import { TenantScopeState } from '../../../../../core/scope/tenant-scope';
 import { ActionSelection, ActionsMenu } from '../../../../../shared/ui/actions-menu/actions-menu';
 import { Button } from '../../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
@@ -33,15 +35,12 @@ import { ViewOption, ViewSwitcher } from '../../../../../shared/ui/view-switcher
 import { TemplateCreateWizard, TemplateDuplicateModal } from '../../create';
 import { templateFamilyMeta, templateValidationMeta } from '../../shared/template-family';
 import {
-  TemplateApiError,
-  TemplateListRequestDto,
-  TemplateListResponse,
-  TemplateListRow,
-  archiveTemplate,
-  deleteTemplate,
-  getCreationScopes,
-  listTemplates,
-  restoreTemplate,
+  TemplatesApi,
+  type TemplateCreationScope,
+  type TemplateCreationScopesResponse,
+  type TemplateListRequestDto,
+  type TemplateListResponse,
+  type TemplateListRow,
 } from '../../templates.api';
 import { formatDateRangeLabel } from '../date-range-field/date-range-field';
 import {
@@ -69,6 +68,22 @@ interface FilterChip {
 }
 
 const SEARCH_DEBOUNCE_MS = 250;
+
+type AssignmentTargetParams = Pick<
+  TemplateListRequestDto,
+  'assignmentScopeType' | 'assignmentCompanyId' | 'assignmentBranchId'
+>;
+
+type RowMutationKind = 'archive' | 'restore' | 'delete';
+
+function unwrapApiError(raw: unknown): ApiError | null {
+  if (raw instanceof ApiError) return raw;
+  if (raw && typeof raw === 'object' && 'cause' in raw) {
+    const cause = (raw as { cause: unknown }).cause;
+    if (cause instanceof ApiError) return cause;
+  }
+  return null;
+}
 
 @Component({
   selector: 'app-library-page',
@@ -113,7 +128,8 @@ const SEARCH_DEBOUNCE_MS = 250;
 export class LibraryPage {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
-  private readonly scope = inject(ScopeState);
+  private readonly templatesApi = inject(TemplatesApi);
+  private readonly tenantScope = inject(TenantScopeState);
   private readonly language = inject(LanguageState).current;
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
@@ -139,37 +155,165 @@ export class LibraryPage {
   protected readonly appliedSearch = signal('');
   protected readonly filters = signal<LibraryFilters>(emptyLibraryFilters());
   protected readonly filtersModalOpen = signal(false);
-  protected readonly currentCursor = signal<string | null>(null);
-  protected readonly cursorStack = signal<(string | null)[]>([]);
   protected readonly reloadTick = signal(0);
   protected readonly busyIds = signal<ReadonlySet<string>>(new Set());
   protected readonly deletingName = signal('');
 
+  private readonly pendingWriteKeys = new Map<string, string>();
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
 
-  protected readonly activeScopeName = computed(() => {
-    const branch = this.scope.branch();
-    return this.language() === 'ar' ? branch.nameAr : branch.nameEn;
+  private readonly assignmentScope = computed<AssignmentTargetParams>(() => {
+    const me = this.tenantScope.me();
+    const selection = this.tenantScope.selection();
+    const readGrant = me?.permissionScopes['templates.read'];
+    const tenantWide = Boolean(me?.isTenantOwner || readGrant?.tenantWide);
+
+    if (selection?.branchId) {
+      return {
+        assignmentScopeType: 'BRANCH',
+        assignmentCompanyId: selection.companyId,
+        assignmentBranchId: selection.branchId,
+      };
+    }
+
+    if (selection) {
+      if (tenantWide || !readGrant || readGrant.companyIds.includes(selection.companyId)) {
+        return {
+          assignmentScopeType: 'COMPANY',
+          assignmentCompanyId: selection.companyId,
+        };
+      }
+      const branchInCompany = readGrant.branchIds.find(
+        (branchId) => this.tenantScope.branchCompanies().get(branchId) === selection.companyId,
+      );
+      if (branchInCompany) {
+        return {
+          assignmentScopeType: 'BRANCH',
+          assignmentCompanyId: selection.companyId,
+          assignmentBranchId: branchInCompany,
+        };
+      }
+    }
+
+    if (tenantWide || !me) {
+      return { assignmentScopeType: 'TENANT' };
+    }
+
+    if (readGrant?.companyIds[0]) {
+      return {
+        assignmentScopeType: 'COMPANY',
+        assignmentCompanyId: readGrant.companyIds[0],
+      };
+    }
+
+    const branchCompanies = this.tenantScope.branchCompanies();
+    for (const branchId of readGrant?.branchIds ?? []) {
+      const companyId = branchCompanies.get(branchId);
+      if (companyId) {
+        return {
+          assignmentScopeType: 'BRANCH',
+          assignmentCompanyId: companyId,
+          assignmentBranchId: branchId,
+        };
+      }
+    }
+
+    const fallbackCompany = this.tenantScope.selectorCompanyIds()[0];
+    if (fallbackCompany) {
+      const fallbackBranch = this.tenantScope.branchesFor(fallbackCompany)[0];
+      return fallbackBranch
+        ? {
+            assignmentScopeType: 'BRANCH',
+            assignmentCompanyId: fallbackCompany,
+            assignmentBranchId: fallbackBranch,
+          }
+        : {
+            assignmentScopeType: 'COMPANY',
+            assignmentCompanyId: fallbackCompany,
+          };
+    }
+
+    return { assignmentScopeType: 'TENANT' };
+  });
+
+  private readonly scopeKey = computed(() => {
+    const me = this.tenantScope.me();
+    return JSON.stringify([
+      me?.id ?? null,
+      me?.isTenantOwner ?? false,
+      me?.permissions ?? [],
+      me?.permissionScopes ?? {},
+      this.assignmentScope(),
+    ]);
+  });
+
+  private readonly paginationResetKey = computed(() =>
+    JSON.stringify([this.scopeKey(), this.appliedSearch(), this.filters()]),
+  );
+
+  protected readonly currentCursor = linkedSignal<string, string | null>({
+    source: this.paginationResetKey,
+    computation: () => null,
+  });
+
+  protected readonly cursorStack = linkedSignal<string, (string | null)[]>({
+    source: this.paginationResetKey,
+    computation: () => [],
+  });
+
+  private readonly canRequestCreationScopes = computed(() => {
+    const me = this.tenantScope.me();
+    return !me || Boolean(me.isTenantOwner || me.permissions.includes('templates.create'));
   });
 
   private readonly creationScopesResource = resource({
-    params: () => this.reloadTick(),
-    loader: () => getCreationScopes().catch(() => ({ scopes: [] })),
+    params: () => ({
+      tick: this.reloadTick(),
+      scopeKey: this.scopeKey(),
+      canLoad: this.canRequestCreationScopes(),
+    }),
+    loader: ({ params }): Promise<TemplateCreationScopesResponse> =>
+      params.canLoad
+        ? this.templatesApi.getCreationScopes().catch((error: unknown) => {
+            this.notify.error(writeErrorMessage(error, 'templates', this.transloco));
+            return { scopes: [] };
+          })
+        : Promise.resolve({ scopes: [] }),
   });
 
   protected readonly canCreate = computed(() => (this.creationScopesResource.value()?.scopes.length ?? 0) > 0);
 
+  protected readonly activeScopeName = computed(() => {
+    this.i18n();
+    const target = this.assignmentScope();
+    if (target.assignmentScopeType === 'COMPANY' && target.assignmentCompanyId) {
+      const match = this.creationScopesResource
+        .value()
+        ?.scopes.find(
+          (scope): scope is Extract<TemplateCreationScope, { type: 'COMPANY' }> =>
+            scope.type === 'COMPANY' && scope.companyId === target.assignmentCompanyId,
+        );
+      if (match) return match.label;
+    }
+    return this.transloco.translate(`templatesLibrary.table.scopeTypes.${target.assignmentScopeType}`);
+  });
+
   private readonly listRequest = computed<TemplateListRequestDto>(() => {
     this.reloadTick();
-    const company = this.scope.company();
-    const branch = this.scope.branch();
+    this.scopeKey();
+    const target = this.assignmentScope();
     const f = this.filters();
     const name = this.appliedSearch().trim();
+    const definitionCompanyId =
+      f.definitionScopeType === 'COMPANY'
+        ? target.assignmentCompanyId ??
+          this.tenantScope.selection()?.companyId ??
+          this.tenantScope.selectorCompanyIds()[0] ??
+          this.firstCreationCompanyId()
+        : undefined;
 
     return {
-      assignmentScopeType: 'BRANCH',
-      assignmentCompanyId: company.id,
-      assignmentBranchId: branch.id,
+      ...target,
       ...(name ? { name } : {}),
       ...(f.documentType ? { documentType: f.documentType } : {}),
       ...(f.outputChannel ? { outputChannel: f.outputChannel } : {}),
@@ -179,7 +323,7 @@ export class LibraryPage {
       ...(f.definitionScopeType
         ? {
             definitionScopeType: f.definitionScopeType,
-            ...(f.definitionScopeType === 'COMPANY' ? { definitionCompanyId: company.id } : {}),
+            ...(definitionCompanyId ? { definitionCompanyId } : {}),
           }
         : {}),
       ...(f.hasPublishedVersion !== null ? { hasPublishedVersion: f.hasPublishedVersion } : {}),
@@ -193,27 +337,35 @@ export class LibraryPage {
 
   private readonly listResource = resource({
     params: () => this.listRequest(),
-    loader: ({ params }) => listTemplates(params),
+    loader: ({ params }) => this.templatesApi.listTemplates(params),
   });
 
   private readonly lastResponse = signal<TemplateListResponse | null>(null);
+  private readonly listApiError = computed(() => unwrapApiError(this.listResource.error()));
 
   protected readonly loading = this.listResource.isLoading;
 
   protected readonly errorKind = computed<'none' | 'forbidden' | 'featureDisabled' | 'failed'>(() => {
-    const err = this.listResource.error();
-    if (!err) return 'none';
-    if (err instanceof TemplateApiError) {
-      if (err.code === 'CORE.TEMPLATE.FEATURE.DISABLED') return 'featureDisabled';
-      if (err.status === 403 || err.code === 'CORE.TEMPLATE.PERMISSION.DENIED') return 'forbidden';
+    if (this.loading()) return 'none';
+    const raw = this.listResource.error();
+    if (!raw) return 'none';
+    const err = this.listApiError();
+    if (err) {
+      if (err.code === 'CORE.TEMPLATE.FEATURE.DISABLED' || err.code === 'FEATURE.DISABLED') {
+        return 'featureDisabled';
+      }
+      if (
+        (err.status === 403 &&
+          !['TENANT_MAINTENANCE_ACTIVE', 'TENANT_MAINTENANCE_RELEASE_REQUIRED'].includes(err.code)) ||
+        err.code === 'CORE.TEMPLATE.PERMISSION.DENIED'
+      ) {
+        return 'forbidden';
+      }
     }
     return 'failed';
   });
 
-  protected readonly errorCorrelationId = computed(() => {
-    const err = this.listResource.error();
-    return err instanceof TemplateApiError ? err.correlationId : null;
-  });
+  protected readonly errorCorrelationId = computed(() => correlationIdOf(this.listApiError()));
 
   protected readonly items = computed<TemplateListRow[]>(() => {
     if (this.listResource.error()) return [];
@@ -227,7 +379,9 @@ export class LibraryPage {
   });
 
   protected readonly hasNextPage = computed(() =>
-    this.listResource.hasValue() ? this.listResource.value().pageInfo.hasNextPage : false,
+    this.listResource.hasValue()
+      ? this.listResource.value().pageInfo.hasNextPage && Boolean(this.listResource.value().pageInfo.nextCursor)
+      : false,
   );
 
   protected readonly hasPrevPage = computed(() => this.cursorStack().length > 0);
@@ -335,12 +489,19 @@ export class LibraryPage {
       }
     });
 
-    let prevScopeKey = `${this.scope.company().id}:${this.scope.branch().id}`;
+    let prevScopeKey = this.scopeKey();
     effect(() => {
-      const nextScopeKey = `${this.scope.company().id}:${this.scope.branch().id}`;
+      const nextScopeKey = this.scopeKey();
       if (nextScopeKey === prevScopeKey) return;
       prevScopeKey = nextScopeKey;
-      untracked(() => this.resetPagination());
+      untracked(() => this.lastResponse.set(null));
+    });
+
+    effect(() => {
+      const err = this.listApiError();
+      if (err && err.code === 'CORE.TEMPLATE.CURSOR.INVALID' && untracked(() => this.currentCursor() !== null)) {
+        untracked(() => this.resetPagination());
+      }
     });
 
     this.destroyRef.onDestroy(() => {
@@ -529,15 +690,34 @@ export class LibraryPage {
         });
         break;
       case 'archive':
-        void this.performRowMutation(row, () => archiveTemplate(row.templateId, row.definitionEtag), 'templatesLibrary.toasts.archived');
+        void this.performRowMutation(
+          'archive',
+          row,
+          (key) => this.templatesApi.archiveTemplate(row.templateId, row.definitionEtag, key),
+          'templatesLibrary.toasts.archived',
+        );
         break;
       case 'restore':
-        void this.performRowMutation(row, () => restoreTemplate(row.templateId, row.definitionEtag), 'templatesLibrary.toasts.restored');
+        void this.performRowMutation(
+          'restore',
+          row,
+          (key) => this.templatesApi.restoreTemplate(row.templateId, row.definitionEtag, key),
+          'templatesLibrary.toasts.restored',
+        );
         break;
       case 'delete':
         void this.confirmDelete(row);
         break;
     }
+  }
+
+  private firstCreationCompanyId(): string | undefined {
+    const scope = this.creationScopesResource
+      .value()
+      ?.scopes.find(
+        (item): item is Extract<TemplateCreationScope, { type: 'COMPANY' }> => item.type === 'COMPANY',
+      );
+    return scope?.companyId;
   }
 
   private commitSearch(value: string): void {
@@ -555,32 +735,42 @@ export class LibraryPage {
   private async confirmDelete(row: TemplateListRow): Promise<void> {
     this.deletingName.set(row.name);
     if (!(await this.deleteConfirm().open())) return;
-    const deleted = await this.performRowMutation(
+    await this.performRowMutation(
+      'delete',
       row,
-      () => deleteTemplate(row.templateId, row.definitionEtag),
+      (key) => this.templatesApi.deleteTemplate(row.templateId, row.definitionEtag, key),
       'templatesLibrary.toasts.deleted',
     );
-    if (deleted && this.items().length <= 1 && this.hasPrevPage()) {
-      this.goPrev();
-    }
   }
 
   private async performRowMutation(
+    kind: RowMutationKind,
     row: TemplateListRow,
-    action: () => Promise<unknown>,
+    action: (key: string) => Promise<unknown>,
     successKey: string,
   ): Promise<boolean> {
+    const intentKey = `${kind}:${row.templateId}:${row.definitionEtag}`;
+    const key = this.pendingWriteKeys.get(intentKey) ?? newIdempotencyKey();
+    this.pendingWriteKeys.set(intentKey, key);
+
     this.busyIds.update((set) => {
       const next = new Set(set);
       next.add(row.templateId);
       return next;
     });
     try {
-      await action();
+      await action(key);
+      this.pendingWriteKeys.delete(intentKey);
       this.notify.success(this.transloco.translate(successKey));
+      if (kind === 'delete' && this.items().length <= 1 && this.hasPrevPage()) {
+        this.goPrev();
+      }
       this.reload();
       return true;
     } catch (error: unknown) {
+      if (!isRetryableWriteError(error) && !(error instanceof ApiError && error.status === 401)) {
+        this.pendingWriteKeys.delete(intentKey);
+      }
       this.notifyError(error);
       return false;
     } finally {
@@ -593,7 +783,7 @@ export class LibraryPage {
   }
 
   private notifyError(error: unknown): void {
-    if (error instanceof TemplateApiError && error.status === 409) {
+    if (error instanceof ApiError && error.status === 409 && error.code === 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION') {
       this.reload();
       this.notify.warning(
         this.transloco.translate('templates.states.conflict.title'),
@@ -601,9 +791,9 @@ export class LibraryPage {
       );
       return;
     }
-    const code = error instanceof TemplateApiError ? error.code : null;
-    const key = code ? `templates.errors.${code}` : 'templates.errors.generic';
-    const translated = this.transloco.translate(key);
-    this.notify.error(translated === key ? this.transloco.translate('templates.errors.generic') : translated);
+    if (error instanceof ApiError && (error.status === 404 || error.status === 428)) {
+      this.reload();
+    }
+    this.notify.error(writeErrorMessage(error, 'templates', this.transloco));
   }
 }

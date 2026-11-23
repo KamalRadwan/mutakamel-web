@@ -12,6 +12,8 @@ import {
   tablerRefresh,
   tablerShoppingCart,
 } from '@ng-icons/tabler-icons';
+import { ApiError, errorCodeOf, isRetryableWriteError, writeErrorMessage } from '../../../../../core/api/api-errors';
+import { newIdempotencyKey } from '../../../../../core/api/idempotency';
 import { LanguageState } from '../../../../../core/i18n/language';
 import { Notify } from '../../../../../core/notify/notify';
 import { ActionItem, ActionSelection, ActionsMenu } from '../../../../../shared/ui/actions-menu/actions-menu';
@@ -21,12 +23,11 @@ import {
   templateValidationMeta,
 } from '../../shared/template-family';
 import {
-  TemplateApiError,
-  TemplateCapability,
-  TemplateListRow,
-  TemplateThumbnailRetryRequest,
-  getTemplateThumbnail,
-  retryTemplateThumbnail,
+  TemplatesApi,
+  type TemplateCapability,
+  type TemplateListRow,
+  type TemplateThumbnailQuery,
+  type TemplateThumbnailRetryRequest,
 } from '../../templates.api';
 
 export function formatTemplateDate(iso: string, lang: 'ar' | 'en'): string {
@@ -129,10 +130,13 @@ export function buildTemplateRowActions(row: TemplateListRow, t: (key: string) =
   host: { class: 'block h-full min-w-0' },
 })
 export class LibraryCard {
+  private readonly templatesApi = inject(TemplatesApi);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly language = inject(LanguageState).current;
   private readonly notify = inject(Notify);
+
+  private retryAttempt: { intent: string; key: string } | null = null;
 
   readonly row = input.required<TemplateListRow>();
   readonly open = output<TemplateListRow>();
@@ -178,7 +182,11 @@ export class LibraryCard {
       this.thumbUrl.set(null);
       this.thumbState.set('LOADING');
 
-      void getTemplateThumbnail(thumb.downloadPath)
+      const load = thumb.downloadPath
+        ? this.templatesApi.getTemplateThumbnail(thumb.downloadPath)
+        : this.templatesApi.getTemplateThumbnail(current.templateId, this.thumbnailSource(current));
+
+      void load
         .then((blob) => {
           if (cancelled) return;
           objectUrl = URL.createObjectURL(blob);
@@ -187,7 +195,7 @@ export class LibraryCard {
         })
         .catch((error: unknown) => {
           if (cancelled) return;
-          if (error instanceof TemplateApiError && error.code === 'CORE.TEMPLATE.THUMBNAIL.NOT_READY') {
+          if (errorCodeOf(error) === 'CORE.TEMPLATE.THUMBNAIL.NOT_READY') {
             this.thumbState.set('PENDING');
           } else {
             this.thumbState.set('UNAVAILABLE');
@@ -206,31 +214,43 @@ export class LibraryCard {
     event.stopPropagation();
     if (this.retryingThumb()) return;
     const current = this.row();
+    const body: TemplateThumbnailRetryRequest = this.thumbnailSource(current);
+    const intent = JSON.stringify([current.templateId, body]);
+    if (this.retryAttempt?.intent !== intent) {
+      this.retryAttempt = { intent, key: newIdempotencyKey() };
+    }
+    const key = this.retryAttempt.key;
+
     this.retryingThumb.set(true);
     try {
-      const canEditDraft = current.actions.design.state !== 'HIDDEN';
-      const body: TemplateThumbnailRetryRequest =
-        !canEditDraft && current.currentPublishedVersion
-          ? {
-              sourceKind: 'PUBLISHED',
-              versionId: current.currentPublishedVersion.versionId,
-              sourceChecksum: current.thumbnail.sourceChecksum,
-            }
-          : {
-              sourceKind: 'DRAFT',
-              draftRevision: current.draft.revision,
-              sourceChecksum: current.thumbnail.sourceChecksum,
-            };
-      await retryTemplateThumbnail(current.templateId, body);
+      await this.templatesApi.retryTemplateThumbnail(current.templateId, body, key);
+      this.retryAttempt = null;
+      this.thumbUrl.set(null);
+      this.thumbState.set('PENDING');
       this.notify.info(this.transloco.translate('templatesLibrary.toasts.thumbnailQueued'));
       this.thumbnailRetried.emit(current);
     } catch (error: unknown) {
-      const code = error instanceof TemplateApiError ? error.code : null;
-      const key = code ? `templates.errors.${code}` : 'templates.errors.generic';
-      const translated = this.transloco.translate(key);
-      this.notify.error(translated === key ? this.transloco.translate('templates.errors.generic') : translated);
+      if (!isRetryableWriteError(error) && !(error instanceof ApiError && error.status === 401)) {
+        this.retryAttempt = null;
+      }
+      this.notify.error(writeErrorMessage(error, 'templates', this.transloco));
     } finally {
       this.retryingThumb.set(false);
     }
+  }
+
+  private thumbnailSource(current: TemplateListRow): TemplateThumbnailQuery {
+    const canEditDraft = current.actions.design.state !== 'HIDDEN';
+    return !canEditDraft && current.currentPublishedVersion
+      ? {
+          sourceKind: 'PUBLISHED',
+          versionId: current.currentPublishedVersion.versionId,
+          sourceChecksum: current.thumbnail.sourceChecksum,
+        }
+      : {
+          sourceKind: 'DRAFT',
+          draftRevision: current.draft.revision,
+          sourceChecksum: current.thumbnail.sourceChecksum,
+        };
   }
 }
