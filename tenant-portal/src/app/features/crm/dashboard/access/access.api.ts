@@ -116,9 +116,3 @@ export async function listReviewTargets(widgetId: string): Promise<AccessPerson[
   } while (cursor);
   return result;
 }
-
-/** FAKE-ONLY, no backend route: unscoped active-owner lookup. AC-1 uses resource transfer targets. */
-export async function listActiveOwners(): Promise<AccessPerson[]> {
-  const { FAKE_ACTIVE_PEOPLE } = await import('./access.fake');
-  return structuredClone(FAKE_ACTIVE_PEOPLE);
-}
