@@ -1,5 +1,16 @@
+@if (!canRead() || forbidden()) {
+  <div class="flex flex-1 rounded-10 border border-border bg-surface shadow-card">
+    <ui-full-state
+      kind="forbidden"
+      [title]="'errors.forbidden.title' | transloco"
+      [text]="'errors.forbidden.text' | transloco"
+      [actionLabel]="'errors.notFound.action' | transloco"
+      (action)="goHome()"
+    />
+  </div>
+} @else {
 <div class="flex shrink-0 items-center gap-8 rounded-10 bg-surface p-8 shadow-card">
-  @if (canManage) {
+  @if (canManage()) {
     <button type="button" uiButton variant="primary" class="shrink-0" (click)="openNew()">
       <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
       {{ 'tradeChannels.toolbar.new' | transloco }}
@@ -50,7 +61,7 @@
   [loadFailed]="loadFailed()"
   [hasAnyChannels]="hasAnyChannels()"
   [companyName]="companyName()"
-  [canManage]="canManage"
+  [canManage]="canManage()"
   [busyChannelId]="busyChannelId()"
   (open)="openChannel($event)"
   (toggleStatus)="onToggleStatus($event)"
@@ -63,9 +74,10 @@
   <app-channel-modal
     class="contents"
     [channelId]="activeChannelId()"
-    [canManage]="canManage"
+    [canManage]="canManage()"
     (closed)="onModalClosed()"
     (saved)="onModalSaved($event)"
+    (forbidden)="onModalForbidden()"
   />
 }
 
@@ -88,3 +100,4 @@
   [discardLabel]="'tradeChannels.conflict.keep' | transloco"
   [cancelLabel]="'tradeChannels.unsaved.cancel' | transloco"
 />
+}

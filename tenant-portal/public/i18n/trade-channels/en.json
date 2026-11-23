@@ -96,6 +96,7 @@
   "errors": {
     "codeTaken": "This code is already used by another channel of this company.",
     "codePattern": "Use Latin letters, digits, dot, dash or underscore.",
+    "nameInvalid": "Enter a valid channel name.",
     "required": "Required.",
     "maxLength": "Up to {{max}} characters."
   },

@@ -1,9 +1,11 @@
 import {
   Component,
   DestroyRef,
+  Injector,
   computed,
   effect,
   inject,
+  runInInjectionContext,
   signal,
   untracked,
   viewChild,
@@ -24,6 +26,7 @@ import {
   tablerX,
 } from '@ng-icons/tabler-icons';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
+import { ApiError as CoreApiError } from '../../../../core/api/api-errors';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
 import { ScopeState } from '../../../../core/scope/scope';
@@ -31,11 +34,13 @@ import type { BulkJob } from '../../../../shared/bulk-jobs/bulk-jobs.model';
 import { BulkJobsTracker } from '../../../../shared/bulk-jobs/bulk-jobs-tracker';
 import { Button } from '../../../../shared/ui/button/button';
 import { Dropdown, type DropdownOption } from '../../../../shared/ui/dropdown/dropdown';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { Pagination } from '../../../../shared/ui/pagination/pagination';
 import { StepFilter, type StepOption } from '../../../../shared/ui/step-filter/step-filter';
 import { UnsavedDialog } from '../../../../shared/ui/unsaved-dialog/unsaved-dialog';
 import { ViewSwitcher, type ViewOption } from '../../../../shared/ui/view-switcher/view-switcher';
-import { ApiError, errorKey, newIdempotencyKey, tradeContext, type TradeContext } from '../../shared/trade-api';
+import { branchGrants } from '../../shared/trade-access';
+import { ApiError, errorCodeOf, errorKey, newIdempotencyKey, tradeContext, type TradeContext } from '../../shared/trade-api';
 import { itemName, listReasons } from '../../shared/trade-foundation.api';
 import type { ReasonCode } from '../../shared/trade-foundation.model';
 import { AccountSelection } from './account-bulk/account-selection';
@@ -69,7 +74,9 @@ import {
   type PriceBookOption,
 } from './commercial-accounts.model';
 
-const CAN_MANAGE = true; // later from the session permissions
+function isForbiddenError(error: unknown): boolean {
+  return (error instanceof ApiError || error instanceof CoreApiError) && error.status === 403;
+}
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = 24;
@@ -126,6 +133,7 @@ function parsePageSize(raw: string | null): number {
     AccountTable,
     Button,
     Dropdown,
+    FullState,
     Pagination,
     StepFilter,
     UnsavedDialog,
@@ -152,6 +160,7 @@ function parsePageSize(raw: string | null): number {
 export class AccountsPage {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly injector = inject(Injector);
   private readonly destroyRef = inject(DestroyRef);
   private readonly scope = inject(ScopeState);
   private readonly notify = inject(Notify);
@@ -166,7 +175,14 @@ export class AccountsPage {
   private readonly statusDialog = viewChild.required(AccountStatusDialog);
   private readonly conflictDialog = viewChild.required<UnsavedDialog>('conflictDialog');
 
-  protected readonly canManage: boolean = CAN_MANAGE;
+  protected readonly forbidden = signal(false);
+  protected readonly canRead = computed(() => this.hasGrant('trade.commercial_accounts.read'));
+  protected readonly canManage = computed(
+    () => !this.forbidden() && this.hasGrant('trade.commercial_accounts.manage'),
+  );
+  protected readonly canViewCredit = computed(
+    () => !this.forbidden() && this.hasGrant('trade.credit.view'),
+  );
   protected readonly pageSizes: number[] = [...ALLOWED_PAGE_SIZES];
 
   protected readonly view = computed<AccountView>(() => parseView(this.queryParams()?.get('view') ?? null));
@@ -186,7 +202,7 @@ export class AccountsPage {
   protected readonly ctx = computed<TradeContext>(() => tradeContext(this.scope, 'BRANCH'));
   protected readonly currentBranchName = computed(() => {
     const branch = this.scope.branch();
-    return this.language() === 'ar' ? branch.nameAr : branch.nameEn;
+    return (this.language() === 'ar' ? branch?.nameAr : branch?.nameEn) ?? '';
   });
 
   protected readonly search = signal('');
@@ -318,6 +334,7 @@ export class AccountsPage {
     }
 
     effect(() => {
+      const allowed = this.canRead();
       const ctx = this.ctx();
       const role = this.roleFilter();
       const status = this.statusFilter();
@@ -327,23 +344,47 @@ export class AccountsPage {
       const limit = this.pageSize();
       const _lang = this.language();
       untracked(() => {
+        if (!allowed) {
+          this.listSeq += 1;
+          this.accounts.set([]);
+          this.total.set(0);
+          this.loading.set(false);
+          this.loadFailed.set(false);
+          return;
+        }
+        this.forbidden.set(false);
         void this.loadAccounts(ctx, { page, limit, role, status, search, sort });
       });
     });
 
     effect(() => {
+      const allowed = this.canRead();
       const ctx = this.ctx();
       const role = this.roleFilter();
       const search = this.appliedSearch().trim();
       untracked(() => {
+        if (!allowed) {
+          this.countsSeq += 1;
+          this.counts.set(null);
+          return;
+        }
         void this.loadCounts(ctx, role, search);
       });
     });
 
     effect(() => {
+      const allowed = this.canRead();
       const ctx = this.ctx();
       untracked(() => {
+        if (!allowed) {
+          this.booksSeq += 1;
+          this.reasonsSeq += 1;
+          this.priceBooks.set([]);
+          this.blockReasons.set([]);
+          return;
+        }
         void this.loadLookups(ctx);
+        void this.loadBlockReasons(ctx);
       });
     });
 
@@ -383,8 +424,14 @@ export class AccountsPage {
     });
 
     effect(() => {
+      const allowed = this.canRead();
+      const isForbidden = this.forbidden();
       const id = this.openId();
       untracked(() => {
+        if (!allowed || isForbidden) {
+          this.accountModal().forceClose();
+          return;
+        }
         if (!id) {
           const openModalId = this.accountModal().openAccountId();
           if (openModalId) {
@@ -405,11 +452,26 @@ export class AccountsPage {
         this.accountModal().openEdit(id);
       });
     });
+  }
 
-    void this.loadBlockReasons();
+  protected goHome(): void {
+    void this.router.navigateByUrl('/workspace/home');
+  }
+
+  protected onForbidden(): void {
+    this.forbidden.set(true);
+    this.loadFailed.set(false);
+    this.loading.set(false);
   }
 
   protected reload(): void {
+    if (!this.canRead()) {
+      this.forbidden.set(true);
+      this.loadFailed.set(false);
+      this.loading.set(false);
+      return;
+    }
+    this.forbidden.set(false);
     const ctx = this.ctx();
     const search = this.appliedSearch().trim();
     void this.loadAccounts(ctx, {
@@ -422,7 +484,7 @@ export class AccountsPage {
     });
     void this.loadCounts(ctx, this.roleFilter(), search);
     void this.loadLookups(ctx);
-    void this.loadBlockReasons();
+    void this.loadBlockReasons(ctx);
   }
 
   protected onBulkJobFinished(job: BulkJob): void {
@@ -521,7 +583,7 @@ export class AccountsPage {
   }
 
   protected openCreate(): void {
-    if (!this.canManage) return;
+    if (!this.canManage()) return;
     this.accountModal().openCreate();
   }
 
@@ -557,7 +619,7 @@ export class AccountsPage {
   }
 
   protected openBlockDialog(account: AccountWithParty): void {
-    if (!this.canManage) return;
+    if (!this.canManage()) return;
     this.statusTarget.set(account);
     this.statusMode.set('block');
     this.statusKey = null;
@@ -566,7 +628,7 @@ export class AccountsPage {
   }
 
   protected openUnblockDialog(account: AccountWithParty): void {
-    if (!this.canManage) return;
+    if (!this.canManage()) return;
     this.statusTarget.set(account);
     this.statusMode.set('unblock');
     this.statusKey = null;
@@ -604,6 +666,19 @@ export class AccountsPage {
       );
       this.reload();
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.statusDialog().close();
+        this.statusTarget.set(null);
+        this.statusKey = null;
+        this.statusFingerprint = null;
+        this.forbidden.set(true);
+        return;
+      }
+      const code = errorCodeOf(error);
+      if (code === 'GW.IDEM.MISMATCH' || code === 'TRADE.IDEMPOTENCY.MISMATCH') {
+        this.statusKey = null;
+        this.statusFingerprint = null;
+      }
       if (error instanceof ApiError && error.status === 409 && error.code === 'TRADE.CONCURRENCY.STALE_VERSION') {
         this.statusDialog().close();
         this.statusSaving.set(false);
@@ -660,9 +735,23 @@ export class AccountsPage {
       this.reload();
     } catch (error) {
       this.statusTarget.set(null);
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+        return;
+      }
       this.notify.error(this.transloco.translate(errorKey(error)));
       this.reload();
     }
+  }
+
+  private hasGrant(key: string): boolean {
+    const grants = runInInjectionContext(this.injector, () => branchGrants(key));
+    if (grants === 'ALL') return true;
+    const company = this.scope.company();
+    if (!company?.id) return grants.size > 0;
+    const branchId = company.branches.length > 0 ? this.scope.branch()?.id : undefined;
+    if (branchId && grants.has(branchId)) return true;
+    return !branchId && company.branches.some((branch) => grants.has(branch.id));
   }
 
   private async loadAccounts(
@@ -700,11 +789,16 @@ export class AccountsPage {
 
       this.accounts.set(res.items);
       this.total.set(res.total);
-    } catch {
+    } catch (error) {
       if (seq !== this.listSeq) return;
       this.accounts.set([]);
       this.total.set(0);
-      this.loadFailed.set(true);
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+        this.loadFailed.set(false);
+      } else {
+        this.loadFailed.set(true);
+      }
     } finally {
       if (seq === this.listSeq) {
         this.loading.set(false);
@@ -725,9 +819,12 @@ export class AccountsPage {
       });
       if (seq !== this.countsSeq) return;
       this.counts.set(res);
-    } catch {
+    } catch (error) {
       if (seq !== this.countsSeq) return;
       this.counts.set(null);
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+      }
     }
   }
 
@@ -737,21 +834,27 @@ export class AccountsPage {
       const lookups = await listAccountLookups(ctx);
       if (seq !== this.booksSeq) return;
       this.priceBooks.set(lookups.priceBooks);
-    } catch {
+    } catch (error) {
       if (seq !== this.booksSeq) return;
       this.priceBooks.set([]);
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+      }
     }
   }
 
-  private async loadBlockReasons(): Promise<void> {
+  private async loadBlockReasons(ctx: TradeContext): Promise<void> {
     const seq = ++this.reasonsSeq;
     try {
-      const reasons = await listReasons('ACCOUNT_BLOCK', { includeInactive: true });
+      const reasons = await listReasons('ACCOUNT_BLOCK', { includeInactive: true }, ctx);
       if (seq !== this.reasonsSeq) return;
       this.blockReasons.set(reasons);
-    } catch {
+    } catch (error) {
       if (seq !== this.reasonsSeq) return;
       this.blockReasons.set([]);
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+      }
     }
   }
 }

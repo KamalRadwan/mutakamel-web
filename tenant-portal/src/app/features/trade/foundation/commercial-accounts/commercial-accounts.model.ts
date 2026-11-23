@@ -30,9 +30,11 @@ export interface BranchRule {
 
 export type AccountDetail = AccountWithParty & { branchRule: BranchRule | null };
 
+export type BranchRuleListItem = BranchRule & { branchName: string; branchNameAr: string | null };
+
 /** GET /commercial-accounts/:id/branch-rules: `{ items }`, each rule with the branch name (branchNameAr is null today). */
 export interface BranchRuleList {
-  items: (BranchRule & { branchName: string; branchNameAr: string | null })[];
+  items: BranchRuleListItem[];
 }
 
 export interface AccountWarning {
@@ -56,6 +58,7 @@ export interface CreditPolicy {
 export interface PriceBookOption {
   id: string;
   companyId: string;
+  code?: string;
   name: string;
   purpose: 'SALES' | 'PURCHASE';
   currencyCode: string;

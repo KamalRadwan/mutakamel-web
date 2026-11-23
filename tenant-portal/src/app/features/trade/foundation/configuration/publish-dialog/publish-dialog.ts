@@ -12,6 +12,7 @@ import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { type TradeContext, errorCodeOf, errorKey, newIdempotencyKey } from '../../../shared/trade-api';
 import { formatDate } from '../../../shared/trade-format';
+import { isForbiddenError, isIdempotencyMismatch } from '../configuration-access';
 import { publishVersion } from '../configuration.api';
 import type { ConfigDefinition, ConfigVersion, PublishedConfigVersion } from '../configuration.model';
 
@@ -41,6 +42,7 @@ export class PublishDialog {
   readonly ctx = input.required<TradeContext>();
   readonly published = output<PublishedConfigVersion>();
   readonly reloadRequested = output<void>();
+  readonly forbidden = output<void>();
 
   protected readonly definition = signal<PublishableDefinition | null>(null);
   protected readonly targetVersion = signal<ConfigVersion | null>(null);
@@ -160,13 +162,24 @@ export class PublishDialog {
       this.lastFingerprint = '';
       this.lastIdempotencyKey = '';
       const toastKey =
-        result.effectiveState === 'SCHEDULED' ? 'tradeConfig.toasts.scheduled' : 'tradeConfig.toasts.published';
+        result.status === 'SCHEDULED' ? 'tradeConfig.toasts.scheduled' : 'tradeConfig.toasts.published';
       this.notify.success(this.transloco.translate(toastKey, { n: result.versionNumber }));
       this.allowClose = true;
       this.modal().close();
       this.published.emit(result);
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.publishing.set(false);
+        this.allowClose = true;
+        this.modal().close();
+        this.forbidden.emit();
+        return;
+      }
       const code = errorCodeOf(error);
+      if (isIdempotencyMismatch(code)) {
+        this.lastFingerprint = '';
+        this.lastIdempotencyKey = '';
+      }
       if (code === 'TRADE.APPROVAL.MAKER_CHECKER_REQUIRED') {
         this.notify.warning(this.transloco.translate('tradeConfig.toasts.makerChecker'));
         this.allowClose = true;

@@ -19,6 +19,7 @@ import {
   tablerShieldCheck,
 } from '@ng-icons/tabler-icons';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
+import { ApiError as CoreApiError } from '../../../../../core/api/api-errors';
 import { LanguageState } from '../../../../../core/i18n/language';
 import { Notify } from '../../../../../core/notify/notify';
 import { ScopeState } from '../../../../../core/scope/scope';
@@ -73,6 +74,10 @@ import {
   type UpdateAccountPatch,
   partyDisplayName,
 } from '../commercial-accounts.model';
+
+function isForbiddenError(error: unknown): boolean {
+  return (error instanceof ApiError || error instanceof CoreApiError) && error.status === 403;
+}
 
 type AccountServerErrorField = 'party' | 'priceBook' | 'creditLimit' | 'branchCreditLimit';
 
@@ -231,14 +236,17 @@ export class AccountModal {
   protected readonly mutedBadgeClass = BADGE_CLASS.muted;
 
   readonly canManage = input(true);
+  readonly canViewCredit = input(true);
   readonly saved = output<AccountDetail>();
   readonly closed = output<void>();
+  readonly forbidden = output<void>();
 
   protected readonly isOpen = signal(false);
   protected readonly mode = signal<'create' | 'edit'>('create');
   protected readonly accountId = signal<string | null>(null);
   protected readonly detail = signal<AccountDetail | null>(null);
-  protected readonly branchRules = signal<readonly BranchRule[]>([]);
+  protected readonly branchRules = signal<readonly (BranchRule & { branchName?: string; branchNameAr?: string | null })[]>([]);
+  protected readonly partyPickerForbidden = signal(false);
 
   protected readonly accountBase = signal<AccountFormState>(emptyAccountForm());
   protected readonly accountDraft = signal<AccountFormState>(emptyAccountForm());
@@ -301,7 +309,7 @@ export class AccountModal {
 
   protected readonly currentBranchName = computed(() => {
     const branch = this.scope.branch();
-    return this.language() === 'ar' ? branch.nameAr : branch.nameEn;
+    return (this.language() === 'ar' ? branch?.nameAr : branch?.nameEn) ?? '';
   });
 
   protected readonly otherBranchRules = computed<OtherBranchRuleRow[]>(() => {
@@ -322,7 +330,7 @@ export class AccountModal {
       .filter((rule) => rule.branchId !== currentBranchId)
       .map((rule) => ({
         id: rule.id,
-        branchName: branchNames.get(rule.branchId) ?? rule.branchId,
+        branchName: branchNames.get(rule.branchId) ?? rule.branchName ?? rule.branchId,
         limitLabel: rule.narrowingRules.creditLimit
           ? formatMoney(currency, rule.narrowingRules.creditLimit)
           : noneLabel,
@@ -553,8 +561,8 @@ export class AccountModal {
 
   constructor() {
     effect(() => {
-      const companyId = this.scope.company().id;
-      const branchId = this.scope.branch().id;
+      const companyId = this.scope.company()?.id ?? null;
+      const branchId = this.scope.branch()?.id ?? null;
       untracked(() => {
         if (!this.isOpen()) return;
         if (this.openedCompanyId !== null && companyId !== this.openedCompanyId) {
@@ -579,10 +587,18 @@ export class AccountModal {
     return this.isOpen() ? this.accountId() : null;
   }
 
+  forceClose(): void {
+    this.allowClose = true;
+    if (this.isOpen()) {
+      this.modal().close();
+    }
+  }
+
   openCreate(): void {
     this.loadSeq++;
     this.allowClose = false;
     this.guardBusy.set(false);
+    this.partyPickerForbidden.set(false);
     this.resetIdempotencyKeys();
 
     const ctx = this.ctx();
@@ -617,6 +633,7 @@ export class AccountModal {
   openEdit(id: string): void {
     this.allowClose = false;
     this.guardBusy.set(false);
+    this.partyPickerForbidden.set(false);
     this.resetIdempotencyKeys();
 
     const ctx = this.ctx();
@@ -787,6 +804,18 @@ export class AccountModal {
       );
       this.saved.emit(nextDetail);
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.statusDialog().close();
+        this.guardBusy.set(false);
+        this.statusSaving.set(false);
+        this.handleForbidden();
+        return;
+      }
+      const code = errorCodeOf(error);
+      if (code === 'GW.IDEM.MISMATCH' || code === 'TRADE.IDEMPOTENCY.MISMATCH') {
+        this.lastStatusFingerprint = null;
+        this.lastStatusKey = null;
+      }
       if (this.isStaleVersion(error)) {
         this.statusDialog().close();
         this.guardBusy.set(false);
@@ -798,6 +827,10 @@ export class AccountModal {
     } finally {
       this.statusSaving.set(false);
     }
+  }
+
+  protected onCreditForbidden(): void {
+    this.handleForbidden();
   }
 
   protected async save(): Promise<boolean> {
@@ -842,6 +875,7 @@ export class AccountModal {
     this.saving.set(false);
     this.statusSaving.set(false);
     this.guardBusy.set(false);
+    this.partyPickerForbidden.set(false);
     this.attempted.set(false);
     this.serverErrors.set({});
     this.openedCompanyId = null;
@@ -1163,6 +1197,10 @@ export class AccountModal {
       this.branchDraft.set(rebasedBranch);
       return await this.save();
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.handleForbidden();
+        return false;
+      }
       this.notify.error(this.transloco.translate(errorKey(error)));
       return false;
     }
@@ -1207,6 +1245,10 @@ export class AccountModal {
       );
       this.saved.emit(nextDetail);
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.handleForbidden();
+        return;
+      }
       this.notify.error(this.transloco.translate(errorKey(error)));
     }
   }
@@ -1251,9 +1293,52 @@ export class AccountModal {
     };
   }
 
+  private handleForbidden(): void {
+    this.allowClose = true;
+    if (this.isOpen()) {
+      this.modal().close();
+    }
+    this.forbidden.emit();
+  }
+
   private handleSaveError(error: unknown, stage: 'account' | 'branch'): void {
+    if (isForbiddenError(error)) {
+      this.handleForbidden();
+      return;
+    }
+
     const code = errorCodeOf(error);
     const message = this.transloco.translate(errorKey(error));
+
+    if (code === 'GW.IDEM.MISMATCH' || code === 'TRADE.IDEMPOTENCY.MISMATCH') {
+      this.lastCreateFingerprint = null;
+      this.lastCreateKey = null;
+      this.lastUpdateFingerprint = null;
+      this.lastUpdateKey = null;
+      this.lastBranchFingerprint = null;
+      this.lastBranchKey = null;
+    }
+
+    if (error instanceof ApiError && code === 'TRADE.VALIDATION_FAILED' && error.details) {
+      const mapped: Partial<Record<AccountServerErrorField, string>> = {};
+      const details = error.details;
+      if (details['partyId']?.[0]) mapped.party = details['partyId'][0];
+      if (details['priceBookId']?.[0]) mapped.priceBook = details['priceBookId'][0];
+      const limitMsg = details['creditLimit']?.[0] ?? details['creditCurrencyCode']?.[0];
+      if (limitMsg) {
+        if (stage === 'branch') mapped.branchCreditLimit = limitMsg;
+        else mapped.creditLimit = limitMsg;
+      }
+      const branchMsg =
+        details['narrowingRules']?.[0] ??
+        details['narrowingRules.creditLimit']?.[0] ??
+        details['branchId']?.[0];
+      if (branchMsg) mapped.branchCreditLimit = branchMsg;
+      if (Object.keys(mapped).length > 0) {
+        this.serverErrors.set(mapped);
+        return;
+      }
+    }
 
     switch (code) {
       case 'TRADE.ACCOUNT.PARTY_ROLE_INVALID':
@@ -1286,7 +1371,15 @@ export class AccountModal {
     this.branchRules.update((rules) => {
       const idx = rules.findIndex((item) => item.id === rule.id);
       if (idx >= 0) {
-        return rules.map((item, i) => (i === idx ? rule : item));
+        return rules.map((item, i) =>
+          i === idx
+            ? {
+                ...rule,
+                ...(item.branchName !== undefined ? { branchName: item.branchName } : {}),
+                ...(item.branchNameAr !== undefined ? { branchNameAr: item.branchNameAr } : {}),
+              }
+            : item,
+        );
       }
       return [...rules, rule];
     });
@@ -1308,9 +1401,13 @@ export class AccountModal {
       ]);
       if (seq !== this.loadSeq) return;
       this.applyLoadedDetail(loaded, allRules);
-    } catch {
+    } catch (error) {
       if (seq !== this.loadSeq) return;
       this.loading.set(false);
+      if (isForbiddenError(error)) {
+        this.handleForbidden();
+        return;
+      }
       this.loadFailed.set(true);
     }
   }
@@ -1320,13 +1417,18 @@ export class AccountModal {
     const booksSeq = ++this.booksLookupSeq;
     const ctx = this.ctx();
     const role = includeCreateLists ? this.accountDraft().accountRole : undefined;
+
+    if (includeCreateLists) {
+      this.partyPickerForbidden.set(false);
+      void this.loadPartiesForCreate(role, seq);
+    }
+
     try {
-      const [lookups, reasons, parties, existing] = await Promise.all([
+      const [lookups, reasons, existing] = await Promise.all([
         listAccountLookups(ctx, role),
         listReasons('ACCOUNT_BLOCK', { includeInactive: true }).catch(() => [] as ReasonCode[]),
-        includeCreateLists ? listParties() : Promise.resolve<readonly DirectoryParty[] | null>(null),
         includeCreateLists
-          ? this.loadAllCompanyAccounts(ctx.companyId)
+          ? this.loadAllCompanyAccounts(ctx.companyId).catch(() => [] as AccountWithParty[])
           : Promise.resolve<readonly AccountWithParty[] | null>(null),
       ]);
       if (booksSeq === this.booksLookupSeq) {
@@ -1335,23 +1437,45 @@ export class AccountModal {
       }
       if (seq !== this.lookupSeq) return;
       this.blockReasons.set(reasons);
-      if (parties) this.parties.set(parties);
       if (existing) this.existingAccounts.set(existing);
-    } catch {
-      // Non-fatal lookup failure; lists stay empty or keep prior values.
+    } catch (error) {
+      if (seq !== this.lookupSeq) return;
+      if (isForbiddenError(error)) {
+        this.handleForbidden();
+      }
     }
   }
 
   private async loadLookupsForRole(role: CommercialAccountRole): Promise<void> {
     const seq = ++this.booksLookupSeq;
+    const lookupSeq = this.lookupSeq;
     const ctx = this.ctx();
+    void this.loadPartiesForCreate(role, lookupSeq);
     try {
       const lookups = await listAccountLookups(ctx, role);
       if (seq !== this.booksLookupSeq) return;
       this.priceBooks.set(lookups.priceBooks);
       this.creditPolicies.set(lookups.creditPolicies);
-    } catch {
-      // Non-fatal lookup failure.
+    } catch (error) {
+      if (seq !== this.booksLookupSeq) return;
+      if (isForbiddenError(error)) {
+        this.handleForbidden();
+      }
+    }
+  }
+
+  private async loadPartiesForCreate(role: CommercialAccountRole | undefined, seq: number): Promise<void> {
+    try {
+      const parties = await listParties(role);
+      if (seq !== this.lookupSeq) return;
+      this.partyPickerForbidden.set(false);
+      this.parties.set(parties);
+    } catch (error) {
+      if (seq !== this.lookupSeq) return;
+      if (isForbiddenError(error)) {
+        this.partyPickerForbidden.set(true);
+        this.parties.set([]);
+      }
     }
   }
 

@@ -11,6 +11,7 @@ import { TimeField } from '../../../../../shared/ui/date-time/time-field';
 import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { ApiError, type TradeContext, errorCodeOf, errorKey, newIdempotencyKey } from '../../../shared/trade-api';
+import { isForbiddenError, isIdempotencyMismatch } from '../configuration-access';
 import { createVersion } from '../configuration.api';
 import type { ConfigDefinition, CreatedConfigVersion, ScopeTarget } from '../configuration.model';
 import { ValueEditor } from '../value-editor/value-editor';
@@ -97,6 +98,7 @@ export class VersionModal {
 
   readonly created = output<CreatedConfigVersion>();
   readonly reloadRequested = output<void>();
+  readonly forbidden = output<void>();
 
   protected readonly definition = signal<VersionModalDefinition | null>(null);
   private readonly scopeOverride = signal<VersionModalScopeOverride | null>(null);
@@ -109,6 +111,8 @@ export class VersionModal {
   protected readonly saving = signal(false);
   protected readonly attemptedSubmit = signal(false);
   protected readonly serverValueErrors = signal<ValueValidationError[]>([]);
+  private readonly serverFromError = signal<string | null>(null);
+  private readonly serverToError = signal<string | null>(null);
 
   private readonly activeScopeTarget = computed(() => this.scopeOverride()?.scopeTarget ?? this.scopeTarget());
   private readonly activeCtx = computed(() => this.scopeOverride()?.ctx ?? this.ctx());
@@ -147,6 +151,8 @@ export class VersionModal {
 
   protected readonly fromError = computed<string | null>(() => {
     this.i18n();
+    const serverErr = this.serverFromError();
+    if (serverErr) return serverErr;
     if (!this.attemptedSubmit()) return null;
     if (!this.fromDate() || !this.fromTime()) {
       return this.transloco.translate('tradeConfig.versionModal.dateRequired');
@@ -159,6 +165,8 @@ export class VersionModal {
 
   protected readonly toError = computed<string | null>(() => {
     this.i18n();
+    const serverErr = this.serverToError();
+    if (serverErr) return serverErr;
     if (!this.attemptedSubmit()) return null;
     const td = this.toDate();
     const tt = this.toTime();
@@ -204,6 +212,8 @@ export class VersionModal {
     this.toTime.set(null);
     this.attemptedSubmit.set(false);
     this.serverValueErrors.set([]);
+    this.serverFromError.set(null);
+    this.serverToError.set(null);
     this.saving.set(false);
     this.allowClose = false;
     this.lastSubmitFingerprint = '';
@@ -218,7 +228,18 @@ export class VersionModal {
     this.value.set(next);
   }
 
+  protected onFromDateChange(nextDate: string | null): void {
+    this.serverFromError.set(null);
+    this.fromDate.set(nextDate);
+  }
+
+  protected onFromTimeChange(nextTime: string | null): void {
+    this.serverFromError.set(null);
+    this.fromTime.set(nextTime);
+  }
+
   protected onToDateChange(nextDate: string | null): void {
+    this.serverToError.set(null);
     this.toDate.set(nextDate);
     if (nextDate && !this.toTime()) {
       this.toTime.set('23:59');
@@ -228,6 +249,7 @@ export class VersionModal {
   }
 
   protected onToTimeChange(nextTime: string | null): void {
+    this.serverToError.set(null);
     this.toTime.set(nextTime);
     if (nextTime && !this.toDate()) {
       this.toDate.set(this.fromDate() ?? localNowParts().date);
@@ -237,6 +259,7 @@ export class VersionModal {
   }
 
   protected clearEnd(): void {
+    this.serverToError.set(null);
     this.toDate.set(null);
     this.toTime.set(null);
   }
@@ -259,6 +282,8 @@ export class VersionModal {
     this.scopeOverride.set(null);
     this.attemptedSubmit.set(false);
     this.serverValueErrors.set([]);
+    this.serverFromError.set(null);
+    this.serverToError.set(null);
     this.saving.set(false);
   }
 
@@ -269,6 +294,8 @@ export class VersionModal {
     const committed = this.valueEditor()?.commit() ?? true;
     this.attemptedSubmit.set(true);
     this.serverValueErrors.set([]);
+    this.serverFromError.set(null);
+    this.serverToError.set(null);
     if (!committed) return;
 
     const clientErrors = validateValue(def.valueSchema, this.value());
@@ -311,7 +338,18 @@ export class VersionModal {
       this.modal().close();
       this.created.emit(created);
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.saving.set(false);
+        this.allowClose = true;
+        this.modal().close();
+        this.forbidden.emit();
+        return;
+      }
       const code = errorCodeOf(error);
+      if (isIdempotencyMismatch(code)) {
+        this.lastSubmitFingerprint = '';
+        this.lastIdempotencyKey = '';
+      }
       if (code === 'TRADE.CONFIGURATION.VALUE_INVALID') {
         const rawPaths =
           error instanceof ApiError && Array.isArray(error.details?.['path'])
@@ -325,6 +363,33 @@ export class VersionModal {
             messageKey: 'tradeShared.errors.TRADE_CONFIGURATION_VALUE_INVALID',
           })),
         );
+      } else if (code === 'TRADE.VALIDATION_FAILED' && error instanceof ApiError && error.details) {
+        let mapped = false;
+        if (error.details['effectiveFrom']?.length) {
+          this.serverFromError.set(this.transloco.translate('tradeConfig.versionModal.invalidDate'));
+          mapped = true;
+        }
+        if (error.details['effectiveTo']?.length) {
+          this.serverToError.set(this.transloco.translate('tradeConfig.versionModal.invalidDate'));
+          mapped = true;
+        }
+        const valuePaths = error.details['value'] ?? error.details['path'];
+        if (Array.isArray(valuePaths) && valuePaths.length > 0) {
+          const paths = valuePaths
+            .filter((p): p is string => typeof p === 'string' && p.trim().length > 0)
+            .map(normalizeServerPath);
+          this.serverValueErrors.set(
+            (paths.length > 0 ? paths : ['$']).map((path) => ({
+              path,
+              rule: 'type',
+              messageKey: 'tradeShared.errors.TRADE_CONFIGURATION_VALUE_INVALID',
+            })),
+          );
+          mapped = true;
+        }
+        if (!mapped) {
+          this.notify.error(this.transloco.translate(errorKey(error)));
+        }
       } else if (code === 'TRADE.CONCURRENCY.STALE_VERSION') {
         const reload = await this.conflictDialog().open();
         if (reload) {

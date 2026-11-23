@@ -4,7 +4,6 @@ import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse
 import { provideIcons } from '@ng-icons/core';
 import { tablerLock, tablerLockOpen } from '@ng-icons/tabler-icons';
 import { Notify } from '../../../../../../core/notify/notify';
-import { ApiError } from '../../../../../crm/settings/shared/settings-api';
 import { listBulkJobs } from '../../../../../../shared/bulk-jobs/bulk-jobs.api';
 import {
   type BulkJob,
@@ -20,7 +19,7 @@ import {
   type ReasonPickerValue,
   TradeReasonPicker,
 } from '../../../../shared/pickers/reason-picker/reason-picker';
-import { errorCodeOf, newIdempotencyKey, type TradeContext } from '../../../../shared/trade-api';
+import { ApiError, errorCodeOf, newIdempotencyKey, type TradeContext } from '../../../../shared/trade-api';
 import type { ReasonKind } from '../../../../shared/trade-foundation.model';
 import { type AccountListFilter, AccountSelection } from '../account-selection';
 import {

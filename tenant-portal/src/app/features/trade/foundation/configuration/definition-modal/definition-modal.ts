@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component, computed, inject, input, output, signal, viewChild } from '@angular/core';
+import { ChangeDetectorRef, Component, Injector, computed, inject, input, output, signal, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
@@ -21,6 +21,7 @@ import { Modal } from '../../../../../shared/ui/modal/modal';
 import { Segmented, type SegmentedOption } from '../../../../../shared/ui/segmented/segmented';
 import { type TradeContext, errorCodeOf, errorKey, newIdempotencyKey, tradeContext } from '../../../shared/trade-api';
 import { formatDate } from '../../../shared/trade-format';
+import { hasConfigScopeGrant, isForbiddenError } from '../configuration-access';
 import { cancelVersion, getDefinition, retireVersion, testVersion } from '../configuration.api';
 import {
   type ConfigDefinition,
@@ -48,6 +49,7 @@ export class DefinitionModal {
   protected readonly uid = `cfg-def-${++DefinitionModal.nextId}`;
 
   private readonly cdr = inject(ChangeDetectorRef);
+  private readonly injector = inject(Injector);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly language = inject(LanguageState).current;
@@ -61,14 +63,16 @@ export class DefinitionModal {
   private readonly retireDialog = viewChild.required<ConfirmDialog>('retireDialog');
 
   readonly scopeTarget = input.required<ScopeTarget>();
-  readonly canManage = input(true);
-  readonly canPublish = input(true);
+  readonly canManage = input<boolean | undefined>(undefined);
+  readonly canPublish = input<boolean | undefined>(undefined);
 
   readonly newVersionRequested = output<{ definition: ConfigDefinitionDetail; scopeTarget: ScopeTarget }>();
   readonly changed = output<void>();
+  readonly forbidden = output<void>();
 
   private readonly openedSummary = signal<ConfigDefinition | null>(null);
   protected readonly detail = signal<ConfigDefinitionDetail | null>(null);
+  private readonly loadedScope = signal<ScopeTarget | null>(null);
   protected readonly loadingDetail = signal(false);
   protected readonly loadError = signal(false);
   private readonly isOpen = signal(false);
@@ -107,12 +111,12 @@ export class DefinitionModal {
     }
     const lang = this.language();
     const company = this.scopeState.company();
-    const companyName = lang === 'ar' ? company.nameAr : company.nameEn;
+    const companyName = lang === 'ar' ? (company?.nameAr ?? '') : (company?.nameEn ?? '');
     if (target === 'COMPANY') {
       return `${scopeName} · ${companyName}`;
     }
     const branch = this.scopeState.branch();
-    const branchName = lang === 'ar' ? branch.nameAr : branch.nameEn;
+    const branchName = lang === 'ar' ? (branch?.nameAr ?? '') : (branch?.nameEn ?? '');
     const pair = this.transloco.translate('tradeConfig.page.showingPair', {
       company: companyName,
       branch: branchName,
@@ -189,7 +193,25 @@ export class DefinitionModal {
     return [this.formatDiagnostic(list)];
   });
 
-  protected readonly showActionsColumn = computed(() => this.canManage() || this.canPublish());
+  protected readonly effectiveCanManage = computed(() => {
+    const override = this.canManage();
+    if (override !== undefined) return override;
+    return hasConfigScopeGrant(this.injector, this.scopeState, 'trade.configuration.manage', this.modalScope());
+  });
+
+  protected readonly effectiveCanPublish = computed(() => {
+    const override = this.canPublish();
+    if (override !== undefined) return override;
+    return hasConfigScopeGrant(this.injector, this.scopeState, 'trade.policy.publish', this.modalScope());
+  });
+
+  protected readonly showVersionsSkeleton = computed(
+    () => this.loadingDetail() && (!this.detail() || this.loadedScope() !== this.modalScope()),
+  );
+
+  protected readonly showActionsColumn = computed(
+    () => this.effectiveCanManage() || this.effectiveCanPublish(),
+  );
 
   protected readonly retireDialogTitle = computed(() => {
     this.i18n();
@@ -200,6 +222,7 @@ export class DefinitionModal {
   open(def: ConfigDefinition): void {
     this.openedSummary.set(def);
     this.detail.set(null);
+    this.loadedScope.set(null);
     this.loadError.set(false);
     this.modalScope.set(this.scopeTarget());
     this.busyVersionId.set(null);
@@ -230,6 +253,10 @@ export class DefinitionModal {
     if (nextValue === this.modalScope()) return;
     this.modalScope.set(nextValue);
     this.failedDiagnostics.set(null);
+    const id = this.detail()?.id ?? this.openedSummary()?.id;
+    if (this.isOpen() && id) {
+      void this.fetchDetail(id);
+    }
   }
 
   protected close(): void {
@@ -242,6 +269,7 @@ export class DefinitionModal {
     this.isOpen.set(false);
     this.openedSummary.set(null);
     this.detail.set(null);
+    this.loadedScope.set(null);
     this.loadingDetail.set(false);
     this.loadError.set(false);
     this.busyVersionId.set(null);
@@ -290,16 +318,20 @@ export class DefinitionModal {
       : this.transloco.translate('tradeConfig.definitionModal.noEnd');
   }
 
+  protected createdByLabel(ver: ConfigVersionDetail): string {
+    return ver.createdByName?.trim() || '—';
+  }
+
   protected canTestRow(ver: ConfigVersionDetail): boolean {
-    return this.canManage() && (ver.effectiveState === 'DRAFT' || ver.effectiveState === 'TESTED');
+    return this.effectiveCanManage() && (ver.effectiveState === 'DRAFT' || ver.effectiveState === 'TESTED');
   }
 
   protected showPublishRow(ver: ConfigVersionDetail): boolean {
-    return this.canPublish() && (ver.effectiveState === 'DRAFT' || ver.effectiveState === 'TESTED');
+    return this.effectiveCanPublish() && (ver.effectiveState === 'DRAFT' || ver.effectiveState === 'TESTED');
   }
 
   protected isCreatedByCurrentUser(ver: ConfigVersionDetail): boolean {
-    return ver.createdBy === this.currentUserId();
+    return ver.createdBy !== null && ver.createdBy === this.currentUserId();
   }
 
   protected isPublishDisabled(ver: ConfigVersionDetail): boolean {
@@ -323,9 +355,9 @@ export class DefinitionModal {
 
   protected rowMenuActions(ver: ConfigVersionDetail): ActionItem[] {
     this.i18n();
-    if (!this.canManage()) return [];
     const disabled = this.busyVersionId() !== null;
     if (ver.effectiveState === 'LIVE' || ver.effectiveState === 'SCHEDULED') {
+      if (!this.effectiveCanPublish()) return [];
       return [
         {
           id: 'retire',
@@ -338,6 +370,7 @@ export class DefinitionModal {
       ];
     }
     if (ver.effectiveState === 'DRAFT' || ver.effectiveState === 'TESTED') {
+      if (!this.effectiveCanManage()) return [];
       return [
         {
           id: 'cancelDraft',
@@ -362,7 +395,7 @@ export class DefinitionModal {
 
   protected async runTest(ver: ConfigVersionDetail): Promise<void> {
     const def = this.detail();
-    if (!def || !this.canManage() || this.busyVersionId() !== null) return;
+    if (!def || !this.effectiveCanManage() || this.busyVersionId() !== null) return;
     this.busyVersionId.set(ver.id);
     this.testingVersionId.set(ver.id);
     this.failedDiagnostics.set(null);
@@ -377,6 +410,13 @@ export class DefinitionModal {
       this.changed.emit();
       await this.fetchDetail(def.id);
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.testingVersionId.set(null);
+        this.busyVersionId.set(null);
+        this.modal().close();
+        this.forbidden.emit();
+        return;
+      }
       if (errorCodeOf(error) === 'TRADE.CONCURRENCY.STALE_VERSION') {
         const reload = await this.conflictDialog().open();
         if (reload) {
@@ -396,7 +436,7 @@ export class DefinitionModal {
     const def = this.detail();
     if (
       !def ||
-      !this.canPublish() ||
+      !this.effectiveCanPublish() ||
       ver.effectiveState !== 'TESTED' ||
       this.isCreatedByCurrentUser(ver) ||
       this.busyVersionId() !== null
@@ -423,15 +463,20 @@ export class DefinitionModal {
     }
   }
 
+  protected onChildForbidden(): void {
+    this.modal().close();
+    this.forbidden.emit();
+  }
+
   protected requestNewVersion(): void {
     const def = this.detail();
-    if (!def || !this.canManage() || !this.allowedHere() || this.busyVersionId() !== null) return;
+    if (!def || !this.effectiveCanManage() || !this.allowedHere() || this.busyVersionId() !== null) return;
     this.newVersionRequested.emit({ definition: def, scopeTarget: this.modalScope() });
   }
 
   private async runRetire(ver: ConfigVersionDetail): Promise<void> {
     const def = this.detail();
-    if (!def || !this.canManage() || this.busyVersionId() !== null) return;
+    if (!def || !this.effectiveCanPublish() || this.busyVersionId() !== null) return;
     if (ver.effectiveState !== 'LIVE' && ver.effectiveState !== 'SCHEDULED') return;
 
     this.pendingRetireVersion.set(ver);
@@ -448,6 +493,12 @@ export class DefinitionModal {
       this.changed.emit();
       await this.fetchDetail(def.id);
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.busyVersionId.set(null);
+        this.modal().close();
+        this.forbidden.emit();
+        return;
+      }
       if (errorCodeOf(error) === 'TRADE.CONCURRENCY.STALE_VERSION') {
         const reload = await this.conflictDialog().open();
         if (reload) {
@@ -464,7 +515,7 @@ export class DefinitionModal {
 
   private async runCancelDraft(ver: ConfigVersionDetail): Promise<void> {
     const def = this.detail();
-    if (!def || !this.canManage() || this.busyVersionId() !== null) return;
+    if (!def || !this.effectiveCanManage() || this.busyVersionId() !== null) return;
     if (ver.effectiveState !== 'DRAFT' && ver.effectiveState !== 'TESTED') return;
 
     this.busyVersionId.set(ver.id);
@@ -477,6 +528,12 @@ export class DefinitionModal {
       this.changed.emit();
       await this.fetchDetail(def.id);
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.busyVersionId.set(null);
+        this.modal().close();
+        this.forbidden.emit();
+        return;
+      }
       if (errorCodeOf(error) === 'TRADE.CONCURRENCY.STALE_VERSION') {
         const reload = await this.conflictDialog().open();
         if (reload) {
@@ -493,14 +550,22 @@ export class DefinitionModal {
 
   private async fetchDetail(id: string): Promise<void> {
     const seq = ++this.loadSeq;
+    const targetScope = this.modalScope();
+    const ctx = this.modalCtx();
     this.loadingDetail.set(true);
     this.loadError.set(false);
     try {
-      const result = await getDefinition(id);
+      const result = await getDefinition(id, ctx);
       if (seq !== this.loadSeq || !this.isOpen()) return;
       this.detail.set(result);
+      this.loadedScope.set(targetScope);
     } catch (error) {
       if (seq !== this.loadSeq || !this.isOpen()) return;
+      if (isForbiddenError(error)) {
+        this.modal().close();
+        this.forbidden.emit();
+        return;
+      }
       if (!this.detail()) {
         this.loadError.set(true);
       } else {

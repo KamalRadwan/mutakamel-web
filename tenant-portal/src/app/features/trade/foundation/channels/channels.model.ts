@@ -11,8 +11,8 @@ export interface ChannelRow extends Channel {
 }
 
 export interface ChannelBranchLink extends ChannelBranch {
-  branchName: string;
-  branchNameAr: string;
+  branchName: string | null;
+  branchNameAr: string | null;
 }
 
 export interface ChannelDetail extends Channel {

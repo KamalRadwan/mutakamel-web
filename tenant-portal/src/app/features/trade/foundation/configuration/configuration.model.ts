@@ -37,6 +37,14 @@ export interface ValueSchema {
   maxItems?: number;
 }
 
+export interface VersionTestEvidence {
+  passed: boolean;
+  /** Flat list: [code, ...paths], e.g. ['BRANCH_WEAKENS_MIN'] or ['TRADE.CONFIGURATION.VALUE_INVALID', '$.x']. */
+  diagnostics: string[];
+  testedAt: string;
+  testedBy: string | null;
+}
+
 export interface ConfigVersion {
   id: string;
   versionNumber: number;
@@ -53,22 +61,12 @@ export interface ConfigVersion {
   supersededAt: string | null;
   supersededByVersionId: string | null;
   contentHash: string;
+  createdBy: string | null;
+  createdByName: string | null;
+  testEvidence: VersionTestEvidence | null;
 }
 
-export interface VersionTestEvidence {
-  evidenceId: string;
-  passed: boolean;
-  /** Flat list: [code, ...paths], e.g. ['BRANCH_WEAKENS_MIN'] or ['TRADE.CONFIGURATION.VALUE_INVALID', '$.x']. */
-  diagnostics: string[];
-  contentHash: string;
-  testedAt: string;
-}
-
-export interface ConfigVersionDetail extends ConfigVersion {
-  createdBy: string;
-  createdByName: string;
-  latestTestEvidence: VersionTestEvidence | null;
-}
+export type ConfigVersionDetail = ConfigVersion;
 
 export interface ConfigDefinition {
   id: string;
@@ -82,8 +80,10 @@ export interface ConfigDefinition {
   versions: ConfigVersion[];
 }
 
-export interface ConfigDefinitionDetail extends Omit<ConfigDefinition, 'versions'> {
-  versions: ConfigVersionDetail[];
+export type ConfigDefinitionDetail = ConfigDefinition;
+
+export interface CreatedConfigDefinition extends Omit<ConfigDefinition, 'versions'> {
+  versions?: ConfigVersion[];
 }
 
 export interface TestResult {
@@ -117,15 +117,32 @@ export interface CreateVersionBody {
   effectiveTo: string | null;
 }
 
-export interface CreatedConfigVersion extends ConfigVersion {
-  createdBy: string;
+export interface RawConfigVersion {
+  id: string;
+  definitionId: string;
+  versionNumber: number;
+  version: number;
+  scopeTarget: ScopeTarget;
+  companyId: string | null;
+  branchId: string | null;
+  channelId: string | null;
+  value: unknown;
+  status: VersionStatus;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  supersededAt: string | null;
+  supersededByVersionId: string | null;
+  contentHash: string;
+  createdBy: string | null;
 }
+
+export type CreatedConfigVersion = RawConfigVersion;
 
 export interface PublishVersionBody {
   supersedesVersionId?: string;
 }
 
-export interface PublishedConfigVersion extends ConfigVersion {
+export interface PublishedConfigVersion extends RawConfigVersion {
   configurationEpoch: number;
 }
 

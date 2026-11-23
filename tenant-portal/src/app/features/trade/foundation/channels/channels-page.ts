@@ -1,9 +1,11 @@
 import {
   Component,
+  Injector,
   computed,
   effect,
   inject,
   input,
+  runInInjectionContext,
   signal,
   untracked,
   viewChild,
@@ -13,6 +15,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerPlus, tablerRefresh } from '@ng-icons/tabler-icons';
+import { ApiError as CoreApiError } from '../../../../core/api/api-errors';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
 import { ScopeState } from '../../../../core/scope/scope';
@@ -20,8 +23,10 @@ import { Button } from '../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { FacetSearch } from '../../../../shared/ui/facet-search/facet-search';
 import type { SearchFacet, SearchField } from '../../../../shared/ui/facet-search/facet-search.model';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { StepFilter, type StepOption } from '../../../../shared/ui/step-filter/step-filter';
 import { UnsavedDialog } from '../../../../shared/ui/unsaved-dialog/unsaved-dialog';
+import { branchGrants } from '../../shared/trade-access';
 import { ApiError, errorCodeOf, newIdempotencyKey, tradeContext } from '../../shared/trade-api';
 import type { Channel, ChannelStatus, ChannelType } from '../../shared/trade-foundation.model';
 import { CHANNEL_TYPE_KEY } from '../../shared/trade-labels';
@@ -44,8 +49,11 @@ import {
   type ChannelStatusFilter,
 } from './channels.model';
 
-const CAN_MANAGE = true; // later from the session permissions
 const LIMIT_PLACEHOLDER = '__LIMIT_TOTAL__';
+
+function isForbiddenError(error: unknown): boolean {
+  return (error instanceof ApiError || error instanceof CoreApiError) && error.status === 403;
+}
 
 interface LimitedParts {
   before: string;
@@ -82,6 +90,7 @@ function parseTypesParam(raw: string | undefined): ChannelType[] {
     Button,
     ConfirmDialog,
     FacetSearch,
+    FullState,
     StepFilter,
     UnsavedDialog,
     ChannelTable,
@@ -97,6 +106,7 @@ function parseTypesParam(raw: string | undefined): ChannelType[] {
 export class ChannelsPage {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly injector = inject(Injector);
   private readonly scope = inject(ScopeState);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
@@ -116,7 +126,11 @@ export class ChannelsPage {
   /** Bound from `?channel=` (`new` or id). */
   readonly channelParam = input<string | undefined>(undefined, { alias: 'channel' });
 
-  protected readonly canManage: boolean = CAN_MANAGE;
+  protected readonly forbidden = signal(false);
+  protected readonly canRead = computed(() => this.hasCompanyGrant('trade.items.read'));
+  protected readonly canManage = computed(
+    () => !this.forbidden() && this.hasCompanyGrant('trade.items.manage'),
+  );
   protected readonly limits = CHANNEL_LIMITS;
 
   protected readonly rows = signal<readonly ChannelRow[]>([]);
@@ -154,6 +168,7 @@ export class ChannelsPage {
 
   protected readonly companyName = computed(() => {
     const comp = this.scope.company();
+    if (!comp) return '';
     return this.language() === 'ar' ? comp.nameAr : comp.nameEn;
   });
 
@@ -255,16 +270,32 @@ export class ChannelsPage {
 
   constructor() {
     effect(() => {
-      const companyId = this.scope.company().id;
+      const allowed = this.canRead();
+      const companyId = this.scope.company()?.id ?? '';
       const status = this.statusFilter();
       const search = this.searchQuery();
       const types = this.selectedTypes();
       const filterKey = `${companyId}|${status}|${search}|${types.join(',')}`;
 
+      if (!allowed) {
+        this.lastCompanyId = companyId || null;
+        this.lastFilterKey = '';
+        untracked(() => {
+          this.loadSeq += 1;
+          this.rows.set([]);
+          this.totalRows.set(0);
+          this.statusCounts.set({ ACTIVE: 0, INACTIVE: 0, total: 0 });
+          this.loading.set(false);
+          this.loadFailed.set(false);
+        });
+        return;
+      }
+
       if (this.lastCompanyId === null) {
         this.lastCompanyId = companyId;
         this.lastFilterKey = filterKey;
         untracked(() => {
+          this.forbidden.set(false);
           void this.loadChannels();
         });
         return;
@@ -274,6 +305,7 @@ export class ChannelsPage {
         this.lastCompanyId = companyId;
         this.lastFilterKey = `${companyId}|active||`;
         untracked(() => {
+          this.forbidden.set(false);
           void this.handleCompanyChanged(companyId);
         });
         return;
@@ -285,6 +317,7 @@ export class ChannelsPage {
 
       this.lastFilterKey = filterKey;
       untracked(() => {
+        this.forbidden.set(false);
         void this.loadChannels();
       });
     });
@@ -294,12 +327,20 @@ export class ChannelsPage {
     return (await this.channelModal()?.canDeactivate()) ?? true;
   }
 
+  protected goHome(): void {
+    void this.router.navigateByUrl('/workspace/home');
+  }
+
+  protected onModalForbidden(): void {
+    this.forbidden.set(true);
+  }
+
   protected reload(): void {
     void this.loadChannels();
   }
 
   protected openNew(): void {
-    if (!this.canManage) return;
+    if (!this.canManage()) return;
     void this.router.navigate([], {
       relativeTo: this.route,
       queryParams: { channel: 'new' },
@@ -390,7 +431,7 @@ export class ChannelsPage {
   }
 
   protected async onToggleStatus(row: ChannelRow): Promise<void> {
-    if (!this.canManage || this.busyChannelId()) return;
+    if (!this.canManage() || this.busyChannelId()) return;
     const nextStatus: ChannelStatus = row.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
 
     if (nextStatus === 'INACTIVE') {
@@ -415,13 +456,17 @@ export class ChannelsPage {
 
     try {
       await patchChannel(ctx, channelId, version, { status: nextStatus }, newIdempotencyKey());
-      if (this.scope.company().id !== companyAtStart) return;
+      if (this.scope.company()?.id !== companyAtStart) return;
       const toastKey =
         nextStatus === 'ACTIVE' ? 'tradeChannels.toast.activated' : 'tradeChannels.toast.deactivated';
       this.notify.success(this.transloco.translate(toastKey, { name: channelName }));
       await this.loadChannels();
     } catch (error) {
-      if (this.scope.company().id !== companyAtStart) return;
+      if (this.scope.company()?.id !== companyAtStart) return;
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+        return;
+      }
       if (
         !isRetryAfterConflict &&
         error instanceof ApiError &&
@@ -465,6 +510,10 @@ export class ChannelsPage {
       }
       await this.applyRowStatusChange(fresh.id, fresh.name, fresh.version, nextStatus, true);
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+        return;
+      }
       this.notify.error(this.transloco.translate(channelErrorKey(error)));
     } finally {
       this.busyChannelId.set(null);
@@ -507,8 +556,18 @@ export class ChannelsPage {
       }
     }
 
-    if (this.scope.company().id !== targetCompanyId) return;
+    if (this.scope.company()?.id !== targetCompanyId) return;
     void this.loadChannels({ status: 'active', search: '', types: [] });
+  }
+
+  private hasCompanyGrant(key: string): boolean {
+    const grants = runInInjectionContext(this.injector, () => branchGrants(key));
+    if (grants === 'ALL') return true;
+    const company = this.scope.company();
+    if (!company?.id) return grants.size > 0;
+    const branchId = company.branches.length > 0 ? this.scope.branch()?.id : undefined;
+    if (branchId && grants.has(branchId)) return true;
+    return !branchId && company.branches.some((branch) => grants.has(branch.id));
   }
 
   private async loadChannels(override?: {
@@ -516,6 +575,10 @@ export class ChannelsPage {
     search: string;
     types: readonly ChannelType[];
   }): Promise<void> {
+    if (!this.canRead()) {
+      this.loading.set(false);
+      return;
+    }
     const seq = ++this.loadSeq;
     const ctx = tradeContext(this.scope, 'COMPANY');
     const statusFilter = override ? override.status : this.statusFilter();
@@ -540,6 +603,7 @@ export class ChannelsPage {
 
     this.loading.set(true);
     this.loadFailed.set(false);
+    this.forbidden.set(false);
 
     try {
       const [result, counts] = await Promise.all([
@@ -557,6 +621,11 @@ export class ChannelsPage {
       this.totalRows.set(0);
       this.statusCounts.set({ ACTIVE: 0, INACTIVE: 0, total: 0 });
       this.loading.set(false);
+      if (isForbiddenError(error)) {
+        this.loadFailed.set(false);
+        this.forbidden.set(true);
+        return;
+      }
       this.loadFailed.set(true);
       this.notify.error(this.transloco.translate(channelErrorKey(error)));
     }

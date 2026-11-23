@@ -9,6 +9,7 @@ import type {
   ConfigVersionDetail,
   CreateDefinitionBody,
   CreateVersionBody,
+  CreatedConfigDefinition,
   CreatedConfigVersion,
   ListDefinitionsQuery,
   PublishVersionBody,
@@ -30,8 +31,8 @@ const KEY_PATTERN = /^trade\.[a-z0-9][a-z0-9_.-]{1,110}$/;
 const VALID_SCOPES: ReadonlySet<ScopeTarget> = new Set(['TENANT', 'COMPANY', 'BRANCH']);
 const VALID_RISKS: ReadonlySet<RiskClass> = new Set(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']);
 
-interface FakeConfigVersion extends Omit<ConfigVersion, 'effectiveState'> {
-  createdBy: string;
+interface FakeConfigVersion extends Omit<ConfigVersion, 'effectiveState' | 'createdByName' | 'testEvidence'> {
+  createdBy: string | null;
 }
 
 interface FakeConfigDefinition extends Omit<ConfigDefinition, 'versions'> {
@@ -381,7 +382,8 @@ const passingEvidence = new Map<string, string>();
 const latestEvidence = new Map<string, VersionTestEvidence>();
 const scopeEpochs = new Map<string, number>();
 
-function ownerName(userId: string): string {
+function ownerName(userId: string | null): string | null {
+  if (!userId) return null;
   if (userId === CURRENT_USER_ID) return FAKE_USER.displayName;
   return TRADE_FAKE_DB.owners.find((owner) => owner.id === userId)?.name ?? userId;
 }
@@ -398,11 +400,10 @@ function seedInitialEvidence(defs: readonly FakeConfigDefinition[]): void {
         const evidenceId = `ev-${ver.id}`;
         passingEvidence.set(`${ver.id}:${ver.contentHash}`, evidenceId);
         latestEvidence.set(ver.id, {
-          evidenceId,
           passed: true,
           diagnostics: [],
-          contentHash: ver.contentHash,
           testedAt: ver.effectiveFrom,
+          testedBy: ver.createdBy ?? OMAR_USER_ID,
         });
       }
     }
@@ -412,21 +413,17 @@ function seedInitialEvidence(defs: readonly FakeConfigDefinition[]): void {
 seedInitialEvidence(SEED_DEFINITIONS);
 
 function toPublicVersion(ver: FakeConfigVersion, now = new Date()): ConfigVersion {
-  const { createdBy: _createdBy, ...publicVersion } = ver;
-  return clone({
-    ...publicVersion,
-    effectiveState: versionState(ver, now),
-  });
-}
-
-function toDetailVersion(ver: FakeConfigVersion, now = new Date()): ConfigVersionDetail {
   const evidence = latestEvidence.get(ver.id) ?? null;
   return clone({
     ...ver,
     effectiveState: versionState(ver, now),
     createdByName: ownerName(ver.createdBy),
-    latestTestEvidence: evidence,
+    testEvidence: evidence,
   });
+}
+
+function toDetailVersion(ver: FakeConfigVersion, now = new Date()): ConfigVersionDetail {
+  return toPublicVersion(ver, now);
 }
 
 function resolveScopeTarget(ctx: TradeContext): ScopeTarget {
@@ -438,7 +435,7 @@ function resolveScopeTarget(ctx: TradeContext): ScopeTarget {
   return 'TENANT';
 }
 
-function matchesExactScope(ver: Omit<ConfigVersion, 'effectiveState'>, target: ScopeTarget, ctx: TradeContext): boolean {
+function matchesExactScope(ver: Pick<ConfigVersion, 'scopeTarget' | 'companyId' | 'branchId'>, target: ScopeTarget, ctx: TradeContext): boolean {
   if (ver.scopeTarget !== target) return false;
   if (target === 'TENANT') {
     return ver.companyId === null && ver.branchId === null;
@@ -534,7 +531,7 @@ export async function fakeListDefinitions(
   return { items, total, page, limit };
 }
 
-export async function fakeGetDefinition(id: string): Promise<ConfigDefinitionDetail> {
+export async function fakeGetDefinition(id: string, _ctx?: TradeContext): Promise<ConfigDefinitionDetail> {
   await fakeDelay();
   const def = SEED_DEFINITIONS.find((entry) => entry.id === id);
   if (!def) {
@@ -560,7 +557,7 @@ export async function fakeGetDefinition(id: string): Promise<ConfigDefinitionDet
   });
 }
 
-export async function fakeCreateDefinition(body: CreateDefinitionBody, key: string): Promise<ConfigDefinition> {
+export async function fakeCreateDefinition(body: CreateDefinitionBody, key: string): Promise<CreatedConfigDefinition> {
   await fakeDelay();
   requireIdempotencyKey(key);
 
@@ -614,10 +611,8 @@ export async function fakeCreateDefinition(body: CreateDefinitionBody, key: stri
   };
   SEED_DEFINITIONS.push(created);
 
-  return clone({
-    ...created,
-    versions: [],
-  });
+  const { versions: _versions, ...rawCreated } = created;
+  return clone(rawCreated);
 }
 
 export async function fakeCreateVersion(
@@ -683,7 +678,7 @@ export async function fakeCreateVersion(
   def.versions.push(created);
   return clone({
     ...created,
-    effectiveState: versionState(created),
+    definitionId,
   });
 }
 
@@ -756,11 +751,10 @@ export async function fakeTestVersion(
 
   const evidenceId = fakeId();
   latestEvidence.set(ver.id, {
-    evidenceId,
     passed: diagnostics.length === 0,
     diagnostics: clone(diagnostics),
-    contentHash: ver.contentHash,
     testedAt: nowIso(),
+    testedBy: CURRENT_USER_ID,
   });
 
   if (diagnostics.length > 0) {
@@ -876,10 +870,11 @@ export async function fakePublishVersion(
   const nextEpoch = (scopeEpochs.get(epochKey) ?? 0) + 1;
   scopeEpochs.set(epochKey, nextEpoch);
 
-  return {
-    ...toPublicVersion(ver),
+  return clone({
+    ...ver,
+    definitionId: def.id,
     configurationEpoch: nextEpoch,
-  };
+  });
 }
 
 export async function fakeRetireVersion(

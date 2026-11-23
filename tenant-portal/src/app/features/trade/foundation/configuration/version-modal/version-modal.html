@@ -41,7 +41,8 @@
               [nextMonthLabel]="'tradeConfig.versionModal.nextMonth' | transloco"
               [invalid]="!!fromError()"
               [disabled]="saving()"
-              [(value)]="fromDate"
+              [value]="fromDate()"
+              (valueChange)="onFromDateChange($event)"
             />
             <ui-time-field
               class="shrink-0"
@@ -52,7 +53,8 @@
               [minuteLabel]="'tradeConfig.versionModal.minute' | transloco"
               [invalid]="!!fromError()"
               [disabled]="saving()"
-              [(value)]="fromTime"
+              [value]="fromTime()"
+              (valueChange)="onFromTimeChange($event)"
             />
           </div>
         </ui-field>

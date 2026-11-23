@@ -142,7 +142,7 @@
           />
         </ui-field>
 
-        @if (loadingDetail() && !detail()) {
+        @if (showVersionsSkeleton()) {
           <div class="overflow-x-auto" [attr.aria-busy]="true">
             <div role="table" class="min-w-modal-form-wide" [attr.aria-label]="'tradeConfig.definitionModal.versionsTitle' | transloco">
               <div
@@ -271,8 +271,8 @@
                     <span class="tabular-nums">
                       <bdi dir="ltr">v{{ ver.versionNumber }}</bdi>
                     </span>
-                    <span class="truncate text-11 leading-16 text-text-muted" [title]="ver.createdByName">
-                      {{ ver.createdByName }}
+                    <span class="truncate text-11 leading-16 text-text-muted" [title]="createdByLabel(ver)">
+                      {{ createdByLabel(ver) }}
                     </span>
                   </span>
                   <span role="cell" class="flex min-w-0 items-center border-s border-border px-8 py-6" [title]="valueSummary(ver)">
@@ -344,7 +344,7 @@
   }
 
   <div modal-footer class="flex flex-1 items-center gap-8">
-    @if (canManage() && allowedHere() && detail()) {
+    @if (effectiveCanManage() && allowedHere() && detail()) {
       <button
         type="button"
         uiButton
@@ -372,6 +372,7 @@
   [ctx]="modalCtx()"
   (published)="onPublished($event)"
   (reloadRequested)="onChildReloadRequested()"
+  (forbidden)="onChildForbidden()"
 />
 
 <ui-confirm-dialog

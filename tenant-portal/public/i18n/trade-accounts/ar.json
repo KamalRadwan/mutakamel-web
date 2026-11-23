@@ -64,7 +64,8 @@
     "loadFailed": "تعذّر تحميل هذا الحساب.",
     "alreadyHasCustomer": " — لديه حساب عميل بالفعل",
     "alreadyHasSupplier": " — لديه حساب مورد بالفعل",
-    "selectParty": "اختر طرفًا"
+    "selectParty": "اختر طرفًا",
+    "partyDirectoryForbidden": "ليست لديك صلاحية لعرض الجهات من الدليل."
   },
   "sections": {
     "commercialTerms": "الشروط التجارية",
@@ -156,7 +157,7 @@
     "blockText": "ستُمنع الطلبات الجديدة لهذا الحساب حتى يُلغى حظره.",
     "unblockText": "يمكن للحساب إنشاء طلبات من جديد.",
     "evidenceLabel": "مرجع الإثبات",
-    "evidenceHint": "رقم مستند أو طلب يدعم القرار، حتى 240 حرفًا."
+    "evidenceHint": "رقم مستند أو طلب يدعم القرار، حتى 200 حرف."
   },
   "validation": {
     "invalidDecimal": "أدخل رقمًا موجبًا صالحًا بحد أقصى 8 منازل عشرية.",

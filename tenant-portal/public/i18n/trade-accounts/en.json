@@ -64,7 +64,8 @@
     "loadFailed": "This account could not be loaded.",
     "alreadyHasCustomer": " — already has a customer account",
     "alreadyHasSupplier": " — already has a supplier account",
-    "selectParty": "Select a party"
+    "selectParty": "Select a party",
+    "partyDirectoryForbidden": "You do not have permission to list parties from the directory."
   },
   "sections": {
     "commercialTerms": "Commercial terms",
@@ -156,7 +157,7 @@
     "blockText": "New orders for this account will be blocked until it is unblocked.",
     "unblockText": "The account can place orders again.",
     "evidenceLabel": "Evidence reference",
-    "evidenceHint": "A document or ticket number that supports the decision, up to 240 characters."
+    "evidenceHint": "A document or ticket number that supports the decision, up to 200 characters."
   },
   "validation": {
     "invalidDecimal": "Enter a valid positive number with up to 8 decimals.",

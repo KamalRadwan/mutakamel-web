@@ -14,7 +14,7 @@ import {
   partyDisplayName,
 } from '../commercial-accounts.model';
 
-const MAX_EVIDENCE_LENGTH = 240;
+const MAX_EVIDENCE_LENGTH = 200;
 
 function emptyReasonValue(): ReasonPickerValue {
   return { reasonCodeId: null, note: '' };

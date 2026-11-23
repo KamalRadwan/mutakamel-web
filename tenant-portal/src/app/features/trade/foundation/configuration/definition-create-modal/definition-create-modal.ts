@@ -12,10 +12,11 @@ import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { Switch } from '../../../../../shared/ui/switch/switch';
 import { TagOption, TagPicker } from '../../../../../shared/ui/tag-picker/tag-picker';
-import { errorCodeOf, errorKey, newIdempotencyKey } from '../../../shared/trade-api';
+import { ApiError, errorCodeOf, errorKey, newIdempotencyKey } from '../../../shared/trade-api';
+import { isForbiddenError, isIdempotencyMismatch } from '../configuration-access';
 import { createDefinition } from '../configuration.api';
 import {
-  type ConfigDefinition,
+  type CreatedConfigDefinition,
   type MergeStrategy,
   RISK_CLASSES,
   type RiskClass,
@@ -45,7 +46,8 @@ export class DefinitionCreateModal {
   private readonly modal = viewChild.required(Modal);
   private readonly discardDialog = viewChild.required<ConfirmDialog>('discardDialog');
 
-  readonly created = output<ConfigDefinition>();
+  readonly created = output<CreatedConfigDefinition>();
+  readonly forbidden = output<void>();
 
   protected readonly keyValue = signal('');
   protected readonly valueType = signal<CreateValueType>('integer');
@@ -65,6 +67,7 @@ export class DefinitionCreateModal {
   protected readonly saving = signal(false);
   protected readonly attemptedSubmit = signal(false);
   protected readonly keyTakenError = signal(false);
+  private readonly serverKeyError = signal<string | null>(null);
 
   private isOpen = false;
   private allowClose = false;
@@ -109,6 +112,8 @@ export class DefinitionCreateModal {
     if (this.keyTakenError()) {
       return this.transloco.translate('tradeConfig.createModal.keyTaken');
     }
+    const serverErr = this.serverKeyError();
+    if (serverErr) return serverErr;
     if (!this.attemptedSubmit()) return null;
     const normalized = this.keyValue().trim().toLowerCase();
     if (!KEY_PATTERN.test(normalized)) {
@@ -205,6 +210,7 @@ export class DefinitionCreateModal {
     this.saving.set(false);
     this.attemptedSubmit.set(false);
     this.keyTakenError.set(false);
+    this.serverKeyError.set(null);
     this.allowClose = false;
     this.lastSubmitFingerprint = '';
     this.lastIdempotencyKey = '';
@@ -217,6 +223,7 @@ export class DefinitionCreateModal {
     const raw = (event.target as HTMLInputElement).value.toLowerCase();
     this.keyValue.set(raw);
     this.keyTakenError.set(false);
+    this.serverKeyError.set(null);
   }
 
   protected onValueTypeChange(nextType: CreateValueType): void {
@@ -264,12 +271,14 @@ export class DefinitionCreateModal {
     this.saving.set(false);
     this.attemptedSubmit.set(false);
     this.keyTakenError.set(false);
+    this.serverKeyError.set(null);
   }
 
   protected async submit(): Promise<void> {
     if (this.saving()) return;
     this.attemptedSubmit.set(true);
     this.keyTakenError.set(false);
+    this.serverKeyError.set(null);
 
     if (
       this.keyError() ||
@@ -314,12 +323,27 @@ export class DefinitionCreateModal {
       this.modal().close();
       this.created.emit(result);
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.saving.set(false);
+        this.allowClose = true;
+        this.modal().close();
+        this.forbidden.emit();
+        return;
+      }
       const code = errorCodeOf(error);
+      if (isIdempotencyMismatch(code)) {
+        this.lastSubmitFingerprint = '';
+        this.lastIdempotencyKey = '';
+      }
       if (code === 'TRADE.CONFIGURATION.KEY_TAKEN') {
         this.keyTakenError.set(true);
       } else if (code === 'TRADE.VALIDATION_FAILED') {
         this.attemptedSubmit.set(true);
-        this.notify.error(this.transloco.translate(errorKey(error)));
+        if (error instanceof ApiError && error.details?.['key']?.length) {
+          this.serverKeyError.set(this.transloco.translate('tradeConfig.createModal.keyInvalid'));
+        } else {
+          this.notify.error(this.transloco.translate(errorKey(error)));
+        }
       } else {
         this.notify.error(this.transloco.translate(errorKey(error)));
       }

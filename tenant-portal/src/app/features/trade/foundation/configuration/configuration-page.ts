@@ -1,4 +1,4 @@
-import { Component, computed, inject, input, linkedSignal, resource, signal, viewChild } from '@angular/core';
+import { Component, Injector, computed, inject, input, linkedSignal, resource, signal, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../core/i18n/translation-events';
 import { Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
@@ -8,10 +8,17 @@ import { LanguageState } from '../../../../core/i18n/language';
 import { ScopeState } from '../../../../core/scope/scope';
 import { Button } from '../../../../shared/ui/button/button';
 import { Field } from '../../../../shared/ui/field/field';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { Pagination } from '../../../../shared/ui/pagination/pagination';
 import { Segmented, SegmentedOption } from '../../../../shared/ui/segmented/segmented';
 import { type TradeContext, tradeContext } from '../../shared/trade-api';
 import type { Page } from '../../shared/trade-foundation.model';
+import {
+  canCreateConfigDefinition,
+  hasConfigReadGrant,
+  hasConfigScopeGrant,
+  isForbiddenError,
+} from './configuration-access';
 import { listDefinitions } from './configuration.api';
 import {
   type ConfigDefinition,
@@ -23,9 +30,6 @@ import { DefinitionCreateModal } from './definition-create-modal/definition-crea
 import { DefinitionModal } from './definition-modal/definition-modal';
 import { DefinitionsTable } from './definitions-table/definitions-table';
 import { VersionModal } from './version-modal/version-modal';
-
-const CAN_MANAGE = true; // later from the session permissions
-const CAN_PUBLISH = true; // trade.policy.publish
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = 24;
@@ -72,6 +76,7 @@ function ctxKey(ctx: TradeContext, target: ScopeTarget): string {
     Field,
     Segmented,
     Button,
+    FullState,
     Pagination,
     DefinitionsTable,
     DefinitionModal,
@@ -90,6 +95,7 @@ export class ConfigurationPage {
   protected readonly uid = `trade-config-page-${++ConfigurationPage.nextId}`;
 
   private readonly router = inject(Router);
+  private readonly injector = inject(Injector);
   private readonly scopeState = inject(ScopeState);
   private readonly language = inject(LanguageState).current;
   private readonly transloco = inject(TranslocoService);
@@ -103,8 +109,21 @@ export class ConfigurationPage {
   readonly pageParam = input<string | undefined>(undefined, { alias: 'page' });
   readonly sizeParam = input<string | undefined>(undefined, { alias: 'size' });
 
-  protected readonly canManage = CAN_MANAGE;
-  protected readonly canPublish = CAN_PUBLISH;
+  protected readonly forbidden = signal(false);
+  protected readonly canRead = computed(() => hasConfigReadGrant(this.injector));
+  protected readonly canCreateDefinition = computed(
+    () => !this.isForbidden() && canCreateConfigDefinition(this.injector),
+  );
+  protected readonly canManageAtScope = computed(
+    () =>
+      !this.isForbidden() &&
+      hasConfigScopeGrant(this.injector, this.scopeState, 'trade.configuration.manage', this.scopeTarget()),
+  );
+  protected readonly canPublishAtScope = computed(
+    () =>
+      !this.isForbidden() &&
+      hasConfigScopeGrant(this.injector, this.scopeState, 'trade.policy.publish', this.scopeTarget()),
+  );
   protected readonly pageSizes = [...PAGE_SIZES];
 
   protected readonly scopeTarget = linkedSignal<string | undefined, ScopeTarget>({
@@ -135,15 +154,26 @@ export class ConfigurationPage {
   private readonly reloadTick = signal(0);
 
   private readonly definitionsResource = resource({
-    params: () => ({
-      ctx: this.ctx(),
-      target: this.scopeTarget(),
-      page: this.page(),
-      limit: this.pageSize(),
-      tick: this.reloadTick(),
-    }),
+    params: () => {
+      if (!this.canRead() || this.forbidden()) return undefined;
+      return {
+        ctx: this.ctx(),
+        target: this.scopeTarget(),
+        page: this.page(),
+        limit: this.pageSize(),
+        tick: this.reloadTick(),
+      };
+    },
     loader: ({ params }) => listDefinitions(params.ctx, { page: params.page, limit: params.limit }),
   });
+
+  private readonly resourceForbidden = computed(
+    () => this.definitionsResource.status() === 'error' && isForbiddenError(this.definitionsResource.error()),
+  );
+
+  protected readonly isForbidden = computed(
+    () => !this.canRead() || this.forbidden() || this.resourceForbidden(),
+  );
 
   private readonly cachedPage = linkedSignal<
     { key: string; loading: boolean; hasValue: boolean; value: Page<ConfigDefinition> | undefined },
@@ -172,7 +202,10 @@ export class ConfigurationPage {
     () => this.definitionsResource.isLoading() && this.cachedPage() === null,
   );
   protected readonly loadFailed = computed(
-    () => this.definitionsResource.status() === 'error' && this.cachedPage() === null,
+    () =>
+      this.definitionsResource.status() === 'error' &&
+      !this.resourceForbidden() &&
+      this.cachedPage() === null,
   );
 
   protected readonly scopeOptions = computed<SegmentedOption[]>(() => {
@@ -224,12 +257,21 @@ export class ConfigurationPage {
     });
   }
 
+  protected goHome(): void {
+    void this.router.navigateByUrl('/workspace/home');
+  }
+
+  protected onForbidden(): void {
+    this.forbidden.set(true);
+  }
+
   protected reload(): void {
+    if (this.isForbidden()) return;
     this.reloadTick.update((n) => n + 1);
   }
 
   protected openCreateDefinition(): void {
-    if (!this.canManage || this.scopeTarget() !== 'TENANT') return;
+    if (!this.canCreateDefinition() || this.scopeTarget() !== 'TENANT') return;
     this.createModal().open();
   }
 
@@ -242,7 +284,13 @@ export class ConfigurationPage {
     scopeOverride?: ScopeTarget,
   ): void {
     const target = scopeOverride ?? this.scopeTarget();
-    if (!this.canManage || !def.allowedScopes.includes(target)) return;
+    const canManageTarget = hasConfigScopeGrant(
+      this.injector,
+      this.scopeState,
+      'trade.configuration.manage',
+      target,
+    );
+    if (this.isForbidden() || !canManageTarget || !def.allowedScopes.includes(target)) return;
     this.versionModal().open(def, {
       scopeTarget: target,
       ctx: tradeContext(this.scopeState, target),
@@ -282,12 +330,12 @@ export class ConfigurationPage {
     }
     const lang = this.language();
     const company = this.scopeState.company();
-    const companyName = lang === 'ar' ? company.nameAr : company.nameEn;
+    const companyName = lang === 'ar' ? (company?.nameAr ?? '') : (company?.nameEn ?? '');
     if (target === 'COMPANY') {
       return companyName;
     }
     const branch = this.scopeState.branch();
-    const branchName = lang === 'ar' ? branch.nameAr : branch.nameEn;
+    const branchName = lang === 'ar' ? (branch?.nameAr ?? '') : (branch?.nameEn ?? '');
     return this.transloco.translate('tradeConfig.page.showingPair', {
       company: companyName,
       branch: branchName,

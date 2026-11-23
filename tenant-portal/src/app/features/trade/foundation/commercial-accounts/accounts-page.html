@@ -1,12 +1,23 @@
+@if (!canRead() || forbidden()) {
+  <div class="flex flex-1 rounded-10 border border-border bg-surface shadow-card">
+    <ui-full-state
+      kind="forbidden"
+      [title]="'errors.forbidden.title' | transloco"
+      [text]="'errors.forbidden.text' | transloco"
+      [actionLabel]="'errors.notFound.action' | transloco"
+      (action)="goHome()"
+    />
+  </div>
+} @else {
 <div class="flex shrink-0 flex-wrap items-center gap-8 rounded-10 bg-surface p-8 shadow-card">
-  @if (canManage) {
+  @if (canManage()) {
     <button type="button" uiButton class="shrink-0" (click)="openCreate()">
       <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
       <span>{{ 'tradeAccounts.toolbar.new' | transloco }}</span>
     </button>
   }
 
-  @if (canManage && view() === 'table' && selection.count() > 0) {
+  @if (canManage() && view() === 'table' && selection.count() > 0) {
     <app-account-bulk-menu
       class="shrink-0"
       [selection]="selection"
@@ -97,7 +108,7 @@
   (valueChange)="setRole($event)"
 />
 
-@if (canManage && view() === 'table' && selection.count() > 0) {
+@if (canManage() && view() === 'table' && selection.count() > 0) {
   <app-account-selection-bar
     [selection]="selection"
     [filter]="filter()"
@@ -124,7 +135,7 @@
         <ng-icon name="tablerAddressBook" size="18" aria-hidden="true" />
       </span>
       <p class="text-12 leading-18 text-text-muted">{{ 'tradeAccounts.empty.title' | transloco }}</p>
-      @if (canManage) {
+      @if (canManage()) {
         <button type="button" uiButton variant="primary" (click)="openCreate()">
           <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
           <span>{{ 'tradeAccounts.toolbar.new' | transloco }}</span>
@@ -145,7 +156,7 @@
       <app-account-cards
         [accounts]="accounts()"
         [loading]="loading()"
-        [canManage]="canManage"
+        [canManage]="canManage()"
         [priceBookNames]="priceBookNames()"
         [blockReasonNames]="blockReasonNames()"
         (open)="openAccount($event)"
@@ -157,7 +168,7 @@
       <app-account-table
         [accounts]="accounts()"
         [loading]="loading()"
-        [canManage]="canManage"
+        [canManage]="canManage()"
         [priceBookNames]="priceBookNames()"
         [blockReasonNames]="blockReasonNames()"
         (open)="openAccount($event)"
@@ -181,12 +192,15 @@
     />
   </footer>
 }
+}
 
 <app-account-modal
   class="absolute"
-  [canManage]="canManage"
+  [canManage]="canManage()"
+  [canViewCredit]="canViewCredit()"
   (saved)="onAccountSaved($event)"
   (closed)="onModalClosed()"
+  (forbidden)="onForbidden()"
 />
 
 <app-account-status-dialog

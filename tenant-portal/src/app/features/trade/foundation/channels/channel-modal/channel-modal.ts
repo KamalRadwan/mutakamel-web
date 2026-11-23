@@ -27,6 +27,7 @@ import {
   tablerRefresh,
   tablerShoppingCart,
 } from '@ng-icons/tabler-icons';
+import { ApiError as CoreApiError } from '../../../../../core/api/api-errors';
 import { LanguageState } from '../../../../../core/i18n/language';
 import { Notify } from '../../../../../core/notify/notify';
 import { ScopeState } from '../../../../../core/scope/scope';
@@ -69,6 +70,10 @@ interface PreviewParts {
 }
 
 const CODE_PLACEHOLDER = '__CHANNEL_CODE__';
+
+function isForbiddenError(error: unknown): boolean {
+  return (error instanceof ApiError || error instanceof CoreApiError) && error.status === 403;
+}
 
 @Component({
   selector: 'app-channel-modal',
@@ -124,6 +129,7 @@ export class ChannelModal {
 
   readonly closed = output<void>();
   readonly saved = output<Channel>();
+  readonly forbidden = output<void>();
 
   protected readonly detail = signal<ChannelDetail | null>(null);
   protected readonly code = signal('');
@@ -144,6 +150,7 @@ export class ChannelModal {
 
   private readonly attemptedSubmit = signal(false);
   private readonly serverCodeError = signal<string | null>(null);
+  private readonly serverNameError = signal<string | null>(null);
 
   private allowClose = false;
   private initializedForKey: string | null | undefined = undefined;
@@ -277,6 +284,8 @@ export class ChannelModal {
   protected readonly nameError = computed<string | null>(() => {
     this.i18n();
     this.language();
+    const serverErr = this.serverNameError();
+    if (serverErr) return this.transloco.translate(serverErr);
     if (!this.attemptedSubmit()) return null;
 
     const trimmed = this.name().trim();
@@ -328,7 +337,7 @@ export class ChannelModal {
       this.lastBranchId = branchId;
 
       const current = untracked(() => this.detail());
-      const currentCompanyId = untracked(() => this.scope.company().id);
+      const currentCompanyId = untracked(() => this.scope.company()?.id ?? null);
       if (!current || current.companyId !== currentCompanyId) return;
 
       untracked(() => {
@@ -360,6 +369,7 @@ export class ChannelModal {
   protected onNameInput(value: string): void {
     if (!this.canEdit()) return;
     this.name.set(value);
+    this.serverNameError.set(null);
   }
 
   protected onTypeChange(value: ChannelType): void {
@@ -392,6 +402,7 @@ export class ChannelModal {
 
     this.attemptedSubmit.set(true);
     this.serverCodeError.set(null);
+    this.serverNameError.set(null);
 
     if (this.codeError() || this.nameError()) {
       this.focusFirstError();
@@ -411,6 +422,7 @@ export class ChannelModal {
     this.draftBranchActive.set({ ...this.baseBranchActive() });
     this.attemptedSubmit.set(false);
     this.serverCodeError.set(null);
+    this.serverNameError.set(null);
   }
 
   protected retryLoad(): void {
@@ -477,6 +489,7 @@ export class ChannelModal {
       this.draftBranchActive.set({ ...this.baseBranchActive() });
       this.attemptedSubmit.set(false);
       this.serverCodeError.set(null);
+      this.serverNameError.set(null);
     }
   }
 
@@ -497,6 +510,7 @@ export class ChannelModal {
     this.saving.set(false);
     this.attemptedSubmit.set(false);
     this.serverCodeError.set(null);
+    this.serverNameError.set(null);
     this.clearAllIdempotency();
 
     afterNextRender(() => this.focusCode(), { injector: this.injector });
@@ -510,6 +524,7 @@ export class ChannelModal {
     this.notFound.set(false);
     this.attemptedSubmit.set(false);
     this.serverCodeError.set(null);
+    this.serverNameError.set(null);
     this.clearAllIdempotency();
 
     try {
@@ -519,6 +534,11 @@ export class ChannelModal {
     } catch (error) {
       if (seq !== this.loadSeq) return;
       this.loading.set(false);
+      if (isForbiddenError(error)) {
+        this.forceClose();
+        this.forbidden.emit();
+        return;
+      }
       if (error instanceof ApiError && error.status === 404) {
         this.notFound.set(true);
       } else {
@@ -545,7 +565,11 @@ export class ChannelModal {
       this.detail.set({ ...current, branches: fresh.branches });
       this.baseBranchActive.set(freshBase);
       this.draftBranchActive.set(nextDraft);
-    } catch {
+    } catch (error) {
+      if (isForbiddenError(error)) {
+        this.forceClose();
+        this.forbidden.emit();
+      }
       // Keep current state if branch link refresh fails.
     }
   }
@@ -577,6 +601,7 @@ export class ChannelModal {
     this.notFound.set(false);
     this.attemptedSubmit.set(false);
     this.serverCodeError.set(null);
+    this.serverNameError.set(null);
   }
 
   private async submitCreate(): Promise<boolean> {
@@ -598,7 +623,16 @@ export class ChannelModal {
       this.saved.emit(created);
       return true;
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.clearIdempotency('create');
+        this.forceClose();
+        this.forbidden.emit();
+        return false;
+      }
       const errCode = errorCodeOf(error);
+      if (errCode === 'GW.IDEM.MISMATCH' || errCode === 'TRADE.IDEMPOTENCY.MISMATCH') {
+        this.clearIdempotency('create');
+      }
       if (errCode === 'TRADE.CATALOG.CODE_TAKEN') {
         this.clearIdempotency('create');
         this.serverCodeError.set('tradeChannels.errors.codeTaken');
@@ -614,6 +648,17 @@ export class ChannelModal {
         this.clearIdempotency('create');
         this.serverCodeError.set('tradeChannels.errors.codePattern');
         this.focusCode();
+        return false;
+      }
+      if (
+        errCode === 'TRADE.VALIDATION_FAILED' &&
+        error instanceof ApiError &&
+        error.details &&
+        'name' in error.details
+      ) {
+        this.clearIdempotency('create');
+        this.serverNameError.set('tradeChannels.errors.nameInvalid');
+        this.focusName();
         return false;
       }
       if (
@@ -713,10 +758,31 @@ export class ChannelModal {
         this.saved.emit(activeChannel);
       }
       this.saving.set(false);
+      if (isForbiddenError(error)) {
+        this.clearAllIdempotency();
+        this.forceClose();
+        this.forbidden.emit();
+        return false;
+      }
+      const errCode = errorCodeOf(error);
+      if (errCode === 'GW.IDEM.MISMATCH' || errCode === 'TRADE.IDEMPOTENCY.MISMATCH') {
+        this.clearAllIdempotency();
+      }
+      if (
+        errCode === 'TRADE.VALIDATION_FAILED' &&
+        error instanceof ApiError &&
+        error.details &&
+        'name' in error.details
+      ) {
+        this.clearAllIdempotency();
+        this.serverNameError.set('tradeChannels.errors.nameInvalid');
+        this.focusName();
+        return false;
+      }
       if (
         error instanceof ApiError &&
         error.status === 409 &&
-        errorCodeOf(error) === 'TRADE.CONCURRENCY.STALE_VERSION'
+        errCode === 'TRADE.CONCURRENCY.STALE_VERSION'
       ) {
         this.clearAllIdempotency();
         return this.handleEditConflict(
@@ -837,6 +903,12 @@ export class ChannelModal {
       if (patchedInRetry && activeChannel) {
         this.saved.emit(activeChannel);
       }
+      if (isForbiddenError(error)) {
+        this.clearAllIdempotency();
+        this.forceClose();
+        this.forbidden.emit();
+        return false;
+      }
       this.notify.error(this.transloco.translate(channelErrorKey(error)));
       return false;
     } finally {
@@ -867,13 +939,17 @@ export class ChannelModal {
     this.host.nativeElement.querySelector<HTMLInputElement>(`#${this.uid}-code`)?.focus();
   }
 
+  private focusName(): void {
+    this.host.nativeElement.querySelector<HTMLInputElement>(`#${this.uid}-name`)?.focus();
+  }
+
   private focusFirstError(): void {
     if (this.codeError()) {
       this.focusCode();
       return;
     }
     if (this.nameError()) {
-      this.host.nativeElement.querySelector<HTMLInputElement>(`#${this.uid}-name`)?.focus();
+      this.focusName();
     }
   }
 }

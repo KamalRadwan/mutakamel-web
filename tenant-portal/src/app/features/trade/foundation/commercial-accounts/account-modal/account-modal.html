@@ -62,6 +62,7 @@
               [label]="'tradeAccounts.fields.party' | transloco"
               [for]="uid + '-party'"
               [hint]="'tradeAccounts.fields.partyHint' | transloco"
+              [hintText]="partyPickerForbidden() ? ('tradeAccounts.modal.partyDirectoryForbidden' | transloco) : null"
               [required]="true"
               [error]="partyError()"
             >
@@ -73,7 +74,7 @@
                 [value]="accountDraft().partyId"
                 [label]="'tradeAccounts.fields.party' | transloco"
                 [describedBy]="uid + '-party-hint' + (partyError() ? ' ' + uid + '-party-error' : '')"
-                [disabled]="saving()"
+                [disabled]="saving() || partyPickerForbidden()"
                 (valueChange)="onPartyChange($event)"
               />
             </ui-field>
@@ -490,7 +491,7 @@
           </div>
         </section>
 
-        @if (!isSupplier() && detail(); as acc) {
+        @if (!isSupplier() && canViewCredit() && detail(); as acc) {
           <section class="flex flex-col gap-8">
             <header class="flex h-table-head items-center gap-6 rounded-10 bg-icon-violet px-10 text-13 leading-18 font-medium text-on-nav">
               <span class="inline-flex shrink-0 text-on-nav">
@@ -501,7 +502,7 @@
               </h3>
             </header>
 
-            <app-account-credit-check [account]="acc" [ctx]="ctx()" [dirty]="dirty()" />
+            <app-account-credit-check [account]="acc" [ctx]="ctx()" [dirty]="dirty()" (forbidden)="onCreditForbidden()" />
           </section>
         }
       }

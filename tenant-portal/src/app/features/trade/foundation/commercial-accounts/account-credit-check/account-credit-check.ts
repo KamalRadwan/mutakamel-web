@@ -1,13 +1,15 @@
-import { Component, computed, effect, inject, input, linkedSignal, signal, untracked } from '@angular/core';
+import { Component, computed, effect, inject, input, linkedSignal, output, signal, untracked } from '@angular/core';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerShieldCheck } from '@ng-icons/tabler-icons';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
+import { ApiError as CoreApiError } from '../../../../../core/api/api-errors';
 import { Notify } from '../../../../../core/notify/notify';
+import { ScopeState } from '../../../../../core/scope/scope';
 import { Button } from '../../../../../shared/ui/button/button';
 import { Dropdown, type DropdownOption } from '../../../../../shared/ui/dropdown/dropdown';
 import { Field } from '../../../../../shared/ui/field/field';
-import { errorCodeOf, errorKey, newIdempotencyKey, type TradeContext } from '../../../shared/trade-api';
+import { ApiError, errorCodeOf, errorKey, newIdempotencyKey, type TradeContext } from '../../../shared/trade-api';
 import { formatMoney } from '../../../shared/trade-format';
 import { BADGE_CLASS } from '../../../shared/trade-labels';
 import { evaluateCredit, getCreditSummary } from '../commercial-accounts.api';
@@ -17,6 +19,10 @@ import {
   type CreditDecision,
   type CreditSummary,
 } from '../commercial-accounts.model';
+
+function isForbiddenError(error: unknown): boolean {
+  return (error instanceof ApiError || error instanceof CoreApiError) && error.status === 403;
+}
 
 function pad2(n: number): string {
   return String(n).padStart(2, '0');
@@ -40,6 +46,7 @@ export class AccountCreditCheck {
   private static nextId = 0;
 
   private readonly notify = inject(Notify);
+  private readonly scope = inject(ScopeState);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
 
@@ -53,6 +60,7 @@ export class AccountCreditCheck {
   readonly account = input.required<AccountDetail>();
   readonly ctx = input.required<TradeContext>();
   readonly dirty = input(false);
+  readonly forbidden = output<void>();
 
   protected readonly summary = signal<CreditSummary | null>(null);
   protected readonly summaryLoading = signal(false);
@@ -61,10 +69,10 @@ export class AccountCreditCheck {
   protected readonly attempted = signal(false);
   protected readonly checking = signal(false);
   protected readonly decision = signal<CreditDecision | null>(null);
+  protected readonly serverAmountError = signal<string | null>(null);
 
   private summarySeq = 0;
   private checkSeq = 0;
-  private readonly idempotencyKeys = new Map<string, string>();
 
   protected readonly currencyOptions = computed<DropdownOption<string>[]>(() => {
     const acc = this.account();
@@ -75,7 +83,7 @@ export class AccountCreditCheck {
     if (allowed && allowed.length > 0) {
       return allowed.map((code) => ({ value: code, label: code }));
     }
-    const fallback = this.ctx().companyId === 'c2' ? 'SAR' : 'EGP';
+    const fallback = this.scope.company()?.currencyCode ?? (this.ctx().companyId === 'c2' ? 'SAR' : 'EGP');
     return [{ value: fallback, label: fallback }];
   });
 
@@ -97,6 +105,8 @@ export class AccountCreditCheck {
 
   protected readonly amountError = computed<string | null>(() => {
     this.i18n();
+    const server = this.serverAmountError();
+    if (server) return server;
     if (!this.attempted()) return null;
     const raw = this.amount().trim();
     if (!raw) {
@@ -122,6 +132,7 @@ export class AccountCreditCheck {
         this.checkSeq++;
         this.decision.set(null);
         this.attempted.set(false);
+        this.serverAmountError.set(null);
       });
     });
 
@@ -134,7 +145,7 @@ export class AccountCreditCheck {
       const _ruleVersion = acc.branchRule?.version;
       const _ruleStatus = acc.branchRule?.status;
       untracked(() => {
-        if (acc.accountRole === 'SUPPLIER' || !ctx.companyId || !ctx.branchId) {
+        if (acc.accountRole === 'SUPPLIER' || !ctx.companyId) {
           this.summarySeq++;
           this.summary.set(null);
           this.summaryLoading.set(false);
@@ -146,6 +157,7 @@ export class AccountCreditCheck {
   }
 
   protected onAmountInput(event: Event): void {
+    this.serverAmountError.set(null);
     this.amount.set((event.target as HTMLInputElement).value);
   }
 
@@ -156,6 +168,7 @@ export class AccountCreditCheck {
   protected async runCheck(): Promise<void> {
     if (this.dirty() || this.checking()) return;
     this.attempted.set(true);
+    this.serverAmountError.set(null);
 
     const proposedAmount = this.amount().trim();
     if (!proposedAmount || !CREDIT_LIMIT_PATTERN.test(proposedAmount)) {
@@ -165,12 +178,7 @@ export class AccountCreditCheck {
     const currencyCode = this.effectiveCurrency();
     const acc = this.account();
     const ctx = this.ctx();
-    const keySlot = `${acc.id}:${acc.version}:${ctx.companyId ?? ''}:${ctx.branchId ?? ''}:${proposedAmount}:${currencyCode}`;
-    let key = this.idempotencyKeys.get(keySlot);
-    if (!key) {
-      key = newIdempotencyKey();
-      this.idempotencyKeys.set(keySlot, key);
-    }
+    const key = newIdempotencyKey();
 
     const seq = ++this.checkSeq;
     this.checking.set(true);
@@ -180,6 +188,14 @@ export class AccountCreditCheck {
       this.decision.set(res);
     } catch (error) {
       if (seq !== this.checkSeq) return;
+      if (isForbiddenError(error)) {
+        this.forbidden.emit();
+        return;
+      }
+      if (error instanceof ApiError && error.code === 'TRADE.VALIDATION_FAILED' && error.details?.['proposedAmount']?.[0]) {
+        this.serverAmountError.set(this.transloco.translate('tradeAccounts.validation.invalidDecimal'));
+        return;
+      }
       const code = errorCodeOf(error);
       if (code === 'TRADE.CREDIT.EXPOSURE_UNAVAILABLE') {
         this.notify.warning(this.transloco.translate('tradeAccounts.credit.exposureUnavailable'));
@@ -203,6 +219,10 @@ export class AccountCreditCheck {
     } catch (error) {
       if (seq !== this.summarySeq) return;
       this.summary.set(null);
+      if (isForbiddenError(error)) {
+        this.forbidden.emit();
+        return;
+      }
       this.notify.error(this.transloco.translate(errorKey(error)));
     } finally {
       if (seq === this.summarySeq) {
