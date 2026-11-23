@@ -1,8 +1,8 @@
 import { DOCUMENT } from '@angular/common';
-import { Component, computed, inject, input, output, signal, viewChild } from '@angular/core';
+import { Component, computed, effect, inject, input, output, signal, untracked, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
-import { PluralKeyPipe, pluralKey } from '../../../../../core/i18n/plural';
+import { PluralKeyPipe } from '../../../../../core/i18n/plural';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerDownload, tablerUpload } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../../core/i18n/language';
@@ -16,15 +16,17 @@ import { Segmented, SegmentedOption } from '../../../../../shared/ui/segmented/s
 import { newIdempotencyKey } from '../../shared/staff.api';
 import { DryRunReport } from '../../../seats/dry-run-report/dry-run-report';
 import { seatErrorMessage } from '../../../seats/seat-errors';
-import { importUsers } from '../../../seats/seats.api';
-import { ImportResult, importOk } from '../../../seats/seats.model';
+import { SEAT_PREVIEW } from '../../../seats/seats.api';
+import { BulkJobsTracker } from '../../../../../shared/bulk-jobs/bulk-jobs-tracker';
+import { StaffUsersApi, ImportBatchCreated, ImportBatchRow, ImportBatchRowStatus, InviteUserBody } from '../users.api';
+import { SeatPreview } from '../../../seats/seats.model';
 import { Branch, Company, Department, EMPLOYEE_CODE_PATTERN, Role, STAFF_LIMITS, Team } from '../../shared/staff.model';
 import { EMAIL_PATTERN, resolveStaffError } from '../users-page/users.model';
 
 type ImportMode = 'ALL_OR_NOTHING' | 'SKIP_ROLES_THAT_DONT_FIT';
 
 const MAX_IMPORT_BYTES = 1024 * 1024;
-const MAX_IMPORT_ROWS = 500;
+const MAX_IMPORT_ROWS = 5000;
 const TEMPLATE_COLUMNS = [
   'email',
   'firstName',
@@ -38,20 +40,7 @@ const TEMPLATE_COLUMNS = [
   'roleName',
 ] as const;
 
-interface ParsedImportRow {
-  email: string;
-  firstName: string;
-  lastName: string;
-  name: string;
-  employeeCode?: string;
-  jobTitle?: string;
-  companyId: string;
-  branchId: string;
-  departmentId: string;
-  teamId?: string;
-  roleName?: string;
-  roleAssignments?: { branchId: string; roleId: string }[];
-}
+type ParsedImportRow = InviteUserBody;
 
 function parseCsvRecords(rawText: string): string[][] {
   const text = rawText.replace(/^\uFEFF/, '');
@@ -126,6 +115,9 @@ export class ImportModal {
   protected readonly uid = `import-modal-${++ImportModal.nextId}`;
 
   private readonly document = inject(DOCUMENT);
+  private readonly api = inject(StaffUsersApi);
+  private readonly tracker = inject(BulkJobsTracker);
+  private readonly previewSeats = inject(SEAT_PREVIEW);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
@@ -151,8 +143,12 @@ export class ImportModal {
 
   protected readonly checking = signal(false);
   protected readonly importing = signal(false);
-  protected readonly dryRunResult = signal<ImportResult | null>(null);
-  protected readonly finalResult = signal<ImportResult | null>(null);
+  protected readonly dryRunResult = signal<SeatPreview | null>(null);
+  protected readonly batch = signal<ImportBatchCreated | null>(null);
+  protected readonly invalidRows = signal<ImportBatchRow[]>([]);
+  protected readonly batchError = signal<string | null>(null);
+  private readonly checked = signal(false);
+  private checkedFingerprint: string | null = null;
 
 
   private lastFingerprint: string | null = null;
@@ -172,33 +168,24 @@ export class ImportModal {
     () =>
       !this.busy() &&
       this.parsedRows().length > 0 &&
-      this.parseErrors().length === 0 &&
-      this.finalResult() === null,
+      this.parseErrors().length === 0,
   );
 
   protected readonly canImport = computed(() => {
-    const dry = this.dryRunResult();
-    return (
-      !this.busy() &&
-      this.parsedRows().length > 0 &&
-      this.parseErrors().length === 0 &&
-      dry !== null &&
-      importOk(dry) &&
-      this.finalResult() === null
-    );
+    const batch = this.batch();
+    const preview = this.dryRunResult();
+    return !this.busy() && this.checked() && Boolean(batch?.valid) &&
+      this.checkedFingerprint === this.fingerprint() &&
+      (this.parsedRows().length > 500 || preview !== null && (preview.ok || this.mode() === 'SKIP_ROLES_THAT_DONT_FIT'));
   });
 
-  protected readonly roleLabels = computed<Record<string, string>>(() => {
-    const lang = this.language();
-    const list = this.roles();
-    const map: Record<string, string> = {};
-    for (const role of list) {
-      map[role.id] = role.nameI18n?.[lang] || role.name;
-    }
-    return map;
-  });
-
-  protected readonly activeReport = computed(() => this.finalResult() ?? this.dryRunResult());
+  constructor() {
+    effect(() => {
+      this.parsedRows();
+      this.mode();
+      untracked(() => this.clearBatch());
+    });
+  }
 
   open(): void {
     this.resetState();
@@ -230,9 +217,7 @@ export class ImportModal {
     this.fileError.set(null);
     this.parseErrors.set([]);
     this.parsedRows.set([]);
-    this.dryRunResult.set(null);
-    this.finalResult.set(null);
-    this.clearIdempotency();
+    this.clearBatch();
 
     try {
       const content = await file.text();
@@ -243,10 +228,9 @@ export class ImportModal {
   }
 
   protected onFileRejected(reason: 'type' | 'size'): void {
+    this.clearBatch();
     this.parsedRows.set([]);
     this.parseErrors.set([]);
-    this.dryRunResult.set(null);
-    this.finalResult.set(null);
     this.fileError.set(
       reason === 'size' || reason === 'type'
         ? this.transloco.translate('users.import.fileHint')
@@ -255,29 +239,32 @@ export class ImportModal {
   }
 
   protected onModeChange(value: string | null): void {
+    if (this.busy()) return;
     if (value !== 'ALL_OR_NOTHING' && value !== 'SKIP_ROLES_THAT_DONT_FIT') return;
     if (value === this.mode()) return;
     this.mode.set(value);
-    this.dryRunResult.set(null);
-    this.finalResult.set(null);
-    this.clearIdempotency();
+    this.clearBatch();
   }
 
   protected async checkImport(): Promise<void> {
     if (!this.canCheck()) return;
     this.checking.set(true);
+    this.batchError.set(null);
+    this.checked.set(false);
     try {
-      const result = await importUsers(
-        {
-          rows: this.parsedRows(),
-          mode: this.mode(),
-          dryRun: true,
-        },
-        newIdempotencyKey(),
-      );
-      this.dryRunResult.set(result);
+      const body = {
+        rows: this.parsedRows(),
+        mode: this.mode() === 'ALL_OR_NOTHING' ? 'STRICT' as const : 'SKIP_ROLES_THAT_DONT_FIT' as const,
+      };
+      const batch = await this.api.createImportBatch(body, this.idempotencyKeyFor(body));
+      this.batch.set(batch);
+      this.invalidRows.set(batch.invalid ? await this.collectRows(batch.batchId, 'INVALID') : []);
+      this.dryRunResult.set(this.parsedRows().length <= 500
+        ? await this.previewSeats([{ kind: 'IMPORT', rows: this.parsedRows() }]) : null);
+      this.checkedFingerprint = this.fingerprint();
+      this.checked.set(true);
     } catch (error) {
-      this.notify.error(this.resolveError(error));
+      this.handleBatchError(error);
     } finally {
       this.checking.set(false);
     }
@@ -285,29 +272,90 @@ export class ImportModal {
 
   protected async runImport(): Promise<void> {
     if (!this.canImport()) return;
-    const rows = this.parsedRows();
-    const body = {
-      rows,
-      mode: this.mode(),
-      dryRun: false,
-    };
-    const key = this.idempotencyKeyFor(body);
+    const batch = this.batch()!;
+    if (Date.parse(batch.expiresAt) <= Date.now()) {
+      this.handleBatchError(new ApiError(410, 'IMPORT_BATCH_EXPIRED'));
+      return;
+    }
     this.importing.set(true);
+    this.batchError.set(null);
     try {
-      const result = await importUsers(body, key);
-      this.finalResult.set(result);
+      const rows = await this.collectRows(batch.batchId, 'VALID');
+      if (!rows.length) throw new ApiError(422, 'IMPORT_BATCH_NO_VALID_ROWS');
+      const body = {
+        module: 'core.users', action: 'IMPORT', scope: {},
+        selection: { kind: 'IDS' as const, ids: rows.map((row) => row.id) },
+        params: {
+          batchId: batch.batchId, confirmAddonCascade: false,
+          skipRolesThatDontFit: this.mode() === 'SKIP_ROLES_THAT_DONT_FIT',
+        },
+      };
+      await this.tracker.submit('core', body, { idempotencyKey: this.idempotencyKeyFor(body) });
       this.clearIdempotency();
-      const importedCount = result.results.filter((r) => r.status === 'CREATED').length;
-      this.notify.success(this.transloco.translate(pluralKey('users.import.donePlural', importedCount, this.language()), { n: importedCount }));
+      this.modal().close();
       this.imported.emit();
     } catch (error) {
-      this.notify.error(this.resolveError(error));
+      if (!(error instanceof ApiError && error.code === 'BULK_JOB_ACTIVE')) this.handleBatchError(error);
     } finally {
       this.importing.set(false);
     }
   }
 
+  private async collectRows(batchId: string, status: ImportBatchRowStatus): Promise<ImportBatchRow[]> {
+    const rows: ImportBatchRow[] = [];
+    let page = 1;
+    while (true) {
+      const result = await this.api.listImportBatchRows(batchId, { status, page, limit: 100 });
+      rows.push(...result.data);
+      if (!result.meta.hasNext) return rows;
+      page++;
+    }
+  }
+
+  protected rowErrors(row: ImportBatchRow): string[] {
+    this.i18n();
+    return Object.entries(row.errors).flatMap(([field, messages]) =>
+      messages.map((message) => {
+        const key = `users.errors.${message}`;
+        const translated = this.transloco.translate(key);
+        return this.transloco.translate('users.import.rowError', {
+          row: row.rowNo, message: `${field}: ${translated === key ? message : translated}`,
+        });
+      }),
+    );
+  }
+
+  private handleBatchError(error: unknown): void {
+    if (error instanceof ApiError && ['IMPORT_BATCH_EXPIRED', 'IMPORT_BATCH_NOT_FOUND'].includes(error.code)) {
+      this.clearBatch();
+      this.batchError.set(this.transloco.translate('users.import.recheck'));
+    } else if (error instanceof ApiError && error.code === 'IMPORT_BATCH_ALREADY_SUBMITTED') {
+      this.checked.set(false);
+      this.batchError.set(this.transloco.translate(`users.errors.${error.code}`));
+    } else if (error instanceof ApiError && error.code === 'IMPORT_BATCH_NO_VALID_ROWS') {
+      this.checked.set(false);
+      this.batchError.set(this.transloco.translate(`users.errors.${error.code}`));
+    } else {
+      this.notify.error(this.resolveError(error));
+    }
+  }
+
+  private fingerprint(): string {
+    return JSON.stringify([this.parsedRows(), this.mode()]);
+  }
+
+  private clearBatch(): void {
+    this.batch.set(null);
+    this.invalidRows.set([]);
+    this.batchError.set(null);
+    this.dryRunResult.set(null);
+    this.checked.set(false);
+    this.checkedFingerprint = null;
+    this.clearIdempotency();
+  }
+
   private parseCsvContent(content: string): void {
+    this.clearBatch();
     const records = parseCsvRecords(content);
     if (records.length < 2) {
       this.parseErrors.set([this.transloco.translate('users.import.fileHint')]);
@@ -488,7 +536,6 @@ export class ImportModal {
           email,
           firstName,
           lastName,
-          name: `${firstName} ${lastName}`.trim(),
           ...(employeeCode ? { employeeCode } : {}),
           ...(jobTitle ? { jobTitle } : {}),
           companyId: company.id,
@@ -497,7 +544,6 @@ export class ImportModal {
           ...(team ? { teamId: team.id } : {}),
           ...(role
             ? {
-                roleName: role.name,
                 roleAssignments: [{ branchId: branch.id, roleId: role.id }],
               }
             : {}),
@@ -515,9 +561,7 @@ export class ImportModal {
     this.parseErrors.set([]);
     this.parsedRows.set([]);
     this.mode.set('ALL_OR_NOTHING');
-    this.dryRunResult.set(null);
-    this.finalResult.set(null);
-    this.clearIdempotency();
+    this.clearBatch();
   }
 
   private idempotencyKeyFor(body: unknown): string {

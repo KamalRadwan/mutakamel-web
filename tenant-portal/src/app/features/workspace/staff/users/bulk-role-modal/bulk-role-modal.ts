@@ -1,7 +1,7 @@
 import { Component, computed, effect, inject, input, output, signal, untracked, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
-import { PluralKeyPipe, pluralKey } from '../../../../../core/i18n/plural';
+import { PluralKeyPipe } from '../../../../../core/i18n/plural';
 import { provideIcons } from '@ng-icons/core';
 import { tablerShieldLock } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../../core/i18n/language';
@@ -14,7 +14,9 @@ import { Segmented, SegmentedOption } from '../../../../../shared/ui/segmented/s
 import { newIdempotencyKey } from '../../shared/staff.api';
 import { DryRunReport } from '../../../seats/dry-run-report/dry-run-report';
 import { seatErrorMessage } from '../../../seats/seat-errors';
-import { bulkAssignRole } from '../../../seats/seats.api';
+import { SEAT_PREVIEW } from '../../../seats/seats.api';
+import { ApiError } from '../../../../../core/api/api-errors';
+import { BulkJobsTracker } from '../../../../../shared/bulk-jobs/bulk-jobs-tracker';
 import { SeatPreview } from '../../../seats/seats.model';
 import { StaffSession } from '../../shared/staff-session';
 import { Branch, Company, Role, ScopeTarget } from '../../shared/staff.model';
@@ -43,6 +45,8 @@ export class BulkRoleModal {
   protected readonly uid = `bulk-role-modal-${++BulkRoleModal.nextId}`;
 
   private readonly session = inject(StaffSession);
+  private readonly tracker = inject(BulkJobsTracker);
+  private readonly previewSeats = inject(SEAT_PREVIEW);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
@@ -62,6 +66,7 @@ export class BulkRoleModal {
   protected readonly selectedCompanyId = signal('');
   protected readonly selectedBranchId = signal('');
 
+  protected readonly previewSkipped = signal(false);
   protected readonly checking = signal(false);
   protected readonly assigning = signal(false);
   protected readonly dryRunResult = signal<SeatPreview | null>(null);
@@ -128,7 +133,7 @@ export class BulkRoleModal {
   protected readonly canCheck = computed(() => this.hasValidSelection() && !this.busy());
 
   protected readonly canAssign = computed(
-    () => this.hasValidSelection() && !this.busy() && this.dryRunResult()?.ok === true,
+    () => this.hasValidSelection() && !this.busy() && (this.previewSkipped() || this.dryRunResult()?.ok === true),
   );
 
   constructor() {
@@ -145,6 +150,7 @@ export class BulkRoleModal {
     this.userIds.set([...userIds]);
     this.scopeTarget.set('BRANCH');
     this.dryRunResult.set(null);
+    this.previewSkipped.set(false);
     this.clearIdempotency();
     this.syncDefaultSelections();
     this.modal().open();
@@ -158,6 +164,7 @@ export class BulkRoleModal {
   protected onClosed(): void {
     this.userIds.set([]);
     this.dryRunResult.set(null);
+    this.previewSkipped.set(false);
     this.clearIdempotency();
   }
 
@@ -168,6 +175,7 @@ export class BulkRoleModal {
   }
 
   protected onScopeChange(value: string | null): void {
+    if (this.busy()) return;
     if (value !== 'TENANT' && value !== 'COMPANY' && value !== 'BRANCH') return;
     if (!this.isOwner() && value !== 'BRANCH') return;
     if (value === this.scopeTarget()) return;
@@ -198,10 +206,16 @@ export class BulkRoleModal {
 
   protected async checkSeats(): Promise<void> {
     if (!this.canCheck()) return;
-    const body = this.buildPayload(true);
+    if (this.userIds().length > 100) {
+      this.dryRunResult.set(null);
+      this.previewSkipped.set(true);
+      return;
+    }
     this.checking.set(true);
     try {
-      const result = await bulkAssignRole(body, newIdempotencyKey());
+      const result = await this.previewSeats([{
+        kind: 'BULK_ROLE', roleId: this.selectedRoleId(), scope: this.assignmentScope(), userIds: [...this.userIds()],
+      }]);
       this.dryRunResult.set(result);
     } catch (error) {
       this.notify.error(this.resolveError(error));
@@ -212,42 +226,36 @@ export class BulkRoleModal {
 
   protected async assign(): Promise<void> {
     if (!this.canAssign()) return;
-    const body = this.buildPayload(false);
-    const key = this.idempotencyKeyFor(body);
+    const assignmentScope = this.assignmentScope();
+    const { target, ...scope } = assignmentScope;
+    const body = {
+      module: 'core.users', action: 'ASSIGN_ROLE', scope,
+      selection: { kind: 'IDS' as const, ids: [...this.userIds()] },
+      params: {
+        roleId: this.selectedRoleId(), confirmAddonCascade: false,
+        ...(target === 'BRANCH' ? { branchId: assignmentScope.branchId } : { scope: assignmentScope }),
+      },
+    };
     this.assigning.set(true);
     try {
-      const result = await bulkAssignRole(body, key);
-      if (!result.ok) {
-        this.dryRunResult.set(result);
-        return;
-      }
-      const count = this.userIds().length;
+      await this.tracker.submit('core', body, { idempotencyKey: this.idempotencyKeyFor(body) });
       this.clearIdempotency();
-      this.notify.success(this.transloco.translate(pluralKey('users.bulk.donePlural', count, this.language()), { n: count }));
       this.modal().close();
       this.assigned.emit();
     } catch (error) {
-      this.notify.error(this.resolveError(error));
+      if (!(error instanceof ApiError && error.code === 'BULK_JOB_ACTIVE')) {
+        this.notify.error(this.resolveError(error));
+      }
     } finally {
       this.assigning.set(false);
     }
   }
 
-  private buildPayload(dryRun: boolean): Parameters<typeof bulkAssignRole>[0] {
+  private assignmentScope(): { target: ScopeTarget; companyId?: string; branchId?: string } {
     const target = this.scopeTarget();
-    const scope: Parameters<typeof bulkAssignRole>[0]['scope'] = { target };
-    if (target === 'COMPANY') {
-      scope.companyId = this.selectedCompanyId();
-    } else if (target === 'BRANCH') {
-      scope.companyId = this.selectedCompanyId() || undefined;
-      scope.branchId = this.selectedBranchId();
-    }
-    return {
-      roleId: this.selectedRoleId(),
-      scope,
-      userIds: [...this.userIds()],
-      dryRun,
-    };
+    if (target === 'COMPANY') return { target, companyId: this.selectedCompanyId() };
+    if (target === 'BRANCH') return { target, branchId: this.selectedBranchId() };
+    return { target };
   }
 
   private syncDefaultSelections(): void {
@@ -267,6 +275,7 @@ export class BulkRoleModal {
 
   private resetDryRun(): void {
     this.dryRunResult.set(null);
+    this.previewSkipped.set(false);
     this.clearIdempotency();
   }
 

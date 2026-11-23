@@ -30,7 +30,8 @@ describe('Workspace Users API', () => {
     TestBed.configureTestingModule({ providers: [
       provideHttpClient(),
       provideHttpClientTesting(),
-      { provide: StaffSession, useValue: { scopeRevision: () => 'staff-scope', can } },
+      { provide: StaffSession, useValue: { scopeRevision: () => 'staff-scope', can,
+        me: () => ({ permissions: can() ? ['users.user.invite'] : [] }) } },
     ] });
     api = TestBed.inject(StaffUsersApi);
     requests = TestBed.inject(HttpTestingController);
@@ -39,6 +40,49 @@ describe('Workspace Users API', () => {
   afterEach(() => {
     requests.verify();
     document.cookie = `${csrfCookie}=; Max-Age=0; path=/${location.protocol === 'https:' ? '; Secure' : ''}`;
+  });
+
+  it('stages invitations with the closed STRICT body and write idempotency header', async () => {
+    const key = newIdempotencyKey();
+    const payload = { rows: [body], mode: 'STRICT' as const };
+    const result = api.createImportBatch(payload, key);
+    const request = requests.expectOne({ url: `${usersPath}/import-batches`, method: 'POST' });
+    expect(request.request.body).toEqual(payload);
+    expect(request.request.headers.get('x-idempotency-key')).toBe(key);
+    expect(request.request.headers.get('x-csrf-token')).toBe('staff-test-proof');
+    expect(request.request.withCredentials).toBe(true);
+    const batch = { batchId: 'batch', total: 1, valid: 1, invalid: 0, expiresAt: '2026-11-24T12:00:00Z' };
+    request.flush({ success: true, data: batch }, { status: 201, statusText: 'Created' });
+    await expect(result).resolves.toEqual(batch);
+  });
+
+  it('lists staging rows through the Core page without a write header', async () => {
+    const result = api.listImportBatchRows('batch/id', { page: 2, limit: 100, status: 'VALID' });
+    const request = requests.expectOne((item) => item.url === `${usersPath}/import-batches/batch%2Fid/rows`);
+    expect(request.request.method).toBe('GET');
+    expect(request.request.params.get('status')).toBe('VALID');
+    expect(request.request.params.get('page')).toBe('2');
+    expect(request.request.params.get('limit')).toBe('100');
+    expect(request.request.headers.has('x-idempotency-key')).toBe(false);
+    const row = { id: 'row', rowNo: 1, status: 'VALID', data: body, errors: {}, resultCode: null };
+    const meta = { page: 2, limit: 100, total: 101, totalPages: 2, hasNext: false, hasPrev: true };
+    request.flush({ success: true, data: [row], meta });
+    await expect(result).resolves.toEqual({ data: [row], meta });
+  });
+
+  it('surfaces staging expiry 410 as ApiError', async () => {
+    const result = expect(api.listImportBatchRows('expired')).rejects.toEqual(new ApiError(410, 'IMPORT_BATCH_EXPIRED'));
+    requests.expectOne(`${usersPath}/import-batches/expired/rows`).flush(
+      { errorCode: 'IMPORT_BATCH_EXPIRED' }, { status: 410, statusText: 'Gone' },
+    );
+    await result;
+  });
+
+  it('requires invite authority for both staging calls', async () => {
+    can.mockReturnValue(false);
+    await expect(api.createImportBatch({ rows: [body], mode: 'STRICT' }, newIdempotencyKey())).rejects.toMatchObject({ status: 403 });
+    await expect(api.listImportBatchRows('batch')).rejects.toMatchObject({ status: 403 });
+    requests.expectNone((request) => request.url.includes('import-batches'));
   });
 
   it('uses the scoped Core read and its pagination envelope', async () => {

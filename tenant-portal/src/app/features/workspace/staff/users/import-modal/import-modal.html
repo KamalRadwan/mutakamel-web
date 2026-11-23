@@ -85,8 +85,25 @@
       </button>
     </div>
 
-    @if (activeReport(); as report) {
-      <app-dry-run-report [result]="report" kind="import" [roleLabels]="roleLabels()" />
+    @if (batch(); as staged) {
+      <p role="status" class="rounded-8 border border-border bg-surface-muted px-10 py-6 text-12 text-text">
+        {{ 'users.import.counts' | transloco: { total: staged.total, valid: staged.valid, invalid: staged.invalid } }}
+      </p>
+    }
+    @if (batchError(); as message) {
+      <p role="alert" class="rounded-10 border border-danger-border bg-danger-soft px-10 py-8 text-12 leading-18 text-on-danger-soft">{{ message }}</p>
+    }
+    @if (invalidRows().length) {
+      <div role="alert" class="flex max-h-notif-list-max flex-col gap-4 overflow-y-auto rounded-10 border border-danger-border bg-danger-soft px-10 py-8 text-12 leading-18 text-on-danger-soft">
+        @for (row of invalidRows(); track row.id) {
+          @for (message of rowErrors(row); track $index) {
+            <p>{{ message }}</p>
+          }
+        }
+      </div>
+    }
+    @if (dryRunResult(); as report) {
+      <app-dry-run-report [result]="report" kind="import" />
     }
   </div>
 
@@ -98,11 +115,11 @@
       [disabled]="!canImport()"
       (click)="runImport()"
     >
-      {{ ('users.import.goPlural' | pluralKey: parsedRows().length) | transloco: { n: parsedRows().length } }}
+      {{ ('users.import.goPlural' | pluralKey: (batch()?.valid ?? parsedRows().length)) | transloco: { n: batch()?.valid ?? parsedRows().length } }}
     </button>
 
     <button type="button" uiButton variant="secondary" [disabled]="busy()" (click)="close()">
-      {{ (finalResult() ? 'users.common.close' : 'users.common.cancel') | transloco }}
+      {{ 'users.common.cancel' | transloco }}
     </button>
   </div>
 </ui-modal>

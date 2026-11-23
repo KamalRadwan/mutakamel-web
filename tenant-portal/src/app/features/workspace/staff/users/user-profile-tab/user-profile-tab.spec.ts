@@ -53,7 +53,7 @@ describe('user-profile-tab', () => {
     tab['draft'].update((draft) => ({ ...draft, firstName: 'Changed' }));
     await settle();
   });
-  afterEach(() => { requests.verify(); document.cookie = `${cookie}=; Max-Age=0; path=/`; vi.useRealTimers(); });
+  afterEach(() => { requests?.verify(); document.cookie = `${cookie}=; Max-Age=0; path=/`; vi.useRealTimers(); });
 
   async function fail(status: number, code: string, details?: Record<string, string[]>) {
     const pending = tab.save(); await settle();

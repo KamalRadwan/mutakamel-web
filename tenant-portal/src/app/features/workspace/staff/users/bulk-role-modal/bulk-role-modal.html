@@ -120,6 +120,11 @@
       }
     </div>
 
+    @if (previewSkipped()) {
+      <p role="status" class="rounded-8 border border-border bg-surface-muted px-10 py-6 text-12 text-text-muted">
+        {{ 'seats.errors.SEAT_PREVIEW_TOO_LARGE' | transloco }}
+      </p>
+    }
     @if (dryRunResult(); as report) {
       <app-dry-run-report [result]="report" kind="bulk" />
     }

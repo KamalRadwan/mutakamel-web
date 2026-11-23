@@ -649,6 +649,13 @@ let store: StoreState = createSeedState();
 
 export function resetStaffFake(): void {
   store = createSeedState();
+  FAKE_ACTOR = 'owner';
+  FAKE_TREE_TOO_LARGE = false;
+  FAKE_SEAT_IMPACT = false;
+  FAKE_SEAT_CASCADE = false;
+  FAKE_OVER_CAPACITY = false;
+  FAKE_SEATS['crm'] = 4;
+  FAKE_SEATS['trade'] = 2;
 }
 
 function clone<T>(value: T): T {

@@ -49,12 +49,14 @@ class TestLoader {
 }
 
 describe('Organization API tree', () => {
+  let languageBefore: { stored: string | null; lang: string; dir: string };
   const me = signal<TenantMe | null>(null);
   const status = signal<SessionStatus>('loading');
   let http: HttpTestingController;
   let fixture: ComponentFixture<OrganizationPage>;
 
   beforeEach(() => {
+    languageBefore = { stored: localStorage.getItem('lang'), lang: document.documentElement.lang, dir: document.documentElement.dir };
     me.set(null);
     status.set('loading');
     TestBed.configureTestingModule({
@@ -79,6 +81,11 @@ describe('Organization API tree', () => {
     http.verify();
     TestBed.inject(DOCUMENT).documentElement.removeAttribute('data-theme');
     vi.restoreAllMocks();
+    TestBed.resetTestingModule();
+    if (languageBefore.stored === null) localStorage.removeItem('lang');
+    else localStorage.setItem('lang', languageBefore.stored);
+    document.documentElement.lang = languageBefore.lang;
+    document.documentElement.dir = languageBefore.dir;
   });
 
   function signIn(permissionScopes: TenantMe['permissionScopes'] = readScopes, id = 'actor'): void {

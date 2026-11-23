@@ -3,7 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { newIdempotencyKey } from '../../../../core/api/idempotency';
 import { StaffSession } from '../shared/staff-session';
 import { RolesApi } from './roles.api';
@@ -48,11 +48,11 @@ describe('RolesApi real Core contract', () => {
     });
     const doc = TestBed.inject(DOCUMENT);
     csrf = `${doc.location.protocol === 'https:' ? '__Host-mutakamel-tenant-csrf' : 'mutakamel-http-tenant-csrf'}=proof`;
-    Object.defineProperty(doc, 'cookie', { configurable: true, get: () => csrf });
+    vi.spyOn(doc, 'cookie', 'get').mockImplementation(() => csrf);
     api = TestBed.inject(RolesApi);
     http = TestBed.inject(HttpTestingController);
   });
-  afterEach(() => http.verify());
+  afterEach(() => { try { http.verify(); } finally { vi.restoreAllMocks(); } });
 
   const writes = [
     {

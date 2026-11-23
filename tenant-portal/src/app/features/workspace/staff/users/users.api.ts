@@ -33,6 +33,31 @@ export interface InviteUserBody {
   managerId?: string;
   employeeCode?: string;
   jobTitle?: string;
+  roleAssignments?: { branchId: string; roleId: string }[];
+}
+
+export interface CreateImportBatchBody {
+  rows: InviteUserBody[];
+  mode: 'STRICT' | 'SKIP_ROLES_THAT_DONT_FIT';
+}
+
+export interface ImportBatchCreated {
+  batchId: string;
+  total: number;
+  valid: number;
+  invalid: number;
+  expiresAt: string;
+}
+
+export type ImportBatchRowStatus = 'VALID' | 'INVALID' | 'IMPORTED' | 'FAILED';
+
+export interface ImportBatchRow {
+  id: string;
+  rowNo: number;
+  status: ImportBatchRowStatus;
+  data: InviteUserBody;
+  errors: Record<string, string[]>;
+  resultCode: string | null;
 }
 
 @Service()
@@ -71,6 +96,33 @@ export class StaffUsersApi {
 
   async inviteUser(body: InviteUserBody, key: string): Promise<TenantUser> {
     return this.write<TenantUser>('POST', USERS_PATH, body, key, 'users.user.invite', body, undefined, true);
+  }
+
+  async createImportBatch(body: CreateImportBatchBody, key: string): Promise<ImportBatchCreated> {
+    const scope = this.importScope();
+    const result = await this.http.write<ImportBatchCreated>('POST', `${USERS_PATH}/import-batches`, body, { key });
+    if (scope !== this.session.scopeRevision()) throw new ApiError(403, 'COMMON.GENERIC.FORBIDDEN');
+    return result;
+  }
+
+  async listImportBatchRows(id: string, query: { page?: number; limit?: number; status?: ImportBatchRowStatus } = {}): Promise<CorePage<ImportBatchRow>> {
+    const scope = this.importScope();
+    const { data, meta } = await this.http.read<ImportBatchRow[]>(`${USERS_PATH}/import-batches/${encodeURIComponent(id)}/rows`, query);
+    if (scope !== this.session.scopeRevision()) throw new ApiError(403, 'COMMON.GENERIC.FORBIDDEN');
+    if (!Array.isArray(data) || !meta || !Number.isSafeInteger(meta.total) || meta.total < 0 ||
+        !Number.isSafeInteger(meta.totalPages) || meta.totalPages < 0 || typeof meta.hasNext !== 'boolean') {
+      throw new ApiError(502, 'COMMON.GENERIC.INTERNAL_ERROR');
+    }
+    return { data, meta };
+  }
+
+  private importScope(): string {
+    const scope = this.session.scopeRevision();
+    // Batch reads use invite authority and creator ownership, rather than users.user.read.
+    if (!scope || !this.session.me()?.permissions.includes('users.user.invite')) {
+      throw new ApiError(403, 'COMMON.GENERIC.FORBIDDEN');
+    }
+    return scope;
   }
 
   async updateUser(id: string, patch: UpdateUserBody, key: string): Promise<TenantUser> {
