@@ -28,7 +28,9 @@
     "status": "Status",
     "actions": "Actions",
     "lastUpdated": "Last updated",
-    "of": "{{count}} of {{max}}"
+    "of": "{{count}} of {{max}}",
+    "keepEditing": "Keep my changes",
+    "correlationId": "Reference: {{id}}"
   },
   "errors": {
     "generic": "Something went wrong. Try again.",
@@ -38,6 +40,28 @@
     "session": "Your session has ended. Sign in again.",
     "idempotency": "The same request is already being processed.",
     "validation": "Check the highlighted fields.",
-    "subscription": "Your subscription allows viewing only."
+    "subscription": "Your subscription allows viewing only.",
+    "CRM_SUBSCRIPTION_READ_ONLY": "Your plan is read-only. Changes are not saved.",
+    "SEAT_OVER_CAPACITY_READ_ONLY": "Your plan is read-only. Changes are not saved.",
+    "CRM_SUBSCRIPTION_BLOCKED": "CRM is not available for your account.",
+    "CRM_MODULE_DISABLED": "CRM is not available for your account.",
+    "CRM_MODULE_SEAT_REQUIRED": "CRM is not available for your account.",
+    "CRM_FEATURE_DISABLED": "CRM is not available for your account.",
+    "CRM_PERMISSION_DENIED": "You do not have permission for this.",
+    "MISSING_REQUIRED_PERMISSIONS": "You do not have permission for this.",
+    "BRANCH_PERMISSION_DENIED": "You do not have permission for this.",
+    "BRANCH_ACCESS_DENIED": "You do not have permission for this.",
+    "BRANCH_CONTEXT_REQUIRED": "You do not have permission for this.",
+    "REQUEST_PAYLOAD_BOUNDS_EXCEEDED": "The content is too large.",
+    "ENTITLEMENT_UNAVAILABLE": "Settings are unavailable. Try again.",
+    "CRM_SETTINGS_MISSING": "Settings are unavailable. Try again.",
+    "GW.IDEM.IN_FLIGHT": "Still saving",
+    "GW.IDEM.MISMATCH": "Already sent with different values. Reload.",
+    "notSaved": "Not saved. Try again.",
+    "idempotencyMismatch": "Already sent with different values. Reload.",
+    "idempotencyKey": "Could not send the request. Try again.",
+    "rateLimited": "Too many requests. Try again shortly.",
+    "rateLimitedIn": "Too many requests, try again in {{seconds}} s",
+    "tooLarge": "The content is too large."
   }
 }

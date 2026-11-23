@@ -28,7 +28,9 @@
     "status": "الحالة",
     "actions": "الإجراءات",
     "lastUpdated": "آخر تحديث",
-    "of": "{{count}} من {{max}}"
+    "of": "{{count}} من {{max}}",
+    "keepEditing": "الاحتفاظ بتغييراتي",
+    "correlationId": "المرجع: {{id}}"
   },
   "errors": {
     "generic": "حدث خطأ. حاول مرة أخرى.",
@@ -38,6 +40,28 @@
     "session": "انتهت جلستك. سجّل الدخول مرة أخرى.",
     "idempotency": "الطلب نفسه قيد المعالجة بالفعل.",
     "validation": "تحقّق من الحقول المميّزة.",
-    "subscription": "اشتراكك يسمح بالعرض فقط."
+    "subscription": "اشتراكك يسمح بالعرض فقط.",
+    "CRM_SUBSCRIPTION_READ_ONLY": "خطتك تتيح القراءة فقط. لم تُحفظ التغييرات.",
+    "SEAT_OVER_CAPACITY_READ_ONLY": "خطتك تتيح القراءة فقط. لم تُحفظ التغييرات.",
+    "CRM_SUBSCRIPTION_BLOCKED": "إدارة علاقات العملاء غير متاحة لحسابك.",
+    "CRM_MODULE_DISABLED": "إدارة علاقات العملاء غير متاحة لحسابك.",
+    "CRM_MODULE_SEAT_REQUIRED": "إدارة علاقات العملاء غير متاحة لحسابك.",
+    "CRM_FEATURE_DISABLED": "إدارة علاقات العملاء غير متاحة لحسابك.",
+    "CRM_PERMISSION_DENIED": "ليست لديك صلاحية لذلك.",
+    "MISSING_REQUIRED_PERMISSIONS": "ليست لديك صلاحية لذلك.",
+    "BRANCH_PERMISSION_DENIED": "ليست لديك صلاحية لذلك.",
+    "BRANCH_ACCESS_DENIED": "ليست لديك صلاحية لذلك.",
+    "BRANCH_CONTEXT_REQUIRED": "ليست لديك صلاحية لذلك.",
+    "REQUEST_PAYLOAD_BOUNDS_EXCEEDED": "حجم المحتوى أكبر من المسموح.",
+    "ENTITLEMENT_UNAVAILABLE": "الإعدادات غير متاحة. حاول مرة أخرى.",
+    "CRM_SETTINGS_MISSING": "الإعدادات غير متاحة. حاول مرة أخرى.",
+    "GW.IDEM.IN_FLIGHT": "جارٍ الحفظ",
+    "GW.IDEM.MISMATCH": "أُرسل الطلب بالفعل بقيم مختلفة. أعد التحميل.",
+    "notSaved": "لم تُحفظ التغييرات. حاول مرة أخرى.",
+    "idempotencyMismatch": "أُرسل الطلب بالفعل بقيم مختلفة. أعد التحميل.",
+    "idempotencyKey": "تعذّر إرسال الطلب. حاول مرة أخرى.",
+    "rateLimited": "الطلبات كثيرة جدًا. حاول مجددًا بعد قليل.",
+    "rateLimitedIn": "الطلبات كثيرة جدًا، حاول مجددًا بعد {{seconds}} ثانية",
+    "tooLarge": "حجم المحتوى أكبر من المسموح."
   }
 }
