@@ -1,4 +1,4 @@
-import { Component, ElementRef, computed, inject, signal, viewChild, viewChildren } from '@angular/core';
+import { Component, Injector, computed, inject, runInInjectionContext, signal, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../core/i18n/translation-events';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
@@ -23,14 +23,16 @@ import {
   tablerUserPlus,
   tablerUsers,
 } from '@ng-icons/tabler-icons';
-import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
 import { ActionItem, ActionSelection, ActionsMenu } from '../../../../shared/ui/actions-menu/actions-menu';
-import { Button } from '../../../../shared/ui/button/button';
+import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { Dropdown, DropdownOption } from '../../../../shared/ui/dropdown/dropdown';
-import { errorCodeOf } from '../shared/settings-api';
+import { ApiError } from '../../../../core/api/api-errors';
+import { tenantWide } from '../shared/settings-access';
+import { customFieldsError } from './custom-fields-errors';
 import { SettingsFrame } from '../../../../shared/ui/settings-frame/settings-frame';
-import { listCustomFields, updateCustomField } from './custom-fields.api';
+import { CustomFieldSubmission, listCustomFields, updateCustomField } from './custom-fields.api';
 import {
   CREATABLE_OWNER_TYPES,
   CreatableOwnerType,
@@ -45,12 +47,8 @@ import {
   scopedRequirements,
 } from './custom-fields.model';
 import { CustomFieldModal } from './custom-field-modal/custom-field-modal';
-import { RecordValues } from './record-values/record-values';
 import { RequirementsModal } from './requirements-modal/requirements-modal';
 
-const CAN_MANAGE = true; // later from the session permissions
-
-type PageTab = 'definitions' | 'values';
 type OwnerTypeFilter = 'ALL' | CreatableOwnerType;
 type StatusFilter = 'ACTIVE' | 'ARCHIVED' | 'ALL';
 
@@ -61,11 +59,11 @@ type StatusFilter = 'ACTIVE' | 'ARCHIVED' | 'ALL';
     TranslocoPipe,
     SettingsFrame,
     Dropdown,
-    Button,
+    FullState,
+    ConfirmDialog,
     ActionsMenu,
     CustomFieldModal,
     RequirementsModal,
-    RecordValues,
   ],
   providers: [
     provideTranslocoScope('settings', { scope: 'settings-custom-fields', alias: 'customFields' }),
@@ -92,32 +90,36 @@ type StatusFilter = 'ACTIVE' | 'ARCHIVED' | 'ALL';
     }),
   ],
   templateUrl: './custom-fields-page.html',
-  host: { class: 'flex min-h-0 flex-1 flex-col' },
+  host: { class: 'flex flex-1 shrink-0 flex-col' },
 })
 export class CustomFieldsPage {
-  private static nextId = 0;
-  protected readonly uid = `cf-page-${++CustomFieldsPage.nextId}`;
-
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly notify = inject(Notify);
-  protected readonly language = inject(LanguageState).current;
+  private readonly injector = inject(Injector);
+  private readonly archiveDialog = viewChild.required(ConfirmDialog);
+  private readonly submissions = new Map<string, CustomFieldSubmission>();
 
   private readonly fieldModal = viewChild.required(CustomFieldModal);
   private readonly requirementsModal = viewChild.required(RequirementsModal);
-  private readonly tabButtons = viewChildren<ElementRef<HTMLButtonElement>>('tabBtn');
 
-  protected readonly canManage = CAN_MANAGE;
+  protected readonly readOnly = signal(false);
+  protected readonly canRead = computed(() => runInInjectionContext(this.injector, () => tenantWide('crm.custom_fields.read')));
+  protected readonly canManage = computed(() => !this.readOnly() && runInInjectionContext(this.injector, () => tenantWide('crm.custom_fields.manage')));
   protected readonly maxDefinitions = MAX_DEFINITIONS;
   protected readonly typeIcons = FIELD_TYPE_ICONS;
   protected readonly ownerLook = OWNER_TYPE_LOOK;
   protected readonly operations = REQUIREMENT_OPERATIONS;
   protected readonly isChoicesType = isChoicesType;
 
-  protected readonly activeTab = signal<PageTab>('definitions');
   protected readonly fields = signal<CustomField[]>([]);
   protected readonly loading = signal(false);
-  protected readonly failed = signal(false);
+  private readonly loadError = signal<unknown | null>(null);
+  protected readonly failure = computed(() => {
+    this.i18n();
+    const error = this.loadError();
+    return error ? customFieldsError(this.transloco, error) : null;
+  });
   protected readonly search = signal('');
   protected readonly ownerTypeFilter = signal<OwnerTypeFilter>('ALL');
   protected readonly statusFilter = signal<StatusFilter>('ACTIVE');
@@ -174,15 +176,19 @@ export class CustomFieldsPage {
   protected async loadFields(): Promise<void> {
     const seq = ++this.loadSeq;
     this.loading.set(true);
-    this.failed.set(false);
+    this.loadError.set(null);
+    if (!this.canRead()) {
+      this.loadError.set(new ApiError(403, 'CRM_PERMISSION_DENIED'));
+      this.loading.set(false);
+      return;
+    }
     try {
       const items = await listCustomFields();
       if (seq !== this.loadSeq) return;
       this.fields.set(items);
     } catch (error) {
       if (seq !== this.loadSeq) return;
-      this.failed.set(true);
-      this.notify.error(this.resolveError(error));
+      if (!(error instanceof ApiError && error.status === 401)) this.loadError.set(error);
     } finally {
       if (seq === this.loadSeq) {
         this.loading.set(false);
@@ -190,27 +196,8 @@ export class CustomFieldsPage {
     }
   }
 
-  protected onTabKeydown(event: KeyboardEvent): void {
-    const tabs: PageTab[] = ['definitions', 'values'];
-    const currentIdx = tabs.indexOf(this.activeTab());
-    const rtl = this.language() === 'ar';
-    const nextKey = rtl ? 'ArrowLeft' : 'ArrowRight';
-    const prevKey = rtl ? 'ArrowRight' : 'ArrowLeft';
-
-    let nextIdx = -1;
-    if (event.key === nextKey) nextIdx = (currentIdx + 1) % tabs.length;
-    else if (event.key === prevKey) nextIdx = (currentIdx - 1 + tabs.length) % tabs.length;
-    else if (event.key === 'Home') nextIdx = 0;
-    else if (event.key === 'End') nextIdx = tabs.length - 1;
-    else return;
-
-    event.preventDefault();
-    this.activeTab.set(tabs[nextIdx]);
-    this.tabButtons()[nextIdx]?.nativeElement.focus();
-  }
-
   protected openCreate(): void {
-    if (!this.canManage || this.atLimit()) return;
+    if (!this.canManage() || this.atLimit()) return;
     this.fieldModal().openCreate();
   }
 
@@ -277,7 +264,7 @@ export class CustomFieldsPage {
       this.openEdit(field);
       return;
     }
-    if (!this.canManage) return;
+    if (!this.canManage()) return;
     if (selection.id === 'requirements') {
       if (!field.isActive) {
         this.notify.warning(this.transloco.translate('customFields.actions.requirementsArchived'));
@@ -290,20 +277,28 @@ export class CustomFieldsPage {
   }
 
   private async toggleActive(field: CustomField): Promise<void> {
-    if (this.togglingIds().has(field.id)) return;
+    if (!this.canManage() || this.togglingIds().has(field.id)) return;
+    if (field.isActive && !await this.archiveDialog().open()) return;
+    if (!this.canManage() || this.togglingIds().has(field.id)) return;
+    const submission = this.submissions.get(field.id) ?? new CustomFieldSubmission();
+    this.submissions.set(field.id, submission);
     this.setToggling(field.id, true);
     try {
       // PATCH returns the definition only, so keep the requirements already loaded.
       const updated: CustomField = {
-        ...(await updateCustomField(field.id, { isActive: !field.isActive })),
+        ...(await submission.run({ isActive: !field.isActive }, body => updateCustomField(field.id, body))),
         requirements: field.requirements,
       };
+      this.submissions.delete(field.id);
       this.onFieldSaved(updated);
       this.notify.success(
         this.transloco.translate(updated.isActive ? 'customFields.toasts.restored' : 'customFields.toasts.archived'),
       );
     } catch (error) {
-      this.notify.error(this.resolveError(error));
+      const result = customFieldsError(this.transloco, error);
+      if (result.readOnly) this.readOnly.set(true);
+      this.notify.error(result.message);
+      if (error instanceof ApiError && error.status === 404) await this.loadFields();
     } finally {
       this.setToggling(field.id, false);
     }
@@ -318,14 +313,4 @@ export class CustomFieldsPage {
     });
   }
 
-  private resolveError(error: unknown): string {
-    const code = errorCodeOf(error);
-    if (code) {
-      const key = `customFields.errors.${code}`;
-      const translated = this.transloco.translate(key);
-      if (translated !== key) return translated;
-      if (code === 'CUSTOM_FIELD_NOT_FOUND') return this.transloco.translate('settings.errors.notFound');
-    }
-    return this.transloco.translate('settings.errors.generic');
-  }
 }

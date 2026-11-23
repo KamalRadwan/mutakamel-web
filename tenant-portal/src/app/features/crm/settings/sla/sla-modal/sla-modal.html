@@ -80,18 +80,30 @@
         [label]="'sla.form.kind' | transloco"
         [for]="uid + '-kind'"
         [hint]="'sla.form.kindHint' | transloco"
+        [error]="serverFieldError('policyKind')"
         [required]="true"
       >
-        <ui-dropdown
-          [id]="uid + '-kind'"
-          size="field"
-          [label]="'sla.form.kind' | transloco"
-          [describedBy]="uid + '-kind-hint'"
-          [options]="kindOptions()"
-          [value]="policyKind()"
-          [disabled]="lineageLocked()"
-          (valueChange)="onKindChange($event)"
-        />
+        @if (lineageLocked()) {
+          <input
+            [id]="uid + '-kind'"
+            readonly
+            [value]="optionLabel(kindOptions(), policyKind())"
+            [attr.aria-label]="'sla.form.kind' | transloco"
+            [attr.aria-describedby]="uid + '-kind-hint'"
+            class="h-field w-full rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text outline-none"
+          />
+        } @else {
+          <ui-dropdown
+            [id]="uid + '-kind'"
+            size="field"
+            [label]="'sla.form.kind' | transloco"
+            [describedBy]="uid + '-kind-hint'"
+            [options]="kindOptions()"
+            [value]="policyKind()"
+            [disabled]="lineageLocked()"
+            (valueChange)="onKindChange($event)"
+          />
+        }
       </ui-field>
 
       <ui-field
@@ -99,37 +111,70 @@
         [label]="'sla.form.record' | transloco"
         [for]="uid + '-record'"
         [hint]="'sla.form.recordHint' | transloco"
+        [error]="serverFieldError('appliesToRecord')"
         [required]="true"
       >
-        <ui-dropdown
-          [id]="uid + '-record'"
-          size="field"
-          [label]="'sla.form.record' | transloco"
-          [describedBy]="uid + '-record-hint'"
-          [options]="recordOptions()"
-          [value]="appliesToRecord()"
-          [disabled]="lineageLocked()"
-          (valueChange)="onRecordChange($event)"
-        />
+        @if (lineageLocked()) {
+          <input
+            [id]="uid + '-record'"
+            readonly
+            [value]="optionLabel(recordOptions(), appliesToRecord())"
+            [attr.aria-label]="'sla.form.record' | transloco"
+            [attr.aria-describedby]="uid + '-record-hint'"
+            class="h-field w-full rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text outline-none"
+          />
+        } @else {
+          <ui-dropdown
+            [id]="uid + '-record'"
+            size="field"
+            [label]="'sla.form.record' | transloco"
+            [describedBy]="uid + '-record-hint'"
+            [options]="recordOptions()"
+            [value]="appliesToRecord()"
+            [disabled]="lineageLocked()"
+            (valueChange)="onRecordChange($event)"
+          />
+        }
       </ui-field>
 
-      <ui-field
-        size="bare"
-        [label]="'sla.form.branch' | transloco"
-        [for]="uid + '-branch'"
-        [hint]="'sla.form.branchHint' | transloco"
-      >
-        <ui-dropdown
-          [id]="uid + '-branch'"
-          size="field"
+      @if (canChooseBranch || isEdit()) {
+        <ui-field
+          size="bare"
           [label]="'sla.form.branch' | transloco"
-          [describedBy]="uid + '-branch-hint'"
-          [options]="branchOptions()"
-          [value]="branchKey()"
-          [disabled]="lineageLocked()"
-          (valueChange)="onBranchChange($event)"
-        />
-      </ui-field>
+          [for]="uid + '-branch'"
+          [hint]="'sla.form.branchHint' | transloco"
+          [error]="branchError()"
+        >
+          @if (lineageLocked()) {
+            <input
+              [id]="uid + '-branch'"
+              readonly
+              [value]="branchDisplay()"
+              [attr.aria-describedby]="
+                uid + '-branch-hint' + (branchError() ? ' ' + uid + '-branch-error' : '')
+              "
+              class="h-field w-full rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text outline-none"
+            />
+          } @else {
+            <ui-dropdown
+              [id]="uid + '-branch'"
+              size="field"
+              [label]="'sla.form.branch' | transloco"
+              [describedBy]="
+                uid + '-branch-hint' + (branchError() ? ' ' + uid + '-branch-error' : '')
+              "
+              [options]="branchOptions()"
+              [value]="branchKey()"
+              [disabled]="lineageLocked()"
+              (valueChange)="onBranchChange($event)"
+            />
+          }
+        </ui-field>
+      } @else {
+        <p class="text-12 text-text-muted">
+          {{ 'sla.errors.branchLookupUnavailable' | transloco }}
+        </p>
+      }
 
       <!-- Row 3: Clock + Target -->
       <ui-field
@@ -137,18 +182,30 @@
         [label]="'sla.form.clockKind' | transloco"
         [for]="uid + '-clock-kind'"
         [hint]="'sla.form.clockKindHint' | transloco"
+        [error]="serverFieldError('clockKind')"
         [required]="true"
       >
-        <ui-dropdown
-          [id]="uid + '-clock-kind'"
-          size="field"
-          [label]="'sla.form.clockKind' | transloco"
-          [describedBy]="uid + '-clock-kind-hint'"
-          [options]="clockKindOptions()"
-          [value]="clockKind()"
-          [disabled]="readOnly() || policyKind() === 'FOLLOW_UP_CADENCE'"
-          (valueChange)="onClockKindChange($event)"
-        />
+        @if (readOnly() || policyKind() === 'FOLLOW_UP_CADENCE') {
+          <input
+            [id]="uid + '-clock-kind'"
+            readonly
+            [value]="optionLabel(clockKindOptions(), clockKind())"
+            [attr.aria-label]="'sla.form.clockKind' | transloco"
+            [attr.aria-describedby]="uid + '-clock-kind-hint'"
+            class="h-field w-full rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text outline-none"
+          />
+        } @else {
+          <ui-dropdown
+            [id]="uid + '-clock-kind'"
+            size="field"
+            [label]="'sla.form.clockKind' | transloco"
+            [describedBy]="uid + '-clock-kind-hint'"
+            [options]="clockKindOptions()"
+            [value]="clockKind()"
+            [disabled]="readOnly() || policyKind() === 'FOLLOW_UP_CADENCE'"
+            (valueChange)="onClockKindChange($event)"
+          />
+        }
       </ui-field>
 
       <div class="col-span-2">
@@ -179,22 +236,34 @@
                 [readOnly]="readOnly()"
                 [attr.aria-readonly]="readOnly() ? 'true' : null"
                 [attr.aria-invalid]="targetError() ? 'true' : null"
-                [attr.aria-describedby]="uid + '-target-hint' + (targetError() ? ' ' + uid + '-target-error' : '')"
+                [attr.aria-describedby]="
+                  uid + '-target-hint' + (targetError() ? ' ' + uid + '-target-error' : '')
+                "
                 (input)="onTargetInput($event)"
                 (blur)="markTouched('target')"
               />
             </div>
 
             <div class="w-preset shrink-0">
-              <ui-dropdown
-                size="field"
-                [label]="'sla.form.targetUnit' | transloco"
-                [describedBy]="uid + '-target-hint'"
-                [options]="targetUnitOptions()"
-                [value]="targetUnit()"
-                [disabled]="readOnly()"
-                (valueChange)="targetUnit.set($event)"
-              />
+              @if (readOnly()) {
+                <input
+                  readonly
+                  [value]="optionLabel(targetUnitOptions(), targetUnit())"
+                  [attr.aria-label]="'sla.form.targetUnit' | transloco"
+                  [attr.aria-describedby]="uid + '-target-hint'"
+                  class="h-field w-full rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text outline-none"
+                />
+              } @else {
+                <ui-dropdown
+                  size="field"
+                  [label]="'sla.form.targetUnit' | transloco"
+                  [describedBy]="uid + '-target-hint'"
+                  [options]="targetUnitOptions()"
+                  [value]="targetUnit()"
+                  [disabled]="readOnly()"
+                  (valueChange)="targetUnit.set($event)"
+                />
+              }
             </div>
           </div>
         </ui-field>
@@ -256,17 +325,29 @@
         [label]="'sla.form.qualifyingTouchBy' | transloco"
         [for]="uid + '-touch-by'"
         [hint]="'sla.form.qualifyingTouchByHint' | transloco"
+        [error]="serverFieldError('qualifyingTouchBy')"
       >
-        <ui-dropdown
-          [id]="uid + '-touch-by'"
-          size="field"
-          [label]="'sla.form.qualifyingTouchBy' | transloco"
-          [describedBy]="uid + '-touch-by-hint'"
-          [options]="touchByOptions()"
-          [value]="qualifyingTouchBy()"
-          [disabled]="readOnly()"
-          (valueChange)="qualifyingTouchBy.set($event)"
-        />
+        @if (readOnly()) {
+          <input
+            [id]="uid + '-touch-by'"
+            readonly
+            [value]="optionLabel(touchByOptions(), qualifyingTouchBy())"
+            [attr.aria-label]="'sla.form.qualifyingTouchBy' | transloco"
+            [attr.aria-describedby]="uid + '-touch-by-hint'"
+            class="h-field w-full rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text outline-none"
+          />
+        } @else {
+          <ui-dropdown
+            [id]="uid + '-touch-by'"
+            size="field"
+            [label]="'sla.form.qualifyingTouchBy' | transloco"
+            [describedBy]="uid + '-touch-by-hint'"
+            [options]="touchByOptions()"
+            [value]="qualifyingTouchBy()"
+            [disabled]="readOnly()"
+            (valueChange)="qualifyingTouchBy.set($event)"
+          />
+        }
       </ui-field>
 
       <ui-field
@@ -277,19 +358,33 @@
         [required]="true"
         [error]="effectiveFromError()"
       >
-        <ui-date-field
-          [id]="uid + '-effective-from'"
-          [ariaLabel]="'sla.form.effectiveFrom' | transloco"
-          [describedBy]="uid + '-effective-from-hint' + (effectiveFromError() ? ' ' + uid + '-effective-from-error' : '')"
-          [min]="readOnly() ? null : todayIso"
-          [todayLabel]="'sla.form.today' | transloco"
-          [prevMonthLabel]="'sla.form.prevMonth' | transloco"
-          [nextMonthLabel]="'sla.form.nextMonth' | transloco"
-          [invalid]="!!effectiveFromError()"
-          [disabled]="readOnly()"
-          [value]="effectiveFrom()"
-          (valueChange)="onEffectiveFromChange($event)"
-        />
+        @if (readOnly()) {
+          <input
+            [id]="uid + '-effective-from'"
+            readonly
+            [value]="effectiveDateDisplay()"
+            [attr.aria-describedby]="uid + '-effective-from-hint'"
+            class="h-field w-full rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text outline-none"
+          />
+        } @else {
+          <ui-date-field
+            [id]="uid + '-effective-from'"
+            [ariaLabel]="'sla.form.effectiveFrom' | transloco"
+            [describedBy]="
+              uid +
+              '-effective-from-hint' +
+              (effectiveFromError() ? ' ' + uid + '-effective-from-error' : '')
+            "
+            [min]="readOnly() ? null : todayIso"
+            [todayLabel]="'sla.form.today' | transloco"
+            [prevMonthLabel]="'sla.form.prevMonth' | transloco"
+            [nextMonthLabel]="'sla.form.nextMonth' | transloco"
+            [invalid]="!!effectiveFromError()"
+            [disabled]="readOnly()"
+            [value]="effectiveFrom()"
+            (valueChange)="onEffectiveFromChange($event)"
+          />
+        }
       </ui-field>
 
       <ui-field
@@ -297,18 +392,30 @@
         [label]="'sla.form.state' | transloco"
         [for]="uid + '-state'"
         [hint]="'sla.form.stateHint' | transloco"
+        [error]="serverFieldError('state')"
         [required]="true"
       >
-        <ui-dropdown
-          [id]="uid + '-state'"
-          size="field"
-          [label]="'sla.form.state' | transloco"
-          [describedBy]="uid + '-state-hint'"
-          [options]="stateOptions()"
-          [value]="policyState()"
-          [disabled]="readOnly()"
-          (valueChange)="policyState.set($event)"
-        />
+        @if (readOnly()) {
+          <input
+            [id]="uid + '-state'"
+            readonly
+            [value]="optionLabel(stateOptions(), policyState())"
+            [attr.aria-label]="'sla.form.state' | transloco"
+            [attr.aria-describedby]="uid + '-state-hint'"
+            class="h-field w-full rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text outline-none"
+          />
+        } @else {
+          <ui-dropdown
+            [id]="uid + '-state'"
+            size="field"
+            [label]="'sla.form.state' | transloco"
+            [describedBy]="uid + '-state-hint'"
+            [options]="stateOptions()"
+            [value]="policyState()"
+            [disabled]="readOnly()"
+            (valueChange)="policyState.set($event)"
+          />
+        }
       </ui-field>
 
       <!-- Row 6: Qualifying multi-select chip groups -->
@@ -318,6 +425,7 @@
           [label]="'sla.form.activityTypes' | transloco"
           [for]="uid + '-activity-types'"
           [hint]="'sla.form.activityTypesHint' | transloco"
+          [error]="serverFieldError('qualifying.activityTypes')"
         >
           <div
             [id]="uid + '-activity-types'"
@@ -350,77 +458,79 @@
       </div>
 
       @if (showTouchFilters()) {
-      <div class="col-span-3 grid grid-cols-2 gap-x-10">
-        <ui-field
-          size="bare"
-          [label]="'sla.form.directions' | transloco"
-          [for]="uid + '-directions'"
-          [hint]="'sla.form.directionsHint' | transloco"
-        >
-          <div
-            [id]="uid + '-directions'"
-            role="group"
-            class="flex flex-wrap gap-4 rounded-8 border border-border-field bg-surface-field p-4"
-            [attr.aria-label]="'sla.form.directions' | transloco"
-            [attr.aria-describedby]="uid + '-directions-hint'"
+        <div class="col-span-3 grid grid-cols-2 gap-x-10">
+          <ui-field
+            size="bare"
+            [label]="'sla.form.directions' | transloco"
+            [for]="uid + '-directions'"
+            [hint]="'sla.form.directionsHint' | transloco"
+            [error]="serverFieldError('qualifying.directions')"
           >
-            @for (dir of directionOptions; track dir) {
-              @let selected = directions().includes(dir);
-              <button
-                type="button"
-                class="inline-flex h-chip items-center rounded-6 border px-6 text-11 font-medium outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
-                [class]="
-                  (selected
-                    ? 'border-brand bg-brand-soft text-on-brand-soft'
-                    : 'border-border-field bg-surface text-text hover:bg-row-hover') +
-                  ' ' +
-                  (readOnly() ? 'cursor-default' : 'cursor-pointer')
-                "
-                [attr.aria-pressed]="selected"
-                [attr.aria-disabled]="readOnly() ? 'true' : null"
-                (click)="toggleDirection(dir)"
-              >
-                {{ 'sla.direction.' + dir | transloco }}
-              </button>
-            }
-          </div>
-        </ui-field>
+            <div
+              [id]="uid + '-directions'"
+              role="group"
+              class="flex flex-wrap gap-4 rounded-8 border border-border-field bg-surface-field p-4"
+              [attr.aria-label]="'sla.form.directions' | transloco"
+              [attr.aria-describedby]="uid + '-directions-hint'"
+            >
+              @for (dir of directionOptions; track dir) {
+                @let selected = directions().includes(dir);
+                <button
+                  type="button"
+                  class="inline-flex h-chip items-center rounded-6 border px-6 text-11 font-medium outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  [class]="
+                    (selected
+                      ? 'border-brand bg-brand-soft text-on-brand-soft'
+                      : 'border-border-field bg-surface text-text hover:bg-row-hover') +
+                    ' ' +
+                    (readOnly() ? 'cursor-default' : 'cursor-pointer')
+                  "
+                  [attr.aria-pressed]="selected"
+                  [attr.aria-disabled]="readOnly() ? 'true' : null"
+                  (click)="toggleDirection(dir)"
+                >
+                  {{ 'sla.direction.' + dir | transloco }}
+                </button>
+              }
+            </div>
+          </ui-field>
 
-        <ui-field
-          size="bare"
-          [label]="'sla.form.touchSources' | transloco"
-          [for]="uid + '-touch-sources'"
-          [hint]="'sla.form.touchSourcesHint' | transloco"
-        >
-          <div
-            [id]="uid + '-touch-sources'"
-            role="group"
-            class="flex flex-wrap gap-4 rounded-8 border border-border-field bg-surface-field p-4"
-            [attr.aria-label]="'sla.form.touchSources' | transloco"
-            [attr.aria-describedby]="uid + '-touch-sources-hint'"
+          <ui-field
+            size="bare"
+            [label]="'sla.form.touchSources' | transloco"
+            [for]="uid + '-touch-sources'"
+            [hint]="'sla.form.touchSourcesHint' | transloco"
+            [error]="serverFieldError('qualifying.touchSources')"
           >
-            @for (src of touchSourceOptions; track src) {
-              @let selected = touchSources().includes(src);
-              <button
-                type="button"
-                class="inline-flex h-chip items-center rounded-6 border px-6 text-11 font-medium outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
-                [class]="
-                  (selected
-                    ? 'border-brand bg-brand-soft text-on-brand-soft'
-                    : 'border-border-field bg-surface text-text hover:bg-row-hover') +
-                  ' ' +
-                  (readOnly() ? 'cursor-default' : 'cursor-pointer')
-                "
-                [attr.aria-pressed]="selected"
-                [attr.aria-disabled]="readOnly() ? 'true' : null"
-                (click)="toggleTouchSource(src)"
-              >
-                {{ 'sla.touchSource.' + src | transloco }}
-              </button>
-            }
-          </div>
-        </ui-field>
-      </div>
+            <div
+              [id]="uid + '-touch-sources'"
+              role="group"
+              class="flex flex-wrap gap-4 rounded-8 border border-border-field bg-surface-field p-4"
+              [attr.aria-label]="'sla.form.touchSources' | transloco"
+              [attr.aria-describedby]="uid + '-touch-sources-hint'"
+            >
+              @for (src of touchSourceOptions; track src) {
+                @let selected = touchSources().includes(src);
+                <button
+                  type="button"
+                  class="inline-flex h-chip items-center rounded-6 border px-6 text-11 font-medium outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  [class]="
+                    (selected
+                      ? 'border-brand bg-brand-soft text-on-brand-soft'
+                      : 'border-border-field bg-surface text-text hover:bg-row-hover') +
+                    ' ' +
+                    (readOnly() ? 'cursor-default' : 'cursor-pointer')
+                  "
+                  [attr.aria-pressed]="selected"
+                  [attr.aria-disabled]="readOnly() ? 'true' : null"
+                  (click)="toggleTouchSource(src)"
+                >
+                  {{ 'sla.touchSource.' + src | transloco }}
+                </button>
+              }
+            </div>
+          </ui-field>
+        </div>
       }
     </div>
 
@@ -433,7 +543,11 @@
           [for]="uid + '-meta-version'"
           [hint]="'sla.meta.versionHint' | transloco"
         >
-          <dd [id]="uid + '-meta-version'" class="text-12 leading-18 font-medium text-text">
+          <dd
+            [id]="uid + '-meta-version'"
+            [attr.aria-describedby]="uid + '-meta-version-hint'"
+            class="text-12 leading-18 font-medium text-text"
+          >
             <bdi dir="ltr">v{{ displayVersionNumber() }}</bdi>
           </dd>
         </ui-field>
@@ -446,7 +560,11 @@
           [for]="uid + '-meta-start'"
           [hint]="'sla.meta.startEventHint' | transloco"
         >
-          <dd [id]="uid + '-meta-start'" class="text-12 leading-18 font-medium text-text">
+          <dd
+            [id]="uid + '-meta-start'"
+            [attr.aria-describedby]="uid + '-meta-start-hint'"
+            class="text-12 leading-18 font-medium text-text"
+          >
             {{ startEventKey() | transloco }}
           </dd>
         </ui-field>
@@ -459,7 +577,11 @@
           [for]="uid + '-meta-fact'"
           [hint]="'sla.meta.qualifyingFactHint' | transloco"
         >
-          <dd [id]="uid + '-meta-fact'" class="text-12 leading-18 font-medium text-text">
+          <dd
+            [id]="uid + '-meta-fact'"
+            [attr.aria-describedby]="uid + '-meta-fact-hint'"
+            class="text-12 leading-18 font-medium text-text"
+          >
             {{ qualifyingFactKey() | transloco }}
           </dd>
         </ui-field>
@@ -472,7 +594,11 @@
           [for]="uid + '-meta-supersedes'"
           [hint]="'sla.meta.supersedesHint' | transloco"
         >
-          <dd [id]="uid + '-meta-supersedes'" class="text-12 leading-18 font-medium text-text">
+          <dd
+            [id]="uid + '-meta-supersedes'"
+            [attr.aria-describedby]="uid + '-meta-supersedes-hint'"
+            class="text-12 leading-18 font-medium text-text"
+          >
             <bdi dir="ltr">{{ supersedesDisplay() }}</bdi>
           </dd>
         </ui-field>
@@ -480,27 +606,38 @@
     </dl>
 
     <!-- Try the clock section -->
-    @if (canManage()) {
-      <section class="flex flex-col gap-8 border-t border-border pt-8" [attr.aria-label]="'sla.clock.sectionTitle' | transloco">
-        <h3 class="text-13 leading-18 font-medium text-text">{{ 'sla.clock.sectionTitle' | transloco }}</h3>
+    @if (previewAllowed()) {
+      <section
+        class="flex flex-col gap-8 border-t border-border pt-8"
+        [attr.aria-label]="'sla.clock.sectionTitle' | transloco"
+      >
+        <h3 class="text-13 leading-18 font-medium text-text">
+          {{ 'sla.clock.sectionTitle' | transloco }}
+        </h3>
 
         <div class="grid grid-cols-3 gap-x-10 gap-y-8">
-          <ui-field
-            size="bare"
-            [label]="'sla.clock.branch' | transloco"
-            [for]="uid + '-clock-branch'"
-            [hint]="'sla.clock.branchHint' | transloco"
-          >
-            <ui-dropdown
-              [id]="uid + '-clock-branch'"
-              size="field"
+          @if (canChooseBranch) {
+            <ui-field
+              size="bare"
               [label]="'sla.clock.branch' | transloco"
-              [describedBy]="uid + '-clock-branch-hint'"
-              [options]="previewBranchOptions()"
-              [value]="clockBranchId()"
-              (valueChange)="clockBranchId.set($event)"
-            />
-          </ui-field>
+              [for]="uid + '-clock-branch'"
+              [hint]="'sla.clock.branchHint' | transloco"
+            >
+              <ui-dropdown
+                [id]="uid + '-clock-branch'"
+                size="field"
+                [label]="'sla.clock.branch' | transloco"
+                [describedBy]="uid + '-clock-branch-hint'"
+                [options]="previewBranchOptions()"
+                [value]="clockBranchId()"
+                (valueChange)="clockBranchId.set($event)"
+              />
+            </ui-field>
+          } @else {
+            <p class="text-12 text-text-muted">
+              {{ 'sla.errors.branchLookupUnavailable' | transloco }}
+            </p>
+          }
 
           <div class="col-span-2">
             <ui-field
@@ -515,7 +652,11 @@
                   <ui-date-field
                     [id]="uid + '-clock-date'"
                     [ariaLabel]="'sla.clock.from' | transloco"
-                    [describedBy]="uid + '-clock-date-hint' + (clockFromError() ? ' ' + uid + '-clock-date-error' : '')"
+                    [describedBy]="
+                      uid +
+                      '-clock-date-hint' +
+                      (clockFromError() ? ' ' + uid + '-clock-date-error' : '')
+                    "
                     [todayLabel]="'sla.form.today' | transloco"
                     [prevMonthLabel]="'sla.form.prevMonth' | transloco"
                     [nextMonthLabel]="'sla.form.nextMonth' | transloco"
@@ -527,7 +668,11 @@
                 <ui-time-field
                   [id]="uid + '-clock-time'"
                   [ariaLabel]="'sla.clock.from' | transloco"
-                  [describedBy]="uid + '-clock-date-hint' + (clockFromError() ? ' ' + uid + '-clock-date-error' : '')"
+                  [describedBy]="
+                    uid +
+                    '-clock-date-hint' +
+                    (clockFromError() ? ' ' + uid + '-clock-date-error' : '')
+                  "
                   [hourLabel]="'sla.form.hour' | transloco"
                   [minuteLabel]="'sla.form.minute' | transloco"
                   [invalid]="!!clockFromError()"
@@ -582,6 +727,7 @@
                 variant="secondary"
                 size="small"
                 [loading]="clockBusy()"
+                [disabled]="!canChooseBranch || !clockBranchId()"
                 (click)="calculateClock()"
               >
                 {{ 'sla.clock.calculate' | transloco }}
@@ -589,6 +735,11 @@
             </div>
           </div>
         </div>
+        @if (clockMissingReason()) {
+          <a uiButton variant="ghost" size="small" routerLink="/crm/settings/calendars">
+            {{ 'sla.errors.openCalendars' | transloco }}
+          </a>
+        }
       </section>
     }
   </form>
@@ -600,23 +751,19 @@
         uiButton
         variant="primary"
         [loading]="saving()"
-        [disabled]="isEdit() ? !dirty() : false"
+        [disabled]="resolvingConflict() || conflictOpen() || (isEdit() ? !dirty() : false)"
         (click)="publish()"
       >
         {{ 'sla.modal.publishVersion' | transloco }}
       </button>
 
       @if (dirty()) {
-        <button
-          type="button"
-          uiButton
-          variant="secondary"
-          [disabled]="saving()"
-          (click)="undo()"
-        >
+        <button type="button" uiButton variant="secondary" [disabled]="saving()" (click)="undo()">
           {{ 'settings.common.undo' | transloco }}
         </button>
-        <span class="text-12 leading-18 text-text-muted">{{ 'settings.common.unsaved' | transloco }}</span>
+        <span class="text-12 leading-18 text-text-muted">{{
+          'settings.common.unsaved' | transloco
+        }}</span>
       }
     }
 
@@ -641,11 +788,8 @@
   [cancelLabel]="'sla.modal.discardKeep' | transloco"
 />
 
-<ui-confirm-dialog
-  #conflictDialog
-  tone="warning"
-  [title]="'analytics.common.conflictTitle' | transloco"
-  [text]="'analytics.common.conflictText' | transloco"
-  [confirmLabel]="'analytics.common.reload' | transloco"
-  [cancelLabel]="'analytics.common.keepMine' | transloco"
+<ui-conflict-dialog
+  [(open)]="conflictOpen"
+  (reload)="resolveConflict(true)"
+  (keepEditing)="resolveConflict(false)"
 />

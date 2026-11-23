@@ -1,435 +1,202 @@
+import { DOCUMENT } from '@angular/common';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, FAKE_FAIL, FAKE_NOW } from '../../../../shared/widgets/dashboard/analytics-api';
-import { bindAnalyticsPermissions } from '../../../../shared/widgets/dashboard/analytics-permissions';
-import { ANALYTICS_PERMISSIONS_FIXTURE } from '../../../../shared/widgets/dashboard/analytics-permissions.fixture';
-import { FAKE_BRANCHES } from '../../../../shared/widgets/dashboard/fake/fake-org';
+import { CrmHttp, bindCrmHttpForTest, crmQueries } from '../../shared/crm-http';
 import { getCalendar, publishCalendar } from './calendars.api';
 import {
-  DEFAULT_TIME_ZONE,
-  DEFAULT_WEEKDAY_MASK,
-  PublishWorkingCalendarRequest,
   CALENDAR_TIME_ZONES,
+  DEFAULT_WEEKDAY_MASK,
   MAX_WINDOW_LABEL_LENGTH,
   buildWorkingDaysForYear,
   daysInYear,
   isValidIanaTimeZone,
   windowsOverlap,
+  type PublishWorkingCalendarRequest,
 } from './calendars.model';
 
-/** Runs the fake timers to completion and returns (or rethrows) the settled result. */
-async function settle<T>(promise: Promise<T>): Promise<T> {
-  const guarded = promise.then(
-    (value) => ({ ok: true as const, value }),
-    (error: unknown) => ({ ok: false as const, error }),
-  );
-  await vi.runAllTimersAsync();
-  const result = await guarded;
-  if (!result.ok) throw result.error;
-  return result.value;
-}
-
-async function errorOf(promise: Promise<unknown>): Promise<ApiError | undefined> {
-  try {
-    await settle(promise);
-    return undefined;
-  } catch (error) {
-    return error instanceof ApiError ? error : undefined;
-  }
-}
-
-/** Runs `work` with the given permission keys removed, then restores them. */
-async function withoutPermissions<T>(keys: readonly string[], work: () => Promise<T>): Promise<T> {
-  bindAnalyticsPermissions(() => ANALYTICS_PERMISSIONS_FIXTURE.filter((key) => !keys.includes(key)));
-  try {
-    return await work();
-  } finally {
-    bindAnalyticsPermissions(() => ANALYTICS_PERMISSIONS_FIXTURE);
-  }
-}
-
-beforeEach(() => bindAnalyticsPermissions(() => ANALYTICS_PERMISSIONS_FIXTURE));
-afterEach(() => bindAnalyticsPermissions(() => []));
-
-const CAIRO = FAKE_BRANCHES[0].id;
-const ALEX = FAKE_BRANCHES[1].id;
-const GIZA = FAKE_BRANCHES[2].id;
-
-function body(year: number, patch: Partial<PublishWorkingCalendarRequest> = {}): PublishWorkingCalendarRequest {
+const BRANCH = '01934b10-0000-7000-8000-000000000901';
+const uuidV7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+function body(year = 2026): PublishWorkingCalendarRequest {
   return {
     expectedRevision: 0,
     workingDays: buildWorkingDaysForYear(year, DEFAULT_WEEKDAY_MASK),
     workdayStartMinute: 540,
     workdayEndMinute: 1020,
-    timeZone: DEFAULT_TIME_ZONE,
+    timeZone: 'Asia/Riyadh',
     windows: [],
-    ...patch,
   };
 }
 
-describe('calendars contract (crm dashboards working-calendars)', () => {
-  beforeEach(() => vi.useFakeTimers());
-  afterEach(() => {
-    FAKE_FAIL.nextCall = false;
-    vi.useRealTimers();
-  });
+// Replaces fake-store/permission/validation assertions with the real HTTP boundary.
+for (const language of ['en', 'ar'])
+  for (const theme of ['light', 'dark']) {
+    describe(`CalendarsApi (${language}, ${theme})`, () => {
+      let http: HttpTestingController;
+      let dispose: () => void;
+      const url = (year = 2026) => `/api/tenant/crm/v1/targets/working-calendars/${BRANCH}/${year}`;
+      beforeEach(() => {
+        TestBed.configureTestingModule({
+          providers: [provideHttpClient(), provideHttpClientTesting()],
+        });
+        const doc = TestBed.inject(DOCUMENT);
+        doc.documentElement.lang = language;
+        doc.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
+        doc.documentElement.setAttribute('data-theme', theme);
+        const name =
+          doc.location.protocol === 'https:'
+            ? '__Host-mutakamel-tenant-csrf'
+            : 'mutakamel-http-tenant-csrf';
+        vi.spyOn(doc, 'cookie', 'get').mockReturnValue(`${name}=csrf-calendars`);
+        dispose = bindCrmHttpForTest(TestBed.inject(CrmHttp));
+        http = TestBed.inject(HttpTestingController);
+      });
+      afterEach(() => {
+        http.verify();
+        crmQueries().clear();
+        dispose();
+        vi.restoreAllMocks();
+        document.documentElement.removeAttribute('lang');
+        document.documentElement.removeAttribute('dir');
+        document.documentElement.removeAttribute('data-theme');
+      });
 
-  describe('GET targets/working-calendars/:branchId/:year', () => {
-    it('returns the bare WorkingCalendar body of a published calendar', async () => {
-      const calendar = await settle(getCalendar(CAIRO, 2026));
-      expect(calendar).toEqual({
-        branchId: CAIRO,
-        calendarYear: 2026,
-        revision: 2,
-        workingDays: expect.stringMatching(/^[01]{365}$/),
-        publishedAt: '2026-01-05T08:00:00.000Z',
-        workdayStartMinute: 540,
-        workdayEndMinute: 1020,
-        timeZone: 'Africa/Cairo',
-        windows: [
-          {
-            windowNo: 1,
+      it('sends no scope headers', async () => {
+        const read = getCalendar(BRANCH, 2026);
+        const get = http.expectOne(url());
+        expect(get.request.headers.keys().filter((key) => key.startsWith('x-mutakamel-'))).toEqual(
+          [],
+        );
+        get.flush({ branchId: BRANCH, revision: 0 });
+        await read;
+        const write = publishCalendar(BRANCH, 2026, body());
+        const post = http.expectOne(url());
+        expect(post.request.headers.keys().filter((key) => key.startsWith('x-mutakamel-'))).toEqual(
+          [],
+        );
+        expect(post.request.headers.get('x-idempotency-key')).toMatch(uuidV7);
+        expect(post.request.headers.get('x-csrf-token')).toBe('csrf-calendars');
+        post.flush({ revision: 1 }, { status: 201, statusText: 'Created' });
+        await write;
+      });
+
+      it('first publish sends revision 0', async () => {
+        const pending = publishCalendar(BRANCH, 2026, body());
+        const request = http.expectOne(url());
+        expect(request.request.method).toBe('POST');
+        expect(request.request.body.expectedRevision).toBe(0);
+        expect(request.request.body).toEqual(body());
+        request.flush({ revision: 1 }, { status: 201, statusText: 'Created' });
+        await expect(pending).resolves.toEqual({ revision: 1 });
+      });
+
+      it('workingDays length follows the year', async () => {
+        for (const year of [2026, 2028]) {
+          const pending = publishCalendar(BRANCH, year, body(year));
+          const request = http.expectOne(url(year));
+          expect(request.request.body.workingDays).toHaveLength(daysInYear(year));
+          expect(request.request.body.workingDays).toMatch(/^[01]+$/);
+          request.flush({ revision: 1 }, { status: 201, statusText: 'Created' });
+          await pending;
+        }
+      });
+
+      it.each([0, 503, 401, 409])(
+        'reuses the same body and UUID v7 after retryable status %s or session recovery',
+        async (status) => {
+          const payload = body();
+          const first = publishCalendar(BRANCH, 2026, payload);
+          const rejected = expect(first).rejects.toMatchObject({ status });
+          const request = http.expectOne(url());
+          const key = request.request.headers.get('x-idempotency-key');
+          expect(key).toMatch(uuidV7);
+          if (status === 0) request.error(new ProgressEvent('error'));
+          else
+            request.flush(
+              { code: status === 409 ? 'GW.IDEM.IN_FLIGHT' : 'TEST_FAILURE' },
+              { status, statusText: 'Failed' },
+            );
+          await rejected;
+          http.expectNone(url());
+          const retry = publishCalendar(BRANCH, 2026, payload);
+          const next = http.expectOne(url());
+          expect(next.request.headers.get('x-idempotency-key')).toBe(key);
+          expect(next.request.body).toEqual(payload);
+          next.flush({ revision: 2 }, { status: 201, statusText: 'Created' });
+          await retry;
+        },
+      );
+
+      it.each([503, 422])('uses a new key for a changed body after %s', async (status) => {
+        const pending = publishCalendar(BRANCH, 2026, body());
+        const rejected = expect(pending).rejects.toMatchObject({ status });
+        const first = http.expectOne(url());
+        const key = first.request.headers.get('x-idempotency-key');
+        first.flush({ errorCode: 'TEST_FAILURE' }, { status, statusText: 'Failed' });
+        await rejected;
+        const changed = { ...body(), workdayEndMinute: 900 };
+        const retry = publishCalendar(BRANCH, 2026, changed);
+        const request = http.expectOne(url());
+        expect(request.request.headers.get('x-idempotency-key')).not.toBe(key);
+        expect(request.request.body).toEqual(changed);
+        request.flush({ revision: 2 }, { status: 201, statusText: 'Created' });
+        await retry;
+      });
+
+      it('does not reuse a completed or rejected action key', async () => {
+        const keys: (string | null)[] = [];
+        for (const status of [422, 201, 201]) {
+          const pending = publishCalendar(BRANCH, 2026, body());
+          const result =
+            status === 422 ? expect(pending).rejects.toMatchObject({ status }) : pending;
+          const request = http.expectOne(url());
+          keys.push(request.request.headers.get('x-idempotency-key'));
+          request.flush({ revision: 1 }, { status, statusText: 'Result' });
+          await result;
+        }
+        expect(new Set(keys).size).toBe(3);
+      });
+
+      it('cancels and invalidates calendar queries only after a successful write', async () => {
+        const cancel = vi.spyOn(crmQueries(), 'cancelQueries');
+        const invalidate = vi.spyOn(crmQueries(), 'invalidateQueries');
+        const pending = publishCalendar(BRANCH, 2026, body());
+        http.expectOne(url()).flush({ revision: 3 }, { status: 201, statusText: 'Created' });
+        await pending;
+        expect(cancel).toHaveBeenCalledWith({ queryKey: ['crm-settings', 'calendars'] });
+        expect(invalidate).toHaveBeenCalledWith({ queryKey: ['crm-settings', 'calendars'] });
+      });
+
+      describe('model rules shared with the backend', () => {
+        it('limits labels to 80 and offers only region zones', () => {
+          expect(MAX_WINDOW_LABEL_LENGTH).toBe(80);
+          expect(CALENDAR_TIME_ZONES.every((zone) => isValidIanaTimeZone(zone))).toBe(true);
+          expect(isValidIanaTimeZone('UTC')).toBe(false);
+        });
+
+        it('treats windows as overlapping when masks share a bit, even if that weekday misses the shared dates', () => {
+          // 2027-01-03 is a Sunday; the windows share only that date, and the shared mask bit is Monday.
+          const a = {
             layer: 1,
-            validFrom: '2026-02-18',
-            validTo: '2026-03-19',
-            weekdayMask: DEFAULT_WEEKDAY_MASK,
-            startMinute: 540,
-            endMinute: 870,
-            label: 'Ramadan hours',
-          },
-        ],
-      });
-      expect(calendar).not.toHaveProperty('data');
-    });
-
-    it('returns a copy, so editing the result never changes the store', async () => {
-      const first = await settle(getCalendar(CAIRO, 2026));
-      first.windows.length = 0;
-      first.revision = 99;
-      const second = await settle(getCalendar(CAIRO, 2026));
-      expect(second.revision).toBe(2);
-      expect(second.windows).toHaveLength(1);
-    });
-
-    it('answers a year with no calendar with revision 0 and no publish time', async () => {
-      const calendar = await settle(getCalendar(GIZA, 2027));
-      expect(calendar.branchId).toBe(GIZA);
-      expect(calendar.calendarYear).toBe(2027);
-      expect(calendar.revision).toBe(0);
-      expect(calendar.publishedAt).toBeNull();
-      expect(calendar.windows).toEqual([]);
-    });
-
-    // Backend WorkingCalendarService.view: workingDays, hours and timeZone are null until the first publish.
-    it('an unpublished calendar has null workingDays, hours and timeZone', async () => {
-      const calendar = await settle(getCalendar(GIZA, 2025));
-      expect(calendar.workingDays).toBeNull();
-      expect(calendar.workdayStartMinute).toBeNull();
-      expect(calendar.workdayEndMinute).toBeNull();
-      expect(calendar.timeZone).toBeNull();
-    });
-
-    it('accepts any year from 2000 through 2100 and rejects others in the ValidationPipe (400 year: matches)', async () => {
-      const far = await settle(getCalendar(CAIRO, 2031));
-      expect(far.revision).toBe(0);
-      const year = await errorOf(getCalendar(CAIRO, 1999));
-      expect(year?.status).toBe(400);
-      expect(year?.code).toBe('CRM_VALIDATION_FAILED');
-      expect(year?.details).toEqual({ year: ['matches'] });
-    });
-
-    it('answers a branch the actor cannot reach with 403 BRANCH_PERMISSION_DENIED', async () => {
-      const error = await errorOf(getCalendar('01934b10-0000-7000-8000-0000000009ff', 2026));
-      expect(error?.status).toBe(403);
-      expect(error?.code).toBe('BRANCH_PERMISSION_DENIED');
-    });
-
-    // Backend DashboardWorkingCalendarParamsDto: branchId is @IsUUID('7'), so the ValidationPipe answers first.
-    it('a malformed branch id is 400 CRM_VALIDATION_FAILED keyed by branchId', async () => {
-      const error = await errorOf(getCalendar('not-a-uuid', 2026));
-      expect(error?.status).toBe(400);
-      expect(error?.code).toBe('CRM_VALIDATION_FAILED');
-      expect(Object.keys(error?.details ?? {})).toEqual(['branchId']);
-    });
-
-    it('needs crm.targets.read or crm.sla.manage (403)', async () => {
-      const error = await withoutPermissions(['crm.targets.read.all', 'crm.sla.manage'], () =>
-        errorOf(getCalendar(CAIRO, 2026)),
-      );
-      expect(error?.status).toBe(403);
-    });
-
-    // Backend assertBranchGrant throws 403 BRANCH_PERMISSION_DENIED.
-    it('a missing branch grant is 403 BRANCH_PERMISSION_DENIED', async () => {
-      const error = await withoutPermissions(['crm.targets.read.all', 'crm.sla.manage'], () =>
-        errorOf(getCalendar(CAIRO, 2026)),
-      );
-      expect(error?.code).toBe('BRANCH_PERMISSION_DENIED');
-    });
-
-    it('passes a gateway 503 through', async () => {
-      FAKE_FAIL.nextCall = true;
-      const error = await errorOf(getCalendar(CAIRO, 2026));
-      expect(error?.status).toBe(503);
-      expect(error?.code).toBe('GW.UPSTREAM.UNAVAILABLE');
-    });
-  });
-
-  describe('POST targets/working-calendars/:branchId/:year', () => {
-    it('publishes the first revision and returns the bare saved calendar', async () => {
-      const saved = await settle(
-        publishCalendar(GIZA, 2026, body(2026, {
-          timeZone: 'Africa/Cairo',
-          windows: [
-            {
-              layer: 2,
-              validFrom: '2026-03-01',
-              validTo: '2026-03-31',
-              weekdayMask: 3,
-              startMinute: 600,
-              endMinute: 900,
-              label: '  Spring  ',
-            },
-          ],
-        })),
-      );
-      expect(saved).toEqual({
-        branchId: GIZA,
-        calendarYear: 2026,
-        revision: 1,
-        workingDays: buildWorkingDaysForYear(2026, DEFAULT_WEEKDAY_MASK),
-        publishedAt: FAKE_NOW,
-        workdayStartMinute: 540,
-        workdayEndMinute: 1020,
-        timeZone: 'Africa/Cairo',
-        windows: [
-          {
-            windowNo: 1,
-            layer: 2,
-            validFrom: '2026-03-01',
-            validTo: '2026-03-31',
+            validFrom: '2027-01-01',
+            validTo: '2027-01-03',
+            weekdayMask: 2,
+            startMinute: 0,
+            endMinute: 60,
+          };
+          const b = {
+            layer: 1,
+            validFrom: '2027-01-03',
+            validTo: '2027-01-10',
             weekdayMask: 3,
-            startMinute: 600,
-            endMinute: 900,
-            label: 'Spring',
-          },
-        ],
+            startMinute: 30,
+            endMinute: 90,
+          };
+          expect(windowsOverlap(a, b)).toBe(true);
+          expect(windowsOverlap(a, { ...b, layer: 2 })).toBe(false);
+          expect(windowsOverlap(a, { ...b, startMinute: 60 })).toBe(false);
+        });
       });
-
-      const reread = await settle(getCalendar(GIZA, 2026));
-      expect(reread).toEqual(saved);
     });
-
-    it('needs the hours and zone with any window (422 CRM_CALENDAR_HOURS_INVALID)', async () => {
-      const error = await errorOf(
-        publishCalendar(GIZA, 2025, {
-          expectedRevision: 0,
-          workingDays: '1'.repeat(daysInYear(2025)),
-          windows: [{ layer: 1, validFrom: '2025-01-01', validTo: '2025-01-31', weekdayMask: 1, startMinute: 0, endMinute: 60 }],
-        }),
-      );
-      expect(error?.status).toBe(422);
-      expect(error?.code).toBe('CRM_CALENDAR_HOURS_INVALID');
-
-      const partial = await errorOf(
-        publishCalendar(GIZA, 2025, { expectedRevision: 0, workingDays: '1'.repeat(daysInYear(2025)), workdayStartMinute: 540 }),
-      );
-      expect(partial?.code).toBe('CRM_CALENDAR_HOURS_INVALID');
-    });
-
-    it('stores null hours for a first day-only publish', async () => {
-      const saved = await settle(
-        publishCalendar(GIZA, 2025, { expectedRevision: 0, workingDays: '1'.repeat(daysInYear(2025)) }),
-      );
-      expect(saved.revision).toBe(1);
-      expect(saved.workdayStartMinute).toBeNull();
-      expect(saved.workdayEndMinute).toBeNull();
-      expect(saved.timeZone).toBeNull();
-      expect(saved.windows).toEqual([]);
-    });
-
-    it('carries the head hours, zone and windows over a day-only publish', async () => {
-      const head = await settle(getCalendar(CAIRO, 2026));
-      const saved = await settle(
-        publishCalendar(CAIRO, 2026, { expectedRevision: head.revision, workingDays: head.workingDays! }),
-      );
-      expect(saved.revision).toBe(head.revision + 1);
-      expect(saved.workdayStartMinute).toBe(head.workdayStartMinute);
-      expect(saved.timeZone).toBe(head.timeZone);
-      expect(saved.windows).toEqual(head.windows);
-
-      const cleared = await settle(
-        publishCalendar(CAIRO, 2026, { expectedRevision: saved.revision, workingDays: head.workingDays!, windows: [] }),
-      );
-      expect(cleared.timeZone).toBe(head.timeZone);
-      expect(cleared.windows).toEqual([]);
-    });
-
-    it('rejects a blank window label with 422 CRM_WORKING_CALENDAR_INVALID', async () => {
-      const error = await errorOf(
-        publishCalendar(GIZA, 2027, body(2027, {
-          windows: [{ layer: 1, validFrom: '2027-01-01', validTo: '2027-01-31', weekdayMask: 1, startMinute: 0, endMinute: 60, label: '   ' }],
-        })),
-      );
-      expect(error?.code).toBe('CRM_WORKING_CALENDAR_INVALID');
-    });
-
-    it('rejects a layer over 9 and a window outside the calendar year', async () => {
-      const layer = await errorOf(
-        publishCalendar(GIZA, 2027, body(2027, {
-          windows: [{ layer: 10, validFrom: '2027-01-01', validTo: '2027-01-31', weekdayMask: 1, startMinute: 0, endMinute: 60 }],
-        })),
-      );
-      expect(layer?.code).toBe('CRM_WORKING_CALENDAR_INVALID');
-      const outside = await errorOf(
-        publishCalendar(GIZA, 2027, body(2027, {
-          windows: [{ layer: 1, validFrom: '2026-12-31', validTo: '2027-01-31', weekdayMask: 1, startMinute: 0, endMinute: 60 }],
-        })),
-      );
-      expect(outside?.code).toBe('CRM_WORKING_CALENDAR_INVALID');
-    });
-
-    it('rejects UTC, Etc/ and padded zones, and a zone change for the branch', async () => {
-      for (const timeZone of ['UTC', 'Etc/GMT+2', ' Africa/Cairo ']) {
-        const error = await errorOf(publishCalendar(GIZA, 2027, body(2027, { timeZone })));
-        expect(error?.code).toBe('CRM_CALENDAR_TIME_ZONE_INVALID');
-      }
-      const head = await settle(getCalendar(ALEX, 2026));
-      const changed = await errorOf(
-        publishCalendar(ALEX, 2027, body(2027, { expectedRevision: 0, timeZone: 'Asia/Riyadh' })),
-      );
-      expect(changed?.status).toBe(422);
-      expect(changed?.code).toBe('CRM_CALENDAR_TIME_ZONE_INVALID');
-      expect(head.timeZone).toBe('Africa/Cairo');
-    });
-
-    it('runs the ValidationPipe first, then the body checks, then the branch grant', async () => {
-      const unknown = '01934b10-0000-7000-8000-0000000009ff';
-      const pipe = await errorOf(publishCalendar(unknown, 2027, body(2027, { workingDays: 'abc', expectedRevision: -1 })));
-      expect(pipe?.status).toBe(400);
-      expect(pipe?.details).toEqual({ expectedRevision: ['min'], workingDays: ['matches'] });
-
-      const service = await errorOf(publishCalendar(unknown, 2027, body(2027, { workdayStartMinute: 900, workdayEndMinute: 600 })));
-      expect(service?.code).toBe('CRM_CALENDAR_HOURS_INVALID');
-
-      const grant = await errorOf(publishCalendar(unknown, 2027, body(2027)));
-      expect(grant?.status).toBe(403);
-      expect(grant?.code).toBe('BRANCH_PERMISSION_DENIED');
-    });
-
-    it('keys nested window errors by path', async () => {
-      const error = await errorOf(
-        publishCalendar(GIZA, 2027, body(2027, {
-          windows: [
-            { layer: 1, validFrom: '2027-01-01', validTo: '2027-01-02', weekdayMask: 1, startMinute: 0, endMinute: 60 },
-            { layer: 1.5, validFrom: '2027/01/01', validTo: '2027-01-02', weekdayMask: 1, startMinute: 0, endMinute: 60 },
-          ],
-        })),
-      );
-      expect(error?.details).toEqual({ 'windows.1.layer': ['is_int'], 'windows.1.validFrom': ['matches'] });
-    });
-
-    it('answers a stale expectedRevision with 409 CRM_WORKING_CALENDAR_REVISION_CONFLICT and no details', async () => {
-      const error = await errorOf(publishCalendar(ALEX, 2026, body(2026, { expectedRevision: 0 })));
-      expect(error?.status).toBe(409);
-      expect(error?.code).toBe('CRM_WORKING_CALENDAR_REVISION_CONFLICT');
-      expect(error?.details).toBeUndefined();
-
-      const current = await settle(getCalendar(ALEX, 2026));
-      const saved = await settle(publishCalendar(ALEX, 2026, body(2026, { expectedRevision: current.revision })));
-      expect(saved.revision).toBe(current.revision + 1);
-    });
-
-    it('rejects a wrong day count for the year with 422 CRM_WORKING_CALENDAR_INVALID', async () => {
-      const error = await errorOf(publishCalendar(GIZA, 2027, body(2027, { workingDays: '1'.repeat(366) })));
-      expect(error?.status).toBe(422);
-      expect(error?.code).toBe('CRM_WORKING_CALENDAR_INVALID');
-    });
-
-    it('rejects bad hours with 422 CRM_CALENDAR_HOURS_INVALID', async () => {
-      const reversed = await errorOf(
-        publishCalendar(GIZA, 2027, body(2027, { workdayStartMinute: 900, workdayEndMinute: 600 })),
-      );
-      expect(reversed?.status).toBe(422);
-      expect(reversed?.code).toBe('CRM_CALENDAR_HOURS_INVALID');
-
-      const window = await errorOf(
-        publishCalendar(GIZA, 2027, body(2027, {
-          windows: [{ layer: 1, validFrom: '2027-01-01', validTo: '2027-01-02', weekdayMask: 1, startMinute: 0, endMinute: 1441 }],
-        })),
-      );
-      expect(window?.code).toBe('CRM_CALENDAR_HOURS_INVALID');
-    });
-
-    it('rejects an unknown time zone with 422 CRM_CALENDAR_TIME_ZONE_INVALID', async () => {
-      const error = await errorOf(publishCalendar(GIZA, 2027, body(2027, { timeZone: 'Mars/Olympus' })));
-      expect(error?.status).toBe(422);
-      expect(error?.code).toBe('CRM_CALENDAR_TIME_ZONE_INVALID');
-    });
-
-    it('rejects a bad window range and overlapping windows of one layer', async () => {
-      const range = await errorOf(
-        publishCalendar(GIZA, 2027, body(2027, {
-          windows: [{ layer: 1, validFrom: '2027-02-10', validTo: '2027-02-01', weekdayMask: 1, startMinute: 0, endMinute: 60 }],
-        })),
-      );
-      expect(range?.code).toBe('CRM_WORKING_CALENDAR_INVALID');
-
-      const overlap = await errorOf(
-        publishCalendar(GIZA, 2027, body(2027, {
-          windows: [
-            { layer: 1, validFrom: '2027-02-01', validTo: '2027-02-28', weekdayMask: 1, startMinute: 0, endMinute: 120 },
-            { layer: 1, validFrom: '2027-02-15', validTo: '2027-03-15', weekdayMask: 1, startMinute: 60, endMinute: 180 },
-          ],
-        })),
-      );
-      expect(overlap?.status).toBe(422);
-      expect(overlap?.code).toBe('CRM_CALENDAR_WINDOW_OVERLAP');
-    });
-
-    it('needs crm.sla.manage or crm.targets.manage (403)', async () => {
-      const error = await withoutPermissions(['crm.sla.manage', 'crm.targets.manage'], () =>
-        errorOf(publishCalendar(GIZA, 2027, body(2027))),
-      );
-      expect(error?.status).toBe(403);
-    });
-
-    // Backend PublishDashboardWorkingCalendarDto: workingDays @Matches(/^[01]{365,366}$/).
-    it('a malformed workingDays string is 400 CRM_VALIDATION_FAILED keyed by workingDays', async () => {
-      const error = await errorOf(publishCalendar(GIZA, 2027, body(2027, { workingDays: 'abc' })));
-      expect(error?.status).toBe(400);
-      expect(error?.code).toBe('CRM_VALIDATION_FAILED');
-      expect(error?.details).toEqual({ workingDays: ['matches'] });
-    });
-
-    // Backend WorkingCalendarWindowDto: label @MaxLength(80); the fake allows 120.
-    it('a window label over 80 characters is 400 CRM_VALIDATION_FAILED keyed windows.0.label', async () => {
-      const error = await errorOf(
-        publishCalendar(GIZA, 2027, body(2027, {
-          windows: [
-            { layer: 1, validFrom: '2027-01-01', validTo: '2027-01-02', weekdayMask: 1, startMinute: 0, endMinute: 60, label: 'x'.repeat(100) },
-          ],
-        })),
-      );
-      expect(error?.status).toBe(400);
-      expect(error?.code).toBe('CRM_VALIDATION_FAILED');
-      expect(error?.details).toEqual({ 'windows.0.label': ['max_length'] });
-    });
-  });
-
-  describe('model rules shared with the backend', () => {
-    it('limits labels to 80 and offers only region zones', () => {
-      expect(MAX_WINDOW_LABEL_LENGTH).toBe(80);
-      expect(CALENDAR_TIME_ZONES.every((zone) => isValidIanaTimeZone(zone))).toBe(true);
-      expect(isValidIanaTimeZone('UTC')).toBe(false);
-    });
-
-    it('treats windows as overlapping when masks share a bit, even if that weekday misses the shared dates', () => {
-      // 2027-01-03 is a Sunday; the windows share only that date, and the shared mask bit is Monday.
-      const a = { layer: 1, validFrom: '2027-01-01', validTo: '2027-01-03', weekdayMask: 2, startMinute: 0, endMinute: 60 };
-      const b = { layer: 1, validFrom: '2027-01-03', validTo: '2027-01-10', weekdayMask: 3, startMinute: 30, endMinute: 90 };
-      expect(windowsOverlap(a, b)).toBe(true);
-      expect(windowsOverlap(a, { ...b, layer: 2 })).toBe(false);
-      expect(windowsOverlap(a, { ...b, startMinute: 60 })).toBe(false);
-    });
-  });
-});
+  }

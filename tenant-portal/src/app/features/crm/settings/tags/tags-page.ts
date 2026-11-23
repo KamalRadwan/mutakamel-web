@@ -1,56 +1,90 @@
-import { Component, computed, inject, signal, viewChild } from '@angular/core';
+import { Component, Injector, computed, effect, inject, runInInjectionContext, signal, untracked, viewChild } from '@angular/core';
+import { Router } from '@angular/router';
 import { translationEvents } from '../../../../core/i18n/translation-events';
 import { provideIcons } from '@ng-icons/core';
-import { tablerAlertTriangle, tablerTag, tablerTrash } from '@ng-icons/tabler-icons';
+import { tablerTag, tablerTrash } from '@ng-icons/tabler-icons';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
 import { ActionItem, ActionSelection, ActionsMenu } from '../../../../shared/ui/actions-menu/actions-menu';
 import { Button } from '../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
-import { Modal } from '../../../../shared/ui/modal/modal';
-import { errorCodeOf } from '../shared/settings-api';
+import { Badge } from '../../../../shared/ui/badge/badge';
+import { BulkJobsTracker } from '../../../../shared/bulk-jobs/bulk-jobs-tracker';
+import { BulkJob, isBulkJobActive } from '../../../../shared/bulk-jobs/bulk-jobs.model';
+import { ApiError } from '../shared/settings-api';
+import { tenantWide } from '../shared/settings-access';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
+import { contrastInkFor } from '../../../../shared/ui/color/contrast-ink';
 import { SettingsFrame } from '../../../../shared/ui/settings-frame/settings-frame';
 import { presetOf } from './tag-colors';
 import { TagModal } from './tag-modal/tag-modal';
-import { deleteTag, detachLimitCount, listTags, tagErrorMessage } from './tags.api';
+import { deleteTagJob, listTags, tagErrorMessage, tagErrorState } from './tags.api';
+import { tagDeleteJob } from './tags-bulk';
 import { MAX_TAGS, Tag } from './tags.model';
-
-const CAN_MANAGE = true; // later from the session permissions
 
 @Component({
   selector: 'app-tags-page',
-  imports: [TranslocoPipe, ActionsMenu, Button, ConfirmDialog, Modal, SettingsFrame, TagModal],
+  imports: [TranslocoPipe, ActionsMenu, Badge, Button, ConfirmDialog, FullState, SettingsFrame, TagModal],
   providers: [
     provideTranslocoScope('settings', { scope: 'settings-tags', alias: 'tags' }),
-    provideIcons({ tablerAlertTriangle, tablerTag, tablerTrash }),
+    provideIcons({ tablerTag, tablerTrash }),
   ],
   templateUrl: './tags-page.html',
-  host: { class: 'flex min-h-0 flex-1 flex-col' },
+  host: { class: 'flex flex-1 shrink-0 flex-col' },
 })
 export class TagsPage {
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly language = inject(LanguageState).current;
+  private readonly injector = inject(Injector);
+  private readonly router = inject(Router);
+  private readonly tracker = inject(BulkJobsTracker);
 
-  private readonly tagModal = viewChild.required(TagModal);
+  private readonly tagModal = viewChild(TagModal);
   private readonly deleteDialog = viewChild.required<ConfirmDialog>('deleteDialog');
-  private readonly detachWarningModal = viewChild.required<Modal>('detachWarningModal');
 
-  protected readonly canManage = CAN_MANAGE;
+  protected readonly readOnly = signal(false);
+  protected readonly canRead = computed(() => runInInjectionContext(this.injector, () => tenantWide('crm.tags.read')));
+  protected readonly canManage = computed(() => !this.readOnly() && this.canRead()
+    && runInInjectionContext(this.injector, () => tenantWide('crm.tags.manage')));
+  protected readonly contrastInkFor = contrastInkFor;
   protected readonly maxTags = MAX_TAGS;
   protected readonly skeletonRows = [0, 1, 2, 3, 4];
 
   protected readonly tags = signal<Tag[]>([]);
   protected readonly search = signal('');
   protected readonly loading = signal(false);
-  protected readonly loadError = signal(false);
+  protected readonly loadError = signal<unknown | null>(null);
+  protected readonly loadState = computed(() => {
+    this.i18n();
+    return !this.canRead()
+      ? tagErrorState(this.transloco, new ApiError(403, 'CRM_PERMISSION_DENIED'))
+      : this.loadError() ? tagErrorState(this.transloco, this.loadError()) : null;
+  });
+  protected readonly loadErrorText = computed(() => {
+    const state = this.loadState();
+    return state?.correlationId
+      ? `${state.message} ${this.transloco.translate('settings.common.correlationId', { id: state.correlationId })}`
+      : state?.message ?? '';
+  });
   protected readonly deleting = signal(false);
   protected readonly pendingDeleteTag = signal<Tag | null>(null);
-  protected readonly detachWarningCount = signal<number | null>(null);
+  protected readonly isBulkJobActive = isBulkJobActive;
+  protected readonly deleteJobs = computed(() => {
+    const jobs = new Map<string, BulkJob>();
+    for (const job of this.tracker.jobs()) {
+      const tagId = job.paramsSummary['tagId'];
+      if (job.app !== 'crm' || job.module !== 'crm.tags' || job.action !== 'DELETE'
+        || typeof tagId !== 'string' || jobs.has(tagId)) continue;
+      jobs.set(tagId, job);
+    }
+    return jobs;
+  });
 
   private loadSeq = 0;
+  private readonly refreshedJobs = new Set<string>();
 
   protected readonly atLimit = computed(() => this.tags().length >= MAX_TAGS);
 
@@ -61,7 +95,7 @@ export class TagsPage {
   });
 
   protected readonly gridColumnsClass = computed(() =>
-    this.canManage
+    this.canManage()
       ? 'grid-cols-[minmax(0,1.6fr)_minmax(0,2fr)_minmax(0,1fr)_var(--table-head-h)]'
       : 'grid-cols-[minmax(0,1.6fr)_minmax(0,2fr)_minmax(0,1fr)]',
   );
@@ -93,19 +127,37 @@ export class TagsPage {
 
   constructor() {
     void this.load();
+    effect(() => {
+      if (this.loading()) return;
+      const completed = [...this.deleteJobs().values()].filter((job) =>
+        !isBulkJobActive(job.status) && !this.refreshedJobs.has(job.id));
+      if (!completed.length) return;
+      untracked(() => {
+        for (const job of completed) {
+          this.refreshedJobs.add(job.id);
+          if (job.status === 'COMPLETED') this.dropTag(String(job.paramsSummary['tagId']));
+        }
+        void this.refreshList();
+      });
+    });
   }
 
   protected async load(): Promise<void> {
     const seq = ++this.loadSeq;
+    if (!this.canRead()) {
+      this.loading.set(false);
+      return;
+    }
     this.loading.set(true);
-    this.loadError.set(false);
+    this.loadError.set(null);
     try {
       const items = await listTags();
       if (seq !== this.loadSeq) return;
-      this.tags.set(items);
-    } catch {
+      this.tags.set(items.sort((a, b) => a.name.localeCompare(b.name)));
+    } catch (error) {
       if (seq !== this.loadSeq) return;
-      this.loadError.set(true);
+      if (error instanceof ApiError && error.status === 401) return;
+      this.loadError.set(error);
     } finally {
       if (seq === this.loadSeq) {
         this.loading.set(false);
@@ -114,12 +166,22 @@ export class TagsPage {
   }
 
   protected openNew(): void {
-    if (!this.canManage || this.atLimit()) return;
-    this.tagModal().openCreate();
+    if (!this.canManage() || this.atLimit()) return;
+    this.tagModal()?.openCreate();
   }
 
   protected openTag(tag: Tag): void {
-    this.tagModal().openEdit(tag);
+    if (!this.canRead()) return;
+    const job = this.deleteJobs().get(tag.id);
+    if (job && isBulkJobActive(job.status)) {
+      this.openDeleteReport(job);
+      return;
+    }
+    this.tagModal()?.openEdit(tag);
+  }
+
+  protected openDeleteReport(job: BulkJob): void {
+    this.tracker.openReport('crm', job.id);
   }
 
   protected presetKey(tag: Tag): string | null {
@@ -146,8 +208,9 @@ export class TagsPage {
     }
   }
 
-  protected onTagSaved(): void {
-    void this.refreshList();
+  protected onTagSaved(tag: Tag): void {
+    this.tags.update((items) => [...items.filter((item) => item.id !== tag.id), tag]
+      .sort((a, b) => a.name.localeCompare(b.name)));
   }
 
   protected onTagDeletedRemotely(): void {
@@ -155,56 +218,77 @@ export class TagsPage {
   }
 
   protected async requestDelete(tag: Tag): Promise<void> {
-    if (!this.canManage || this.deleting()) return;
+    if (!this.canManage() || this.deleting()) return;
+    const active = this.deleteJobs().get(tag.id);
+    if (active && isBulkJobActive(active.status)) {
+      this.openDeleteReport(active);
+      return;
+    }
     this.pendingDeleteTag.set(tag);
     const confirmed = await this.deleteDialog().open();
     if (!confirmed) {
       this.pendingDeleteTag.set(null);
       return;
     }
+    if (!this.canManage()) {
+      this.pendingDeleteTag.set(null);
+      return;
+    }
 
     this.deleting.set(true);
     try {
-      await deleteTag(tag.id);
-      this.notify.success(this.transloco.translate('tags.toasts.deleted'));
-      if (this.tagModal().editingId() === tag.id) {
-        this.tagModal().close();
-      }
-      await this.refreshList();
-    } catch (error) {
-      const code = errorCodeOf(error);
-      if (code === 'CRM_TAG_DETACH_LIMIT_EXCEEDED') {
-        this.detachWarningCount.set(detachLimitCount(error));
-        this.detachWarningModal().open();
+      const result = await deleteTagJob(tag.id);
+      if (result) {
+        const job = this.tracker.jobs().find((job) => job.app === 'crm' && job.id === result.jobId)
+          ?? tagDeleteJob(tag.id, result);
+        this.tracker.syncExternalJob(job);
+        const modal = this.tagModal();
+        if (modal?.editingId() === tag.id) modal.close();
+        this.openDeleteReport(job);
         return;
       }
-      this.notify.error(tagErrorMessage(this.transloco, error));
-      if (code === 'CRM_TAG_NOT_FOUND') {
-        if (this.tagModal().editingId() === tag.id) {
-          this.tagModal().close();
-        }
+      this.dropTag(tag.id);
+      this.notify.success(this.transloco.translate('tags.toasts.deleted'));
+      await this.refreshList();
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) {
+        this.dropTag(tag.id);
         await this.refreshList();
+        return;
       }
+      if (tagErrorState(this.transloco, error).readOnly) this.readOnly.set(true);
+      this.notify.error(tagErrorMessage(this.transloco, error));
     } finally {
       this.deleting.set(false);
       this.pendingDeleteTag.set(null);
     }
   }
 
-  protected closeDetachWarning(): void {
-    this.detachWarningModal().close();
+  private dropTag(id: string): void {
+    this.tags.update((items) => items.filter((item) => item.id !== id));
+    const modal = this.tagModal();
+    if (modal?.editingId() === id) modal.close();
+  }
+
+  protected onLoadAction(): void {
+    if (this.loadState()?.kind === 'forbidden') {
+      void this.router.navigateByUrl('/workspace/home');
+    } else {
+      void this.load();
+    }
   }
 
   private async refreshList(): Promise<void> {
     const seq = ++this.loadSeq;
+    if (!this.canRead()) return;
     try {
       const items = await listTags();
       if (seq !== this.loadSeq) return;
-      this.tags.set(items);
-      this.loadError.set(false);
+      this.tags.set(items.sort((a, b) => a.name.localeCompare(b.name)));
+      this.loadError.set(null);
     } catch (error) {
       if (seq === this.loadSeq) {
-        this.notify.error(tagErrorMessage(this.transloco, error));
+        if (!(error instanceof ApiError && error.status === 401)) this.loadError.set(error);
       }
     }
   }

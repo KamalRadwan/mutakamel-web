@@ -1,61 +1,10 @@
-<div
-  role="tablist"
-  class="mx-12 flex h-tab shrink-0 items-stretch border-b border-border text-12 leading-18"
-  [attr.aria-label]="'customFields.tabs.label' | transloco"
-  (keydown)="onTabKeydown($event)"
->
-  <button
-    #tabBtn
-    type="button"
-    role="tab"
-    [id]="uid + '-tab-definitions'"
-    [attr.aria-selected]="activeTab() === 'definitions'"
-    [attr.aria-controls]="uid + '-panel-definitions'"
-    [tabIndex]="activeTab() === 'definitions' ? 0 : -1"
-    class="inline-flex h-tab cursor-pointer items-center gap-6 px-10 text-12 leading-18 whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
-    [class]="activeTab() === 'definitions' ? 'font-medium text-accent subnav-active' : 'text-text-muted hover:text-text'"
-    (click)="activeTab.set('definitions')"
-  >
-    <ng-icon name="tablerAdjustmentsHorizontal" size="14" aria-hidden="true" />
-    <span>{{ 'customFields.tabs.definitions' | transloco }}</span>
-    <span
-      class="inline-flex h-counter min-w-counter items-center justify-center rounded-full bg-neutral-soft px-4 text-11 leading-16 font-medium text-on-neutral-soft tabular-nums"
-    >
-      {{ fields().length }}
-    </span>
-  </button>
-
-  <button
-    #tabBtn
-    type="button"
-    role="tab"
-    [id]="uid + '-tab-values'"
-    [attr.aria-selected]="activeTab() === 'values'"
-    [attr.aria-controls]="uid + '-panel-values'"
-    [tabIndex]="activeTab() === 'values' ? 0 : -1"
-    class="inline-flex h-tab cursor-pointer items-center gap-6 px-10 text-12 leading-18 whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
-    [class]="activeTab() === 'values' ? 'font-medium text-accent subnav-active' : 'text-text-muted hover:text-text'"
-    (click)="activeTab.set('values')"
-  >
-    <ng-icon name="tablerEdit" size="14" aria-hidden="true" />
-    <span>{{ 'customFields.tabs.values' | transloco }}</span>
-  </button>
-</div>
-
-<div
-  role="tabpanel"
-  [id]="uid + '-panel-definitions'"
-  [attr.aria-labelledby]="uid + '-tab-definitions'"
-  [hidden]="activeTab() !== 'definitions'"
-  [class]="activeTab() === 'definitions' ? 'flex min-h-0 flex-1 flex-col' : 'hidden'"
->
     <app-settings-frame
       [addLabel]="'customFields.add' | transloco"
       [addDisabled]="atLimit()"
       [addHint]="atLimit() ? ('customFields.addLimitHint' | transloco) : null"
       [searchPlaceholder]="'customFields.search' | transloco"
       [loading]="loading()"
-      [showAdd]="canManage"
+      [showAdd]="canManage()"
       [(search)]="search"
       (add)="openCreate()"
       (reload)="loadFields()"
@@ -75,13 +24,15 @@
         />
       </div>
 
-      @if (failed()) {
-        <div class="flex flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center">
-          <p class="text-12 text-danger-text" role="alert">{{ 'settings.common.loadFailed' | transloco }}</p>
-          <button type="button" uiButton variant="secondary" size="small" (click)="loadFields()">
-            {{ 'settings.common.retry' | transloco }}
-          </button>
-        </div>
+      @if (failure(); as error) {
+        <ui-full-state
+          [kind]="error.kind"
+          [title]="error.message"
+          [text]="error.correlationId ? ('settings.common.correlationId' | transloco: { id: error.correlationId }) : ''"
+          [actionLabel]="'settings.common.retry' | transloco"
+          [busy]="loading()"
+          (action)="loadFields()"
+        />
       } @else {
         <div class="overflow-x-auto pb-4">
           <div
@@ -231,7 +182,7 @@
                     class="flex items-center justify-center border-s border-border"
                     (click)="$event.stopPropagation()"
                   >
-                    @if (canManage) {
+                    @if (canManage()) {
                       <ui-actions-menu
                         [items]="rowActions(field)"
                         [label]="'settings.common.actions' | transloco"
@@ -256,17 +207,11 @@
         {{ 'settings.common.of' | transloco: { count: fields().length, max: maxDefinitions } }}
       </div>
     </app-settings-frame>
-</div>
-
-<div
-  role="tabpanel"
-  [id]="uid + '-panel-values'"
-  [attr.aria-labelledby]="uid + '-tab-values'"
-  [hidden]="activeTab() !== 'values'"
-  [class]="activeTab() === 'values' ? 'flex min-h-0 flex-1 flex-col p-12' : 'hidden'"
->
-  <app-record-values [fields]="fields()" [canManage]="canManage" />
-</div>
-
-<app-custom-field-modal [canManage]="canManage" (saved)="onFieldSaved($event)" />
-<app-requirements-modal [canManage]="canManage" (updated)="onFieldSaved($event)" />
+<app-custom-field-modal [canManage]="canManage()" (readOnly)="readOnly.set(true)" (reload)="loadFields()" (saved)="onFieldSaved($event)" />
+<app-requirements-modal [canManage]="canManage()" (readOnly)="readOnly.set(true)" (reload)="loadFields()" (updated)="onFieldSaved($event)" />
+<ui-confirm-dialog
+  [title]="'customFields.archive.title' | transloco"
+  [text]="'customFields.archive.text' | transloco"
+  [confirmLabel]="'customFields.actions.archive' | transloco"
+  [cancelLabel]="'settings.common.cancel' | transloco"
+/>

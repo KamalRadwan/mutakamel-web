@@ -1,4 +1,14 @@
-import { Component, computed, inject, input, output, signal, viewChild } from '@angular/core';
+import {
+  Component,
+  Injector,
+  computed,
+  inject,
+  input,
+  output,
+  runInInjectionContext,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
@@ -12,8 +22,10 @@ import { Dropdown, DropdownOption } from '../../../../../shared/ui/dropdown/drop
 import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { Switch } from '../../../../../shared/ui/switch/switch';
-import { errorCodeOf } from '../../shared/settings-api';
-import { createLeadStage, updateLeadStage } from '../lead-stages.api';
+import { fieldErrorsOf, isValidationError } from '../../../../../core/api/api-errors';
+import { crmSettingsError, errorCodeOf } from '../../shared/settings-api';
+import { tenantWide } from '../../shared/settings-access';
+import { beginLeadStageEdit, createLeadStage, updateLeadStage } from '../lead-stages.api';
 import {
   CUSTOM_LEAD_STAGE_FLAGS,
   LEAD_STAGE_CATEGORIES,
@@ -24,22 +36,13 @@ import {
   UpdateLeadStagePatch,
   isProtectedStage,
   stageErrorMessage,
+  stageErrorTranslator,
   stageNameIn,
 } from '../lead-stages.model';
 
 @Component({
   selector: 'app-lead-stage-modal',
-  imports: [
-    NgIcon,
-    TranslocoPipe,
-    Button,
-    Checkbox,
-    ConfirmDialog,
-    Dropdown,
-    Field,
-    Modal,
-    Switch,
-  ],
+  imports: [NgIcon, TranslocoPipe, Button, Checkbox, ConfirmDialog, Dropdown, Field, Modal, Switch],
   providers: [provideIcons({ tablerListNumbers, tablerLock })],
   templateUrl: './lead-stage-modal.html',
 })
@@ -49,15 +52,21 @@ export class LeadStageModal {
 
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
+  private readonly translateError = stageErrorTranslator(this.transloco);
   private readonly i18n = translationEvents(this.transloco);
   private readonly language = inject(LanguageState).current;
 
   private readonly modal = viewChild.required(Modal);
   private readonly discardDialog = viewChild.required<ConfirmDialog>('discardDialog');
 
-  readonly canManage = input(true);
+  private readonly injector = inject(Injector);
+  private readonly forcedReadOnly = signal(false);
+  readonly canManage = input(false);
   readonly saved = output<LeadStage>();
   readonly deleted = output<LeadStage>();
+  readonly inUse = output<LeadStage>();
+  readonly readOnly = output<void>();
+  protected readonly serverErrors = signal<Record<string, string[]>>({});
 
   protected readonly maxNameLength = LEAD_STAGE_NAME_MAX;
   protected readonly mode = signal<'create' | 'edit'>('create');
@@ -80,8 +89,16 @@ export class LeadStageModal {
     return this.mode() === 'edit' && current !== null && isProtectedStage(current);
   });
 
-  protected readonly isReadOnly = computed(() => !this.canManage() || this.isProtected());
-  protected readonly isDefaultStage = computed(() => this.mode() === 'edit' && Boolean(this.stage()?.isDefault));
+  protected readonly isReadOnly = computed(
+    () =>
+      !this.canManage() ||
+      this.forcedReadOnly() ||
+      this.isProtected() ||
+      !runInInjectionContext(this.injector, () => tenantWide('crm.lead_stages.manage')),
+  );
+  protected readonly isDefaultStage = computed(
+    () => this.mode() === 'edit' && Boolean(this.stage()?.isDefault),
+  );
 
   protected readonly modalTitle = computed(() => {
     this.i18n();
@@ -96,7 +113,13 @@ export class LeadStageModal {
     const ar = this.nameAr().trim();
     const en = this.nameEn().trim();
     if (this.mode() === 'create') {
-      return ar.length > 0 || en.length > 0 || this.flag() !== 'CONTACTED' || this.category() !== 'IN_PROGRESS' || this.isDefault();
+      return (
+        ar.length > 0 ||
+        en.length > 0 ||
+        this.flag() !== 'CONTACTED' ||
+        this.category() !== 'IN_PROGRESS' ||
+        this.isDefault()
+      );
     }
     const current = this.stage();
     if (!current || this.isReadOnly()) return false;
@@ -139,6 +162,7 @@ export class LeadStageModal {
   });
 
   openCreate(): void {
+    beginLeadStageEdit(null);
     this.mode.set('create');
     this.stage.set(null);
     this.resetFieldsForCreate();
@@ -147,6 +171,7 @@ export class LeadStageModal {
   }
 
   openEdit(stage: LeadStage): void {
+    beginLeadStageEdit(stage.id);
     this.mode.set('edit');
     this.stage.set(stage);
     this.resetFieldsFromStage(stage);
@@ -171,6 +196,7 @@ export class LeadStageModal {
   }
 
   protected onNameInput(field: 'nameAr' | 'nameEn', event: Event): void {
+    this.clearFieldError(field);
     const value = (event.target as HTMLInputElement).value;
     if (field === 'nameAr') this.nameAr.set(value);
     else this.nameEn.set(value);
@@ -179,15 +205,18 @@ export class LeadStageModal {
   protected onFlagChange(value: LeadStageFlag): void {
     if (this.isReadOnly()) return;
     this.flag.set(value);
+    this.clearFieldError('flag');
   }
 
   protected onCategoryChange(value: LeadStageCategory): void {
     if (this.isReadOnly()) return;
     this.category.set(value);
+    this.clearFieldError('category');
   }
 
   protected async save(): Promise<void> {
     if (this.saving() || this.isReadOnly()) return;
+    this.serverErrors.set({});
     this.submitted.set(true);
     if (this.nameArError() || this.nameEnError()) return;
 
@@ -220,6 +249,24 @@ export class LeadStageModal {
       this.saved.emit(updated);
       this.close();
     } catch (error) {
+      if (isValidationError(error)) {
+        const fields = fieldErrorsOf(error);
+        this.serverErrors.set(fields);
+        if (
+          !Object.keys(fields).length ||
+          Object.keys(fields).some(
+            (key) =>
+              !['nameAr', 'nameEn', 'flag', 'category', 'isDefault', 'isActive'].includes(key),
+          )
+        )
+          this.showErrorToast(error);
+        return;
+      }
+      if (errorCodeOf(error) === 'LEAD_STAGE_IN_USE') {
+        const current = this.stage();
+        if (current) this.inUse.emit(current);
+        return;
+      }
       this.showErrorToast(error);
       if (errorCodeOf(error) === 'LEAD_STAGE_NOT_FOUND') {
         const current = this.stage();
@@ -268,6 +315,7 @@ export class LeadStageModal {
   }
 
   private resetFieldsForCreate(): void {
+    this.serverErrors.set({});
     this.nameAr.set('');
     this.nameEn.set('');
     this.flag.set('CONTACTED');
@@ -279,6 +327,7 @@ export class LeadStageModal {
   }
 
   private resetFieldsFromStage(stage: LeadStage): void {
+    this.serverErrors.set({});
     this.nameAr.set(stage.nameAr);
     this.nameEn.set(stage.nameEn);
     this.flag.set(stage.flag);
@@ -289,7 +338,11 @@ export class LeadStageModal {
     this.submitted.set(false);
   }
 
-  private buildUpdatePatch(current: LeadStage, trimmedAr: string, trimmedEn: string): UpdateLeadStagePatch {
+  private buildUpdatePatch(
+    current: LeadStage,
+    trimmedAr: string,
+    trimmedEn: string,
+  ): UpdateLeadStagePatch {
     const patch: UpdateLeadStagePatch = {};
     if (trimmedAr !== current.nameAr) patch.nameAr = trimmedAr;
     if (trimmedEn !== current.nameEn) patch.nameEn = trimmedEn;
@@ -303,17 +356,37 @@ export class LeadStageModal {
     this.i18n();
     const show = this.submitted() || Boolean(this.touched()[field]);
     if (!show) return null;
+    const serverMessage = this.fieldError(field);
+    if (serverMessage) return serverMessage;
     const trimmed = raw.trim();
     if (!trimmed) {
       return this.transloco.translate('leadStages.validation.required');
     }
-    if (trimmed.length > this.maxNameLength) {
-      return this.transloco.translate('leadStages.validation.maxLength', { max: this.maxNameLength });
+    if (Array.from(trimmed).length > this.maxNameLength) {
+      return this.transloco.translate('leadStages.validation.maxLength', {
+        max: this.maxNameLength,
+      });
     }
     return null;
   }
 
   private showErrorToast(error: unknown): void {
-    this.notify.error(stageErrorMessage(error, (key) => this.transloco.translate(key)));
+    if (crmSettingsError(this.translateError, error, 'leadStages').readOnly) {
+      this.forcedReadOnly.set(true);
+      this.readOnly.emit();
+    }
+    this.notify.error(stageErrorMessage(error, this.translateError));
+  }
+
+  protected fieldError(field: string): string | null {
+    return this.serverErrors()[field]?.join(' ') || null;
+  }
+
+  protected clearFieldError(field: string): void {
+    this.serverErrors.update((errors) => {
+      const next = { ...errors };
+      delete next[field];
+      return next;
+    });
   }
 }

@@ -26,8 +26,8 @@
           [placeholder]="'tags.form.namePlaceholder' | transloco"
           [value]="name()"
           [attr.maxlength]="maxNameLength"
-          [readOnly]="!canManage()"
-          [attr.aria-readonly]="!canManage() ? 'true' : null"
+          [readOnly]="!canWrite()"
+          [attr.aria-readonly]="!canWrite() ? 'true' : null"
           [attr.aria-invalid]="nameError() ? 'true' : null"
           [attr.aria-describedby]="uid + '-name-hint' + (nameError() ? ' ' + uid + '-name-error' : '')"
           (input)="onNameInput($event)"
@@ -83,12 +83,14 @@
         [label]="'tags.form.colour' | transloco"
         [for]="uid + '-colour'"
         [hint]="'tags.form.colourHint' | transloco"
+        [error]="colorServerError() ? ('tags.errors.' + colorServerError() | transloco) : null"
       >
         <div
           [id]="uid + '-colour'"
           role="group"
           [attr.aria-label]="'tags.form.colour' | transloco"
-          [attr.aria-describedby]="uid + '-colour-hint'"
+          [attr.aria-describedby]="uid + '-colour-hint' + (colorServerError() ? ' ' + uid + '-colour-error' : '')"
+          [attr.aria-invalid]="colorServerError() ? 'true' : null"
         >
           <div class="flex flex-wrap items-center gap-6">
             <button
@@ -99,10 +101,10 @@
                   ? 'border-brand bg-brand-soft text-on-brand-soft'
                   : 'border-border-field bg-surface text-text hover:bg-row-hover') +
                 ' ' +
-                (canManage() ? 'cursor-pointer' : 'cursor-default')
+                (canWrite() ? 'cursor-pointer' : 'cursor-default')
               "
               [attr.aria-pressed]="colorMode() === 'none'"
-              [attr.aria-disabled]="!canManage() ? 'true' : null"
+              [attr.aria-disabled]="!canWrite() ? 'true' : null"
               (click)="selectNoColor()"
             >
               {{ 'tags.color.none' | transloco }}
@@ -116,10 +118,10 @@
                   ? 'border-brand bg-brand-soft text-on-brand-soft'
                   : 'border-border-field bg-surface text-text hover:bg-row-hover') +
                 ' ' +
-                (canManage() ? 'cursor-pointer' : 'cursor-default')
+                (canWrite() ? 'cursor-pointer' : 'cursor-default')
               "
               [attr.aria-pressed]="colorMode() === 'custom'"
-              [attr.aria-disabled]="!canManage() ? 'true' : null"
+              [attr.aria-disabled]="!canWrite() ? 'true' : null"
               (click)="selectCustom()"
             >
               {{ 'tags.color.custom' | transloco }}
@@ -139,13 +141,13 @@
                 [class]="
                   (isPresetSelected(preset.key) ? 'ring-2 ring-brand ring-offset-2 ring-offset-surface' : '') +
                   ' ' +
-                  (canManage() ? 'cursor-pointer' : 'cursor-default')
+                  (canWrite() ? 'cursor-pointer' : 'cursor-default')
                 "
                 [style.background-color]="preset.bg"
                 [style.color]="preset.text"
                 [attr.aria-label]="'tags.presets.' + preset.key | transloco"
                 [attr.aria-pressed]="isPresetSelected(preset.key)"
-                [attr.aria-disabled]="!canManage() ? 'true' : null"
+                [attr.aria-disabled]="!canWrite() ? 'true' : null"
                 [title]="'tags.presets.' + preset.key | transloco"
                 (click)="selectPreset(preset.key)"
               >
@@ -196,8 +198,8 @@
             placeholder="#RRGGBB"
             class="w-full bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
             [value]="customBg()"
-            [readOnly]="!canManage()"
-            [attr.aria-readonly]="!canManage() ? 'true' : null"
+            [readOnly]="!canWrite()"
+            [attr.aria-readonly]="!canWrite() ? 'true' : null"
             [attr.aria-invalid]="hexError('bg') ? 'true' : null"
             [attr.aria-describedby]="uid + '-bg-hint' + (hexError('bg') ? ' ' + uid + '-bg-error' : '')"
             (input)="onHexInput('bg', $event)"
@@ -228,8 +230,8 @@
             placeholder="#RRGGBB"
             class="w-full bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
             [value]="customText()"
-            [readOnly]="!canManage()"
-            [attr.aria-readonly]="!canManage() ? 'true' : null"
+            [readOnly]="!canWrite()"
+            [attr.aria-readonly]="!canWrite() ? 'true' : null"
             [attr.aria-invalid]="hexError('text') ? 'true' : null"
             [attr.aria-describedby]="uid + '-text-hint' + (hexError('text') ? ' ' + uid + '-text-error' : '')"
             (input)="onHexInput('text', $event)"
@@ -241,7 +243,7 @@
   </form>
 
   <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
-    @if (canManage()) {
+    @if (canWrite()) {
       <button
         type="button"
         uiButton
@@ -252,7 +254,7 @@
         {{ 'settings.common.save' | transloco }}
       </button>
     }
-    @if (isEdit() && canManage() && dirty()) {
+    @if (isEdit() && canWrite() && dirty()) {
       <button
         type="button"
         uiButton
@@ -271,10 +273,10 @@
       [disabled]="saving()"
       (click)="requestClose()"
     >
-      {{ (canManage() ? 'settings.common.cancel' : 'settings.common.close') | transloco }}
+      {{ (canWrite() ? 'settings.common.cancel' : 'settings.common.close') | transloco }}
     </button>
 
-    @if (isEdit() && canManage() && editingTag(); as tag) {
+    @if (isEdit() && canWrite() && editingTag(); as tag) {
       <button
         type="button"
         uiButton

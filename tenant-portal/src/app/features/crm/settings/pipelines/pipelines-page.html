@@ -4,18 +4,19 @@
   [addHint]="atLimit() ? ('pipelines.list.limitHint' | transloco) : null"
   [searchPlaceholder]="'pipelines.list.searchPlaceholder' | transloco"
   [loading]="loading()"
-  [showAdd]="canManage"
+  [showAdd]="canManage()"
   [(search)]="search"
   (add)="openCreate()"
   (reload)="load()"
 >
   @if (failed()) {
-    <div class="flex flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card" role="alert">
-      <p class="text-12 text-danger-text">{{ 'settings.common.loadFailed' | transloco }}</p>
-      <button type="button" uiButton variant="secondary" (click)="load()">
-        {{ 'settings.common.retry' | transloco }}
-      </button>
-    </div>
+    <ui-full-state
+      [kind]="loadState().kind"
+      [title]="loadState().message"
+      [text]="loadState().correlationId ? ('settings.common.correlationId' | transloco: { id: loadState().correlationId }) : ''"
+      [actionLabel]="loadState().kind === 'forbidden' ? '' : ('settings.common.retry' | transloco)"
+      (action)="load()"
+    />
   } @else {
     <div class="overflow-x-auto pb-4">
       <div
@@ -124,7 +125,7 @@
                 class="flex items-center justify-center border-s border-border"
                 (click)="$event.stopPropagation()"
               >
-                @if (canManage) {
+                @if (canManage()) {
                   <ui-actions-menu
                     [items]="actionsFor(pipeline)"
                     [label]="'settings.common.actions' | transloco"
@@ -148,7 +149,7 @@
   <span footer>{{ 'settings.common.of' | transloco: { count: pipelines().length, max: maxCount } }}</span>
 </app-settings-frame>
 
-<app-pipeline-modal [canManage]="canManage" (saved)="onSaved()" (deleteRequested)="confirmDelete($event)" />
+<app-pipeline-modal [canManage]="canManage()" (saved)="onSaved()" (readOnlyChange)="readOnly.set(true)" (missing)="load()" (deleteRequested)="confirmDelete($event)" />
 
 <ui-confirm-dialog
   #deleteDialog
@@ -170,7 +171,7 @@
   <p class="text-12 leading-18 text-text-muted">{{ 'pipelines.list.inUseModal.text' | transloco }}</p>
 
   <div modal-footer class="flex flex-1 items-center gap-8">
-    @if (inUsePipeline()?.isActive) {
+    @if (canManage() && inUsePipeline()?.isActive) {
       <button type="button" uiButton [loading]="busy()" (click)="deactivateInUse()">
         {{ 'pipelines.list.inUseModal.deactivate' | transloco }}
       </button>

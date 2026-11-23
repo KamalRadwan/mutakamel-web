@@ -1,27 +1,29 @@
 import {
   Component,
   ElementRef,
+  Injector,
   computed,
   effect,
   inject,
   linkedSignal,
   resource,
+  runInInjectionContext,
   signal,
   untracked,
   viewChild,
   viewChildren,
 } from '@angular/core';
 import { translationEvents } from '../../../../core/i18n/translation-events';
+import { Router } from '@angular/router';
+import { fieldErrorsOf, isValidationError, writeErrorMessage } from '../../../../core/api/api-errors';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
-  tablerAlertTriangle,
   tablerBuilding,
   tablerBuildingSkyscraper,
   tablerBuildingStore,
   tablerChevronDown,
   tablerChevronRight,
-  tablerCloudOff,
   tablerCopy,
   tablerExclamationCircle,
 } from '@ng-icons/tabler-icons';
@@ -32,10 +34,12 @@ import { Button } from '../../../../shared/ui/button/button';
 import { Checkbox } from '../../../../shared/ui/checkbox/checkbox';
 import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { Field } from '../../../../shared/ui/field/field';
-import { Modal } from '../../../../shared/ui/modal/modal';
+import { ConflictDialog } from '../../../../shared/ui/conflict-dialog/conflict-dialog';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { rectInPage, viewport } from '../../../../shared/ui/overlay/zoom';
 import { Switch } from '../../../../shared/ui/switch/switch';
-import { ApiError, errorCodeOf, errorMessage } from '../shared/settings-api';
+import { ApiError, crmSettingsError, errorCodeOf, errorMessage } from '../shared/settings-api';
+import { tenantWide } from '../shared/settings-access';
 import { SettingsFrame } from '../../../../shared/ui/settings-frame/settings-frame';
 import { getPolicy, putBranch, putCompany, putDefaults } from './duplicates.api';
 import {
@@ -56,8 +60,6 @@ import {
 } from './duplicates.model';
 import { resetsFromDetails, resolveDefaultsEffective } from './duplicates.policy';
 import { PolicyCell } from './policy-cell/policy-cell';
-
-const CAN_MANAGE = true; // later from the session permissions
 
 interface FilteredCompany {
   company: PolicyCompany;
@@ -108,7 +110,8 @@ type PendingWrite =
     Checkbox,
     ConfirmDialog,
     Field,
-    Modal,
+    ConflictDialog,
+    FullState,
     Switch,
     SettingsFrame,
     PolicyCell,
@@ -122,8 +125,6 @@ type PendingWrite =
       tablerBuildingStore,
       tablerChevronDown,
       tablerChevronRight,
-      tablerCloudOff,
-      tablerAlertTriangle,
       tablerExclamationCircle,
     }),
   ],
@@ -137,14 +138,23 @@ export class DuplicatesPage {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
+  private readonly translateError = (key: string, params?: Record<string, unknown>): string =>
+    Object.hasOwn(this.transloco.getTranslation(this.transloco.getActiveLang()), key)
+      ? this.transloco.translate(key, params) : key;
+  private readonly injector = inject(Injector);
+  private readonly router = inject(Router);
   private readonly i18n = translationEvents(this.transloco);
   protected readonly language = inject(LanguageState).current;
 
   private readonly resetsConfirm = viewChild.required<ConfirmDialog>('resetsConfirm');
-  private readonly conflictModal = viewChild.required<Modal>('conflictModal');
   private readonly treeRows = viewChildren<ElementRef<HTMLElement>>('treeRow');
 
-  protected readonly canManage = CAN_MANAGE;
+  protected readonly readOnly = signal(false);
+  protected readonly canRead = computed(() => runInInjectionContext(this.injector, () => tenantWide('crm.settings.read')));
+  protected readonly canManage = computed(() => this.canRead() && !this.readOnly()
+    && runInInjectionContext(this.injector, () => tenantWide('crm.settings.manage')));
+  protected readonly conflictOpen = signal(false);
+  protected readonly validationErrors = signal<Record<string, string>>({});
   protected readonly skeletonRows = [1, 2, 3, 4, 5, 6];
   protected readonly policyColumns: readonly PolicySwitch[] = ['u', 'b', 'c'];
 
@@ -160,7 +170,7 @@ export class DuplicatesPage {
   protected readonly activeHintCol = signal<PolicySwitch | null>(null);
   protected readonly hintPlace = signal({ top: 0, start: 0 });
 
-  private readonly loaded = resource({ loader: () => getPolicy() });
+  private readonly loaded = resource({ params: () => this.canRead() || undefined, loader: () => getPolicy() });
   private readonly localTree = signal<PolicyTree | null>(null);
   private initializedExpand = false;
   private writeQueue: Promise<void> = Promise.resolve();
@@ -169,7 +179,17 @@ export class DuplicatesPage {
     this.localTree() ?? (this.loaded.hasValue() ? this.loaded.value() : null),
   );
   protected readonly loading = this.loaded.isLoading;
-  protected readonly loadFailed = computed(() => !this.loading() && !!this.loaded.error());
+  protected readonly loadState = computed(() => {
+    this.i18n();
+    const error = !this.canRead() ? new ApiError(403, 'CRM_PERMISSION_DENIED') : this.loaded.error();
+    return error ? crmSettingsError(this.translateError, error, 'dup') : null;
+  });
+  protected readonly loadErrorText = computed(() => {
+    const state = this.loadState();
+    return state?.correlationId
+      ? `${state.message} ${this.transloco.translate('settings.common.correlationId', { id: state.correlationId })}`
+      : state?.message ?? '';
+  });
   protected readonly isSearching = computed(() => this.search().trim().length > 0);
 
   protected readonly workspaceEffective = computed<Effective>(() => {
@@ -355,6 +375,11 @@ export class DuplicatesPage {
     this.loaded.reload();
   }
 
+  protected onLoadAction(): void {
+    if (this.loadState()?.kind === 'forbidden') void this.router.navigateByUrl('/');
+    else this.reload();
+  }
+
   protected clearSearch(): void {
     this.search.set('');
   }
@@ -412,7 +437,7 @@ export class DuplicatesPage {
 
   protected onToggleContactType(key: ContactCheckKey, checked: boolean): void {
     const current = this.tree();
-    if (!this.canManage || !current || this.savingTypes() || current.defaults[key] === checked) {
+    if (!this.canManage() || !current || this.savingTypes() || current.defaults[key] === checked) {
       return;
     }
     void this.enqueueWrite({ kind: 'defaults', patch: { [key]: checked } });
@@ -424,7 +449,7 @@ export class DuplicatesPage {
     cellKey: string,
   ): void {
     const current = this.tree();
-    if (!this.canManage || !current || value === null || current.defaults[field] === value) {
+    if (!this.canManage() || !current || value === null || current.defaults[field] === value) {
       return;
     }
     void this.enqueueWrite({ kind: 'defaults', patch: { [field]: value }, cellKey });
@@ -438,7 +463,7 @@ export class DuplicatesPage {
   ): void {
     const current = this.tree();
     const company = current?.companies.find((item) => item.companyId === companyId);
-    if (!this.canManage || !company || company.override[field] === value) {
+    if (!this.canManage() || !company || company.override[field] === value) {
       return;
     }
     void this.enqueueWrite({
@@ -459,7 +484,7 @@ export class DuplicatesPage {
     const branch = current?.companies
       .flatMap((company) => company.branches)
       .find((item) => item.branchId === branchId);
-    if (!this.canManage || !branch || branch.override[field] === value) {
+    if (!this.canManage() || !branch || branch.override[field] === value) {
       return;
     }
     void this.enqueueWrite({
@@ -477,9 +502,9 @@ export class DuplicatesPage {
       const fresh = await getPolicy();
       this.localTree.set(fresh);
       this.pendingStaleWrite.set(null);
-      this.conflictModal().close();
+      this.conflictOpen.set(false);
     } catch (error) {
-      this.notify.error(errorMessage(error, 'dup', this.transloco));
+      this.notify.error(errorMessage(error, 'dup', this.translateError));
     } finally {
       this.conflictBusy.set(false);
     }
@@ -489,7 +514,7 @@ export class DuplicatesPage {
     const write = this.pendingStaleWrite();
     if (this.conflictBusy()) return;
     if (!write) {
-      this.conflictModal().close();
+      this.conflictOpen.set(false);
       return;
     }
 
@@ -498,9 +523,9 @@ export class DuplicatesPage {
       const fresh = await getPolicy();
       this.localTree.set(fresh);
       this.pendingStaleWrite.set(null);
-      this.conflictModal().close();
+      this.conflictOpen.set(false);
     } catch (error) {
-      this.notify.error(errorMessage(error, 'dup', this.transloco));
+      this.notify.error(errorMessage(error, 'dup', this.translateError));
       return;
     } finally {
       this.conflictBusy.set(false);
@@ -666,11 +691,24 @@ export class DuplicatesPage {
     allowStaleReapply: boolean,
   ): Promise<void> {
     const current = this.tree();
-    if (!current) {
+    if (!current || !this.canManage()) {
       this.setWriteBusy(write, false);
       return;
     }
 
+    const targetId = write.kind === 'company' ? write.companyId : write.kind === 'branch' ? write.branchId : null;
+    const values = write.kind === 'defaults' ? current.defaults
+      : write.kind === 'company' ? current.companies.find((company) => company.companyId === targetId)?.override
+      : current.companies.flatMap((company) => company.branches).find((branch) => branch.branchId === targetId)?.override;
+    const patch = Object.fromEntries(Object.entries(write.patch).filter(([key, value]) => value !== undefined
+      && (!values || values[key as keyof typeof values] !== value)));
+    if (!Object.keys(patch).length) {
+      this.setWriteBusy(write, false);
+      return;
+    }
+    write = { ...write, patch };
+    const errorKey = write.cellKey ?? 'types';
+    this.validationErrors.update((errors) => ({ ...errors, [errorKey]: '' }));
     let retryConfirmed = false;
     try {
       const result = await this.sendWrite(write, current.revision, confirmResets);
@@ -678,12 +716,13 @@ export class DuplicatesPage {
       this.localTree.set(nextTree);
       this.notify.success(this.transloco.translate('dup.saved'));
       if (resets.length > 0) {
-        this.notify.info(this.transloco.translate('dup.resetsDone', { n: resets.length }));
+        const names = resets.map((reset) => `${reset.name} · ${this.transloco.translate(`dup.cols.${reset.switch}`)}`).join(' • ');
+        this.notify.info(this.transloco.translate('dup.resetsDone', { n: resets.length, names }));
       }
     } catch (error) {
       const code = errorCodeOf(error);
-      if (code === 'CRM_DUPLICATE_POLICY_RESETS_REQUIRED' && error instanceof ApiError) {
-        const resets = resetsFromDetails(error.details);
+      if (code === 'CRM_DUPLICATE_POLICY_RESETS_REQUIRED' && error instanceof ApiError && !confirmResets) {
+        const resets = resetsFromDetails(error.details, current);
         this.setWriteBusy(write, false);
         this.pendingResets.set(resets);
         const confirmed = await this.resetsConfirm().open();
@@ -698,11 +737,27 @@ export class DuplicatesPage {
 
       if (code === 'CRM_DUPLICATE_POLICY_STALE' && allowStaleReapply) {
         this.pendingStaleWrite.set(write);
-        this.conflictModal().open();
+        this.conflictOpen.set(true);
         return;
       }
 
-      this.notify.error(errorMessage(error, 'dup', this.transloco));
+      const state = crmSettingsError(this.translateError, error, 'dup');
+      if (state.readOnly) this.readOnly.set(true);
+      if (isValidationError(error)) {
+        const messages = fieldErrorsOf(error);
+        const fields = Object.keys(write.patch);
+        const message = fields.flatMap((field) => messages[field] ?? []).join(' ');
+        if (message) this.validationErrors.update((errors) => ({ ...errors, [errorKey]: message }));
+        else this.notify.error(state.message);
+      } else {
+        const retryAfter = error instanceof ApiError ? error.details?.['retryAfterSeconds'] : undefined;
+        const seconds = Array.isArray(retryAfter) ? retryAfter[0] : retryAfter;
+        this.notify.error(error instanceof ApiError && error.status === 429 && seconds !== undefined
+          ? this.transloco.translate('settings.errors.rateLimitedIn', { seconds })
+          : error instanceof ApiError && error.status === 401
+            ? writeErrorMessage(error, 'dup', this.translateError) : state.message);
+      }
+      if (code === 'CRM_COMPANY_NOT_FOUND' || code === 'CRM_BRANCH_NOT_FOUND') this.reload();
     } finally {
       if (!retryConfirmed) {
         this.setWriteBusy(write, false);

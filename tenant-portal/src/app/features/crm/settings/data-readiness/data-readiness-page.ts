@@ -11,11 +11,11 @@ import { DataCell, DataColumn, DataSort, DataTable } from '../../../../shared/ui
 import { Field } from '../../../../shared/ui/field/field';
 import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { SettingsFrame } from '../../../../shared/ui/settings-frame/settings-frame';
-import { listReadiness } from '../../../../shared/widgets/dashboard/analytics.api';
+import { listReadiness } from './readiness.api';
 import type { SourceReadiness } from '../../../../shared/widgets/dashboard/analytics.model';
-import { errorCodeOf } from '../../../../shared/widgets/dashboard/analytics-api';
-import { can } from '../../../../shared/widgets/dashboard/analytics-permissions';
-import { errorKey, reasonKey } from '../../../../shared/widgets/dashboard/panel-state';
+import { readinessError } from './readiness-error';
+import { tenantWide } from '../shared/settings-access';
+import { readinessReasonKey } from './readiness-reasons';
 import { ReadinessModal } from './readiness-modal/readiness-modal';
 
 const STATUS_ORDER: readonly SourceReadiness['status'][] = [
@@ -102,7 +102,15 @@ export class DataReadinessPage {
   private readonly readinessModal = viewChild<ReadinessModal>('readinessModal');
   private readonly queryParams = toSignal(this.route.queryParamMap);
 
-  protected readonly canView = can('crm.analytics.readiness.view');
+  protected readonly canView = tenantWide('crm.analytics.readiness.view');
+  protected readonly accessDenied = signal(false);
+  private readonly correlationId = signal<string | null>(null);
+  protected readonly loadFailureText = computed(() => {
+    this.i18n();
+    const message = this.transloco.translate('analytics.common.loadFailed');
+    const id = this.correlationId();
+    return id ? `${message} ${this.transloco.translate('settings.common.correlationId', { id })}` : message;
+  });
   protected readonly statuses = STATUS_ORDER;
 
   protected readonly items = signal<SourceReadiness[]>([]);
@@ -174,8 +182,6 @@ export class DataReadinessPage {
 
   protected readonly availableFamilies = computed(() => {
     const present = new Set<string>(this.items().map((row) => normalizeFamily(row.sourceFamily)));
-    const selected = this.selectedFamily();
-    if (selected) present.add(selected);
     const ordered: string[] = FAMILY_ORDER.filter((key) => present.has(key));
     for (const key of present) {
       if (!ordered.includes(key)) ordered.push(key);
@@ -281,14 +287,24 @@ export class DataReadinessPage {
       const response = await listReadiness();
       if (seq !== this.loadSeq) return;
       this.items.set(response.items);
+      const family = this.selectedFamily();
+      if (family && !response.items.some((row) => normalizeFamily(row.sourceFamily) === family)) {
+        this.selectedFamily.set(null);
+      }
       this.loadedOnce.set(true);
       this.loadError.set(false);
+      this.correlationId.set(null);
     } catch (error) {
       if (seq !== this.loadSeq) return;
-      if (!this.loadedOnce()) {
+      const failure = readinessError(this.transloco, error);
+      if (failure.kind === 'forbidden') {
+        this.accessDenied.set(true);
+        this.loadError.set(false);
+      } else if (!this.loadedOnce()) {
         this.loadError.set(true);
+        this.correlationId.set(failure.correlationId);
       } else {
-        this.notify.error(this.transloco.translate(errorKey(errorCodeOf(error))));
+        this.notify.error(failure.message);
       }
     } finally {
       if (seq === this.loadSeq) {
@@ -306,7 +322,7 @@ export class DataReadinessPage {
   }
 
   protected openSource(sourceKey: string): void {
-    if (!this.canView) return;
+    if (!this.canView || this.accessDenied()) return;
     this.activeSourceKey = sourceKey;
     this.readinessModal()?.open(sourceKey);
     if (this.queryParams()?.get('source') !== sourceKey) {
@@ -384,7 +400,7 @@ export class DataReadinessPage {
 
   protected reasonText(code: string | null): string {
     if (!code) return DASH;
-    return this.transloco.translate(reasonKey(code));
+    return this.transloco.translate(readinessReasonKey(code));
   }
 
   protected formatFreshness(lagSeconds: number | null): string {

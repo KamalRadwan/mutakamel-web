@@ -1,46 +1,68 @@
-import {
-  fakeCreateLeadSource,
-  fakeDeleteLeadSource,
-  fakeListLeadSources,
-  fakeReorderLeadSources,
-  fakeUpdateLeadSource,
-  fakeUploadLeadSourceIcon,
-} from './lead-sources.fake';
-import { CreateLeadSourceInput, LeadSource, UpdateLeadSourceInput } from './lead-sources.model';
+import { type CoreWriteMethod } from '../../../../core/api/core-http';
+import { newIdempotencyKey } from '../../../../core/api/idempotency';
+import { crmHttp, crmQueries, type CrmHttpTransport } from '../../shared/crm-http';
+import { CreateLeadSourceInput, LeadSource, UpdateLeadSourceInput, keepSourceWriteKey } from './lead-sources.model';
 
-/** GET /api/tenant/crm/v1/acquisition-sources */
+const queryKey = ['crm-settings', 'lead-sources'] as const;
+const path = '/acquisition-sources';
+// Preserve the public signatures while keeping retry actions local to their transport binding.
+const pendingWrites = new WeakMap<CrmHttpTransport, Map<string, { key: string; bodyJson: string }>>();
+
 export function listLeadSources(): Promise<LeadSource[]> {
-  return fakeListLeadSources();
+  return crmQueries().fetchQuery({ queryKey, queryFn: () => crmHttp().read<LeadSource[]>(path) });
 }
 
-/** POST /api/tenant/crm/v1/acquisition-sources */
 export function createLeadSource(input: CreateLeadSourceInput): Promise<LeadSource> {
-  return fakeCreateLeadSource(input);
+  return writeSource('POST', path, { ...input, nameAr: input.nameAr.trim(), nameEn: input.nameEn.trim() });
 }
 
-/** PATCH /api/tenant/crm/v1/acquisition-sources/:id */
 export function updateLeadSource(id: string, changes: UpdateLeadSourceInput): Promise<LeadSource> {
-  return fakeUpdateLeadSource(id, changes);
+  const body = { ...changes };
+  if (body.nameAr !== undefined) body.nameAr = body.nameAr.trim();
+  if (body.nameEn !== undefined) body.nameEn = body.nameEn.trim();
+  return writeSource('PATCH', `${path}/${id}`, body);
 }
 
-/**
- * PATCH /api/tenant/crm/v1/acquisition-sources/reorder.
- * Header x-idempotency-key (UUID v7) is required: the gateway enforces it (WRITE_SENSITIVE route), not crm-app.
- * New key per user action, same key on retry.
- */
 export function reorderLeadSources(orderedIds: readonly string[], idempotencyKey: string): Promise<LeadSource[]> {
-  return fakeReorderLeadSources(orderedIds, idempotencyKey);
+  return writeSource('PATCH', `${path}/reorder`, { orderedIds: [...orderedIds] }, idempotencyKey);
 }
 
-/** DELETE /api/tenant/crm/v1/acquisition-sources/:id */
 export function deleteLeadSource(id: string): Promise<void> {
-  return fakeDeleteLeadSource(id);
+  return writeSource('DELETE', `${path}/${id}`, undefined);
 }
 
-/**
- * POST /api/tenant/crm/v1/acquisition-sources/:id/icon (multipart).
- * Header x-idempotency-key (UUID v7) is required: the gateway enforces it and stores the replay.
- */
-export function uploadLeadSourceIcon(id: string, file: File, idempotencyKey: string): Promise<LeadSource> {
-  return fakeUploadLeadSourceIcon(id, file, idempotencyKey);
+export async function uploadLeadSourceIcon(id: string, file: File, idempotencyKey: string): Promise<LeadSource> {
+  const form = new FormData();
+  form.append('file', file);
+  const result = await crmHttp().writeMultipart<LeadSource>(`${path}/${id}/icon`, form, { key: idempotencyKey });
+  await refreshSources();
+  return result.data;
+}
+
+async function writeSource<T>(method: CoreWriteMethod, url: string, body: unknown, suppliedKey?: string): Promise<T> {
+  const http = crmHttp();
+  let actions = pendingWrites.get(http);
+  if (!actions) {
+    actions = new Map();
+    pendingWrites.set(http, actions);
+  }
+  const action = `${method} ${url}`;
+  const bodyJson = JSON.stringify(body) ?? '';
+  const previous = actions.get(action);
+  const key = suppliedKey ?? (previous?.bodyJson === bodyJson ? previous.key : newIdempotencyKey());
+  if (!suppliedKey) actions.set(action, { key, bodyJson });
+  try {
+    const result = await http.write<T>(method, url, bodyJson ? JSON.parse(bodyJson) : undefined, { key });
+    actions.delete(action);
+    await refreshSources();
+    return result.data;
+  } catch (error) {
+    if (!keepSourceWriteKey(error)) actions.delete(action);
+    throw error;
+  }
+}
+
+async function refreshSources(): Promise<void> {
+  await crmQueries().cancelQueries({ queryKey });
+  await crmQueries().invalidateQueries({ queryKey });
 }

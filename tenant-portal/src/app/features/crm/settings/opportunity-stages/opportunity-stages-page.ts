@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal, viewChild } from '@angular/core';
+import { Component, Injector, computed, inject, runInInjectionContext, signal, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../core/i18n/translation-events';
 import { Router, RouterLink } from '@angular/router';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
@@ -17,19 +17,21 @@ import { ActionItem, ActionSelection, ActionsMenu } from '../../../../shared/ui/
 import { Button } from '../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { Modal } from '../../../../shared/ui/modal/modal';
-import { errorCodeOf } from '../shared/settings-api';
+import { ApiError, errorCodeOf } from '../shared/settings-api';
+import { tenantWide } from '../shared/settings-access';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { SettingsFrame } from '../../../../shared/ui/settings-frame/settings-frame';
 import { SettingsNotice } from '../../../../shared/ui/settings-notice/settings-notice';
 import { OpportunityStageModal } from './opportunity-stage-modal/opportunity-stage-modal';
+import { opportunityStageError } from './opportunity-stage-errors';
 import {
   deleteOpportunityStage,
   listOpportunityStages,
-  stageUsage,
+  OPPORTUNITY_STAGE_USAGE_READER,
   updateOpportunityStage,
 } from './opportunity-stages.api';
 import { OpportunityStage, OpportunityStageFlag, StageCategory, StageUsagePipeline } from './opportunity-stages.model';
 
-const CAN_MANAGE = true; // later from the session permissions
 const MAX_STAGES = 500;
 const SKELETON_ROWS = [1, 2, 3, 4, 5];
 
@@ -62,6 +64,7 @@ const CANONICAL_SYSTEM_FLAG_ORDER: Partial<Record<OpportunityStageFlag, number>>
     SettingsFrame,
     SettingsNotice,
     OpportunityStageModal,
+    FullState,
   ],
   providers: [
     provideTranslocoScope('settings', { scope: 'settings-opportunity-stages', alias: 'opportunityStages' }),
@@ -75,9 +78,11 @@ const CANONICAL_SYSTEM_FLAG_ORDER: Partial<Record<OpportunityStageFlag, number>>
     }),
   ],
   templateUrl: './opportunity-stages-page.html',
-  host: { class: 'flex min-h-0 flex-1 flex-col p-12' },
+  host: { class: 'flex flex-1 shrink-0 flex-col p-12' },
 })
 export class OpportunityStagesPage {
+  private readonly readUsage = inject(OPPORTUNITY_STAGE_USAGE_READER);
+  private readonly injector = inject(Injector);
   private readonly router = inject(Router);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
@@ -88,22 +93,31 @@ export class OpportunityStagesPage {
   private readonly confirmDialog = viewChild.required(ConfirmDialog);
   private readonly inUseModal = viewChild.required<Modal>('inUseModal');
 
-  protected readonly canManage = CAN_MANAGE;
+  protected readonly hasAccess = computed(() => runInInjectionContext(this.injector, () => tenantWide('crm.pipelines.manage')));
+  protected readonly readOnly = signal(false);
+  protected readonly canManage = computed(() => this.hasAccess() && !this.readOnly());
   protected readonly maxStages = MAX_STAGES;
   protected readonly skeletonRows = SKELETON_ROWS;
-  protected readonly gridColumnsClass = CAN_MANAGE
+  protected readonly gridColumnsClass = computed(() => this.canManage()
     ? 'grid-cols-[minmax(0,1.4fr)_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1.5fr)_var(--table-head-h)]'
-    : 'grid-cols-[minmax(0,1.4fr)_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1.5fr)]';
+    : 'grid-cols-[minmax(0,1.4fr)_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1.5fr)]');
 
   protected readonly search = signal('');
   protected readonly stages = signal<OpportunityStage[]>([]);
   protected readonly usage = signal<Record<string, StageUsagePipeline[]>>({});
+  protected readonly usageKnown = signal(false);
   protected readonly loading = signal(true);
-  protected readonly failed = signal(false);
+  protected readonly loadError = signal<unknown>(null);
+  protected readonly failure = computed(() => {
+    this.i18n();
+    return this.loadError() ? opportunityStageError(this.transloco, this.loadError()) : null;
+  });
   protected readonly deletingStage = signal<OpportunityStage | null>(null);
   protected readonly inUsePipelines = signal<StageUsagePipeline[]>([]);
 
   private loadSeq = 0;
+  private usageSeq = 0;
+  private readonly pendingStages = new Set<string>();
 
   protected readonly atLimit = computed(() => this.stages().length >= MAX_STAGES);
 
@@ -154,21 +168,46 @@ export class OpportunityStagesPage {
   protected async load(): Promise<void> {
     const seq = ++this.loadSeq;
     this.loading.set(true);
-    this.failed.set(false);
+    this.loadError.set(null);
+    if (!this.hasAccess()) {
+      this.loadError.set(new ApiError(403, 'CRM_PERMISSION_DENIED'));
+      this.loading.set(false);
+      return;
+    }
+    void this.loadUsage(seq);
     try {
-      const [stages, usage] = await Promise.all([listOpportunityStages(), stageUsage()]);
+      const stages = await listOpportunityStages();
       if (seq !== this.loadSeq) return;
       this.stages.set(stages);
-      this.usage.set(usage);
-    } catch {
+    } catch (error) {
       if (seq === this.loadSeq) {
-        this.failed.set(true);
+        if (!(error instanceof ApiError && error.status === 401)) this.loadError.set(error);
       }
     } finally {
       if (seq === this.loadSeq) {
         this.loading.set(false);
       }
     }
+  }
+
+  private async loadUsage(seq: number): Promise<void> {
+    const request = ++this.usageSeq;
+    this.usage.set({});
+    this.usageKnown.set(false);
+    try {
+      const usage = await this.readUsage();
+      if (seq === this.loadSeq && request === this.usageSeq) {
+        this.usage.set(usage);
+        this.usageKnown.set(true);
+      }
+    } catch {
+      if (seq === this.loadSeq && request === this.usageSeq) this.usage.set({});
+    }
+  }
+
+  protected failureAction(): void {
+    if (this.failure()?.kind === 'forbidden') void this.router.navigate(['/workspace/home']);
+    else void this.load();
   }
 
   protected pipelinesFor(stageId: string): StageUsagePipeline[] {
@@ -188,7 +227,7 @@ export class OpportunityStagesPage {
   }
 
   protected openCreate(): void {
-    if (!this.canManage || this.atLimit()) return;
+    if (!this.canManage() || this.atLimit()) return;
     this.stageModal().openCreate();
   }
 
@@ -207,12 +246,12 @@ export class OpportunityStagesPage {
   protected async onSaveFailed({ stage, error }: { stage: OpportunityStage; error: unknown }): Promise<void> {
     const code = errorCodeOf(error);
     if (code === 'OPPORTUNITY_STAGE_IN_USE') {
-      await this.openInUseWarning(stage.id, error);
+      await this.openInUseWarning(stage.id);
       this.stageModal().refreshUsage(this.pipelinesFor(stage.id));
-    } else if (code === 'OPPORTUNITY_STAGE_NOT_FOUND') {
+    } else if (error instanceof ApiError && error.status === 404) {
       this.stageModal().close();
       this.showErrorToast(error);
-      void this.load();
+      this.dropStage(stage.id);
     }
   }
 
@@ -304,6 +343,7 @@ export class OpportunityStagesPage {
   }
 
   protected act(stage: OpportunityStage, selection: ActionSelection): void {
+    if (!this.canManage()) return;
     const pipelines = this.pipelinesFor(stage.id);
     switch (selection.id) {
       case 'open':
@@ -327,22 +367,24 @@ export class OpportunityStagesPage {
   }
 
   protected async confirmDelete(stage: OpportunityStage): Promise<void> {
-    if (!this.canManage || stage.isSystem) return;
+    if (!this.canManage() || stage.isSystem || this.pendingStages.has(stage.id)) return;
+    this.pendingStages.add(stage.id);
     this.deletingStage.set(stage);
-    if (!(await this.confirmDialog().open())) return;
-
     try {
+      if (!(await this.confirmDialog().open()) || !this.canManage()) return;
       await deleteOpportunityStage(stage.id);
-      this.stages.update((current) => current.filter((item) => item.id !== stage.id));
+      this.dropStage(stage.id);
     } catch (error) {
       if (errorCodeOf(error) === 'OPPORTUNITY_STAGE_IN_USE') {
-        await this.openInUseWarning(stage.id, error);
+        await this.openInUseWarning(stage.id);
         return;
       }
       this.showErrorToast(error);
-      if (errorCodeOf(error) === 'OPPORTUNITY_STAGE_NOT_FOUND') {
-        void this.load();
+      if (error instanceof ApiError && error.status === 404) {
+        this.dropStage(stage.id);
       }
+    } finally {
+      this.pendingStages.delete(stage.id);
     }
   }
 
@@ -357,28 +399,34 @@ export class OpportunityStagesPage {
   }
 
   private async toggleActive(stage: OpportunityStage): Promise<void> {
+    if (!this.canManage() || this.pendingStages.has(stage.id)) return;
+    this.pendingStages.add(stage.id);
     try {
       const updated = await updateOpportunityStage(stage.id, { isActive: !stage.isActive });
       this.onSaved(updated);
     } catch (error) {
       if (errorCodeOf(error) === 'OPPORTUNITY_STAGE_IN_USE') {
-        await this.openInUseWarning(stage.id, error);
+        await this.openInUseWarning(stage.id);
         return;
       }
       this.showErrorToast(error);
-      if (errorCodeOf(error) === 'OPPORTUNITY_STAGE_NOT_FOUND') {
-        void this.load();
+      if (error instanceof ApiError && error.status === 404) {
+        this.dropStage(stage.id);
       }
+    } finally {
+      this.pendingStages.delete(stage.id);
     }
   }
 
   /** The 409 OPPORTUNITY_STAGE_IN_USE carries no details, so the pipelines come from a fresh usage read. */
-  private async openInUseWarning(stageId: string, _error?: unknown): Promise<void> {
+  private async openInUseWarning(stageId: string): Promise<void> {
+    ++this.usageSeq;
     let pipelines: StageUsagePipeline[] = this.pipelinesFor(stageId);
     try {
-      const freshUsage = await stageUsage();
+      const freshUsage = await this.readUsage();
       this.usage.set(freshUsage);
-      pipelines = freshUsage[stageId] ?? pipelines;
+      this.usageKnown.set(true);
+      pipelines = freshUsage[stageId] ?? [];
     } catch {
       // Keep the usage already loaded.
     }
@@ -387,9 +435,12 @@ export class OpportunityStagesPage {
   }
 
   private showErrorToast(error: unknown): void {
-    const code = errorCodeOf(error);
-    const key = code ? `opportunityStages.errors.${code}` : 'settings.errors.generic';
-    const message = this.transloco.translate(key);
-    this.notify.error(message !== key ? message : this.transloco.translate('settings.errors.generic'));
+    const state = opportunityStageError(this.transloco, error);
+    if (state.readOnly) this.readOnly.set(true);
+    this.notify.error(state.message);
+  }
+
+  private dropStage(id: string): void {
+    this.stages.update((current) => current.filter((stage) => stage.id !== id));
   }
 }

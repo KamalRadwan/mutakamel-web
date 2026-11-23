@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal, viewChild } from '@angular/core';
+import { Component, Injector, computed, effect, inject, untracked, runInInjectionContext, signal, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../core/i18n/translation-events';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
@@ -20,14 +20,16 @@ import { Dropdown, DropdownOption } from '../../../../shared/ui/dropdown/dropdow
 import { Field } from '../../../../shared/ui/field/field';
 import { getCrmSettings } from '../general/general.api';
 import { errorCodeOf } from '../shared/settings-api';
+import { anyGrant, tenantWide } from '../shared/settings-access';
+import { settingsTimeZone } from '../shared/settings-time-zone';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
+import { SourceLookup, searchSourceRecords } from './source-lookup';
 import { SettingsFrame } from '../../../../shared/ui/settings-frame/settings-frame';
-import { SettingsNotice } from '../../../../shared/ui/settings-notice/settings-notice';
 import { ComposeModal } from './compose-modal/compose-modal';
 import { EmailDetailModal } from './email-detail-modal/email-detail-modal';
-import { getEmail, listEmails, listSourceRecords, senderStatus } from './outbound-emails.api';
+import { getEmail, listEmails, senderStatus } from './outbound-emails.api';
 import {
   CrmSourceRecord,
-  EMAIL_SOURCE_TYPES,
   EMAIL_STATUSES,
   EmailDetail,
   EmailListFilter,
@@ -35,20 +37,19 @@ import {
   EmailSourceType,
   EmailStatus,
   MAX_RANGE_DAYS,
-  RETENTION_DAYS,
+  emailDateBound,
   SOURCE_LOOK,
   STATUS_BADGE,
   SenderStatusConfig,
   canRetryEmail,
   formatEmailDateTime,
   mayOfferRetry,
+  emailErrorState,
   resolveEmailErrorMessage,
   shortEmailRef,
 } from './outbound-emails.model';
 import { RetryModal } from './retry-modal/retry-modal';
 import { SenderStatus } from './sender-status/sender-status';
-
-const CAN_MANAGE = true; // later from the session permissions
 
 const SKELETON_ROWS = [0, 1, 2, 3, 4] as const;
 
@@ -67,18 +68,18 @@ type SourceTypeFilter = 'ALL' | EmailSourceType;
     Dropdown,
     Field,
     SettingsFrame,
-    SettingsNotice,
     SenderStatus,
     EmailDetailModal,
     RetryModal,
     ComposeModal,
+    FullState,
   ],
   providers: [
     provideTranslocoScope('settings', { scope: 'settings-outbound-emails', alias: 'outboundEmails' }),
     provideIcons({ tablerEye, tablerRefresh, tablerLink, tablerUserPlus, tablerUsers, tablerTarget }),
   ],
   templateUrl: './outbound-emails-page.html',
-  host: { class: 'flex min-h-0 flex-1 flex-col' },
+  host: { class: 'flex flex-1 shrink-0 flex-col' },
 })
 export class OutboundEmailsPage {
   private static nextId = 0;
@@ -88,13 +89,22 @@ export class OutboundEmailsPage {
   private readonly i18n = translationEvents(this.transloco);
   private readonly language = inject(LanguageState).current;
   private readonly notify = inject(Notify);
+  private readonly injector = inject(Injector);
+  protected readonly sources = new SourceLookup();
+  protected readonly canRead = anyGrant('crm.activities.read');
+  protected readonly canReadSettings = tenantWide('crm.settings.read');
+  private readonly canReadSender = anyGrant('workspace.email.read');
+  protected readonly readOnly = signal(false);
+  protected readonly zone = signal<string | null>(null);
+  protected readonly correlationId = signal<string | null>(null);
 
   private readonly detailModal = viewChild.required(EmailDetailModal);
   private readonly retryModal = viewChild.required(RetryModal);
   private readonly composeModal = viewChild.required(ComposeModal);
 
-  protected readonly canManage = CAN_MANAGE;
-  protected readonly retentionDays = signal(RETENTION_DAYS);
+  protected readonly canManage = computed(() => !this.readOnly() &&
+    runInInjectionContext(this.injector, () => anyGrant('crm.email.send')));
+  protected readonly retentionDays = signal<number | null>(null);
   protected readonly skeletonRows = SKELETON_ROWS;
   protected readonly statusBadge = STATUS_BADGE;
   protected readonly sourceLook = SOURCE_LOOK;
@@ -125,7 +135,7 @@ export class OutboundEmailsPage {
   });
 
   protected readonly gridColumnsClass = computed(() =>
-    this.canManage ? 'grid-cols-crm-outbound-email-row-actions' : 'grid-cols-crm-outbound-email-row',
+    this.canManage() ? 'grid-cols-crm-outbound-email-row-actions' : 'grid-cols-crm-outbound-email-row',
   );
 
   protected readonly rangeError = computed<string | null>(() => {
@@ -135,7 +145,7 @@ export class OutboundEmailsPage {
     if (!from || !to) return null;
     if (from > to) return this.transloco.translate('outboundEmails.filters.invalidRange');
     const diffDays = Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
-    if (diffDays > MAX_RANGE_DAYS) return this.transloco.translate('outboundEmails.filters.rangeTooLong');
+    if (diffDays + 1 > MAX_RANGE_DAYS) return this.transloco.translate('outboundEmails.filters.rangeTooLong');
     return null;
   });
 
@@ -164,12 +174,24 @@ export class OutboundEmailsPage {
     this.i18n();
     return [
       { value: 'ALL', label: this.transloco.translate('outboundEmails.filters.allTypes') },
-      ...EMAIL_SOURCE_TYPES.map((type) => ({
+      ...this.sources.types().map((type) => ({
         value: type,
         label: this.transloco.translate(`outboundEmails.sourceTypes.${type}`),
       })),
     ];
   });
+
+  protected readonly branchOptions = computed(() => {
+    const type = this.sourceTypeFilter();
+    return (type === 'ALL' ? this.sources.availableBranches() : this.sources.branchesFor(type))
+      .map((branch) => ({ value: branch.id, label: branch.name }));
+  });
+
+  protected readonly dateHint = (key: string): string => {
+    this.i18n();
+    return this.transloco.translate(`outboundEmails.filters.${key}`) +
+      (this.zone() ? '' : ` ${this.transloco.translate('outboundEmails.filters.utcHint')}`);
+  };
 
   protected readonly recordOptions = computed<DropdownOption<string>[]>(() => {
     this.i18n();
@@ -197,10 +219,24 @@ export class OutboundEmailsPage {
   private senderSeq = 0;
 
   constructor() {
+    if (!this.canRead) {
+      this.featureDisabled.set(true);
+      return;
+    }
     void this.loadRetention();
     void this.loadSender();
-    void this.loadSourceRecords();
-    void this.loadList(true);
+    void this.sources.loadBranches().catch((error) => this.notify.error(resolveEmailErrorMessage(this.transloco, error)));
+    void settingsTimeZone().then((zone) => this.zone.set(zone)).catch(() => this.zone.set(null))
+      .finally(() => this.loadList(true));
+    effect(() => {
+      const branch = this.sources.branchId();
+      const type = this.sourceTypeFilter();
+      const types = this.sources.types();
+      if (type !== 'ALL' && branch && !types.includes(type)) this.sourceTypeFilter.set('ALL');
+      this.sourceIdFilter.set('ALL');
+      this.sourceRecords.set([]);
+      untracked(() => { void this.loadSourceRecords(); void this.loadList(true); });
+    });
   }
 
   protected reloadAll(): void {
@@ -218,6 +254,16 @@ export class OutboundEmailsPage {
     this.sourceTypeFilter.set(value);
     this.sourceIdFilter.set('ALL');
     void this.loadList(true);
+  }
+
+  protected onBranchChange(value: string | null): void {
+    this.sources.branchId.set(value);
+    this.sourceIdFilter.set('ALL');
+    void this.loadList(true);
+  }
+
+  protected onRecordSearch(event: Event): void {
+    void this.loadSourceRecords((event.target as HTMLInputElement).value);
   }
 
   protected onSourceIdFilterChange(value: string): void {
@@ -259,7 +305,7 @@ export class OutboundEmailsPage {
   }
 
   protected openCompose(): void {
-    if (!this.canManage || this.featureDisabled() || !this.canSendCrm()) return;
+    if (!this.canManage() || this.featureDisabled() || !this.canSendCrm()) return;
     this.composeModal().open();
   }
 
@@ -268,7 +314,7 @@ export class OutboundEmailsPage {
   }
 
   protected openRetry(email: EmailDetail): void {
-    if (!this.canManage || !canRetryEmail(email)) return;
+    if (!this.canManage() || !canRetryEmail(email)) return;
     this.retryModal().open(email);
   }
 
@@ -277,7 +323,7 @@ export class OutboundEmailsPage {
    * so fetch the email detail before opening the retry modal from a row action.
    */
   private async openRetryFromRow(row: EmailRow): Promise<void> {
-    if (!this.canManage) return;
+    if (!this.canManage()) return;
     try {
       const detail = await getEmail(row.outboundEmailId);
       if (!canRetryEmail(detail)) {
@@ -290,8 +336,9 @@ export class OutboundEmailsPage {
     }
   }
 
-  protected onEmailQueued(): void {
+  protected async onEmailQueued(): Promise<void> {
     void this.loadList(true);
+    await this.detailModal().refresh();
   }
 
   protected rowActions(row: EmailRow): ActionItem[] {
@@ -305,7 +352,7 @@ export class OutboundEmailsPage {
       },
     ];
 
-    if (mayOfferRetry(row)) {
+    if (this.canManage() && mayOfferRetry(row)) {
       items.push({
         id: 'retry',
         title: this.transloco.translate('outboundEmails.actions.retry'),
@@ -366,39 +413,36 @@ export class OutboundEmailsPage {
     const to = this.toDate();
 
     if (status !== 'ALL') filter.status = status;
-    if (sourceType !== 'ALL') filter.sourceType = sourceType;
-    if (sourceType !== 'ALL' && sourceId !== 'ALL') filter.sourceId = sourceId;
-    if (from) {
-      const [y, m, d] = from.split('-').map(Number);
-      filter.requestedFrom = new Date(y, m - 1, d).toISOString();
+    if (sourceType !== 'ALL' && sourceId !== 'ALL') {
+      filter.sourceType = sourceType;
+      filter.sourceId = sourceId;
     }
-    if (to) {
-      const [y, m, d] = to.split('-').map(Number);
-      filter.requestedTo = new Date(y, m - 1, d, 23, 59, 59, 999).toISOString();
-    }
+    if (from) filter.requestedFrom = emailDateBound(from, this.zone());
+    if (to) filter.requestedTo = emailDateBound(to, this.zone(), true);
     return filter;
   }
 
   private async loadRetention(): Promise<void> {
+    if (!this.canReadSettings) return;
     try {
       const settings = await getCrmSettings();
       this.retentionDays.set(settings.outboundEmailContentRetentionDays);
     } catch {
-      // Keep default retention days if settings cannot be read
+      this.retentionDays.set(null);
     }
   }
 
   private async loadSender(): Promise<void> {
+    if (!this.canReadSender) return;
     const seq = ++this.senderSeq;
     this.senderLoading.set(true);
     try {
-      const config = await senderStatus();
+      const config = await runInInjectionContext(this.injector, senderStatus);
       if (seq !== this.senderSeq) return;
       this.sender.set(config);
-    } catch (error) {
+    } catch {
       if (seq === this.senderSeq) {
         this.sender.set(null);
-        this.notify.error(resolveEmailErrorMessage(this.transloco, error));
       }
     } finally {
       if (seq === this.senderSeq) {
@@ -407,17 +451,22 @@ export class OutboundEmailsPage {
     }
   }
 
-  private async loadSourceRecords(): Promise<void> {
+  private sourceSeq = 0;
+  private async loadSourceRecords(text = ''): Promise<void> {
+    const seq = ++this.sourceSeq;
+    const type = this.sourceTypeFilter();
+    const branch = this.sources.branchId();
+    if (type === 'ALL' || !branch || !this.sources.types().includes(type)) return;
     try {
-      const records = await listSourceRecords();
-      this.sourceRecords.set(records);
+      const records = await searchSourceRecords(type, branch, text, 1);
+      if (seq === this.sourceSeq) this.sourceRecords.set(records);
     } catch {
       // Non-blocking lookup for record dropdown
     }
   }
 
   private async loadList(reset: boolean): Promise<void> {
-    if (this.rangeError()) return;
+    if (!this.canRead || this.rangeError()) return;
     const seq = ++this.listSeq;
     const cursor = reset ? null : this.nextCursor();
 
@@ -438,8 +487,14 @@ export class OutboundEmailsPage {
       this.hasNext.set(page.hasNext);
     } catch (error) {
       if (seq !== this.listSeq) return;
+      if (errorCodeOf(error) === 'CRM.EMAIL.INVALID_CURSOR' && cursor) {
+        await this.loadList(true);
+        return;
+      }
       const message = resolveEmailErrorMessage(this.transloco, error);
-      if (errorCodeOf(error) === 'CRM_FEATURE_DISABLED') {
+      const state = emailErrorState(this.transloco, error);
+      this.correlationId.set(state.correlationId);
+      if (state.kind === 'forbidden') {
         this.featureDisabled.set(true);
         this.failed.set(false);
         this.errorText.set(message);

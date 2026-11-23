@@ -8,6 +8,7 @@
   (closed)="onModalClosed()"
 >
   <div class="grid grid-cols-2 gap-x-10 gap-y-8">
+    <div>
     <ui-field
       [for]="uid + '-name-ar'"
       [label]="'settings.common.nameAr' | transloco"
@@ -24,12 +25,17 @@
         [value]="nameAr()"
         [readonly]="!canManage() || saving()"
         [attr.aria-invalid]="errorOf('nameAr') ? 'true' : null"
-        [attr.aria-describedby]="errorOf('nameAr') ? uid + '-name-ar-error ' + uid + '-name-ar-hint' : uid + '-name-ar-hint'"
+        [attr.aria-describedby]="uid + '-name-ar-hint' + (errorOf('nameAr') ? ' ' + uid + '-name-ar-error' : '') + (!errorOf('nameAr') && duplicateName('nameAr') ? ' ' + uid + '-name-ar-warning' : '')"
         (input)="onNameInput('nameAr', $event)"
         (blur)="markTouched('nameAr')"
       />
     </ui-field>
+    @if (!errorOf('nameAr') && duplicateName('nameAr'); as warning) {
+      <p [id]="uid + '-name-ar-warning'" class="mt-2 text-11 leading-16 text-warning-text">{{ warning }}</p>
+    }
+    </div>
 
+    <div>
     <ui-field
       [for]="uid + '-name-en'"
       [label]="'settings.common.nameEn' | transloco"
@@ -47,11 +53,15 @@
         [value]="nameEn()"
         [readonly]="!canManage() || saving()"
         [attr.aria-invalid]="errorOf('nameEn') ? 'true' : null"
-        [attr.aria-describedby]="errorOf('nameEn') ? uid + '-name-en-error ' + uid + '-name-en-hint' : uid + '-name-en-hint'"
+        [attr.aria-describedby]="uid + '-name-en-hint' + (errorOf('nameEn') ? ' ' + uid + '-name-en-error' : '') + (!errorOf('nameEn') && duplicateName('nameEn') ? ' ' + uid + '-name-en-warning' : '')"
         (input)="onNameInput('nameEn', $event)"
         (blur)="markTouched('nameEn')"
       />
     </ui-field>
+    @if (!errorOf('nameEn') && duplicateName('nameEn'); as warning) {
+      <p [id]="uid + '-name-en-warning'" class="mt-2 text-11 leading-16 text-warning-text">{{ warning }}</p>
+    }
+    </div>
 
     @if (meaningLocked()) {
       <ui-field
@@ -59,6 +69,7 @@
         [label]="'opportunityStages.modal.meaning' | transloco"
         [required]="true"
         [hint]="meaningHint()"
+        [error]="errorOf('flag')"
       >
         <input
           [id]="uid + '-meaning'"
@@ -73,11 +84,15 @@
     } @else {
       <ui-field
         size="bare"
+        [for]="uid + '-meaning'"
         [label]="'opportunityStages.modal.meaning' | transloco"
         [required]="true"
         [hint]="meaningHint()"
+        [error]="errorOf('flag')"
       >
         <ui-dropdown
+          [id]="uid + '-meaning'"
+          [describedBy]="uid + '-meaning-hint' + (errorOf('flag') ? ' ' + uid + '-meaning-error' : '')"
           class="w-full"
           size="field"
           [options]="flagOptions()"
@@ -94,6 +109,7 @@
         [label]="'opportunityStages.modal.category' | transloco"
         [required]="true"
         [hint]="'opportunityStages.modal.categoryHint' | transloco"
+        [error]="errorOf('category')"
       >
         <input
           [id]="uid + '-category'"
@@ -108,11 +124,15 @@
     } @else {
       <ui-field
         size="bare"
+        [for]="uid + '-category'"
         [label]="'opportunityStages.modal.category' | transloco"
         [required]="true"
         [hint]="'opportunityStages.modal.categoryHint' | transloco"
+        [error]="errorOf('category')"
       >
         <ui-dropdown
+          [id]="uid + '-category'"
+          [describedBy]="uid + '-category-hint' + (errorOf('category') ? ' ' + uid + '-category-error' : '')"
           class="w-full"
           size="field"
           [options]="categoryOptions()"
@@ -125,18 +145,33 @@
 
     @if (isEdit()) {
       <ui-field
-        size="bare"
+        [size]="canManage() ? 'bare' : 'default'"
+        [for]="uid + '-active'"
         [label]="'settings.common.active' | transloco"
         [hint]="activeHintKey() | transloco"
+        [error]="errorOf('isActive')"
       >
+        @if (canManage()) {
         <div class="flex h-field items-center gap-8">
           <ui-switch
+            [id]="uid + '-active'"
+            [describedBy]="uid + '-active-hint' + (errorOf('isActive') ? ' ' + uid + '-active-error' : '')"
             [(checked)]="isActive"
             [disabled]="activeLocked() || saving()"
             [label]="'settings.common.active' | transloco"
           />
           <span class="text-12 text-text">{{ (isActive() ? 'settings.common.active' : 'settings.common.inactive') | transloco }}</span>
         </div>
+        } @else {
+          <input
+            [id]="uid + '-active'"
+            type="text"
+            readonly
+            class="min-w-0 flex-1 cursor-default bg-transparent text-12 text-text outline-none"
+            [value]="(isActive() ? 'settings.common.active' : 'settings.common.inactive') | transloco"
+            [attr.aria-describedby]="uid + '-active-hint'"
+          />
+        }
       </ui-field>
 
       <ui-field
@@ -149,7 +184,7 @@
           type="text"
           readonly
           class="min-w-0 flex-1 cursor-default bg-transparent text-12 text-text outline-none"
-          [value]="isUsed() ? usedInNames() : ('opportunityStages.modal.usedInNone' | transloco)"
+          [value]="!usageKnown() ? '—' : isUsed() ? usedInNames() : ('opportunityStages.modal.usedInNone' | transloco)"
           [attr.aria-describedby]="uid + '-used-in-hint'"
         />
       </ui-field>

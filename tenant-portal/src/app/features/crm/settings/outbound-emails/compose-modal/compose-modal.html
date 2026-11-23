@@ -43,28 +43,40 @@
   @switch (step()) {
     @case (1) {
       <div class="flex flex-col gap-8">
-        <ui-field
-          size="bare"
-          [label]="'outboundEmails.compose.recordTypeLabel' | transloco"
-          [hint]="'outboundEmails.compose.recordTypeHint' | transloco"
-          [required]="true"
-        >
-          <div>
-            <ui-segmented
-              [options]="sourceTypeOptions()"
-              [label]="'outboundEmails.compose.recordTypeLabel' | transloco"
-              [value]="sourceType()"
-              (valueChange)="onSourceTypeChange($event)"
-            />
-          </div>
-        </ui-field>
+        <div class="flex items-start gap-10">
+          <ui-field
+            class="min-w-0 flex-1"
+            size="bare"
+            [label]="'outboundEmails.compose.recordTypeLabel' | transloco"
+            [hint]="'outboundEmails.compose.recordTypeHint' | transloco"
+            [required]="true"
+          >
+            <div>
+              <ui-segmented
+                [options]="sourceTypeOptions()"
+                [label]="'outboundEmails.compose.recordTypeLabel' | transloco"
+                [value]="sourceType()"
+                (valueChange)="onSourceTypeChange($event)"
+              />
+            </div>
+          </ui-field>
 
+          @if (sources.canChooseBranch()) {
+            <ui-field class="min-w-0 flex-1" size="bare" [for]="uid + '-branch'" [label]="'outboundEmails.source.branch' | transloco"
+              [hint]="'outboundEmails.source.branchHint' | transloco">
+              <ui-dropdown size="field" class="w-full" [id]="uid + '-branch'" [describedBy]="uid + '-branch-hint'"
+                [options]="branchOptions()" [value]="sources.branchId()" [label]="'outboundEmails.source.branch' | transloco"
+                (valueChange)="onBranchChange($event)" />
+            </ui-field>
+          }
+        </div>
         <div #recordPicker class="relative" (keydown.escape)="onRecordPickerEscape($event)">
           <ui-field
             size="bare"
             [for]="uid + '-record-trigger'"
+            [error]="modalError()"
             [label]="'outboundEmails.compose.recordLabel' | transloco"
-            [hint]="'outboundEmails.compose.recordHint' | transloco"
+            [hint]="(sources.branchId() ? 'outboundEmails.compose.recordHint' : 'outboundEmails.source.noBranchHint') | transloco"
             [required]="true"
           >
             <button
@@ -80,7 +92,7 @@
                   ? 'border-focus-ring ring-3 ring-focus-halo'
                   : 'border-border-field hover:border-border-field-hover focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-halo'
               "
-              [disabled]="loadingRecords()"
+              [disabled]="loadingRecords() || !sources.branchId() || !sourceTypeOptions().length"
               (click)="toggleRecordMenu()"
             >
               <span dir="auto" class="min-w-0 flex-1 truncate text-start" [class]="selectedRecord() ? 'text-text' : 'text-text-placeholder'">
@@ -142,35 +154,31 @@
     }
 
     @case (2) {
-      @if (senderUnverified()) {
-        <div class="flex flex-col gap-8">
-          <app-settings-notice tone="warning">
-            <div class="flex flex-wrap items-center justify-between gap-8">
-              <span>{{ 'outboundEmails.errors.CRM.EMAIL.SENDER_UNVERIFIED' | transloco }}</span>
-              <a uiButton variant="secondary" size="small" routerLink="/workspace/settings" (click)="close()">
-                {{ 'outboundEmails.sender.openSettings' | transloco }}
-              </a>
-            </div>
-          </app-settings-notice>
-        </div>
-      } @else if (options(); as opts) {
+      @if (options(); as opts) {
         <div class="flex flex-col gap-8">
           @if (opts.availability.includes('NO_APPROVED_RECIPIENT')) {
-            <app-settings-notice tone="warning">
-              {{ 'outboundEmails.compose.noApprovedRecipient' | transloco }}
-            </app-settings-notice>
+            <ui-field [for]="uid + '-unavailable-recipient'" [label]="'outboundEmails.compose.recipientLabel' | transloco"
+              [hint]="'outboundEmails.compose.recipientHint' | transloco" [error]="'outboundEmails.compose.noApprovedRecipient' | transloco">
+              <input [id]="uid + '-unavailable-recipient'" [attr.aria-describedby]="uid + '-unavailable-recipient-hint ' + uid + '-unavailable-recipient-error'"
+                readonly [value]="'outboundEmails.detail.fields.notAvailable' | transloco"
+                class="h-full min-w-0 flex-1 bg-transparent text-12 text-text outline-none" />
+            </ui-field>
           }
 
           @if (opts.availability.includes('NO_COMPATIBLE_TEMPLATE')) {
-            <app-settings-notice tone="warning">
-              {{ 'outboundEmails.compose.noCompatibleTemplate' | transloco }}
-            </app-settings-notice>
+            <ui-field [for]="uid + '-unavailable-template'" [label]="'outboundEmails.compose.templateLabel' | transloco"
+              [hint]="'outboundEmails.compose.templateHint' | transloco" [error]="'outboundEmails.compose.noCompatibleTemplate' | transloco">
+              <input [id]="uid + '-unavailable-template'" [attr.aria-describedby]="uid + '-unavailable-template-hint ' + uid + '-unavailable-template-error'"
+                readonly [value]="'outboundEmails.detail.fields.notAvailable' | transloco"
+                class="h-full min-w-0 flex-1 bg-transparent text-12 text-text outline-none" />
+            </ui-field>
           }
 
           @if (opts.recipients.length) {
             <ui-field
               size="bare"
               [label]="'outboundEmails.compose.recipientLabel' | transloco"
+              [error]="modalError()"
               [hint]="'outboundEmails.compose.recipientHint' | transloco"
               [required]="true"
             >
@@ -255,6 +263,7 @@
           <ui-field
             size="bare"
             [label]="'outboundEmails.detail.format.label' | transloco"
+            [error]="modalError()"
             [hint]="'outboundEmails.detail.format.hint' | transloco"
           >
             <div>
@@ -284,7 +293,7 @@
     }
   }
 
-  @if (step() === 1) {
+  @if (step() === 1 && !readOnly()) {
     <button
       modal-footer
       type="button"
@@ -295,7 +304,7 @@
     >
       {{ 'outboundEmails.compose.next' | transloco }}
     </button>
-  } @else if (step() === 2 && !senderUnverified()) {
+  } @else if (step() === 2 && !readOnly()) {
     <button
       modal-footer
       type="button"
@@ -306,13 +315,13 @@
     >
       {{ 'outboundEmails.compose.next' | transloco }}
     </button>
-  } @else if (step() === 3) {
+  } @else if (step() === 3 && !readOnly()) {
     <button
       modal-footer
       type="button"
       uiButton
       [loading]="sending()"
-      [disabled]="sending()"
+      [disabled]="sending() || readOnly()"
       (click)="send()"
     >
       {{ 'outboundEmails.compose.send' | transloco }}

@@ -1,25 +1,18 @@
 import { TranslocoService } from '@jsverse/transloco';
 import {
   ApiError,
-  FlatPage,
-  InfoPage,
   errorCodeOf,
-} from '../../../../shared/widgets/dashboard/analytics-api';
-import { errorKey } from '../../../../shared/widgets/dashboard/panel-state';
-import {
-  fakeApproveTarget,
-  fakeCorrectTarget,
-  fakeCreateTarget,
-  fakeDeleteTarget,
-  fakeGetTarget,
-  fakeListReleases,
-  fakeListTargets,
-  fakeRejectTarget,
-  fakeSubmitTarget,
-  fakeTargetableMetrics,
-  fakeUpdateTarget,
-} from './targets.fake';
-import {
+  fieldErrorsOf,
+  isRetryableWriteError,
+  writeErrorMessage,
+} from '../../../../core/api/api-errors';
+import { CoreHttp, type CoreWriteMethod } from '../../../../core/api/core-http';
+import { newIdempotencyKey } from '../../../../core/api/idempotency';
+import type { FlatPage, InfoPage } from '../../../../shared/widgets/dashboard/analytics-api';
+import type { WorkspaceLookups } from '../../../../shared/widgets/workspace-lookups/workspace-lookups.api';
+import { crmHttp, crmQueries } from '../../shared/crm-http';
+import { crmSettingsError } from '../shared/settings-api';
+import type {
   ApproveTargetBody,
   CorrectTargetBody,
   CreateTargetBody,
@@ -30,107 +23,144 @@ import {
   TargetApprovalResult,
   TargetRelease,
   TargetableMetric,
+  TargetSubjectOptions,
+  TargetCurrency,
   UpdateTargetBody,
 } from './targets.model';
 
-/** GET /api/tenant/crm/v1/targets */
+const queryKey = ['crm-settings', 'targets'] as const;
+const pendingWrites = new Map<string, { key: string; bodyJson: string }>();
+
+function read<T>(path: string, query?: Record<string, string | number | undefined>): Promise<T> {
+  return crmQueries().fetchQuery({
+    queryKey: [...queryKey, path, query],
+    queryFn: () => crmHttp().read<T>(path, query),
+  });
+}
+
+async function write<T>(
+  method: CoreWriteMethod,
+  path: string,
+  body: unknown,
+  options: { key?: string; revision?: number } = {},
+): Promise<T> {
+  const action = `${method} ${path}`;
+  const bodyJson = JSON.stringify([body ?? null, options.revision ?? null]);
+  const previous = pendingWrites.get(action);
+  const key = options.key ?? (previous?.bodyJson === bodyJson ? previous.key : newIdempotencyKey());
+  pendingWrites.set(action, { key, bodyJson });
+  try {
+    const response = await crmHttp().write<T>(method, path, body, {
+      key,
+      ...(options.revision !== undefined ? { ifMatch: `"${options.revision}"` } : {}),
+    });
+    pendingWrites.delete(action);
+    await crmQueries().cancelQueries({ queryKey });
+    await crmQueries().invalidateQueries({ queryKey });
+    return response.data;
+  } catch (error) {
+    if (!isRetryableWriteError(error) && !(error instanceof ApiError && error.status === 401))
+      pendingWrites.delete(action);
+    throw error;
+  }
+}
+
+/** A newly opened form is a new user action, even if its values match a failed, discarded form. */
+export function beginTargetAction(action: 'create' | 'update' | 'reject', id?: string): void {
+  const method = action === 'update' ? 'PATCH' : 'POST';
+  const path =
+    action === 'create'
+      ? '/targets'
+      : `/targets/${encodeURIComponent(id!)}` + (action === 'reject' ? '/reject' : '');
+  pendingWrites.delete(`${method} ${path}`);
+}
 export function listTargets(q: ListTargetsQuery): Promise<FlatPage<SalesTarget>> {
-  return fakeListTargets(q);
+  return read('/targets', { ...q });
 }
-
-/** GET /api/tenant/crm/v1/targets/:id */
 export function getTarget(id: string): Promise<SalesTarget> {
-  return fakeGetTarget(id);
+  return read(`/targets/${encodeURIComponent(id)}`);
 }
-
-/** GET /api/tenant/crm/v1/targets/:id/releases (cursor page; limit 1..100, default 25) */
-export function listReleases(id: string, cursor?: string | null, limit?: number): Promise<InfoPage<TargetRelease>> {
-  return fakeListReleases(id, cursor, limit);
+export function listReleases(
+  id: string,
+  cursor?: string | null,
+  limit?: number,
+): Promise<InfoPage<TargetRelease>> {
+  return read(`/targets/${encodeURIComponent(id)}/releases`, {
+    cursor: cursor ?? undefined,
+    limit,
+  });
 }
-
-/** POST /api/tenant/crm/v1/targets */
 export function createTarget(body: CreateTargetBody): Promise<SalesTarget> {
-  return fakeCreateTarget(body);
+  return write('POST', '/targets', body);
 }
-
-/** PATCH /api/tenant/crm/v1/targets/:id */
 export function updateTarget(id: string, body: UpdateTargetBody): Promise<SalesTarget> {
-  return fakeUpdateTarget(id, body);
+  return write('PATCH', `/targets/${encodeURIComponent(id)}`, body, { revision: body.revision });
 }
-
-/** DELETE /api/tenant/crm/v1/targets/:id (revision goes in If-Match; optional) */
+/** The landed controller accepts an optional If-Match revision and enforces DRAFT. */
 export function deleteTarget(id: string, revision?: number): Promise<void> {
-  return fakeDeleteTarget(id, revision);
+  return write('DELETE', `/targets/${encodeURIComponent(id)}`, undefined, { revision });
 }
-
-/** POST /api/tenant/crm/v1/targets/:id/submit */
 export function submitTarget(id: string, body: SubmitTargetBody): Promise<SalesTarget> {
-  return fakeSubmitTarget(id, body);
+  return write('POST', `/targets/${encodeURIComponent(id)}/submit`, body, {
+    revision: body.revision,
+  });
 }
-
-/** POST /api/tenant/crm/v1/targets/:id/approve (x-idempotency-key: one key per user action, reused on retry) */
 export function approveTarget(
   id: string,
   body: ApproveTargetBody,
   key: string,
 ): Promise<TargetApprovalResult> {
-  return fakeApproveTarget(id, body, key);
+  return write('POST', `/targets/${encodeURIComponent(id)}/approve`, body, {
+    key,
+    revision: body.revision,
+  });
 }
-
-/** POST /api/tenant/crm/v1/targets/:id/reject */
 export function rejectTarget(id: string, body: RejectTargetBody): Promise<SalesTarget> {
-  return fakeRejectTarget(id, body);
+  return write('POST', `/targets/${encodeURIComponent(id)}/reject`, body, {
+    revision: body.revision,
+  });
 }
-
-/** POST /api/tenant/crm/v1/targets/:id/corrections (x-idempotency-key: one key per user action, reused on retry) */
 export function correctTarget(
   id: string,
   body: CorrectTargetBody,
   key: string,
 ): Promise<TargetApprovalResult> {
-  return fakeCorrectTarget(id, body, key);
+  return write('POST', `/targets/${encodeURIComponent(id)}/corrections`, body, {
+    key,
+    revision: body.revision,
+  });
 }
-
-/** FAKE-ONLY, no backend route (there is no GET /api/tenant/crm/v1/targets/metrics). */
 export function targetableMetrics(): Promise<TargetableMetric[]> {
-  return fakeTargetableMetrics();
+  return read('/targets/metrics');
 }
-
-/**
- * The target is gone or out of reach: an unknown or deleted id answers 403 BRANCH_CONTEXT_REQUIRED (authority is
- * checked before the row is read), a target outside the reader's subject scope answers 404 CRM_TARGET_NOT_FOUND.
- */
+export function targetSubjectOptions(
+  branchId: string,
+  search?: string,
+  limit = 100,
+): Promise<TargetSubjectOptions> {
+  return read('/targets/subject-options', { branchId, search, limit });
+}
+export function targetCurrencies(core: CoreHttp): Promise<TargetCurrency[]> {
+  return crmQueries().fetchQuery({
+    queryKey: [...queryKey, 'currencies'],
+    queryFn: () => core.read<TargetCurrency[]>('/api/tenant/core/v1/currencies/options'),
+  });
+}
+export function targetBranches(lookups: WorkspaceLookups) {
+  return crmQueries().fetchQuery({
+    queryKey: [...queryKey, 'branches'],
+    queryFn: () => lookups.allBranches({ status: 'ACTIVE' }),
+  });
+}
 export function isTargetGone(error: unknown): boolean {
   const code = errorCodeOf(error);
   return code === 'CRM_TARGET_NOT_FOUND' || code === 'BRANCH_CONTEXT_REQUIRED';
 }
-
-/**
- * 400 CRM_VALIDATION_FAILED field paths (ValidationPipe), for example `{ targetValue: ['max'] }`.
- * Only string-array details reach the client.
- */
 export function targetFieldErrors(error: unknown): Record<string, string[]> {
-  if (!(error instanceof ApiError) || error.code !== 'CRM_VALIDATION_FAILED' || !error.details) return {};
-  const out: Record<string, string[]> = {};
-  for (const [path, value] of Object.entries(error.details)) {
-    if (Array.isArray(value) && value.every((item) => typeof item === 'string')) out[path] = [...value];
-  }
-  return out;
+  return fieldErrorsOf(error);
 }
-
 export function targetErrorMessage(transloco: TranslocoService, error: unknown): string {
-  const code = errorCodeOf(error);
-  if (code) {
-    const key = errorKey(code);
-    const translated = transloco.translate(key);
-    if (translated && translated !== key) {
-      return translated;
-    }
-  }
-  if (error instanceof ApiError) {
-    if (error.status === 404) return transloco.translate('settings.errors.notFound');
-    if (error.status === 403) return transloco.translate('settings.errors.permission');
-    if (error.status === 422) return transloco.translate('settings.errors.validation');
-  }
-  return transloco.translate('analytics.error.GENERIC');
+  if (error instanceof ApiError && error.status === 401)
+    return writeErrorMessage(error, 'targets', transloco);
+  return crmSettingsError(transloco, error, 'targets').message;
 }

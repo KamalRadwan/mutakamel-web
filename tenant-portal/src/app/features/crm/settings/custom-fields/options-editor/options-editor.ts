@@ -1,11 +1,10 @@
 import { Component, computed, inject, input, model, output } from '@angular/core';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { tablerAlertTriangle, tablerArrowBackUp, tablerPlus, tablerTrash } from '@ng-icons/tabler-icons';
+import { tablerArrowBackUp, tablerPlus, tablerTrash } from '@ng-icons/tabler-icons';
 import { Button } from '../../../../../shared/ui/button/button';
 import { Field } from '../../../../../shared/ui/field/field';
 import { Switch } from '../../../../../shared/ui/switch/switch';
-import { fakeId } from '../../shared/settings-api';
 import { EditableFieldOption, MAX_KEY_LEN, MAX_NAME_LEN, MAX_OPTIONS } from '../custom-fields.model';
 
 export interface OptionRowErrors {
@@ -18,7 +17,7 @@ export interface OptionRowErrors {
 @Component({
   selector: 'app-options-editor',
   imports: [NgIcon, TranslocoPipe, Button, Field, Switch],
-  providers: [provideIcons({ tablerPlus, tablerTrash, tablerArrowBackUp, tablerAlertTriangle })],
+  providers: [provideIcons({ tablerPlus, tablerTrash, tablerArrowBackUp })],
   templateUrl: './options-editor.html',
   host: { class: 'flex flex-col gap-6' },
 })
@@ -29,6 +28,12 @@ export class OptionsEditor {
   readonly readOnly = input(false);
   readonly showErrors = input(false);
   readonly inUseOptionKeys = input<string[]>([]);
+  readonly error = input<string | null>(null);
+  readonly serverErrors = input<Record<string, string[]>>({});
+
+  protected readonly removedKeys = computed(() => this.inUseOptionKeys().filter(key =>
+    !this.options().some(option => option.key.trim() === key),
+  ));
 
   readonly restoreRemoved = output<void>();
 
@@ -56,7 +61,7 @@ export class OptionsEditor {
     this.options.update((list) => [
       ...list,
       {
-        uid: fakeId(),
+        uid: crypto.randomUUID(),
         isSaved: false,
         key: '',
         nameAr: '',
@@ -98,7 +103,7 @@ export class OptionsEditor {
     this.options.update((list) => list.map((opt) => (opt.uid === uid ? { ...opt, isActive } : opt)));
   }
 
-  protected errorsFor(option: EditableFieldOption): OptionRowErrors {
+  protected errorsFor(option: EditableFieldOption, index: number): OptionRowErrors {
     const key = option.key.trim();
     const isDuplicate = key !== '' && this.duplicateKeys().has(key);
     const showAll = this.showErrors();
@@ -127,6 +132,13 @@ export class OptionsEditor {
       sortOrderError = this.transloco.translate('customFields.validation.optionOrderInvalid');
     }
 
-    return { key: keyError, nameAr: nameArError, nameEn: nameEnError, sortOrder: sortOrderError };
+    const server = (field: string) => this.serverErrors()[`options.${index}.${field}`]?.join(' ') || null;
+    if (this.inUseOptionKeys().includes(key)) keyError = this.transloco.translate('customFields.options.inUseNotice');
+    return {
+      key: keyError ?? server('key') ?? server('isActive'),
+      nameAr: nameArError ?? server('nameAr'),
+      nameEn: nameEnError ?? server('nameEn'),
+      sortOrder: sortOrderError ?? server('sortOrder'),
+    };
   }
 }

@@ -80,7 +80,7 @@ export class EmailDetailModal {
   private readonly modal = viewChild.required(Modal);
   private readonly tabButtons = viewChildren<ElementRef<HTMLButtonElement>>('tabBtn');
 
-  readonly canManage = input(true);
+  readonly canManage = input(false);
   readonly retryRequested = output<EmailDetail>();
 
   protected readonly detail = signal<EmailDetail | null>(null);
@@ -93,6 +93,11 @@ export class EmailDetailModal {
   protected readonly timelineDot = TIMELINE_DOT;
 
   private loadSeq = 0;
+  private emailId: string | null = null;
+
+  async refresh(): Promise<void> {
+    if (this.emailId) await this.open(this.emailId);
+  }
 
   protected readonly formatOptions = computed<SegmentedOption[]>(() => {
     this.i18n();
@@ -126,6 +131,7 @@ export class EmailDetailModal {
   });
 
   async open(emailId: string): Promise<void> {
+    this.emailId = emailId;
     const seq = ++this.loadSeq;
     this.activeTab.set('message');
     this.bodyFormat.set('html');
@@ -220,6 +226,7 @@ export class EmailDetailModal {
   }
 
   protected onClosed(): void {
+    this.emailId = null;
     this.loadSeq++;
     this.loading.set(false);
   }

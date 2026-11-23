@@ -7,9 +7,9 @@ import { Button } from '../../../../../shared/ui/button/button';
 import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { Switch } from '../../../../../shared/ui/switch/switch';
-import { errorCodeOf } from '../../shared/settings-api';
-import { SettingsNotice } from '../../../../../shared/ui/settings-notice/settings-notice';
-import { setRequirement } from '../custom-fields.api';
+import { ApiError } from '../../../../../core/api/api-errors';
+import { customFieldsError } from '../custom-fields-errors';
+import { CustomFieldSubmission, setRequirement } from '../custom-fields.api';
 import {
   CREATABLE_OWNER_TYPES,
   CustomField,
@@ -22,7 +22,7 @@ import {
 
 @Component({
   selector: 'app-requirements-modal',
-  imports: [TranslocoPipe, Modal, Button, Field, Switch, SettingsNotice],
+  imports: [TranslocoPipe, Modal, Button, Field, Switch],
   templateUrl: './requirements-modal.html',
 })
 export class RequirementsModal {
@@ -32,7 +32,10 @@ export class RequirementsModal {
   private readonly language = inject(LanguageState).current;
   private readonly modal = viewChild.required(Modal);
 
-  readonly canManage = input(true);
+  readonly canManage = input(false);
+  readonly readOnly = output<void>();
+  readonly reload = output<void>();
+  private readonly submission = new CustomFieldSubmission();
   readonly updated = output<CustomField>();
 
   protected readonly field = signal<CustomField | null>(null);
@@ -61,6 +64,7 @@ export class RequirementsModal {
   });
 
   open(field: CustomField): void {
+    this.submission.reset();
     this.syncField(field);
     this.pendingOp.set(null);
     this.modal().open();
@@ -80,7 +84,7 @@ export class RequirementsModal {
 
   protected async toggleRequirement(operation: RequirementOperation, nextValue: boolean): Promise<void> {
     const current = this.field();
-    if (!current || !this.canManage() || !current.isActive || this.pendingOp() !== null) {
+    if (!current || !this.canManage() || !current.isActive || (operation === 'CONVERT' && !this.showConvert()) || this.pendingOp() !== null) {
       this.setLocalFlag(operation, !nextValue);
       return;
     }
@@ -89,14 +93,17 @@ export class RequirementsModal {
     this.pendingOp.set(operation);
     try {
       // The backend returns only the saved requirement row; merge it into the field.
-      const row = await setRequirement(current.id, { operation, entityScope: null, isRequired: nextValue });
+      const row = await this.submission.run({ operation, entityScope: null, isRequired: nextValue }, body => setRequirement(current.id, body));
       const saved = mergeRequirementRow(this.field() ?? current, row);
       this.syncField(saved);
       this.updated.emit(saved);
       this.notify.success(this.transloco.translate('customFields.requirements.saved'));
     } catch (error) {
       this.setLocalFlag(operation, !nextValue);
-      this.notify.error(this.resolveError(error));
+      const result = customFieldsError(this.transloco, error);
+      if (result.readOnly) this.readOnly.emit();
+      this.notify.error(result.message);
+      if (error instanceof ApiError && error.status === 404) this.reload.emit();
     } finally {
       this.pendingOp.set(null);
     }
@@ -115,14 +122,4 @@ export class RequirementsModal {
     else this.convertRequired.set(value);
   }
 
-  private resolveError(error: unknown): string {
-    const code = errorCodeOf(error);
-    if (code) {
-      const key = `customFields.errors.${code}`;
-      const translated = this.transloco.translate(key);
-      if (translated !== key) return translated;
-      if (code === 'CUSTOM_FIELD_NOT_FOUND') return this.transloco.translate('settings.errors.notFound');
-    }
-    return this.transloco.translate('settings.errors.generic');
-  }
 }

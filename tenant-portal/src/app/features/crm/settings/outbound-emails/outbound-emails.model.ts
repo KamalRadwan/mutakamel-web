@@ -1,5 +1,5 @@
 import { TranslocoService } from '@jsverse/transloco';
-import { ApiError } from '../shared/settings-api';
+import { ApiError, crmSettingsError } from '../shared/settings-api';
 
 export type EmailStatus = 'QUEUED' | 'DISPATCHING' | 'SENT' | 'FAILED';
 export type EmailSourceType = 'LEAD' | 'CUSTOMER_PROFILE' | 'OPPORTUNITY';
@@ -25,7 +25,6 @@ export const EMAIL_FEEDBACK_REASON_CODES: readonly EmailFeedbackReasonCode[] = [
 ];
 export type EmailAvailabilityIssue = 'NO_APPROVED_RECIPIENT' | 'NO_COMPATIBLE_TEMPLATE';
 
-export const RETENTION_DAYS = 730;
 export const EMAIL_PAGE_LIMIT = 25;
 export const MAX_RANGE_DAYS = 366;
 export const RETRY_REASON_MAX = 500;
@@ -236,9 +235,9 @@ export interface EmailOptionsResponse {
 export interface EmailPreviewRequest {
   sourceType: EmailSourceType;
   sourceId: string;
-  locale: 'ar' | 'en';
+  locale?: 'ar' | 'en';
   recipient: EmailRecipientReference;
-  templateVersionId: string;
+  templateVersionId?: string;
 }
 
 export interface EmailPreviewResponse {
@@ -263,6 +262,7 @@ export interface SenderStatusConfig {
   providerDriver: ProviderDriver;
   dkimVerified: boolean;
   providerCredentialsConfigured: boolean;
+  feedbackProfile: string | null;
   canSendCrm: boolean;
 }
 
@@ -317,20 +317,50 @@ export function formatEmailDateTime(iso: string | null | undefined, language: st
   }).format(date);
 }
 
-export function resolveEmailErrorMessage(transloco: TranslocoService, error: unknown): string {
-  if (error instanceof ApiError) {
-    const specificKey = `outboundEmails.errors.${error.code}`;
-    const rawRetryAfter = error.details?.['retryAfterSeconds'];
-    const retryAfterSeconds = typeof rawRetryAfter === 'number' && Number.isFinite(rawRetryAfter) ? rawRetryAfter : 60;
-    const params =
-      error.code === 'CRM.EMAIL.SEND_RATE_LIMITED'
-        ? { ...error.details, minutes: Math.max(1, Math.ceil(retryAfterSeconds / 60)) }
-        : error.details;
-    const specific = transloco.translate(specificKey, params);
-    if (specific && specific !== specificKey) return specific;
-    if (error.status === 403) return transloco.translate('settings.errors.permission');
-    if (error.status === 404) return transloco.translate('settings.errors.notFound');
-    if (error.status === 400 || error.status === 422) return transloco.translate('settings.errors.validation');
+export function resolveEmailErrorMessage(transloco: TranslocoService, error: unknown, write = false): string {
+  if (error instanceof ApiError && error.status === 429 && error.code === 'CRM.EMAIL.SEND_RATE_LIMITED') {
+    const raw = error.details?.['retryAfterSeconds'];
+    const seconds = Number(Array.isArray(raw) ? raw[0] : raw);
+    return transloco.translate('outboundEmails.errors.CRM.EMAIL.SEND_RATE_LIMITED', {
+      minutes: Math.max(1, Math.ceil((Number.isFinite(seconds) && seconds > 0 ? seconds : 60) / 60)),
+    });
   }
-  return transloco.translate('settings.errors.generic');
+  if (write && error instanceof ApiError && error.status === 401) {
+    return transloco.translate('outboundEmails.errors.notSaved');
+  }
+  if (write && error instanceof ApiError && (error.status === 0 || error.status >= 500)) {
+    return transloco.translate('outboundEmails.errors.notSent');
+  }
+  return emailErrorState(transloco, error).message;
+}
+
+export function emailErrorState(transloco: TranslocoService, error: unknown) {
+  const messages = transloco.getTranslation(transloco.getActiveLang());
+  return crmSettingsError((key, params) => Object.hasOwn(messages, key)
+    ? transloco.translate(key, params) : key, error, 'outboundEmails');
+}
+
+export function keepEmailKey(error: unknown): boolean {
+  return error instanceof ApiError && (error.status === 0 || error.status >= 500 ||
+    error.status === 401 || error.code === 'GW.IDEM.IN_FLIGHT');
+}
+
+/** The API uses an exclusive end, so a selected end date advances one calendar day. */
+export function emailDateBound(day: string, zone: string | null, exclusiveEnd = false): string {
+  const date = new Date(`${day}T00:00:00Z`);
+  if (exclusiveEnd) date.setUTCDate(date.getUTCDate() + 1);
+  const midnight = date.getTime();
+  if (!zone) return date.toISOString();
+  const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' });
+  // Find the first instant of the date, including zones that skip midnight at DST.
+  let start = midnight - 36 * 3_600_000;
+  let end = midnight + 36 * 3_600_000;
+  while (start < end) {
+    const middle = Math.floor((start + end) / 2);
+    const parts = Object.fromEntries(formatter.formatToParts(middle).map(({ type, value }) => [type, value]));
+    const localDay = Date.UTC(+parts['year'], +parts['month'] - 1, +parts['day']);
+    if (localDay < midnight) start = middle + 1;
+    else end = middle;
+  }
+  return new Date(start).toISOString();
 }

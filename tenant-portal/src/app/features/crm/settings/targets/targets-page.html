@@ -7,36 +7,66 @@
     (action)="goHome()"
   />
 } @else {
-  <app-settings-frame
-    [addLabel]="'targets.new' | transloco"
-    [searchPlaceholder]="'targets.search' | transloco"
-    [loading]="loading()"
-    [showAdd]="canManage"
-    [(search)]="search"
-    (add)="openNew()"
-    (reload)="load()"
-  >
-    <div notices class="flex flex-wrap items-center gap-6">
+  <div class="flex flex-1 flex-col gap-8 p-12">
+    <div class="flex items-center gap-8 rounded-10 bg-surface p-8 shadow-card">
+      @if (canCreate()) {
+        <button type="button" uiButton (click)="openNew()">
+          <ng-icon name="tablerPlus" size="15" aria-hidden="true" />{{ 'targets.new' | transloco }}
+        </button>
+      }
       <button
-        #grainBtn
         type="button"
-        class="inline-flex h-filter-chip cursor-pointer items-center gap-6 rounded-8 border px-8 text-12 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
-        [class]="
-          grainFilter()
-            ? 'border-brand bg-brand-soft text-on-brand-soft'
-            : 'border-border-field bg-surface text-text hover:border-border-field-hover hover:bg-row-hover'
-        "
-        aria-haspopup="listbox"
-        [attr.aria-expanded]="openMenu() === 'grain'"
-        (click)="toggleFilterMenu('grain', grainBtn, $event)"
+        class="ms-auto inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text active:bg-border focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+        [disabled]="loading() || branchesLoading()"
+        [attr.aria-label]="'settings.common.reload' | transloco"
+        [title]="'settings.common.reload' | transloco"
+        (click)="load()"
       >
-        <ng-icon name="tablerFilter" size="12" aria-hidden="true" />
-        <span>
-          {{ 'targets.filters.grain' | transloco }}@if (grainFilter(); as g) {: {{ 'targets.grains.' + g | transloco }}}
-        </span>
-        <ng-icon name="tablerChevronDown" size="12" aria-hidden="true" />
+        <ng-icon
+          name="tablerRefresh"
+          size="15"
+          [class.animate-spin]="loading()"
+          aria-hidden="true"
+        />
       </button>
-
+    </div>
+    <div class="flex flex-wrap items-center gap-6">
+      <ui-field
+        size="bare"
+        [label]="'targets.filters.grain' | transloco"
+        [hint]="'targets.form.periodGrainHint' | transloco"
+        [for]="uid + '-grain-filter'"
+        [error]="periodFilterError()"
+      >
+        <button
+          [id]="uid + '-grain-filter'"
+          [attr.aria-describedby]="
+            uid +
+            '-grain-filter-hint' +
+            (periodFilterError() ? ' ' + uid + '-grain-filter-error' : '')
+          "
+          #grainBtn
+          type="button"
+          class="inline-flex h-filter-chip cursor-pointer items-center gap-6 rounded-8 border px-8 text-12 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [class]="
+            grainFilter()
+              ? 'border-brand bg-brand-soft text-on-brand-soft'
+              : 'border-border-field bg-surface text-text hover:border-border-field-hover hover:bg-row-hover'
+          "
+          aria-haspopup="listbox"
+          [attr.aria-expanded]="openMenu() === 'grain'"
+          (click)="toggleFilterMenu('grain', grainBtn, $event)"
+        >
+          <ng-icon name="tablerFilter" size="12" aria-hidden="true" />
+          <span>
+            {{
+              (grainFilter() ? 'targets.grains.' + grainFilter() : 'targets.filters.all')
+                | transloco
+            }}
+          </span>
+          <ng-icon name="tablerChevronDown" size="12" aria-hidden="true" />
+        </button>
+      </ui-field>
       <button
         #stateBtn
         type="button"
@@ -52,7 +82,10 @@
       >
         <ng-icon name="tablerFilter" size="12" aria-hidden="true" />
         <span>
-          {{ 'targets.filters.state' | transloco }}@if (stateFilter(); as s) {: {{ 'targets.states.' + s | transloco }}}
+          {{ 'targets.filters.state' | transloco }}
+          @if (stateFilter(); as s) {
+            : {{ 'targets.states.' + s | transloco }}
+          }
         </span>
         <ng-icon name="tablerChevronDown" size="12" aria-hidden="true" />
       </button>
@@ -72,30 +105,60 @@
       >
         <ng-icon name="tablerFilter" size="12" aria-hidden="true" />
         <span>
-          {{ 'targets.filters.subjectType' | transloco }}@if (subjectTypeFilter(); as st) {: {{ 'targets.subjectTypes.' + st | transloco }}}
+          {{ 'targets.filters.subjectType' | transloco }}
+          @if (subjectTypeFilter(); as st) {
+            : {{ 'targets.subjectTypes.' + st | transloco }}
+          }
         </span>
         <ng-icon name="tablerChevronDown" size="12" aria-hidden="true" />
       </button>
 
-      <button
-        #branchBtn
-        type="button"
-        class="inline-flex h-filter-chip cursor-pointer items-center gap-6 rounded-8 border px-8 text-12 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
-        [class]="
-          branchFilter()
-            ? 'border-brand bg-brand-soft text-on-brand-soft'
-            : 'border-border-field bg-surface text-text hover:border-border-field-hover hover:bg-row-hover'
-        "
-        aria-haspopup="listbox"
-        [attr.aria-expanded]="openMenu() === 'branch'"
-        (click)="toggleFilterMenu('branch', branchBtn, $event)"
-      >
-        <ng-icon name="tablerFilter" size="12" aria-hidden="true" />
-        <span>
-          {{ 'targets.filters.branch' | transloco }}@if (branchFilter()) {: {{ branchFilterLabel() }}}
-        </span>
-        <ng-icon name="tablerChevronDown" size="12" aria-hidden="true" />
-      </button>
+      @if (canChooseBranch) {
+        <ui-field
+          size="bare"
+          [label]="'targets.filters.branch' | transloco"
+          [hint]="'targets.form.branchHint' | transloco"
+          [for]="uid + '-branch-filter'"
+        >
+          <button
+            [id]="uid + '-branch-filter'"
+            [attr.aria-describedby]="uid + '-branch-filter-hint'"
+            #branchBtn
+            type="button"
+            class="inline-flex h-filter-chip cursor-pointer items-center gap-6 rounded-8 border px-8 text-12 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [class]="
+              branchFilter()
+                ? 'border-brand bg-brand-soft text-on-brand-soft'
+                : 'border-border-field bg-surface text-text hover:border-border-field-hover hover:bg-row-hover'
+            "
+            aria-haspopup="listbox"
+            [attr.aria-expanded]="openMenu() === 'branch'"
+            (click)="toggleFilterMenu('branch', branchBtn, $event)"
+          >
+            <ng-icon name="tablerFilter" size="12" aria-hidden="true" />
+            <span>
+              {{ branchFilterLabel() }}
+            </span>
+            <ng-icon name="tablerChevronDown" size="12" aria-hidden="true" />
+          </button>
+        </ui-field>
+      } @else {
+        <ui-field
+          size="bare"
+          [label]="'targets.filters.branch' | transloco"
+          [hint]="'targets.form.branchHint' | transloco"
+          [for]="uid + '-branch-info'"
+        >
+          <span
+            [id]="uid + '-branch-info'"
+            [attr.aria-describedby]="uid + '-branch-info-hint'"
+            class="text-12 text-text-muted"
+            >{{
+              (branchFilter() ? 'targets.yourBranch' : 'targets.askAdministrator') | transloco
+            }}</span
+          >
+        </ui-field>
+      }
 
       <button
         #sortBtn
@@ -153,12 +216,21 @@
 
     @if (loadError()) {
       <ui-full-state
-        kind="load-failure"
-        [title]="'analytics.common.loadFailed' | transloco"
+        [kind]="loadFailure()?.kind ?? 'load-failure'"
+        [title]="
+          (loadFailure()?.kind === 'forbidden'
+            ? 'targets.forbiddenTitle'
+            : 'analytics.common.loadFailed'
+          ) | transloco
+        "
+        [text]="
+          (loadFailure()?.message ?? '') +
+          (loadFailure()?.correlationId ? ' · ' + loadFailure()!.correlationId : '')
+        "
         [actionLabel]="'analytics.common.retry' | transloco"
         (action)="load()"
       />
-    } @else {
+    } @else if (branchFilter()) {
       <div class="overflow-x-auto pb-4">
         <div class="min-w-doc-table-min">
           <ui-data-table
@@ -187,7 +259,9 @@
             </ng-template>
 
             <ng-template uiCell="metricKey" let-row>
-              <span class="truncate" [title]="metricLabel(row.metricKey)">{{ metricLabel(row.metricKey) }}</span>
+              <span class="truncate" [title]="metricLabel(row.metricKey)">{{
+                metricLabel(row.metricKey)
+              }}</span>
             </ng-template>
 
             <ng-template uiCell="periodStart" let-row>
@@ -195,7 +269,7 @@
             </ng-template>
 
             <ng-template uiCell="targetValue" let-row>
-              {{ valueLabel(row) }}
+              <span dir="ltr">{{ valueLabel(row) }}</span>
             </ng-template>
 
             <ng-template uiCell="approvalState" let-row>
@@ -233,10 +307,16 @@
         />
       }
     }
-  </app-settings-frame>
+  </div>
 
   <app-target-modal
-    [canManage]="canManage"
+    [canManage]="canManage && !writeReadOnly()"
+    [branches]="branches()"
+    [metricsError]="metricsError()"
+    [metricsFailure]="metricsFailure()"
+    [timeZone]="timeZone()"
+    (reloadMetrics)="loadMetrics()"
+    (readOnly)="writeReadOnly.set(true)"
     [metrics]="metrics()"
     (saved)="onTargetSaved()"
     (reloaded)="load()"
@@ -254,13 +334,11 @@
     [cancelLabel]="'settings.common.cancel' | transloco"
   />
 
-  <ui-confirm-dialog
-    #conflictDialog
-    tone="warning"
-    [title]="'analytics.common.conflictTitle' | transloco"
-    [text]="'analytics.common.conflictText' | transloco"
-    [confirmLabel]="'analytics.common.reload' | transloco"
-    [cancelLabel]="'analytics.common.keepMine' | transloco"
+  <ui-conflict-dialog
+    [(open)]="conflictOpen"
+    (openChange)="conflictClosed($event)"
+    (reload)="resolveConflict(true)"
+    (keepEditing)="resolveConflict(false)"
   />
 
   <ui-modal
@@ -275,7 +353,9 @@
   >
     @if (activeActionTarget(); as target) {
       <div class="flex flex-col gap-8">
-        <div class="grid grid-cols-2 gap-x-10 gap-y-6 rounded-8 border border-border bg-surface-muted p-8 text-12">
+        <div
+          class="grid grid-cols-2 gap-x-10 gap-y-6 rounded-8 border border-border bg-surface-muted p-8 text-12"
+        >
           <div class="min-w-0">
             <ui-field
               size="bare"
@@ -346,7 +426,9 @@
         >
           <textarea
             [id]="uid + '-approve-note'"
+            [readOnly]="writeReadOnly()"
             rows="2"
+            maxlength="500"
             class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
             [placeholder]="'targets.approveModal.notePlaceholder' | transloco"
             [value]="approveNote()"
@@ -357,10 +439,20 @@
     }
 
     <div modal-footer class="flex flex-1 items-center gap-8">
-      <button type="button" uiButton [loading]="actionBusy()" (click)="confirmApprove()">
-        {{ 'targets.approveModal.confirm' | transloco }}
-      </button>
-      <button type="button" uiButton variant="secondary" [disabled]="actionBusy()" (click)="closeActionModals()">
+      @if (activeActionTarget(); as target) {
+        @if (canApproveTarget(target)) {
+          <button type="button" uiButton [loading]="actionBusy()" (click)="confirmApprove()">
+            {{ 'targets.approveModal.confirm' | transloco }}
+          </button>
+        }
+      }
+      <button
+        type="button"
+        uiButton
+        variant="secondary"
+        [disabled]="actionBusy()"
+        (click)="closeActionModals()"
+      >
         {{ 'settings.common.cancel' | transloco }}
       </button>
     </div>
@@ -378,7 +470,9 @@
   >
     @if (activeActionTarget(); as target) {
       <div class="flex flex-col gap-8">
-        <div class="grid grid-cols-2 gap-x-10 gap-y-6 rounded-8 border border-border bg-surface-muted p-8 text-12">
+        <div
+          class="grid grid-cols-2 gap-x-10 gap-y-6 rounded-8 border border-border bg-surface-muted p-8 text-12"
+        >
           <div class="min-w-0">
             <ui-field
               size="bare"
@@ -451,12 +545,18 @@
         >
           <textarea
             [id]="uid + '-reject-note'"
+            [readOnly]="writeReadOnly()"
             rows="2"
+            maxlength="500"
             class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
             [placeholder]="'targets.rejectModal.notePlaceholder' | transloco"
             [value]="rejectNote()"
             [attr.aria-invalid]="rejectNoteError() ? 'true' : null"
-            [attr.aria-describedby]="uid + '-reject-note-hint' + (rejectNoteError() ? ' ' + uid + '-reject-note-error' : '')"
+            [attr.aria-describedby]="
+              uid +
+              '-reject-note-hint' +
+              (rejectNoteError() ? ' ' + uid + '-reject-note-error' : '')
+            "
             (input)="onRejectNoteInput($event)"
             (blur)="rejectTouched.set(true)"
           ></textarea>
@@ -465,10 +565,23 @@
     }
 
     <div modal-footer class="flex flex-1 items-center gap-8">
-      <button type="button" uiButton variant="secondary" [loading]="actionBusy()" (click)="confirmReject()">
+      <button
+        type="button"
+        uiButton
+        variant="secondary"
+        [loading]="actionBusy()"
+        [disabled]="!canApproveTarget(activeActionTarget()!)"
+        (click)="confirmReject()"
+      >
         {{ 'targets.rejectModal.confirm' | transloco }}
       </button>
-      <button type="button" uiButton variant="secondary" [disabled]="actionBusy()" (click)="closeActionModals()">
+      <button
+        type="button"
+        uiButton
+        variant="secondary"
+        [disabled]="actionBusy()"
+        (click)="closeActionModals()"
+      >
         {{ 'settings.common.cancel' | transloco }}
       </button>
     </div>
@@ -486,7 +599,9 @@
   >
     @if (activeActionTarget(); as target) {
       <form class="flex flex-col gap-8" (submit)="$event.preventDefault(); confirmCorrect()">
-        <div class="grid grid-cols-2 gap-x-10 gap-y-6 rounded-8 border border-border bg-surface-muted p-8 text-12">
+        <div
+          class="grid grid-cols-2 gap-x-10 gap-y-6 rounded-8 border border-border bg-surface-muted p-8 text-12"
+        >
           <div class="min-w-0">
             <ui-field
               size="bare"
@@ -564,13 +679,18 @@
           <input
             [id]="uid + '-correct-value'"
             type="text"
+            [readOnly]="writeReadOnly()"
             inputmode="decimal"
             dir="ltr"
             class="w-full min-w-0 bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
             [placeholder]="'targets.form.targetValuePlaceholder' | transloco"
             [value]="correctValueInput()"
             [attr.aria-invalid]="correctValueError() ? 'true' : null"
-            [attr.aria-describedby]="uid + '-correct-value-hint' + (correctValueError() ? ' ' + uid + '-correct-value-error' : '')"
+            [attr.aria-describedby]="
+              uid +
+              '-correct-value-hint' +
+              (correctValueError() ? ' ' + uid + '-correct-value-error' : '')
+            "
             (input)="onCorrectValueInput($event)"
             (blur)="onCorrectValueBlur()"
           />
@@ -589,24 +709,40 @@
         >
           <textarea
             [id]="uid + '-correct-reason'"
+            [readOnly]="writeReadOnly()"
             rows="2"
+            maxlength="500"
             class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
             [placeholder]="'targets.correctModal.reasonPlaceholder' | transloco"
             [value]="correctReason()"
             [attr.aria-invalid]="correctReasonError() ? 'true' : null"
-            [attr.aria-describedby]="uid + '-correct-reason-hint' + (correctReasonError() ? ' ' + uid + '-correct-reason-error' : '')"
+            [attr.aria-describedby]="
+              uid +
+              '-correct-reason-hint' +
+              (correctReasonError() ? ' ' + uid + '-correct-reason-error' : '')
+            "
             (input)="onCorrectReasonInput($event)"
-            (blur)="correctTouched.update(c => ({ ...c, reason: true }))"
+            (blur)="correctTouched.update((c) => ({ ...c, reason: true }))"
           ></textarea>
         </ui-field>
       </form>
     }
 
     <div modal-footer class="flex flex-1 items-center gap-8">
-      <button type="button" uiButton [loading]="actionBusy()" (click)="confirmCorrect()">
-        {{ 'targets.correctModal.confirm' | transloco }}
-      </button>
-      <button type="button" uiButton variant="secondary" [disabled]="actionBusy()" (click)="closeActionModals()">
+      @if (activeActionTarget(); as target) {
+        @if (canApproveTarget(target)) {
+          <button type="button" uiButton [loading]="actionBusy()" (click)="confirmCorrect()">
+            {{ 'targets.correctModal.confirm' | transloco }}
+          </button>
+        }
+      }
+      <button
+        type="button"
+        uiButton
+        variant="secondary"
+        [disabled]="actionBusy()"
+        (click)="closeActionModals()"
+      >
         {{ 'settings.common.cancel' | transloco }}
       </button>
     </div>

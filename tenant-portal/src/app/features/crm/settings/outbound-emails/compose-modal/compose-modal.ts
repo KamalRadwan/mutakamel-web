@@ -1,7 +1,6 @@
-import { Component, ElementRef, computed, inject, output, signal, viewChild, viewChildren } from '@angular/core';
+import { Component, ElementRef, computed, effect, inject, untracked, output, signal, viewChild, viewChildren } from '@angular/core';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
-import { RouterLink } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerCheck, tablerChevronDown, tablerMailForward, tablerSearch } from '@ng-icons/tabler-icons';
@@ -13,18 +12,20 @@ import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { Segmented, SegmentedOption } from '../../../../../shared/ui/segmented/segmented';
 import { ApiError, newIdempotencyKey } from '../../shared/settings-api';
-import { SettingsNotice } from '../../../../../shared/ui/settings-notice/settings-notice';
-import { emailOptions, emailPreview, listSourceRecords, sendEmail } from '../outbound-emails.api';
+import { anyGrant } from '../../shared/settings-access';
+import { SourceLookup, searchSourceRecords } from '../source-lookup';
+import { emailOptions, emailPreview, sendEmail } from '../outbound-emails.api';
 import {
   CrmSourceRecord,
-  EMAIL_SOURCE_TYPES,
   EmailOptionsResponse,
   EmailPreviewResponse,
   EmailRecipientOption,
   EmailSourceType,
   SendEmailRequest,
+  emailErrorState,
   resolveEmailErrorMessage,
   wrapEmailHtml,
+  keepEmailKey,
 } from '../outbound-emails.model';
 
 type ComposeStep = 1 | 2 | 3;
@@ -36,7 +37,7 @@ function recipientKey({ reference }: EmailRecipientOption): string {
 
 @Component({
   selector: 'app-compose-modal',
-  imports: [RouterLink, TranslocoPipe, NgIcon, Button, Dropdown, Field, Modal, Segmented, SettingsNotice],
+  imports: [ TranslocoPipe, NgIcon, Button, Dropdown, Field, Modal, Segmented],
   providers: [provideIcons({ tablerMailForward, tablerCheck, tablerChevronDown, tablerSearch })],
   templateUrl: './compose-modal.html',
   host: {
@@ -59,6 +60,15 @@ export class ComposeModal {
   private readonly recipientRadios = viewChildren<ElementRef<HTMLButtonElement>>('recipientRadio');
 
   readonly sent = output<string>();
+  readonly refreshLog = output<void>();
+  readonly becameReadOnly = output<void>();
+  protected readonly readOnly = signal(!anyGrant('crm.email.send'));
+  protected readonly sources = new SourceLookup();
+  private readonly opened = signal(false);
+  protected readonly modalError = signal<string | null>(null);
+  protected readonly branchOptions = computed(() => (this.sources.types().includes(this.sourceType())
+    ? this.sources.branchesFor(this.sourceType()) : this.sources.availableBranches())
+    .map((branch) => ({ value: branch.id, label: branch.name })));
 
   protected readonly step = signal<ComposeStep>(1);
   protected readonly sourceType = signal<EmailSourceType>('LEAD');
@@ -69,7 +79,6 @@ export class ComposeModal {
   protected readonly recordQuery = signal('');
 
   protected readonly loadingOptions = signal(false);
-  protected readonly senderUnverified = signal(false);
   protected readonly options = signal<EmailOptionsResponse | null>(null);
   protected readonly selectedRecipientKey = signal('');
   protected readonly selectedTemplateId = signal('');
@@ -92,7 +101,7 @@ export class ComposeModal {
 
   protected readonly sourceTypeOptions = computed<SegmentedOption[]>(() => {
     this.i18n();
-    return EMAIL_SOURCE_TYPES.map((type) => ({
+    return this.sources.types().map((type) => ({
       value: type,
       label: this.transloco.translate(`outboundEmails.sourceTypes.${type}`),
     }));
@@ -114,10 +123,10 @@ export class ComposeModal {
   protected readonly templateDropdownOptions = computed<DropdownOption<string>[]>(() => {
     this.i18n();
     const list = this.options()?.templates ?? [];
-    return list.map((tpl) => ({
+    return [{ value: '', label: this.transloco.translate('outboundEmails.compose.assignedTemplate') }, ...list.map((tpl) => ({
       value: tpl.templateVersionId,
       label: `${tpl.name} · ${this.transloco.translate('outboundEmails.table.version', { version: tpl.versionNumber })}`,
-    }));
+    }))];
   });
 
   protected readonly selectedRecipient = computed(() => {
@@ -127,7 +136,8 @@ export class ComposeModal {
   });
 
   protected readonly canProceedToPreview = computed(
-    () => !this.senderUnverified() && Boolean(this.selectedRecipient() && this.selectedTemplateId()),
+    () => !this.readOnly() && Boolean(this.selectedRecipient()) &&
+      !this.options()?.availability.includes('NO_COMPATIBLE_TEMPLATE'),
   );
 
   protected readonly previewFormatOptions = computed<SegmentedOption[]>(() => {
@@ -149,12 +159,28 @@ export class ComposeModal {
   private sendFingerprint = '';
   private previewLocale: 'ar' | 'en' = 'en';
 
+  constructor() {
+    effect(() => {
+      if (!this.opened()) return;
+      this.sources.branchId();
+      const types = this.sources.types();
+      if (types.length && !types.includes(this.sourceType())) this.sourceType.set(types[0]);
+      this.selectedRecordId.set('');
+      this.records.set([]);
+      this.recordMenuOpen.set(false);
+      this.options.set(null);
+      this.preview.set(null);
+      this.step.set(1);
+      untracked(() => void this.loadRecords());
+    });
+  }
+
   open(): void {
+    if (this.readOnly()) return;
     this.step.set(1);
     this.sourceType.set('LEAD');
     this.recordMenuOpen.set(false);
     this.recordQuery.set('');
-    this.senderUnverified.set(false);
     this.options.set(null);
     this.selectedRecipientKey.set('');
     this.selectedTemplateId.set('');
@@ -163,9 +189,13 @@ export class ComposeModal {
     this.sending.set(false);
     this.sendKey = '';
     this.sendFingerprint = '';
+    this.modalError.set(null);
+    this.selectedRecordId.set('');
+    this.records.set([]);
     this.previewLocale = this.language();
     this.modal().open();
-    void this.loadRecords();
+    this.opened.set(true);
+    void this.sources.loadBranches().catch((error) => this.handleError(error));
   }
 
   close(): void {
@@ -178,17 +208,28 @@ export class ComposeModal {
     this.sourceType.set(value);
     this.recordMenuOpen.set(false);
     this.recordQuery.set('');
-    const firstMatch = this.records().find((record) => record.type === value);
-    this.selectedRecordId.set(firstMatch?.id ?? '');
+    this.selectedRecordId.set('');
+    this.records.set([]);
+    void this.loadRecords();
+  }
+
+  protected onBranchChange(value: string | null): void {
+    this.sources.branchId.set(value);
+    this.selectedRecordId.set('');
+    this.records.set([]);
+    this.recordMenuOpen.set(false);
+    this.options.set(null);
+    this.preview.set(null);
   }
 
   protected toggleRecordMenu(): void {
-    if (this.loadingRecords()) return;
+    if (this.loadingRecords() || !this.sources.branchId() || !this.sources.types().includes(this.sourceType())) return;
     this.recordMenuOpen.update((open) => !open);
   }
 
   protected onRecordQueryInput(event: Event): void {
     this.recordQuery.set((event.target as HTMLInputElement).value);
+    void this.loadRecords();
   }
 
   protected selectRecord(record: CrmSourceRecord): void {
@@ -282,14 +323,14 @@ export class ComposeModal {
   }
 
   protected async nextFromRecord(): Promise<void> {
-    if (this.busy()) return;
+    if (this.busy() || this.readOnly()) return;
     const recordId = this.selectedRecordId();
-    if (!recordId) return;
+    if (!recordId || !this.sources.branchId() || !this.sources.types().includes(this.sourceType())) return;
 
     this.recordMenuOpen.set(false);
     this.loadingOptions.set(true);
-    this.senderUnverified.set(false);
     this.options.set(null);
+    this.modalError.set(null);
 
     try {
       const response = await emailOptions({
@@ -299,20 +340,10 @@ export class ComposeModal {
       });
       this.options.set(response);
       this.selectedRecipientKey.set(response.recipients[0] ? recipientKey(response.recipients[0]) : '');
-      const defaultTpl =
-        response.assignedTemplateVersionId &&
-        response.templates.some((tpl) => tpl.templateVersionId === response.assignedTemplateVersionId)
-          ? response.assignedTemplateVersionId
-          : (response.templates[0]?.templateVersionId ?? '');
-      this.selectedTemplateId.set(defaultTpl);
+      this.selectedTemplateId.set('');
       this.step.set(2);
     } catch (error) {
-      if (error instanceof ApiError && error.code === 'CRM.EMAIL.SENDER_UNVERIFIED') {
-        this.senderUnverified.set(true);
-        this.step.set(2);
-      } else {
-        this.notify.error(resolveEmailErrorMessage(this.transloco, error));
-      }
+      this.handleError(error);
     } finally {
       this.loadingOptions.set(false);
     }
@@ -322,7 +353,7 @@ export class ComposeModal {
     if (this.busy() || !this.canProceedToPreview()) return;
     const recipient = this.selectedRecipient();
     const templateVersionId = this.selectedTemplateId();
-    if (!recipient || !templateVersionId) return;
+    if (!recipient) return;
 
     const locale = this.language();
     const body: SendEmailRequest = {
@@ -330,10 +361,11 @@ export class ComposeModal {
       sourceId: this.selectedRecordId(),
       locale,
       recipient: { ...recipient.reference },
-      templateVersionId,
+      ...(templateVersionId ? { templateVersionId } : {}),
     };
 
     this.loadingPreview.set(true);
+    this.modalError.set(null);
     try {
       const result = await emailPreview(body);
       this.preview.set(result);
@@ -346,35 +378,46 @@ export class ComposeModal {
       }
       this.step.set(3);
     } catch (error) {
-      this.notify.error(resolveEmailErrorMessage(this.transloco, error));
+      this.handleError(error);
     } finally {
       this.loadingPreview.set(false);
     }
   }
 
   protected async send(): Promise<void> {
-    if (this.busy()) return;
+    if (this.busy() || this.readOnly()) return;
     const recipient = this.selectedRecipient();
     const templateVersionId = this.selectedTemplateId();
-    if (!recipient || !templateVersionId) return;
+    if (!recipient) return;
+
+    const body: SendEmailRequest = {
+      sourceType: this.sourceType(), sourceId: this.selectedRecordId(), locale: this.previewLocale,
+      recipient: { ...recipient.reference }, ...(templateVersionId ? { templateVersionId } : {}),
+    };
+    const fingerprint = JSON.stringify(body);
+    if (!this.sendKey || this.sendFingerprint !== fingerprint) {
+      this.sendKey = newIdempotencyKey();
+      this.sendFingerprint = fingerprint;
+    }
 
     this.sending.set(true);
+    this.modalError.set(null);
     try {
       const result = await sendEmail(
-        {
-          sourceType: this.sourceType(),
-          sourceId: this.selectedRecordId(),
-          locale: this.previewLocale,
-          recipient: { ...recipient.reference },
-          templateVersionId,
-        },
+        body,
         this.sendKey,
       );
       this.notify.success(this.transloco.translate('outboundEmails.toasts.queued'));
       this.modal().close();
       this.sent.emit(result.outboundEmailId);
     } catch (error) {
-      this.notify.error(resolveEmailErrorMessage(this.transloco, error));
+      if (!keepEmailKey(error)) this.sendKey = '';
+      if (error instanceof ApiError && error.code === 'CRM.EMAIL.IDEMPOTENCY_MISMATCH') {
+        this.notify.warning(resolveEmailErrorMessage(this.transloco, error));
+        this.refreshLog.emit();
+      } else {
+        this.handleError(error);
+      }
     } finally {
       this.sending.set(false);
     }
@@ -386,12 +429,13 @@ export class ComposeModal {
     if (current === 3) {
       this.step.set(2);
     } else if (current === 2) {
-      this.senderUnverified.set(false);
       this.step.set(1);
     }
   }
 
   protected onClosed(): void {
+    this.opened.set(false);
+    this.recordsLoadSeq++;
     this.recordMenuOpen.set(false);
     this.loadingOptions.set(false);
     this.loadingPreview.set(false);
@@ -400,22 +444,38 @@ export class ComposeModal {
 
   private async loadRecords(): Promise<void> {
     const seq = ++this.recordsLoadSeq;
+    const branch = this.sources.branchId();
+    if (!branch || !this.sources.types().includes(this.sourceType())) {
+      this.loadingRecords.set(false);
+      return;
+    }
     this.loadingRecords.set(true);
     try {
-      const items = await listSourceRecords();
+      const items = await searchSourceRecords(this.sourceType(), branch, this.recordQuery(), 1);
       if (seq !== this.recordsLoadSeq) return;
       this.records.set(items);
-      const currentType = this.sourceType();
-      const firstMatch = items.find((record) => record.type === currentType);
-      this.selectedRecordId.set(firstMatch?.id ?? '');
     } catch (error) {
       if (seq === this.recordsLoadSeq) {
-        this.notify.error(resolveEmailErrorMessage(this.transloco, error));
+        this.handleError(error);
       }
     } finally {
       if (seq === this.recordsLoadSeq) {
         this.loadingRecords.set(false);
       }
+    }
+  }
+
+  private handleError(error: unknown): void {
+    const state = emailErrorState(this.transloco, error);
+    if (state.readOnly) {
+      this.readOnly.set(true);
+      this.becameReadOnly.emit();
+    }
+    const message = resolveEmailErrorMessage(this.transloco, error, true);
+    if (error instanceof ApiError && (error.status === 422 || error.status === 429)) {
+      this.modalError.set(message);
+    } else {
+      this.notify.error(message);
     }
   }
 }

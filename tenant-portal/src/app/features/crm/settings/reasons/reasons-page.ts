@@ -1,9 +1,9 @@
-import { Component, ElementRef, computed, inject, linkedSignal, signal, viewChild, viewChildren } from '@angular/core';
+import { Component, ElementRef, Injector, computed, inject, linkedSignal, runInInjectionContext, signal, viewChild, viewChildren } from '@angular/core';
+import { Router } from '@angular/router';
 import { translationEvents } from '../../../../core/i18n/translation-events';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
-  tablerAlertTriangle,
   tablerChecklist,
   tablerEye,
   tablerListCheck,
@@ -22,7 +22,10 @@ import { Button } from '../../../../shared/ui/button/button';
 import { Field } from '../../../../shared/ui/field/field';
 import { Switch } from '../../../../shared/ui/switch/switch';
 import { CrmModules } from '../../shared/crm-modules/crm-modules';
-import { errorCodeOf, errorMessage } from '../shared/settings-api';
+import { errorCodeOf } from '../shared/settings-api';
+import { reasonsError } from './reasons-error';
+import { tenantWide } from '../shared/settings-access';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { SettingsFrame } from '../../../../shared/ui/settings-frame/settings-frame';
 import { ReasonModal } from './reason-modal/reason-modal';
 import { listReasons, updateReason } from './reasons.api';
@@ -36,8 +39,6 @@ import {
   reasonNameIn,
   reasonOtherNameIn,
 } from './reasons.model';
-
-const CAN_MANAGE = true; // later from the session permissions
 
 const POLARITY_BADGE: Record<ReasonPolarity, string> = {
   POSITIVE: 'bg-success-soft text-on-success-soft',
@@ -55,11 +56,10 @@ const KIND_TABS: Record<ReasonKind, { icon: string; labelKey: string }> = {
 
 @Component({
   selector: 'app-reasons-page',
-  imports: [NgIcon, TranslocoPipe, ActionsMenu, Button, Field, SettingsFrame, Switch, ReasonModal],
+  imports: [NgIcon, TranslocoPipe, ActionsMenu, Button, Field, SettingsFrame, Switch, ReasonModal, FullState],
   providers: [
     provideTranslocoScope('settings', { scope: 'settings-reasons', alias: 'reasons' }),
     provideIcons({
-      tablerAlertTriangle,
       tablerChecklist,
       tablerEye,
       tablerListCheck,
@@ -73,13 +73,15 @@ const KIND_TABS: Record<ReasonKind, { icon: string; labelKey: string }> = {
     }),
   ],
   templateUrl: './reasons-page.html',
-  host: { class: 'flex min-h-0 flex-1 flex-col' },
+  host: { class: 'flex flex-1 shrink-0 flex-col' },
 })
 export class ReasonsPage {
   private static nextId = 0;
   protected readonly uid = `reasons-page-${++ReasonsPage.nextId}`;
 
   private readonly notify = inject(Notify);
+  private readonly injector = inject(Injector);
+  private readonly router = inject(Router);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly crmModules = inject(CrmModules);
@@ -88,14 +90,16 @@ export class ReasonsPage {
   private readonly reasonModal = viewChild.required(ReasonModal);
   private readonly tabButtons = viewChildren<ElementRef<HTMLButtonElement>>('tabBtn');
 
-  protected readonly canManage = CAN_MANAGE;
+  protected readonly canRead = computed(() => runInInjectionContext(this.injector, () => tenantWide('crm.settings.read')));
+  protected readonly readOnly = signal(false);
+  protected readonly canManage = computed(() => !this.readOnly() && runInInjectionContext(this.injector, () => tenantWide('crm.settings.manage')));
   protected readonly limits = REASON_LIMITS;
   protected readonly kindTabs = KIND_TABS;
   protected readonly skeletonRows = [0, 1, 2, 3, 4];
 
   protected readonly reasons = signal<Reason[]>([]);
   protected readonly loading = signal(true);
-  protected readonly failed = signal(false);
+  protected readonly failure = signal<ReturnType<typeof reasonsError> | null>(null);
   protected readonly search = signal('');
   protected readonly showInactive = signal(false);
   private readonly busyIds = signal<ReadonlySet<string>>(new Set());
@@ -126,9 +130,9 @@ export class ReasonsPage {
 
   protected readonly gridColumnsClass = computed(() => {
     if (this.isActivityOutcome()) {
-      return this.canManage ? 'grid-cols-crm-reason-outcome-row-actions' : 'grid-cols-crm-reason-outcome-row';
+      return this.canManage() ? 'grid-cols-crm-reason-outcome-row-actions' : 'grid-cols-crm-reason-outcome-row';
     }
-    return this.canManage ? 'grid-cols-crm-reason-row-actions' : 'grid-cols-crm-reason-row';
+    return this.canManage() ? 'grid-cols-crm-reason-row-actions' : 'grid-cols-crm-reason-row';
   });
 
   protected readonly kindCounts = computed<Record<ReasonKind, number>>(() => {
@@ -184,20 +188,28 @@ export class ReasonsPage {
   protected async load(): Promise<void> {
     const seq = ++this.loadSeq;
     this.loading.set(true);
-    this.failed.set(false);
+    this.failure.set(null);
+    if (!this.canRead()) {
+      this.loading.set(false);
+      return;
+    }
     try {
       const { items } = await listReasons();
       if (seq !== this.loadSeq) return;
       this.reasons.set(items);
-    } catch {
+    } catch (error) {
       if (seq === this.loadSeq) {
-        this.failed.set(true);
+        this.failure.set(reasonsError(this.transloco, error));
       }
     } finally {
       if (seq === this.loadSeq) {
         this.loading.set(false);
       }
     }
+  }
+
+  protected goHome(): void {
+    void this.router.navigateByUrl('/workspace/home');
   }
 
   protected onTabKeydown(event: KeyboardEvent): void {
@@ -221,7 +233,7 @@ export class ReasonsPage {
   }
 
   protected openCreate(): void {
-    if (!this.canManage || this.atLimit()) return;
+    if (!this.canManage() || this.atLimit()) return;
     this.reasonModal().openCreate(this.activeKind(), this.nextSortOrder());
   }
 
@@ -251,6 +263,7 @@ export class ReasonsPage {
 
   protected rowActions(reason: Reason): ActionItem[] {
     this.i18n();
+    if (!this.canManage()) return [];
     const items: ActionItem[] = [
       {
         id: 'open',
@@ -293,7 +306,7 @@ export class ReasonsPage {
       return;
     }
     if (selection.id !== 'activate' && selection.id !== 'deactivate') return;
-    if (!this.canManage || (reason.isSystem && selection.id === 'deactivate') || this.busyIds().has(reason.id)) return;
+    if (!this.canManage() || (reason.isSystem && selection.id === 'deactivate') || this.busyIds().has(reason.id)) return;
 
     const nextActive = selection.id === 'activate';
     this.setBusy(reason.id, true);
@@ -304,11 +317,12 @@ export class ReasonsPage {
         this.transloco.translate(nextActive ? 'reasons.toasts.reasonActivated' : 'reasons.toasts.reasonDeactivated'),
       );
     } catch (error) {
-      if (errorCodeOf(error) === 'CRM_REASON_REVISION_STALE') {
+      if (errorCodeOf(error) === 'CRM_REASON_REVISION_STALE' || errorCodeOf(error) === 'CRM_DASHBOARD_REVISION_MISMATCH') {
         this.reasonModal().openConflict(reason, { isActive: nextActive });
         return;
       }
-      this.notify.error(errorMessage(error, 'reasons', this.transloco));
+      this.reasonModal().showWriteError(error);
+      if (errorCodeOf(error) === 'CRM_REASON_NOT_FOUND') await this.load();
     } finally {
       this.setBusy(reason.id, false);
     }

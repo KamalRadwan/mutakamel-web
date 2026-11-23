@@ -1,193 +1,190 @@
+import { DOCUMENT } from '@angular/common';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, fieldErrorsOf } from '../../../../core/api/api-errors';
 import { newIdempotencyKey } from '../../../../core/api/idempotency';
-import { SYSTEM_STAGE_IDS } from '../opportunity-stages/opportunity-stages.fake';
+import { CrmHttp, bindCrmHttpForTest, crmQueries } from '../../shared/crm-http';
+import { CRM_SETTINGS_FIXTURES } from '../../shared/testing/crm-settings-fixtures';
 import {
-  addPipelineStage,
-  assignmentOptions,
-  createPipeline,
-  deletePipeline,
-  getPipelineConfiguration,
-  listPipelinesConfiguration,
-  listPipelinesForRead,
-  removePipelineStage,
-  reorderPipelineStages,
-  replaceAssignments,
-  updatePipeline,
+  addPipelineStage, assignmentOptions, beginPipelineEdit, createPipeline, deletePipeline,
+  getPipelineAssignments, getPipelineConfiguration, listPipelinesConfiguration, listPipelinesForRead,
+  removePipelineStage, reorderPipelineStages, replaceAssignments, resetPipeline, setDefaultPipeline, updatePipeline,
 } from './pipelines.api';
+import type { Pipeline } from './pipelines.model';
 
-async function settle<T>(promise: Promise<T>): Promise<T> {
-  const guarded = promise.then(
-    (value) => ({ ok: true as const, value }),
-    (error: unknown) => ({ ok: false as const, error }),
-  );
-  await vi.runAllTimersAsync();
-  const result = await guarded;
-  if (!result.ok) throw result.error;
-  return result.value;
-}
+const base = '/api/tenant/crm/v1';
+const uuidV7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const pipeline = (CRM_SETTINGS_FIXTURES['/pipelines/configuration'] as Pipeline[])[0];
+const id = pipeline.id;
+const createBody = { code: 'ENTERPRISE', nameAr: 'المؤسسات', nameEn: 'Enterprise' };
+const assignments = { accessMode: 'RESTRICTED' as const, userIds: ['user'], teamIds: ['team'] };
+const writes = [
+  { name: 'create', method: 'POST', path: '/pipelines', body: createBody, response: pipeline, call: (key: string, changed = false) => createPipeline({ ...createBody, nameEn: changed ? 'Changed' : createBody.nameEn }) },
+  { name: 'update', method: 'PATCH', path: `/pipelines/${id}`, body: { nameEn: 'Updated' }, response: pipeline, call: (key: string, changed = false) => updatePipeline(id, { nameEn: changed ? 'Changed' : 'Updated' }) },
+  { name: 'delete', method: 'DELETE', path: `/pipelines/${id}`, body: null, response: null, call: () => deletePipeline(id) },
+  { name: 'set default', method: 'PUT', path: `/pipelines/${id}/default`, body: null, response: pipeline, call: (key: string) => setDefaultPipeline(id, key) },
+  { name: 'reset', method: 'POST', path: `/pipelines/${id}/reset`, body: null, response: pipeline, call: () => resetPipeline(id) },
+  { name: 'attach stage', method: 'POST', path: `/pipelines/${id}/stages`, body: { opportunityStageId: 'stage' }, response: pipeline.stages[0], call: (key: string, changed = false) => addPipelineStage(id, changed ? 'another' : 'stage') },
+  { name: 'reorder', method: 'PATCH', path: `/pipelines/${id}/stages/reorder`, body: { orderedIds: ['membership'] }, response: pipeline.stages, call: (key: string, changed = false) => reorderPipelineStages(id, [changed ? 'another' : 'membership'], key) },
+  { name: 'detach stage', method: 'DELETE', path: `/pipelines/${id}/stages/membership`, body: null, response: null, call: () => removePipelineStage(id, 'membership') },
+  { name: 'assignments', method: 'PUT', path: `/pipelines/${id}/assignments`, body: assignments, response: assignments, call: (key: string, changed = false) => replaceAssignments(id, { ...assignments, userIds: [changed ? 'another' : 'user'] }, key) },
+];
 
-async function errorOf(promise: Promise<unknown>): Promise<ApiError | undefined> {
-  try {
-    await settle(promise);
-    return undefined;
-  } catch (error) {
-    return error instanceof ApiError ? error : undefined;
-  }
-}
-
-const DEFAULT_ID = '01950000-0000-7000-8000-000000000201';
-const MISSING_ID = '01950000-0000-7000-8000-0000000002ff';
-
-describe('pipelines fake follows crm-app pipelines.controller / pipelines.service', () => {
-  beforeEach(() => vi.useFakeTimers());
-  afterEach(() => vi.useRealTimers());
-
-  describe('GET crm/pipelines (listPipelinesForRead, crm.pipelines.read)', () => {
-    it('returns active pipelines ordered by code, without assignments', async () => {
-      const list = await settle(listPipelinesForRead());
-      expect(list.length).toBeGreaterThan(0);
-      expect(list.every((item) => item.isActive)).toBe(true);
-      expect(list.every((item) => !('assignments' in item))).toBe(true);
-      const codes = list.map((item) => item.code);
-      expect(codes).toEqual([...codes].sort((a, b) => a.localeCompare(b, 'en')));
+for (const language of ['en', 'ar']) for (const theme of ['light', 'dark']) {
+describe(`${language} ${theme}`, () => {
+describe('PipelinesApi', () => {
+  let http: HttpTestingController;
+  let dispose: () => void;
+  let originalAttributes: (string | null)[];
+  beforeEach(() => {
+    originalAttributes = ['lang', 'dir', 'data-theme'].map((name) => document.documentElement.getAttribute(name));
+    document.documentElement.lang = language;
+    document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
+    document.documentElement.setAttribute('data-theme', theme);
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    const doc = TestBed.inject(DOCUMENT);
+    const cookie = doc.location.protocol === 'https:' ? '__Host-mutakamel-tenant-csrf' : 'mutakamel-http-tenant-csrf';
+    vi.spyOn(doc, 'cookie', 'get').mockReturnValue(`${cookie}=csrf-pipelines`);
+    http = TestBed.inject(HttpTestingController);
+    dispose = bindCrmHttpForTest(TestBed.inject(CrmHttp));
+  });
+  afterEach(() => {
+    http.verify();
+    crmQueries().clear();
+    dispose();
+    vi.restoreAllMocks();
+    ['lang', 'dir', 'data-theme'].forEach((name, index) => {
+      const value = originalAttributes[index];
+      if (value === null) document.documentElement.removeAttribute(name);
+      else document.documentElement.setAttribute(name, value);
     });
   });
 
-  describe('POST crm/pipelines', () => {
-    it('answers DTO errors with 400 CRM_VALIDATION_FAILED keyed by field, before the code check', async () => {
-      const error = await errorOf(createPipeline({ code: 'DEFAULT', nameAr: '  ', nameEn: 'x'.repeat(81) }));
-      expect(error?.status).toBe(400);
-      expect(error?.code).toBe('CRM_VALIDATION_FAILED');
-      expect(error?.details).toEqual({ nameAr: ['is_not_empty'], nameEn: ['max_length'] });
+  it('reads every pipeline route with bare bodies', async () => {
+    for (const [path, call, response] of [
+      ['/pipelines', listPipelinesForRead, []],
+      ['/pipelines/configuration', listPipelinesConfiguration, [pipeline]],
+      [`/pipelines/${id}/configuration`, () => getPipelineConfiguration(id), pipeline],
+      [`/pipelines/${id}/assignments`, () => getPipelineAssignments(id), assignments],
+      ['/pipelines/assignment-options?search=enterprise&limit=20', () => assignmentOptions('enterprise', 20), { users: [], teams: [] }],
+    ] as const) {
+      const pending = call();
+      http.expectOne(`${base}${path}`).flush(response);
+      await expect(pending).resolves.toEqual(response);
+    }
+  });
+
+  it('sorts default first then code', async () => {
+    const pending = listPipelinesConfiguration();
+    const unsorted = [
+      { ...pipeline, id: 'z', code: 'Z', isDefault: false },
+      { ...pipeline, id: 'a', code: 'A', isDefault: false },
+      { ...pipeline, id: 'default', code: 'DEFAULT', isDefault: true },
+    ];
+    http.expectOne(`${base}/pipelines/configuration`).flush(unsorted);
+    expect((await pending).map((item) => item.id)).toEqual(['default', 'a', 'z']);
+  });
+
+  it('set default sends the key', async () => {
+    const key = newIdempotencyKey();
+    const pending = setDefaultPipeline(id, key);
+    const request = http.expectOne(`${base}/pipelines/${id}/default`);
+    expect(request.request.headers.get('x-idempotency-key')).toBe(key);
+    expect(key).toMatch(uuidV7);
+    request.flush(pipeline);
+    await pending;
+  });
+
+  it('assignments dedupe and key', async () => {
+    const key = newIdempotencyKey();
+    const pending = replaceAssignments(id, { ...assignments, userIds: ['user', 'user'], teamIds: ['team', 'team'] }, key);
+    const request = http.expectOne(`${base}/pipelines/${id}/assignments`);
+    expect(request.request.body).toEqual(assignments);
+    expect(request.request.headers.get('x-idempotency-key')).toBe(key);
+    request.flush(assignments);
+    await expect(pending).resolves.toEqual(assignments);
+  });
+
+  describe.each(writes)('$name', (operation) => {
+    it('sends UUID v7, csrf, exact body, no scope or revision, then invalidates queries', async () => {
+      const cancel = vi.spyOn(crmQueries(), 'cancelQueries');
+      const invalidate = vi.spyOn(crmQueries(), 'invalidateQueries');
+      const pending = operation.call(newIdempotencyKey());
+      const request = http.expectOne(`${base}${operation.path}`);
+      expect(request.request.method).toBe(operation.method);
+      expect(request.request.body).toEqual(operation.body);
+      expect(request.request.headers.get('x-idempotency-key')).toMatch(uuidV7);
+      expect(request.request.headers.get('x-csrf-token')).toBe('csrf-pipelines');
+      expect(request.request.headers.has('If-Match')).toBe(false);
+      expect(request.request.headers.has('x-mutakamel-company-id')).toBe(false);
+      expect(request.request.headers.has('x-mutakamel-branch-id')).toBe(false);
+      request.flush(operation.response, { status: operation.method === 'DELETE' ? 204 : operation.method === 'POST' ? 201 : 200, statusText: 'Success' });
+      await pending;
+      expect(cancel).toHaveBeenCalledWith({ queryKey: ['crm-settings', 'pipelines'] });
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: ['crm-settings', 'pipelines'] });
     });
 
-    it('rejects a code that breaks the pattern and duplicated stage ids in the pipe', async () => {
-      const error = await errorOf(
-        createPipeline({
-          code: '1BAD',
-          nameAr: 'أ',
-          nameEn: 'A',
-          stageIds: [SYSTEM_STAGE_IDS.NEW, SYSTEM_STAGE_IDS.NEW],
-        }),
-      );
-      expect(error?.status).toBe(400);
-      expect(error?.details).toEqual({ code: ['matches'], stageIds: ['array_unique'] });
+    it.each([0, 503, 409, 401])('keeps the same key and body after retryable outcome %s', async (status) => {
+      const key = newIdempotencyKey();
+      const first = operation.call(key);
+      const assertion = expect(first).rejects.toMatchObject({ status });
+      const request = http.expectOne(`${base}${operation.path}`);
+      const sentKey = request.request.headers.get('x-idempotency-key');
+      if (status === 0) request.error(new ProgressEvent('error'));
+      else request.flush({ errorCode: status === 409 ? 'GW.IDEM.IN_FLIGHT' : status === 401 ? 'UNAUTHORIZED' : 'INTERNAL_ERROR' }, { status, statusText: 'Error' });
+      await assertion;
+      http.expectNone(`${base}${operation.path}`);
+      const retry = operation.call(key);
+      const replay = http.expectOne(`${base}${operation.path}`);
+      expect(replay.request.headers.get('x-idempotency-key')).toBe(sentKey);
+      expect(replay.request.body).toEqual(request.request.body);
+      replay.flush(operation.response);
+      await retry;
     });
 
-    it('answers a taken code with 409 PIPELINE_CODE_TAKEN', async () => {
-      const error = await errorOf(createPipeline({ code: ' default ', nameAr: 'أ', nameEn: 'A' }));
-      expect([error?.status, error?.code]).toEqual([409, 'PIPELINE_CODE_TAKEN']);
+    it('uses a new key after a final outcome', async () => {
+      const first = operation.call(newIdempotencyKey());
+      const assertion = expect(first).rejects.toMatchObject({ status: 422 });
+      const request = http.expectOne(`${base}${operation.path}`);
+      request.flush({ errorCode: 'CRM_VALIDATION_FAILED', details: { nameEn: ['Name is invalid'] } }, { status: 422, statusText: 'Invalid' });
+      await assertion;
+      http.expectNone(`${base}${operation.path}`);
+      const next = operation.call(newIdempotencyKey());
+      const nextRequest = http.expectOne(`${base}${operation.path}`);
+      expect(nextRequest.request.headers.get('x-idempotency-key')).not.toBe(request.request.headers.get('x-idempotency-key'));
+      nextRequest.flush(operation.response);
+      await next;
     });
   });
 
-  describe('PATCH crm/pipelines/:id', () => {
-    it('validates the body before the 404', async () => {
-      const error = await errorOf(updatePipeline(MISSING_ID, { nameEn: '' }));
-      expect(error?.status).toBe(400);
-      expect(Object.keys(fieldErrorsOf(error))).toEqual(['nameEn']);
-    });
-
-    it('refuses to deactivate the default pipeline with 422', async () => {
-      const error = await errorOf(updatePipeline(DEFAULT_ID, { isActive: false }));
-      expect([error?.status, error?.code]).toEqual([422, 'PIPELINE_DEFAULT_DEACTIVATE']);
-    });
+  it.each(writes.filter((operation) => operation.body !== null))('$name gets a new key when the body changes', async (operation) => {
+    const first = operation.call(newIdempotencyKey());
+    const assertion = expect(first).rejects.toMatchObject({ status: 503 });
+    const request = http.expectOne(`${base}${operation.path}`);
+    request.flush({}, { status: 503, statusText: 'Unavailable' });
+    await assertion;
+    const changed = operation.call(newIdempotencyKey(), true);
+    const next = http.expectOne(`${base}${operation.path}`);
+    expect(next.request.body).not.toEqual(request.request.body);
+    expect(next.request.headers.get('x-idempotency-key')).not.toBe(request.request.headers.get('x-idempotency-key'));
+    next.flush(operation.response);
+    await changed;
   });
 
-  describe('DELETE and stage memberships', () => {
-    it('answers PIPELINE_STAGE_IN_USE with no details', async () => {
-      const error = await errorOf(removePipelineStage(DEFAULT_ID, 'ps-def-2'));
-      expect([error?.status, error?.code, error?.details]).toEqual([409, 'PIPELINE_STAGE_IN_USE', undefined]);
-    });
-
-    it('answers an unknown membership with 404 PIPELINE_STAGE_NOT_FOUND', async () => {
-      const error = await errorOf(removePipelineStage(DEFAULT_ID, 'ps-missing'));
-      expect([error?.status, error?.code]).toEqual([404, 'PIPELINE_STAGE_NOT_FOUND']);
-    });
-
-    it('refuses to remove a NEW/WON/LOST membership with 422 PIPELINE_STAGE_REQUIRED', async () => {
-      const error = await errorOf(removePipelineStage(DEFAULT_ID, 'ps-def-1'));
-      expect([error?.status, error?.code]).toEqual([422, 'PIPELINE_STAGE_REQUIRED']);
-    });
-
-    it('answers an already assigned stage with 409 before the semantic duplicate', async () => {
-      const error = await errorOf(addPipelineStage(DEFAULT_ID, SYSTEM_STAGE_IDS.NEW));
-      expect([error?.status, error?.code]).toEqual([409, 'PIPELINE_STAGE_ALREADY_ASSIGNED']);
-    });
-
-    it('refuses to delete the default pipeline with 422 PIPELINE_DEFAULT_DELETE', async () => {
-      const error = await errorOf(deletePipeline(DEFAULT_ID));
-      expect([error?.status, error?.code]).toEqual([422, 'PIPELINE_DEFAULT_DELETE']);
-    });
-  });
-
-  describe('PATCH crm/pipelines/:id/stages/reorder', () => {
-    it('answers an empty or duplicated orderedIds with 400 keyed by orderedIds', async () => {
-      const empty = await errorOf(reorderPipelineStages(DEFAULT_ID, [], newIdempotencyKey()));
-      expect([empty?.status, empty?.details]).toEqual([400, { orderedIds: ['array_not_empty'] }]);
-      const dup = await errorOf(reorderPipelineStages(DEFAULT_ID, ['ps-def-1', 'ps-def-1'], newIdempotencyKey()));
-      expect([dup?.status, dup?.details]).toEqual([400, { orderedIds: ['array_unique'] }]);
-    });
-
-    it('needs every membership with NEW first (422 PIPELINE_STAGE_REORDER_INVALID), then writes dense ranks', async () => {
-      const pipeline = await settle(getPipelineConfiguration(DEFAULT_ID));
-      const ids = pipeline.stages.map((stage) => stage.id);
-      const partial = await errorOf(reorderPipelineStages(DEFAULT_ID, ids.slice(1), newIdempotencyKey()));
-      expect([partial?.status, partial?.code]).toEqual([422, 'PIPELINE_STAGE_REORDER_INVALID']);
-      const newLast = await errorOf(reorderPipelineStages(DEFAULT_ID, [...ids.slice(1), ids[0]], newIdempotencyKey()));
-      expect(newLast?.code).toBe('PIPELINE_STAGE_REORDER_INVALID');
-
-      const swapped = [ids[0], ids[2], ids[1], ...ids.slice(3)];
-      const saved = await settle(reorderPipelineStages(DEFAULT_ID, swapped, newIdempotencyKey()));
-      expect(saved.map((stage) => stage.id)).toEqual(swapped);
-      expect(saved.map((stage) => stage.rank)).toEqual(swapped.map((_, index) => index + 1));
-      await settle(reorderPipelineStages(DEFAULT_ID, ids, newIdempotencyKey()));
-    });
-  });
-
-  describe('assignments', () => {
-    it('lists options sorted by label and refuses a search over 80 characters', async () => {
-      const options = await settle(assignmentOptions());
-      const labels = options.users.map((user) => user.label.toLowerCase());
-      expect(labels).toEqual([...labels].sort((a, b) => a.localeCompare(b, 'en')));
-      const error = await errorOf(assignmentOptions('x'.repeat(81)));
-      expect([error?.status, error?.details]).toEqual([400, { search: ['max_length'] }]);
-    });
-
-    it('answers PUT with the assignments view, not the pipeline', async () => {
-      const list = await settle(listPipelinesConfiguration());
-      const created =
-        list.find((item) => item.code === 'SPEC-ASSIGN') ??
-        (await settle(createPipeline({ code: 'SPEC-ASSIGN', nameAr: 'اختبار', nameEn: 'Spec' })));
-      const view = await settle(
-        replaceAssignments(created.id, { accessMode: 'RESTRICTED', userIds: ['u2', 'u1'], teamIds: [] }, newIdempotencyKey()),
-      );
-      expect(view).toEqual({ accessMode: 'RESTRICTED', userIds: ['u1', 'u2'], teamIds: [] });
-    });
-
-    it('uses the backend codes for duplicates, bad targets and the default pipeline', async () => {
-      const dup = await errorOf(
-        replaceAssignments(DEFAULT_ID, { accessMode: 'RESTRICTED', userIds: ['u1', 'u1'], teamIds: [] }, newIdempotencyKey()),
-      );
-      expect([dup?.status, dup?.details]).toEqual([400, { userIds: ['array_unique'] }]);
-
-      const restricted = await errorOf(
-        replaceAssignments(DEFAULT_ID, { accessMode: 'RESTRICTED', userIds: ['u1'], teamIds: [] }, newIdempotencyKey()),
-      );
-      expect(restricted?.code).toBe('PIPELINE_DEFAULT_RESTRICTED');
-
-      const list = await settle(listPipelinesConfiguration());
-      const other = list.find((item) => item.id !== DEFAULT_ID)!;
-      const users = await errorOf(
-        replaceAssignments(other.id, { accessMode: 'RESTRICTED', userIds: ['nobody'], teamIds: [] }, newIdempotencyKey()),
-      );
-      expect([users?.status, users?.code]).toEqual([422, 'PIPELINE_ASSIGNMENT_USERS_INVALID']);
-      const teams = await errorOf(
-        replaceAssignments(other.id, { accessMode: 'RESTRICTED', userIds: [], teamIds: ['nope'] }, newIdempotencyKey()),
-      );
-      expect(teams?.code).toBe('PIPELINE_ASSIGNMENT_TEAMS_INVALID');
-      const mode = await errorOf(replaceAssignments(other.id, { accessMode: 'RESTRICTED', userIds: [], teamIds: [] }, newIdempotencyKey()));
-      expect(mode?.code).toBe('PIPELINE_ASSIGNMENTS_INVALID');
-    });
+  it('starts a new action when a form is reopened', async () => {
+    const first = createPipeline(createBody);
+    const assertion = expect(first).rejects.toMatchObject({ status: 503 });
+    const request = http.expectOne(`${base}/pipelines`);
+    request.flush({}, { status: 503, statusText: 'Unavailable' });
+    await assertion;
+    beginPipelineEdit(null);
+    const reopened = createPipeline(createBody);
+    const next = http.expectOne(`${base}/pipelines`);
+    expect(next.request.headers.get('x-idempotency-key')).not.toBe(request.request.headers.get('x-idempotency-key'));
+    next.flush(pipeline);
+    await reopened;
   });
 });
+});
+}

@@ -31,12 +31,21 @@ export class WeekEditor {
   readonly startMinute = model.required<number>();
   readonly endMinute = model.required<number>();
   readonly timeZone = model.required<string>();
-  readonly readOnly = input(false);
+  readonly readOnly = input(true);
   readonly hoursError = input<string | null>(null);
+  readonly zoneError = input<string | null>(null);
 
   readonly applyPattern = output<void>();
 
   protected readonly weekdays = WEEKDAY_INDICES;
+
+  protected readonly weekdayText = computed(() => {
+    this.i18n();
+    return this.weekdays
+      .filter((day) => isMaskDayActive(this.weekdayMask(), day))
+      .map((day) => this.transloco.translate(`chart.daysShort.${day}`))
+      .join(' · ');
+  });
 
   protected readonly startTimeText = computed(() => minutesToTime(this.startMinute()));
   protected readonly endTimeText = computed(() => minutesToTime(this.endMinute()));

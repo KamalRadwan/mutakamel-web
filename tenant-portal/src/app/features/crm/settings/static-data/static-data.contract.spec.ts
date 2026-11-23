@@ -1,29 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { bindCrmHttpForTest, crmQueries } from '../../shared/crm-http';
+import { CrmHttpStub } from '../../shared/testing/crm-http-testing';
 import { ApiError } from '../../../../core/api/api-errors';
 import { getCrmStaticData, sanitizeStaticData } from './static-data.api';
-import { setFakeStaticDataFailNext } from './static-data.fake';
 import { CrmStaticData, ENUM_KEYS } from './static-data.model';
-
-/** Runs the fake timers to completion and returns (or rethrows) the settled result. */
-async function settle<T>(promise: Promise<T>): Promise<T> {
-  const guarded = promise.then(
-    (value) => ({ ok: true as const, value }),
-    (error: unknown) => ({ ok: false as const, error }),
-  );
-  await vi.runAllTimersAsync();
-  const result = await guarded;
-  if (!result.ok) throw result.error;
-  return result.value;
-}
-
-async function errorOf(promise: Promise<unknown>): Promise<ApiError | undefined> {
-  try {
-    await settle(promise);
-    return undefined;
-  } catch (error) {
-    return error instanceof ApiError ? error : undefined;
-  }
-}
 
 /** A raw body as a careless server could send it: partial, with junk entries. */
 function raw(patch: Record<string, unknown>): CrmStaticData {
@@ -31,14 +11,20 @@ function raw(patch: Record<string, unknown>): CrmStaticData {
 }
 
 describe('static data contract (GET crm/v1/static-data)', () => {
-  beforeEach(() => vi.useFakeTimers());
+  let dispose: () => void;
+  let stub: CrmHttpStub;
+
+  beforeEach(() => {
+    stub = new CrmHttpStub();
+    dispose = bindCrmHttpForTest(stub);
+  });
   afterEach(() => {
-    setFakeStaticDataFailNext(false);
-    vi.useRealTimers();
+    dispose();
+    vi.restoreAllMocks();
   });
 
   it('returns the bare static-data body with every section', async () => {
-    const data = await settle(getCrmStaticData());
+    const data = await getCrmStaticData();
     expect(Object.keys(data).sort()).toEqual(
       [
         'attachmentPolicy',
@@ -62,7 +48,7 @@ describe('static data contract (GET crm/v1/static-data)', () => {
   });
 
   it('has an options list for every enum key, with the same values as the enum', async () => {
-    const data = await settle(getCrmStaticData());
+    const data = await getCrmStaticData();
     for (const key of ENUM_KEYS) {
       const values = data.enums[key];
       expect(values, key).toBeDefined();
@@ -71,7 +57,7 @@ describe('static data contract (GET crm/v1/static-data)', () => {
   });
 
   it('labels every option in both languages', async () => {
-    const data = await settle(getCrmStaticData());
+    const data = await getCrmStaticData();
     const options = [
       ...Object.values(data.enumOptions).flat(),
       ...data.permissionOptions,
@@ -86,30 +72,48 @@ describe('static data contract (GET crm/v1/static-data)', () => {
     }
   });
 
-  // Backend locales: crm.analytics.export.pdf_render_requested.v1 is "Analytics PDF export requested" /
-  // "طُلب تصدير التحليلات بصيغة PDF"; the fake seed repeats the raw key in both languages.
   it('every event option has an Arabic label', async () => {
-    const data = await settle(getCrmStaticData());
+    const data = await getCrmStaticData();
     for (const option of data.eventOptions) {
       expect(option.label.ar, option.value).toMatch(/[؀-ۿ]/);
     }
   });
 
   it('returns a copy, so editing the result never changes the next read', async () => {
-    const first = await settle(getCrmStaticData());
+    const first = await getCrmStaticData();
     first.permissions.length = 0;
     first.pagination.pageSizes.push(999);
-    const second = await settle(getCrmStaticData());
+    const second = await getCrmStaticData();
     expect(second.permissions.length).toBeGreaterThan(0);
     expect(second.pagination.pageSizes).not.toContain(999);
   });
 
   it('passes 503 ENTITLEMENT_UNAVAILABLE through once, then succeeds', async () => {
-    setFakeStaticDataFailNext(true);
-    const error = await errorOf(getCrmStaticData());
-    expect(error?.status).toBe(503);
-    expect(error?.code).toBe('ENTITLEMENT_UNAVAILABLE');
-    await expect(settle(getCrmStaticData())).resolves.toBeDefined();
+    const error = new ApiError(503, 'ENTITLEMENT_UNAVAILABLE');
+    vi.spyOn(stub, 'read').mockRejectedValueOnce(error);
+    await expect(getCrmStaticData()).rejects.toBe(error);
+    await expect(getCrmStaticData()).resolves.toBeDefined();
+  });
+
+  describe('StaticDataApi', () => {
+    it('one request per session', async () => {
+      const read = vi.spyOn(stub, 'read');
+      await Promise.all([getCrmStaticData(), getCrmStaticData()]);
+      // Retain an unobserved catalogue beyond the shared client's gcTime: 0.
+      await new Promise(resolve => setTimeout(resolve, 10));
+      await getCrmStaticData();
+      expect(read).toHaveBeenCalledExactlyOnceWith('/static-data');
+      const query = crmQueries().getQueryCache().find({ queryKey: ['crm-settings', 'static-data'] });
+      expect(query?.gcTime).toBe(Infinity);
+    });
+
+    it('failures are not cached', async () => {
+      const failure = new ApiError(0, 'NETWORK_ERROR');
+      const read = vi.spyOn(stub, 'read').mockRejectedValueOnce(failure);
+      await expect(getCrmStaticData()).rejects.toBe(failure);
+      await expect(getCrmStaticData()).resolves.toBeDefined();
+      expect(read).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe('sanitizeStaticData', () => {

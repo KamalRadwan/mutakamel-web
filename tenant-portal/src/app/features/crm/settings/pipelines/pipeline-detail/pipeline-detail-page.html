@@ -17,21 +17,20 @@
     </div>
   </div>
 } @else if (notFound()) {
-  <div class="flex flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
-    <ng-icon name="tablerAlertTriangle" size="20" class="text-text-muted" aria-hidden="true" />
-    <p class="text-13 font-medium text-text">{{ 'pipelines.detail.notFound' | transloco }}</p>
-    <a uiButton variant="secondary" [routerLink]="['/crm/settings/pipelines']">
-      {{ 'pipelines.detail.backToList' | transloco }}
-    </a>
-  </div>
-} @else if (failed() && !pipeline()) {
-  <div class="flex flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card" role="alert">
-    <ng-icon name="tablerAlertTriangle" size="20" class="text-text-muted" aria-hidden="true" />
-    <p class="text-12 text-danger-text">{{ 'settings.common.loadFailed' | transloco }}</p>
-    <button type="button" uiButton variant="secondary" (click)="load()">
-      {{ 'settings.common.retry' | transloco }}
-    </button>
-  </div>
+  <ui-full-state
+    kind="not-found"
+    [title]="'pipelines.detail.notFound' | transloco"
+    [actionLabel]="'pipelines.detail.backToList' | transloco"
+    (action)="backToList()"
+  />
+} @else if (failed()) {
+  <ui-full-state
+    [kind]="loadState().kind"
+    [title]="loadState().message"
+    [text]="loadState().correlationId ? ('settings.common.correlationId' | transloco: { id: loadState().correlationId }) : ''"
+    [actionLabel]="loadState().kind === 'forbidden' ? '' : ('settings.common.retry' | transloco)"
+    (action)="load()"
+  />
 } @else if (pipeline(); as p) {
   <!-- Header row -->
   <div class="flex flex-col gap-6 rounded-10 border border-border bg-surface p-8 shadow-card">
@@ -83,7 +82,7 @@
         </div>
       </div>
 
-      @if (canManage) {
+      @if (canManage()) {
         <div class="flex flex-wrap items-center gap-8">
           <button type="button" uiButton variant="secondary" (click)="openEdit()">
             <ng-icon name="tablerEdit" size="15" aria-hidden="true" />
@@ -127,14 +126,14 @@
           <div
             #dropTarget="stageDrop"
             [stageDrag]="stage.id"
-            [dragDisabled]="!canManage || stage.flag === 'NEW' || stageBusy()"
+            [dragDisabled]="!canManage() || stage.flag === 'NEW' || stageBusy()"
             [stageDrop]="stage.id"
-            [dropDisabled]="!canManage || stage.flag === 'NEW' || stageBusy()"
+            [dropDisabled]="!canManage() || stage.flag === 'NEW' || stageBusy()"
             (dropped)="onStageDropped($event, stage.id)"
             class="flex h-table-head items-center gap-6 rounded-8 border px-8 transition-colors duration-fast"
             [class]="dropTarget.over() ? 'border-brand bg-brand-soft' : 'border-border bg-surface hover:bg-row-hover'"
           >
-            @if (canManage) {
+            @if (canManage()) {
               <span
                 class="inline-flex shrink-0 items-center"
                 [class]="stage.flag === 'NEW' ? 'cursor-not-allowed text-text-placeholder' : 'cursor-grab text-text-muted'"
@@ -183,7 +182,7 @@
               }
             </div>
 
-            @if (canManage) {
+            @if (canManage()) {
               <div class="flex shrink-0 items-center gap-2">
                 <button
                   type="button"
@@ -225,7 +224,7 @@
         }
       </div>
 
-      @if (canManage) {
+      @if (canManage()) {
         <div class="flex flex-col gap-4 border-t border-border pt-8">
           @if (availableStages().length > 0) {
             <div class="flex flex-wrap items-end gap-6">
@@ -309,10 +308,18 @@
             [placeholder]="'pipelines.detail.searchPlaceholder' | transloco"
             [value]="accessSearch()"
             [attr.maxlength]="searchMax"
+            [readonly]="!canManage()"
             [attr.aria-describedby]="uid + '-access-search-hint'"
             (input)="onAccessSearchInput($event)"
           />
         </ui-field>
+
+        @if (optionsMessage(); as message) {
+          <p role="alert" class="text-12 leading-18 text-danger-text">{{ message }}</p>
+          <button type="button" uiButton variant="secondary" (click)="retryAssignmentOptions()">
+            {{ 'settings.common.retry' | transloco }}
+          </button>
+        }
 
         <!-- Users -->
         <div class="flex flex-col gap-6">
@@ -331,7 +338,7 @@
                       {{ 'pipelines.detail.invitedBadge' | transloco }}
                     </span>
                   }
-                  @if (canManage) {
+                  @if (canManage()) {
                     <button
                       type="button"
                       class="inline-flex cursor-pointer items-center justify-center rounded-4 text-on-brand-soft outline-none hover:text-danger-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
@@ -354,9 +361,9 @@
                 class="flex h-menu-item w-full items-center justify-between gap-6 rounded-6 px-8 text-start text-12 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
                 [class]="
                   (selected ? 'bg-brand-soft font-medium text-on-brand-soft' : 'text-text hover:bg-row-hover') +
-                  (canManage ? ' cursor-pointer' : ' cursor-default')
+                  (canManage() ? ' cursor-pointer' : ' cursor-default')
                 "
-                [disabled]="!canManage"
+                [disabled]="!canManage()"
                 [attr.aria-pressed]="selected"
                 (click)="toggleUser(user.id)"
               >
@@ -391,7 +398,7 @@
                 <span class="inline-flex h-badge items-center gap-4 rounded-6 bg-brand-soft px-6 text-11 font-medium text-on-brand-soft">
                   <span class="truncate">{{ team.label }}</span>
                   <span dir="ltr" class="text-11 text-on-brand-soft">{{ team.code }}</span>
-                  @if (canManage) {
+                  @if (canManage()) {
                     <button
                       type="button"
                       class="inline-flex cursor-pointer items-center justify-center rounded-4 text-on-brand-soft outline-none hover:text-danger-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
@@ -414,9 +421,9 @@
                 class="flex h-menu-item w-full items-center justify-between gap-6 rounded-6 px-8 text-start text-12 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
                 [class]="
                   (selected ? 'bg-brand-soft font-medium text-on-brand-soft' : 'text-text hover:bg-row-hover') +
-                  (canManage ? ' cursor-pointer' : ' cursor-default')
+                  (canManage() ? ' cursor-pointer' : ' cursor-default')
                 "
-                [disabled]="!canManage"
+                [disabled]="!canManage()"
                 [attr.aria-pressed]="selected"
                 (click)="toggleTeam(team.id)"
               >
@@ -445,7 +452,7 @@
         }
       }
 
-      @if (canManage && !p.isDefault) {
+      @if (canManage() && !p.isDefault) {
         <div class="flex flex-wrap items-center gap-8 border-t border-border pt-8">
           <button
             type="button"
@@ -472,8 +479,10 @@
 }
 
 <app-pipeline-modal
-  [canManage]="canManage"
+  [canManage]="canManage()"
   (saved)="onPipelineSaved($event)"
+  (readOnlyChange)="readOnly.set(true)"
+  (missing)="load()"
   (deleteRequested)="onDeleteFromModal($event)"
 />
 
@@ -549,7 +558,7 @@
   <p class="text-12 leading-18 text-text-muted">{{ 'pipelines.list.inUseModal.text' | transloco }}</p>
 
   <div modal-footer class="flex flex-1 items-center gap-8">
-    @if (pipeline()?.isActive) {
+    @if (canManage() && pipeline()?.isActive) {
       <button type="button" uiButton [loading]="deletingPipeline()" (click)="deactivateInUsePipeline()">
         {{ 'pipelines.list.inUseModal.deactivate' | transloco }}
       </button>
@@ -614,9 +623,11 @@
   </div>
 
   <div modal-footer class="flex flex-1 items-center gap-8">
+    @if (canManage()) {
     <button type="button" uiButton [loading]="savingAssignments()" (click)="confirmSaveAssignments()">
       {{ 'pipelines.detail.assignConfirm.confirm' | transloco }}
     </button>
+    }
     <button
       type="button"
       uiButton

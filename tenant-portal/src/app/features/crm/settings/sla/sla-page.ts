@@ -14,11 +14,11 @@ import { Dropdown, DropdownOption } from '../../../../shared/ui/dropdown/dropdow
 import { Field } from '../../../../shared/ui/field/field';
 import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { SettingsFrame } from '../../../../shared/ui/settings-frame/settings-frame';
-import { errorCodeOf } from '../../../../shared/widgets/dashboard/analytics-api';
-import { can } from '../../../../shared/widgets/dashboard/analytics-permissions';
-import { errorKey } from '../../../../shared/widgets/dashboard/panel-state';
+import { ApiError, errorCodeOf } from '../../../../core/api/api-errors';
+import { anyGrant, branchGrants } from '../shared/settings-access';
+import { slaError } from './sla-error';
 import { SlaModal } from './sla-modal/sla-modal';
-import { listPolicies } from './sla.api';
+import { getPolicy, listPolicies, listSlaBranches } from './sla.api';
 import {
   ListSlaPoliciesQuery,
   SLA_APPLIES_TO_RECORDS,
@@ -30,7 +30,9 @@ import {
   SlaPolicyState,
   decomposeTargetMinutes,
 } from './sla.model';
-import { OrgApi } from '../../../../shared/widgets/dashboard/org.api';
+import { WorkspaceLookups } from '../../../../shared/widgets/workspace-lookups/workspace-lookups.api';
+import { WorkspaceBranch } from '../../../../shared/widgets/workspace-lookups/workspace-lookups.model';
+import { TenantScopeState } from '../../../../core/scope/tenant-scope';
 
 type FilterKindValue = SlaPolicyKind | 'ALL';
 type FilterRecordValue = SlaAppliesToRecord | 'ALL';
@@ -70,7 +72,18 @@ interface ActiveFilterChip {
   host: { class: 'flex min-h-0 flex-1 flex-col' },
 })
 export class SlaPage {
-  private readonly org = inject(OrgApi);
+  private readonly lookups = inject(WorkspaceLookups);
+  private readonly scope = inject(TenantScopeState);
+  protected readonly canChooseBranch = anyGrant('org.branch.read');
+  private readonly readGrants = [
+    branchGrants('crm.sla.manage'),
+    branchGrants('crm.dashboards.read'),
+  ];
+  protected readonly branches = signal<WorkspaceBranch[]>([]);
+  protected readonly serverReadOnly = signal(false);
+  protected readonly forbidden = signal(false);
+  protected readonly failureText = signal('');
+  protected readonly correlationId = signal<string | null>(null);
   private static nextId = 0;
   protected readonly uid = `sla-page-${++SlaPage.nextId}`;
 
@@ -82,8 +95,9 @@ export class SlaPage {
 
   private readonly slaModal = viewChild<SlaModal>('slaModal');
 
-  protected readonly canRead = can('crm.sla.manage') || can('crm.dashboards.read');
-  protected readonly canManage = can('crm.sla.manage');
+  protected readonly canRead = anyGrant('crm.sla.manage') || anyGrant('crm.dashboards.read');
+  private readonly manageGranted = anyGrant('crm.sla.manage');
+  protected readonly canManage = computed(() => this.manageGranted && !this.serverReadOnly());
 
   protected readonly policies = signal<SlaPolicy[]>([]);
   protected readonly nextCursor = signal<string | null>(null);
@@ -145,13 +159,12 @@ export class SlaPage {
 
   protected readonly branchOptions = computed<DropdownOption<FilterBranchValue>[]>(() => {
     this.i18n();
-    const lang = this.language();
     return [
       { value: 'ALL', label: this.transloco.translate('sla.filters.all') },
       { value: 'tenant', label: this.transloco.translate('sla.filters.tenantDefault') },
-      ...this.org.branches.map((branch) => ({
+      ...this.branches().map((branch) => ({
         value: branch.id,
-        label: lang === 'ar' ? branch.name.ar : branch.name.en,
+        label: branch.name,
       })),
     ];
   });
@@ -179,7 +192,6 @@ export class SlaPage {
 
   protected readonly activeFilterChips = computed<ActiveFilterChip[]>(() => {
     this.i18n();
-    const lang = this.language();
     const chips: ActiveFilterChip[] = [];
 
     const kind = this.kindFilter();
@@ -203,7 +215,7 @@ export class SlaPage {
       const branchLabel =
         branch === 'tenant'
           ? this.transloco.translate('sla.filters.tenantDefault')
-          : this.resolveBranchName(branch, lang);
+          : this.resolveBranchName(branch);
       chips.push({
         key: 'branch',
         label: `${this.transloco.translate('sla.filters.branch')}: ${branchLabel}`,
@@ -225,12 +237,29 @@ export class SlaPage {
     this.i18n();
     return this.search().trim() || this.activeFilterChips().length > 0
       ? this.transloco.translate('settings.common.noResults')
-      : this.transloco.translate('sla.page.empty');
+      : this.transloco.translate('sla.errors.noPoliciesYet');
   });
 
   constructor() {
     if (this.canRead) {
       void this.load();
+      if (this.canChooseBranch) void this.loadBranches();
+    }
+  }
+
+  private async loadBranches(): Promise<void> {
+    try {
+      const branches = await listSlaBranches(this.lookups);
+      this.branches.set(
+        branches.filter(
+          (branch) =>
+            branch.status === 'ACTIVE' &&
+            (this.scope.me()?.accessScope.branchesTruncated ||
+              this.readGrants.some((grant) => grant === 'ALL' || grant.has(branch.id))),
+        ),
+      );
+    } catch (error) {
+      this.notify.error(slaError(this.transloco, error).message);
     }
   }
 
@@ -239,14 +268,21 @@ export class SlaPage {
     const seq = ++this.loadSeq;
     this.loading.set(true);
     this.loadError.set(false);
+    this.forbidden.set(false);
+    this.loadingMore.set(false);
     try {
       const page = await listPolicies(this.buildQuery());
       if (seq !== this.loadSeq) return;
       this.policies.set(page.items);
       this.nextCursor.set(page.pageInfo.nextCursor);
-    } catch {
+    } catch (error) {
       if (seq !== this.loadSeq) return;
-      this.loadError.set(true);
+      if (error instanceof ApiError && error.status === 401) return;
+      const failure = slaError(this.transloco, error);
+      this.forbidden.set(failure.kind === 'forbidden');
+      this.failureText.set(failure.message);
+      this.correlationId.set(failure.correlationId);
+      this.loadError.set(failure.kind !== 'forbidden');
     } finally {
       if (seq === this.loadSeq) {
         this.loading.set(false);
@@ -266,7 +302,11 @@ export class SlaPage {
       this.nextCursor.set(page.pageInfo.nextCursor);
     } catch (error) {
       if (seq === this.loadSeq) {
-        this.notify.error(this.transloco.translate(errorKey(errorCodeOf(error))));
+        if (errorCodeOf(error) === 'CRM_DASHBOARD_LIST_CURSOR_INVALID') {
+          await this.load();
+        } else if (!(error instanceof ApiError && error.status === 401)) {
+          this.notify.error(slaError(this.transloco, error).message);
+        }
       }
     } finally {
       if (seq === this.loadSeq) {
@@ -312,12 +352,18 @@ export class SlaPage {
   }
 
   protected openCreate(): void {
-    if (!this.canManage) return;
+    if (!this.canManage()) return;
     this.slaModal()?.openCreate();
   }
 
-  protected openPolicy(policy: SlaPolicy): void {
-    this.slaModal()?.openPolicy(policy);
+  protected async openPolicy(policy: SlaPolicy): Promise<void> {
+    try {
+      this.slaModal()?.openPolicy(await getPolicy(policy.id));
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) return;
+      this.notify.error(slaError(this.transloco, error).message);
+      if (errorCodeOf(error) === 'CRM_DASHBOARD_RESOURCE_NOT_FOUND') await this.load();
+    }
   }
 
   protected onPublished(): void {
@@ -336,7 +382,7 @@ export class SlaPage {
     if (!branchId) {
       return this.transloco.translate('sla.table.allBranchesDefault');
     }
-    return this.resolveBranchName(branchId, this.language());
+    return this.resolveBranchName(branchId);
   }
 
   protected targetPrefixText(policy: SlaPolicy): string {
@@ -348,18 +394,27 @@ export class SlaPage {
 
     if (policy.policyKind === 'FOLLOW_UP_CADENCE') {
       const unitCap = unit === 'days' ? 'Days' : unit === 'hours' ? 'Hours' : 'Minutes';
-      const duration = this.transloco.translate(`sla.targetFormat.cadence${unitCap}.${plural.select(value)}`, { n });
+      const duration = this.transloco.translate(
+        `sla.targetFormat.cadence${unitCap}.${plural.select(value)}`,
+        { n },
+      );
       const touchCount = policy.requiredTouchCount ?? 0;
       const touches = formatNumber(touchCount, lang, 0);
-      return this.transloco.translate(`sla.targetFormat.cadencePrefix.${plural.select(touchCount)}`, {
-        touches,
-        duration,
-      });
+      return this.transloco.translate(
+        `sla.targetFormat.cadencePrefix.${plural.select(touchCount)}`,
+        {
+          touches,
+          duration,
+        },
+      );
     }
 
     const prefix = policy.clockKind === 'WORKING_MINUTES' ? 'working' : 'calendar';
     const unitCap = unit === 'days' ? 'Days' : unit === 'hours' ? 'Hours' : 'Minutes';
-    return this.transloco.translate(`sla.targetFormat.${prefix}${unitCap}.${plural.select(value)}`, { n });
+    return this.transloco.translate(
+      `sla.targetFormat.${prefix}${unitCap}.${plural.select(value)}`,
+      { n },
+    );
   }
 
   protected formattedCompliancePct(policy: SlaPolicy): string {
@@ -383,9 +438,10 @@ export class SlaPage {
     return query;
   }
 
-  private resolveBranchName(branchId: string, lang: 'ar' | 'en'): string {
-    const found = this.org.branches.find((branch) => branch.id === branchId);
-    if (!found) return branchId;
-    return lang === 'ar' ? found.name.ar : found.name.en;
+  private resolveBranchName(branchId: string): string {
+    return (
+      this.branches().find((branch) => branch.id === branchId)?.name ??
+      this.transloco.translate('sla.filters.branch')
+    );
   }
 }

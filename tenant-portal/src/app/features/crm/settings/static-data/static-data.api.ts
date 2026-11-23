@@ -1,4 +1,4 @@
-import { fakeGetCrmStaticData } from './static-data.fake';
+import { crmHttp, crmQueries } from '../../shared/crm-http';
 import { AttachmentFamilyKey, CrmStaticData, Opt, StaticDataPagination } from './static-data.model';
 
 function sanitizeOptions(list: readonly Opt[] | undefined): Opt[] {
@@ -105,6 +105,17 @@ export function sanitizeStaticData(raw: CrmStaticData): CrmStaticData {
 
 /** GET /api/tenant/crm/v1/static-data */
 export async function getCrmStaticData(): Promise<CrmStaticData> {
-  const raw = await fakeGetCrmStaticData();
+  const raw = await crmQueries().fetchQuery({
+    queryKey: ['crm-settings', 'static-data'],
+    queryFn: () => crmHttp().read<CrmStaticData>('/static-data'),
+    staleTime: Infinity,
+    // The shared client otherwise removes unobserved queries immediately.
+    gcTime: Infinity,
+  });
   return sanitizeStaticData(raw);
+}
+
+export async function reloadCrmStaticData(): Promise<CrmStaticData> {
+  await crmQueries().invalidateQueries({ queryKey: ['crm-settings', 'static-data'] });
+  return getCrmStaticData();
 }

@@ -82,12 +82,14 @@
             [bare]="true"
             [label]="'customFields.modal.ownerType' | transloco"
             [for]="uid + '-owner-type'"
+            [error]="serverFieldError('ownerType')"
             [hint]="'customFields.modal.ownerTypeHint' | transloco"
             [required]="true"
           >
             <ui-dropdown
               class="w-full"
               size="field"
+              [id]="uid + '-owner-type'"
               [options]="ownerTypeOptions()"
               [value]="draft().ownerType"
               [label]="'customFields.modal.ownerType' | transloco"
@@ -102,6 +104,7 @@
               [bare]="true"
               [label]="'customFields.modal.type' | transloco"
               [for]="uid + '-type'"
+              [error]="serverFieldError('type')"
               [hint]="'customFields.modal.typeHint' | transloco"
               [required]="true"
             >
@@ -161,7 +164,7 @@
           <ui-field
             [label]="'customFields.modal.key' | transloco"
             [for]="uid + '-key'"
-            [hint]="'customFields.modal.keyHint' | transloco"
+            [hint]="(isEdit() ? 'customFields.modal.keyLockedHint' : 'customFields.modal.keyHint') | transloco"
             [required]="true"
             [error]="keyError()"
           >
@@ -170,7 +173,7 @@
               type="text"
               dir="ltr"
               [attr.maxlength]="maxKeyLen"
-              [readonly]="!canManage()"
+              [readonly]="isEdit() || !canManage()"
               [value]="draft().fieldKey"
               [attr.aria-invalid]="keyError() ? 'true' : null"
               [attr.aria-describedby]="(keyError() ? uid + '-key-error ' : '') + uid + '-key-hint'"
@@ -185,7 +188,7 @@
           <ui-field
             [label]="'customFields.modal.key' | transloco"
             [for]="uid + '-key'"
-            [hint]="'customFields.modal.keyHint' | transloco"
+            [hint]="(isEdit() ? 'customFields.modal.keyLockedHint' : 'customFields.modal.keyHint') | transloco"
             [required]="true"
             [error]="keyError()"
           >
@@ -194,7 +197,7 @@
               type="text"
               dir="ltr"
               [attr.maxlength]="maxKeyLen"
-              [readonly]="!canManage()"
+              [readonly]="isEdit() || !canManage()"
               [value]="draft().fieldKey"
               [attr.aria-invalid]="keyError() ? 'true' : null"
               [attr.aria-describedby]="(keyError() ? uid + '-key-error ' : '') + uid + '-key-hint'"
@@ -220,6 +223,8 @@
                 {{ (draft().isActive ? 'settings.common.active' : 'settings.common.archived') | transloco }}
               </span>
               <ui-switch
+                [id]="uid + '-active'"
+                [describedBy]="uid + '-active-hint'"
                 [checked]="draft().isActive"
                 [disabled]="!canManage()"
                 [label]="'customFields.modal.activeLabel' | transloco"
@@ -236,6 +241,8 @@
           [readOnly]="!canManage()"
           [showErrors]="revealErrors()"
           [inUseOptionKeys]="inUseOptionKeys()"
+          [error]="optionsError()"
+          [serverErrors]="serverErrors()"
           (optionsChange)="onOptionsModelChange($event)"
           (restoreRemoved)="restoreRemovedOptions()"
         />

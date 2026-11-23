@@ -31,31 +31,9 @@ export function crmSettingsError(transloco: SettingsTranslator, error: unknown, 
   const status = error instanceof CoreApiError ? error.status : null;
   return {
     message: message ?? errorMessage(error, pageScope, transloco),
-    readOnly: code === 'CRM_SUBSCRIPTION_READ_ONLY' || code === 'SEAT_OVER_CAPACITY_READ_ONLY',
+    readOnly: code === 'CRM_SUBSCRIPTION_READ_ONLY' || code === 'SEAT_OVER_CAPACITY_READ_ONLY'
+      || code === 'CRM_LEADS_DISABLED' || code === 'CRM_OPPORTUNITIES_DISABLED',
     kind: status === 403 ? 'forbidden' : status === 404 ? 'not-found' : 'load-failure',
     correlationId: correlationIdOf(error),
   };
-}
-
-/**
- * Legacy fake validation shape. Real CRM responses use message text, not constraint names.
- * Kept while settings fakes still import it.
- */
-export function crmValidationFailed(details: Record<string, string[]>): CoreApiError {
-  return new CoreApiError(400, 'CRM_VALIDATION_FAILED', details);
-}
-
-/**
- * `@IsString @IsNotEmpty @MaxLength(max)` on a (possibly already trimmed) string: adds the failed constraint to
- * `details[field]`. MaxLength counts code points, like class-validator.
- */
-export function checkRequiredText(
-  details: Record<string, string[]>,
-  field: string,
-  value: unknown,
-  max: number,
-): void {
-  if (typeof value !== 'string') details[field] = ['is_string'];
-  else if (value.length === 0) details[field] = ['is_not_empty'];
-  else if (Array.from(value).length > max) details[field] = ['max_length'];
 }

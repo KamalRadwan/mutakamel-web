@@ -1,221 +1,249 @@
+import { DOCUMENT } from '@angular/common';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, fieldErrorsOf } from '../../../../core/api/api-errors';
-import { getCorePhoneSummary, getCrmSettings, updateCrmSettings } from './general.api';
-import { setFakePhoneSummaryState } from './general.fake';
-import { CrmSettingsPatch } from './general.model';
+import { bindCrmHttpForTest, CrmHttp, crmQueries } from '../../shared/crm-http';
+import { CRM_SETTINGS_FIXTURES } from '../../shared/testing/crm-settings-fixtures';
+import {
+  getCorePhoneSummary,
+  getCrmSettings,
+  getGeneralPipelines,
+  updateCrmSettings,
+} from './general.api';
+import type { CrmSettings, CrmSettingsPatch } from './general.model';
 
-/** Runs the fake timers to completion and returns (or rethrows) the settled result. */
-async function settle<T>(promise: Promise<T>): Promise<T> {
-  const guarded = promise.then(
-    (value) => ({ ok: true as const, value }),
-    (error: unknown) => ({ ok: false as const, error }),
-  );
-  await vi.runAllTimersAsync();
-  const result = await guarded;
-  if (!result.ok) throw result.error;
-  return result.value;
-}
+const settings = CRM_SETTINGS_FIXTURES['/settings'] as CrmSettings;
+const path = '/api/tenant/crm/v1/settings';
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
-async function errorOf(promise: Promise<unknown>): Promise<ApiError | undefined> {
-  try {
-    await settle(promise);
-    return undefined;
-  } catch (error) {
-    return error instanceof ApiError ? error : undefined;
-  }
-}
-
-/** A patch with a wrongly typed field, as a broken client could send it. */
-function badPatch(field: keyof CrmSettingsPatch, value: unknown): CrmSettingsPatch {
-  return { [field]: value } as unknown as CrmSettingsPatch;
-}
-
-describe('general settings contract (crm settings)', () => {
-  beforeEach(() => vi.useFakeTimers());
+describe('GeneralApi', () => {
+  let http: HttpTestingController;
+  let dispose: () => void;
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting()],
+    });
+    const doc = TestBed.inject(DOCUMENT);
+    const cookie =
+      doc.location.protocol === 'https:'
+        ? '__Host-mutakamel-tenant-csrf'
+        : 'mutakamel-http-tenant-csrf';
+    vi.spyOn(doc, 'cookie', 'get').mockReturnValue(`${cookie}=csrf-proof`);
+    http = TestBed.inject(HttpTestingController);
+    dispose = bindCrmHttpForTest(TestBed.inject(CrmHttp));
+  });
   afterEach(() => {
-    setFakePhoneSummaryState('subscribed');
-    vi.useRealTimers();
+    http.verify();
+    dispose();
+    vi.restoreAllMocks();
   });
 
-  describe('GET crm/v1/settings', () => {
-    it('returns the bare CrmSettings body', async () => {
-      const settings = await settle(getCrmSettings());
-      expect(settings).toEqual({
-        id: expect.any(String),
-        leadsEnabled: expect.any(Boolean),
-        opportunitiesEnabled: expect.any(Boolean),
-        requireQualifiedStageForConversion: expect.any(Boolean),
-        defaultPipelineId: expect.any(String),
-        outboundEmailContentRetentionDays: expect.any(Number),
-        outboundEmailRetentionPolicyRevision: expect.any(Number),
-        analyticsTimeZone: expect.any(String),
-        clickToCallEnabled: expect.any(Boolean),
-        logCallsAsActivities: expect.any(Boolean),
-        createdAt: expect.any(String),
-        updatedAt: expect.any(String),
-      });
-      expect(settings).not.toHaveProperty('data');
-    });
-
-    it('returns a copy, so editing the result never changes the store', async () => {
-      const first = await settle(getCrmSettings());
-      first.leadsEnabled = !first.leadsEnabled;
-      const second = await settle(getCrmSettings());
-      expect(second.leadsEnabled).toBe(!first.leadsEnabled);
-    });
+  it('returns the bare CrmSettings body', async () => {
+    const pending = getCrmSettings();
+    http.expectOne(path).flush(settings);
+    await expect(pending).resolves.toEqual(settings);
   });
 
-  describe('PUT crm/v1/settings', () => {
-    it('applies the boolean switches and returns the saved settings', async () => {
-      const before = await settle(getCrmSettings());
-      const saved = await settle(
-        updateCrmSettings({
-          leadsEnabled: !before.leadsEnabled,
-          opportunitiesEnabled: !before.opportunitiesEnabled,
-          requireQualifiedStageForConversion: !before.requireQualifiedStageForConversion,
-          logCallsAsActivities: !before.logCallsAsActivities,
-        }),
-      );
-      expect(saved.leadsEnabled).toBe(!before.leadsEnabled);
-      expect(saved.opportunitiesEnabled).toBe(!before.opportunitiesEnabled);
-      expect(saved.requireQualifiedStageForConversion).toBe(!before.requireQualifiedStageForConversion);
-      expect(saved.logCallsAsActivities).toBe(!before.logCallsAsActivities);
-      expect(saved.id).toBe(before.id);
-      expect(saved.defaultPipelineId).toBe(before.defaultPipelineId);
+  it('reads pipelines without requesting configuration', async () => {
+    const pending = getGeneralPipelines();
+    http.expectOne('/api/tenant/crm/v1/pipelines').flush([]);
+    await expect(pending).resolves.toEqual([]);
+  });
 
-      const reread = await settle(getCrmSettings());
-      expect(reread).toEqual(saved);
+  it('retention sends days and revision together', async () => {
+    const body = {
+      outboundEmailContentRetentionDays: 365,
+      expectedOutboundEmailRetentionPolicyRevision: 7,
+    };
+    const pending = updateCrmSettings(body);
+    const request = http.expectOne(path);
+    expect(request.request.body).toEqual(body);
+    expect(request.request.method).toBe('PUT');
+    request.flush({
+      ...settings,
+      outboundEmailContentRetentionDays: 365,
+      outboundEmailRetentionPolicyRevision: 8,
     });
+    await expect(pending).resolves.toMatchObject({ outboundEmailRetentionPolicyRevision: 8 });
+  });
 
-    it('keeps clickToCallEnabled in step with the phone actions setting', async () => {
-      const off = await settle(updateCrmSettings({ clickToCallEnabled: false }));
-      expect(off.clickToCallEnabled).toBe(false);
-      expect((await settle(getCrmSettings())).clickToCallEnabled).toBe(false);
+  it('every write sends a key', async () => {
+    const actions: CrmSettingsPatch[] = [
+      { leadsEnabled: false },
+      { opportunitiesEnabled: false },
+      { requireQualifiedStageForConversion: true },
+      { clickToCallEnabled: false },
+      { logCallsAsActivities: false },
+      { outboundEmailContentRetentionDays: 365, expectedOutboundEmailRetentionPolicyRevision: 1 },
+    ];
+    const keys: string[] = [];
+    for (const body of actions) {
+      const pending = updateCrmSettings(body);
+      const request = http.expectOne(path);
+      const key = request.request.headers.get('x-idempotency-key')!;
+      expect(key).toMatch(uuid);
+      expect(request.request.headers.get('x-csrf-token')).toBe('csrf-proof');
+      expect(request.request.headers.has('x-mutakamel-company-id')).toBe(false);
+      expect(request.request.headers.has('If-Match')).toBe(false);
+      keys.push(key);
+      request.flush(settings);
+      await pending;
+    }
+    expect(new Set(keys).size).toBe(actions.length);
+  });
 
-      const on = await settle(updateCrmSettings({ clickToCallEnabled: true }));
-      expect(on.clickToCallEnabled).toBe(true);
-      expect((await settle(getCrmSettings())).clickToCallEnabled).toBe(true);
-    });
-
-    it('bumps the retention policy revision only when the days change', async () => {
-      const before = await settle(getCrmSettings());
-      const same = await settle(
-        updateCrmSettings({
-          outboundEmailContentRetentionDays: before.outboundEmailContentRetentionDays,
-          expectedOutboundEmailRetentionPolicyRevision: before.outboundEmailRetentionPolicyRevision,
-        }),
-      );
-      expect(same.outboundEmailRetentionPolicyRevision).toBe(before.outboundEmailRetentionPolicyRevision);
-
-      const changed = await settle(
-        updateCrmSettings({
-          outboundEmailContentRetentionDays: 365,
-          expectedOutboundEmailRetentionPolicyRevision: before.outboundEmailRetentionPolicyRevision,
-        }),
-      );
-      expect(changed.outboundEmailContentRetentionDays).toBe(365);
-      expect(changed.outboundEmailRetentionPolicyRevision).toBe(before.outboundEmailRetentionPolicyRevision + 1);
-    });
-
-    it('answers a stale retention revision with 409 CRM_OUTBOUND_EMAIL_RETENTION_POLICY_STALE', async () => {
-      const current = await settle(getCrmSettings());
-      const error = await errorOf(
-        updateCrmSettings({
-          outboundEmailContentRetentionDays: 400,
-          expectedOutboundEmailRetentionPolicyRevision: current.outboundEmailRetentionPolicyRevision + 5,
-        }),
-      );
-      expect(error?.status).toBe(409);
-      expect(error?.code).toBe('CRM_OUTBOUND_EMAIL_RETENTION_POLICY_STALE');
-      expect((await settle(getCrmSettings())).outboundEmailContentRetentionDays).toBe(
-        current.outboundEmailContentRetentionDays,
-      );
-    });
-
-    // Backend crm-settings.service.ts throws the ConflictException with code and message only.
-    it('the stale retention 409 carries no details', async () => {
-      const current = await settle(getCrmSettings());
-      const error = await errorOf(
-        updateCrmSettings({
-          outboundEmailContentRetentionDays: 400,
-          expectedOutboundEmailRetentionPolicyRevision: current.outboundEmailRetentionPolicyRevision + 5,
-        }),
-      );
-      expect(error?.details).toBeUndefined();
-    });
-
-    it('answers days without a revision, or a revision without days, with 422 CRM_SETTING_INVALID', async () => {
-      const daysOnly = await errorOf(updateCrmSettings({ outboundEmailContentRetentionDays: 90 }));
-      expect(daysOnly?.status).toBe(422);
-      expect(daysOnly?.code).toBe('CRM_SETTING_INVALID');
-
-      const revisionOnly = await errorOf(updateCrmSettings({ expectedOutboundEmailRetentionPolicyRevision: 1 }));
-      expect(revisionOnly?.status).toBe(422);
-      expect(revisionOnly?.code).toBe('CRM_SETTING_INVALID');
-    });
-
-    it('answers retention days out of 30..2555 with 400 CRM_VALIDATION_FAILED', async () => {
-      const current = await settle(getCrmSettings());
-      for (const days of [29, 2556, 90.5]) {
-        const error = await errorOf(
-          updateCrmSettings({
-            outboundEmailContentRetentionDays: days,
-            expectedOutboundEmailRetentionPolicyRevision: current.outboundEmailRetentionPolicyRevision,
-          }),
+  for (const status of [0, 500, 503, 409, 401]) {
+    it(`reuses the key and body after ${status}`, async () => {
+      const body = { logCallsAsActivities: false };
+      const pending = updateCrmSettings(body);
+      const caught = pending.catch((error: unknown) => error);
+      const first = http.expectOne(path);
+      const key = first.request.headers.get('x-idempotency-key');
+      if (status === 0) first.error(new ProgressEvent('error'));
+      else
+        first.flush(
+          { errorCode: status === 409 ? 'GW.IDEM.IN_FLIGHT' : 'FAILED' },
+          { status, statusText: 'Failed' },
         );
-        expect(error?.status).toBe(400);
-        expect(error?.code).toBe('CRM_VALIDATION_FAILED');
-        expect(Object.keys(fieldErrorsOf(error))).toEqual(['outboundEmailContentRetentionDays']);
-      }
+      expect(await caught).toBeInstanceOf(ApiError);
+      const retry = updateCrmSettings(body);
+      const second = http.expectOne(path);
+      expect(second.request.headers.get('x-idempotency-key')).toBe(key);
+      expect(second.request.body).toEqual(first.request.body);
+      second.flush(settings);
+      await retry;
     });
+  }
 
-    it('answers a non-boolean switch with 400 CRM_VALIDATION_FAILED naming the field', async () => {
-      for (const field of ['leadsEnabled', 'opportunitiesEnabled', 'clickToCallEnabled', 'logCallsAsActivities'] as const) {
-        const error = await errorOf(updateCrmSettings(badPatch(field, 'yes')));
-        expect(error?.status).toBe(400);
-        expect(error?.code).toBe('CRM_VALIDATION_FAILED');
-        expect(Object.keys(fieldErrorsOf(error))).toEqual([field]);
-      }
+  it('a changed body gets a new key after an uncertain response', async () => {
+    const pending = updateCrmSettings({ logCallsAsActivities: false }).catch(
+      (error: unknown) => error,
+    );
+    const first = http.expectOne(path);
+    const key = first.request.headers.get('x-idempotency-key');
+    first.error(new ProgressEvent('error'));
+    await pending;
+    const next = updateCrmSettings({ logCallsAsActivities: true });
+    const second = http.expectOne(path);
+    expect(second.request.headers.get('x-idempotency-key')).not.toBe(key);
+    second.flush(settings);
+    await next;
+  });
+
+  for (const status of [400, 403, 409, 422, 429]) {
+    it(`does not automatically retry ${status} and starts a new key on the next action`, async () => {
+      const body = { clickToCallEnabled: false };
+      const pending = updateCrmSettings(body).catch((error: unknown) => error);
+      const first = http.expectOne(path);
+      const key = first.request.headers.get('x-idempotency-key');
+      first.flush(
+        { errorCode: status === 409 ? 'CRM_OUTBOUND_EMAIL_RETENTION_POLICY_STALE' : 'FAILED' },
+        { status, statusText: 'Failed' },
+      );
+      expect(await pending).toBeInstanceOf(ApiError);
+      http.expectNone(path);
+      const next = updateCrmSettings(body);
+      const second = http.expectOne(path);
+      expect(second.request.headers.get('x-idempotency-key')).not.toBe(key);
+      second.flush(settings);
+      await next;
     });
+  }
 
-    // AGENTS.md: details are keyed by field path with string-array messages ({ leadsEnabled: ['is_boolean'] }).
-    it('validation details are keyed by field path with string arrays', async () => {
-      const error = await errorOf(updateCrmSettings(badPatch('leadsEnabled', 'yes')));
-      expect(error?.details).toEqual({ leadsEnabled: expect.arrayContaining([expect.any(String)]) });
+  it('passes validation field keys and a stale revision without details through', async () => {
+    for (const status of [400, 409, 422, 503]) {
+      const pending = updateCrmSettings({ outboundEmailContentRetentionDays: 29 }).catch(
+        (error: unknown) => error,
+      );
+      const code =
+        status === 400
+          ? 'CRM_VALIDATION_FAILED'
+          : status === 409
+            ? 'CRM_OUTBOUND_EMAIL_RETENTION_POLICY_STALE'
+            : status === 422
+              ? 'CRM_SETTING_INVALID'
+              : 'CRM_SETTINGS_MISSING';
+      const details =
+        status === 400
+          ? { outboundEmailContentRetentionDays: ['must not be less than 30'] }
+          : undefined;
+      http
+        .expectOne(path)
+        .flush(
+          { errorCode: code, details, correlationId: 'general-proof' },
+          { status, statusText: 'Failed' },
+        );
+      const error = await pending;
+      expect(error).toMatchObject({ status, code, correlationId: 'general-proof' });
+      expect(Object.keys(fieldErrorsOf(error))).toEqual(
+        status === 400 ? ['outboundEmailContentRetentionDays'] : [],
+      );
+      if (status === 409) expect((error as ApiError).details).toBeUndefined();
+    }
+  });
+
+  it('successful writes cancel and invalidate the general queries', async () => {
+    const cancel = vi.spyOn(crmQueries(), 'cancelQueries');
+    const invalidate = vi.spyOn(crmQueries(), 'invalidateQueries');
+    const pending = updateCrmSettings({ clickToCallEnabled: false });
+    http.expectOne(path).flush(settings);
+    await pending;
+    expect(cancel).toHaveBeenCalledWith({ queryKey: ['crm-settings', 'general'], exact: true });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['crm-settings', 'general'] });
+  });
+
+  it('composes the phone summary from two Core envelopes', async () => {
+    const pending = TestBed.runInInjectionContext(getCorePhoneSummary);
+    http
+      .expectOne('/api/tenant/webphone/v1/servers')
+      .flush({ success: true, data: [{ id: 'one' }, { id: 'two' }] });
+    http.expectOne('/api/tenant/webphone/v1/seats').flush({
+      success: true,
+      data: { allowed: 2, occupied: 3, available: 0, overAllowance: true, graceUntil: null },
     });
-
-    // Backend UpdateCrmSettingsDto: requireQualifiedStageForConversion is @IsBoolean.
-    it('a non-boolean requireQualifiedStageForConversion is 400 CRM_VALIDATION_FAILED', async () => {
-      const error = await errorOf(updateCrmSettings(badPatch('requireQualifiedStageForConversion', 'yes')));
-      expect(error?.status).toBe(400);
-      expect(error?.code).toBe('CRM_VALIDATION_FAILED');
-    });
-
-    // Backend: the ValidationPipe (400, @Max(2555)) runs before the service's 422 CRM_SETTING_INVALID check.
-    it('out-of-range days without a revision is 400 CRM_VALIDATION_FAILED first', async () => {
-      const error = await errorOf(updateCrmSettings({ outboundEmailContentRetentionDays: 9999 }));
-      expect(error?.status).toBe(400);
-      expect(error?.code).toBe('CRM_VALIDATION_FAILED');
+    await expect(pending).resolves.toEqual({
+      servers: 2,
+      allowed: 2,
+      occupied: 3,
+      available: 0,
+      overAllowance: true,
     });
   });
 
-  describe('GET webphone/v1/servers + seats (phone summary)', () => {
-    it('returns the bare summary counts', async () => {
-      const summary = await settle(getCorePhoneSummary());
-      expect(summary).toEqual({ servers: 2, occupied: 3, allowed: 10, available: 7, overAllowance: false });
+  it('saving settings does not cancel the independent phone load', async () => {
+    const phone = TestBed.runInInjectionContext(getCorePhoneSummary);
+    http.expectOne('/api/tenant/webphone/v1/servers').flush({ success: true, data: [] });
+    const seats = http.expectOne('/api/tenant/webphone/v1/seats');
+    const saving = updateCrmSettings({ logCallsAsActivities: false });
+    http.expectOne(path).flush(settings);
+    await saving;
+    expect(seats.cancelled).toBe(false);
+    seats.flush({
+      success: true,
+      data: { allowed: 0, occupied: 0, available: 0, overAllowance: false },
     });
-
-    it('answers a tenant without the phone module with 403 WEBPHONE_MODULE_NOT_PURCHASED', async () => {
-      setFakePhoneSummaryState('notSubscribed');
-      const error = await errorOf(getCorePhoneSummary());
-      expect(error?.status).toBe(403);
-      expect(error?.code).toBe('WEBPHONE_MODULE_NOT_PURCHASED');
-    });
-
-    it('passes a server failure through as 500', async () => {
-      setFakePhoneSummaryState('failed');
-      const error = await errorOf(getCorePhoneSummary());
-      expect(error?.status).toBe(500);
-    });
+    await expect(phone).resolves.toMatchObject({ servers: 0 });
   });
+
+  for (const [status, errorCode] of [
+    [403, 'WEBPHONE_MODULE_NOT_PURCHASED'],
+    [409, 'WEBPHONE_PROVISIONING_PENDING'],
+    [500, 'FAILED'],
+  ] as const) {
+    it(`passes through the phone ${errorCode} error`, async () => {
+      const pending = TestBed.runInInjectionContext(getCorePhoneSummary).catch(
+        (error: unknown) => error,
+      );
+      http
+        .expectOne('/api/tenant/webphone/v1/servers')
+        .flush({ errorCode }, { status, statusText: 'Failed' });
+      http.expectOne('/api/tenant/webphone/v1/seats').flush({
+        success: true,
+        data: { allowed: 0, occupied: 0, available: 0, overAllowance: false },
+      });
+      expect(await pending).toMatchObject({ status, code: errorCode });
+    });
+  }
 });

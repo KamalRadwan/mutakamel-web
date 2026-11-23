@@ -1,3 +1,12 @@
+@if (!canRead()) {
+  <ui-full-state
+    kind="forbidden"
+    [title]="'errors.forbidden.title' | transloco"
+    [text]="'errors.forbidden.text' | transloco"
+    [actionLabel]="'errors.notFound.action' | transloco"
+    (action)="goHome()"
+  />
+} @else {
 <div
   role="tablist"
   class="mx-12 mt-12 flex h-tab shrink-0 items-stretch overflow-x-auto border-b border-border text-12 leading-18 no-scrollbar"
@@ -41,7 +50,7 @@
     [addHint]="atLimit() ? ('reasons.limitHint' | transloco) : null"
     [searchPlaceholder]="'reasons.search' | transloco"
     [loading]="loading()"
-    [showAdd]="canManage"
+    [showAdd]="canManage() && !failure()"
     [(search)]="search"
     (add)="openCreate()"
     (reload)="load()"
@@ -62,19 +71,14 @@
       </ui-field>
     </div>
 
-    @if (failed()) {
-      <div
-        class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card"
-        role="alert"
-      >
-        <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
-          <ng-icon name="tablerAlertTriangle" size="18" aria-hidden="true" />
-        </span>
-        <p class="text-12 leading-18 text-text-muted">{{ 'settings.common.loadFailed' | transloco }}</p>
-        <button type="button" uiButton variant="secondary" size="small" (click)="load()">
-          {{ 'settings.common.retry' | transloco }}
-        </button>
-      </div>
+    @if (failure(); as error) {
+      <ui-full-state
+        [kind]="error.kind"
+        [title]="(error.kind === 'forbidden' ? 'errors.forbidden.title' : 'settings.common.loadFailed') | transloco"
+        [text]="error.message + (error.correlationId ? ' ' + ('settings.common.correlationId' | transloco: { id: error.correlationId }) : '')"
+        [actionLabel]="(error.kind === 'forbidden' ? 'errors.notFound.action' : 'settings.common.retry') | transloco"
+        (action)="error.kind === 'forbidden' ? goHome() : load()"
+      />
     } @else {
       <div class="overflow-x-auto pb-4">
         <div
@@ -111,7 +115,7 @@
             <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
               {{ 'settings.common.status' | transloco }}
             </span>
-            @if (canManage) {
+            @if (canManage()) {
               <span role="columnheader" class="border-s border-on-nav-line">
                 <span class="sr-only">{{ 'settings.common.actions' | transloco }}</span>
               </span>
@@ -135,7 +139,7 @@
                 }
                 <span role="cell" class="border-s border-border px-10"><span class="block h-skeleton-line rounded-4 bg-neutral-soft"></span></span>
                 <span role="cell" class="border-s border-border px-10"><span class="block h-skeleton-line rounded-4 bg-neutral-soft"></span></span>
-                @if (canManage) {
+                @if (canManage()) {
                   <span role="cell" class="border-s border-border px-10"></span>
                 }
               </div>
@@ -215,7 +219,7 @@
                   }
                 </span>
 
-                @if (canManage) {
+                @if (canManage()) {
                   <span role="cell" class="flex items-center justify-center border-s border-border" (click)="$event.stopPropagation()">
                     <ui-actions-menu
                       [items]="rowActions(reason)"
@@ -234,7 +238,7 @@
                   </button>
                 } @else {
                   <span role="cell" class="text-12 text-text-muted">{{ 'reasons.empty' | transloco }}</span>
-                  @if (canManage && !atLimit()) {
+                  @if (canManage() && !atLimit()) {
                     <button type="button" uiButton variant="ghost" size="small" (click)="openCreate()">
                       {{ 'reasons.new' | transloco }}
                     </button>
@@ -253,5 +257,6 @@
     </div>
   </app-settings-frame>
 </div>
+}
 
-<app-reason-modal [canManage]="canManage" (saved)="onReasonSaved($event)" (reloaded)="onReasonSaved($event)" />
+<app-reason-modal [canManage]="canRead() && canManage()" (readOnly)="readOnly.set(true)" (refresh)="load()" (saved)="onReasonSaved($event)" (reloaded)="onReasonSaved($event)" />

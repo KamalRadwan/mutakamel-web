@@ -27,6 +27,7 @@
         [placeholder]="'outboundEmails.retry.reasonPlaceholder' | transloco"
         [value]="reason()"
         [disabled]="submitting()"
+        [readOnly]="readOnly()"
         [attr.aria-invalid]="reasonError() ? 'true' : null"
         [attr.aria-describedby]="uid + '-reason-hint' + (reasonError() ? ' ' + uid + '-reason-error' : '')"
         (input)="onReasonInput($event)"
@@ -35,18 +36,20 @@
     </ui-field>
   </form>
 
+  @if (!readOnly()) {
   <button
     modal-footer
     type="submit"
     [attr.form]="uid + '-form'"
     uiButton
     [loading]="submitting()"
-    [disabled]="submitting()"
+    [disabled]="submitting() || readOnly()"
   >
     {{ 'outboundEmails.retry.send' | transloco }}
   </button>
 
-  <button modal-footer type="button" uiButton variant="secondary" [disabled]="submitting()" (click)="close()">
+  }
+  <button modal-footer type="button" uiButton variant="secondary" [disabled]="submitting() || readOnly()" (click)="close()">
     {{ 'settings.common.cancel' | transloco }}
   </button>
 

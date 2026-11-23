@@ -2,7 +2,9 @@ import { Component, computed, inject, input, output, signal, viewChild } from '@
 import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { tablerAlertTriangle, tablerListCheck, tablerLock } from '@ng-icons/tabler-icons';
+import { tablerListCheck, tablerLock } from '@ng-icons/tabler-icons';
+import { ApiError, fieldErrorsOf, isRetryableWriteError, isValidationError } from '../../../../../core/api/api-errors';
+import { ConflictDialog } from '../../../../../shared/ui/conflict-dialog/conflict-dialog';
 import { Notify } from '../../../../../core/notify/notify';
 import { Button } from '../../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
@@ -11,8 +13,9 @@ import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { Segmented, SegmentedOption } from '../../../../../shared/ui/segmented/segmented';
 import { Switch } from '../../../../../shared/ui/switch/switch';
-import { errorCodeOf, errorMessage, newIdempotencyKey } from '../../shared/settings-api';
-import { createReason, listReasons, updateReason } from '../reasons.api';
+import { errorCodeOf, newIdempotencyKey } from '../../shared/settings-api';
+import { reasonsError } from '../reasons-error';
+import { beginReasonEdit, createReason, listReasons, updateReason } from '../reasons.api';
 import {
   CreateReasonInput,
   REASON_ACTIVITY_TYPES,
@@ -26,7 +29,7 @@ import {
   UpdateReasonPatch,
 } from '../reasons.model';
 
-type ReasonField = 'code' | 'nameAr' | 'nameEn' | 'definitionAr' | 'definitionEn' | 'polarity' | 'sortOrder';
+type ReasonField = 'code' | 'nameAr' | 'nameEn' | 'definitionAr' | 'definitionEn' | 'polarity' | 'activityType' | 'sortOrder';
 
 interface ReasonFormValue {
   code: string;
@@ -84,10 +87,10 @@ function reasonToForm(reason: Reason): ReasonFormValue {
 
 @Component({
   selector: 'app-reason-modal',
-  imports: [NgIcon, TranslocoPipe, Button, ConfirmDialog, Dropdown, Field, Modal, Segmented, Switch],
+  imports: [NgIcon, TranslocoPipe, Button, ConfirmDialog, ConflictDialog, Dropdown, Field, Modal, Segmented, Switch],
   providers: [
     provideTranslocoScope('settings', { scope: 'settings-reasons', alias: 'reasons' }),
-    provideIcons({ tablerListCheck, tablerLock, tablerAlertTriangle }),
+    provideIcons({ tablerListCheck, tablerLock }),
   ],
   templateUrl: './reason-modal.html',
 })
@@ -99,12 +102,15 @@ export class ReasonModal {
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly modal = viewChild.required(Modal);
-  private readonly conflictModal = viewChild.required<Modal>('conflictModal');
   private readonly discardDialog = viewChild.required<ConfirmDialog>('discardDialog');
 
-  readonly canManage = input(true);
+  readonly canManage = input(false);
+  readonly readOnly = output<void>();
   readonly saved = output<Reason>();
   readonly reloaded = output<Reason>();
+  readonly refresh = output<void>();
+  private readonly forcedReadOnly = signal(false);
+  protected readonly canEdit = computed(() => this.canManage() && !this.forcedReadOnly());
 
   protected readonly limits = REASON_LIMITS;
   protected readonly mode = signal<'create' | 'edit'>('create');
@@ -113,9 +119,11 @@ export class ReasonModal {
   protected readonly form = signal<ReasonFormValue>(createEmptyForm(10));
   protected readonly saving = signal(false);
   protected readonly conflictBusy = signal(false);
+  protected readonly conflictOpen = signal(false);
   private readonly touched = signal<Partial<Record<ReasonField, boolean>>>({});
   private readonly revealAllErrors = signal(false);
   private readonly serverCodeError = signal<string | null>(null);
+  private readonly serverErrors = signal<Record<string, string[]>>({});
   private readonly pendingConflictPatch = signal<UpdateReasonPatch | null>(null);
 
   private defaultOrder = 10;
@@ -132,6 +140,7 @@ export class ReasonModal {
       value,
       label: this.transloco.translate(`reasons.polarities.${value}`),
       dot: POLARITY_DOTS[value],
+      disabled: !this.canEdit() || this.saving(),
     }));
   });
 
@@ -269,6 +278,7 @@ export class ReasonModal {
   });
 
   openCreate(kind: ReasonKind, nextOrder: number): void {
+    if (!this.canEdit()) return;
     this.mode.set('create');
     this.kind.set(kind);
     this.baseReason.set(null);
@@ -282,6 +292,7 @@ export class ReasonModal {
   }
 
   openEdit(reason: Reason): void {
+    beginReasonEdit(reason.id);
     this.mode.set('edit');
     this.kind.set(reason.reasonKind);
     this.baseReason.set(reason);
@@ -296,11 +307,11 @@ export class ReasonModal {
   openConflict(reason: Reason, patch: UpdateReasonPatch): void {
     this.baseReason.set(reason);
     this.pendingConflictPatch.set(patch);
-    this.conflictModal().open();
+    this.conflictOpen.set(true);
   }
 
   protected undo(): void {
-    if (this.saving()) return;
+    if (this.saving() || this.conflictBusy()) return;
     const base = this.baseReason();
     if (this.mode() === 'edit' && base) {
       this.form.set(reasonToForm(base));
@@ -312,7 +323,7 @@ export class ReasonModal {
   }
 
   protected requestClose(): void {
-    if (this.saving()) return;
+    if (this.saving() || this.conflictBusy()) return;
     if (!this.dirty()) {
       this.allowClose = true;
       this.modal().close();
@@ -335,6 +346,8 @@ export class ReasonModal {
     if (field === 'code' && this.serverCodeError()) {
       return this.serverCodeError();
     }
+    const messages = this.serverErrors()[field];
+    if (messages?.length) return messages.join(' ');
     const err = this.validationErrors()[field];
     if (!err) return null;
     if (!this.revealAllErrors() && !this.touched()[field]) return null;
@@ -342,37 +355,41 @@ export class ReasonModal {
   }
 
   protected onCodeInput(event: Event): void {
-    if (!this.canManage() || this.mode() === 'edit') return;
+    if (!this.canEdit() || this.mode() === 'edit') return;
     const target = event.target as HTMLInputElement;
     const upper = target.value.toUpperCase();
     if (target.value !== upper) target.value = upper;
     this.form.update((current) => ({ ...current, code: upper }));
     this.serverCodeError.set(null);
+    this.clearServerError('code');
   }
 
   protected onFieldInput(
     field: 'nameAr' | 'nameEn' | 'definitionAr' | 'definitionEn' | 'sortOrder',
     event: Event,
   ): void {
-    if (!this.canManage()) return;
+    if (!this.canEdit()) return;
     const value = (event.target as HTMLInputElement | HTMLTextAreaElement).value;
     this.form.update((current) => ({ ...current, [field]: value }));
+    this.clearServerError(field);
   }
 
   protected setPolarity(value: string | null): void {
-    if (!this.canManage()) return;
+    if (!this.canEdit() || this.mode() !== 'create') return;
     if (value !== 'POSITIVE' && value !== 'NEUTRAL' && value !== 'NEGATIVE') return;
     this.form.update((current) => ({ ...current, polarity: value }));
     this.markTouched('polarity');
+    this.clearServerError('polarity');
   }
 
   protected setActivityType(value: ReasonActivityType | ''): void {
-    if (!this.canManage()) return;
+    if (!this.canEdit() || this.mode() !== 'create') return;
     this.form.update((current) => ({ ...current, activityType: value }));
+    this.clearServerError('activityType');
   }
 
   protected setActive(checked: boolean): void {
-    if (!this.canManage() || this.baseReason()?.isSystem) return;
+    if (!this.canEdit() || this.baseReason()?.isSystem) return;
     this.form.update((current) => ({ ...current, isActive: checked }));
   }
 
@@ -381,7 +398,7 @@ export class ReasonModal {
   }
 
   protected async save(): Promise<void> {
-    if (!this.canManage() || this.saving()) return;
+    if (!this.canEdit() || this.saving() || this.conflictBusy()) return;
     if (!this.dirty()) return;
 
     this.revealAllErrors.set(true);
@@ -396,10 +413,10 @@ export class ReasonModal {
           code: value.code.trim().toUpperCase(),
           nameAr: value.nameAr.trim(),
           nameEn: value.nameEn.trim(),
-          definitionAr: value.definitionAr.trim() || null,
-          definitionEn: value.definitionEn.trim() || null,
-          polarity: this.isActivityOutcome() ? value.polarity : null,
-          activityType: this.isActivityOutcome() ? value.activityType || null : null,
+          ...(value.definitionAr.trim() ? { definitionAr: value.definitionAr.trim() } : {}),
+          ...(value.definitionEn.trim() ? { definitionEn: value.definitionEn.trim() } : {}),
+          ...(this.isActivityOutcome() && value.polarity ? { polarity: value.polarity } : {}),
+          ...(this.isActivityOutcome() && value.activityType ? { activityType: value.activityType } : {}),
           sortOrder: Number(value.sortOrder.trim()),
         };
         const bodyJson = JSON.stringify(payload);
@@ -429,24 +446,26 @@ export class ReasonModal {
       this.modal().close();
     } catch (error) {
       const code = errorCodeOf(error);
+      if (!isRetryableWriteError(error) && !(error instanceof ApiError && error.status === 401)) {
+        this.pendingCreateKey = null;
+      }
       if (code === 'CRM_REASON_CODE_TAKEN') {
         this.serverCodeError.set(this.transloco.translate('reasons.errors.CRM_REASON_CODE_TAKEN'));
         return;
       }
-      if (code === 'CRM_REASON_REVISION_STALE') {
+      if (code === 'CRM_REASON_REVISION_STALE' || code === 'CRM_DASHBOARD_REVISION_MISMATCH') {
         this.pendingConflictPatch.set(null);
-        this.conflictModal().open();
+        this.conflictOpen.set(true);
         return;
       }
-      this.showErrorToast(error);
+      if (isValidationError(error)) {
+        this.serverErrors.set(fieldErrorsOf(error));
+        if (Object.keys(this.serverErrors()).some((field) => field in this.form())) return;
+      }
+      this.showWriteError(error);
+      if (code === 'CRM_REASON_NOT_FOUND') this.refresh.emit();
     } finally {
       this.saving.set(false);
-    }
-  }
-
-  protected onConflictClosed(): void {
-    if (!this.conflictBusy()) {
-      this.pendingConflictPatch.set(null);
     }
   }
 
@@ -458,10 +477,11 @@ export class ReasonModal {
     try {
       const { items: list } = await listReasons({ kind: base.reasonKind });
       const fresh = list.find((item) => item.id === base.id);
-      this.conflictModal().close();
+      this.conflictOpen.set(false);
       this.pendingConflictPatch.set(null);
       if (!fresh) {
         this.notify.error(this.transloco.translate('reasons.errors.CRM_REASON_NOT_FOUND'));
+        this.refresh.emit();
         if (!fromRowAction) {
           this.allowClose = true;
           this.modal().close();
@@ -475,13 +495,14 @@ export class ReasonModal {
       }
       this.reloaded.emit(fresh);
     } catch (error) {
-      this.showErrorToast(error);
+      this.showWriteError(error);
     } finally {
       this.conflictBusy.set(false);
     }
   }
 
   protected async saveMineOverStale(): Promise<void> {
+    if (!this.canEdit()) return;
     const base = this.baseReason();
     const rowPatch = this.pendingConflictPatch();
     const patch = rowPatch ?? this.editPatch();
@@ -491,9 +512,10 @@ export class ReasonModal {
       const { items: list } = await listReasons({ kind: base.reasonKind });
       const fresh = list.find((item) => item.id === base.id);
       if (!fresh) {
-        this.conflictModal().close();
+        this.conflictOpen.set(false);
         this.pendingConflictPatch.set(null);
         this.notify.error(this.transloco.translate('reasons.errors.CRM_REASON_NOT_FOUND'));
+        this.refresh.emit();
         if (!rowPatch) {
           this.allowClose = true;
           this.modal().close();
@@ -501,7 +523,7 @@ export class ReasonModal {
         return;
       }
       const updated = await updateReason(fresh.id, fresh.revision, patch);
-      this.conflictModal().close();
+      this.conflictOpen.set(false);
       this.pendingConflictPatch.set(null);
       this.baseReason.set(updated);
       this.saved.emit(updated);
@@ -517,7 +539,10 @@ export class ReasonModal {
         this.modal().close();
       }
     } catch (error) {
-      this.showErrorToast(error);
+      this.showWriteError(error);
+      if (errorCodeOf(error) === 'CRM_REASON_REVISION_STALE' || errorCodeOf(error) === 'CRM_DASHBOARD_REVISION_MISMATCH') {
+        this.conflictOpen.set(true);
+      }
     } finally {
       this.conflictBusy.set(false);
     }
@@ -527,6 +552,15 @@ export class ReasonModal {
     this.touched.set({});
     this.revealAllErrors.set(false);
     this.serverCodeError.set(null);
+    this.serverErrors.set({});
+  }
+
+  private clearServerError(field: ReasonField): void {
+    this.serverErrors.update((current) => {
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
   }
 
   private async confirmModalClose(): Promise<void> {
@@ -542,7 +576,21 @@ export class ReasonModal {
     }
   }
 
-  private showErrorToast(error: unknown): void {
-    this.notify.error(errorMessage(error, 'reasons', this.transloco));
+  showWriteError(error: unknown): void {
+    const state = reasonsError(this.transloco, error);
+    if (state.readOnly) {
+      this.forcedReadOnly.set(true);
+      this.readOnly.emit();
+    }
+    let message = state.message;
+    if (error instanceof ApiError && error.status === 401) {
+      message = this.transloco.translate('settings.errors.notSaved');
+    }
+    if (error instanceof ApiError && error.status === 429) {
+      const retryAfter = error.details?.['retryAfterSeconds'];
+      const seconds = Array.isArray(retryAfter) ? retryAfter[0] : retryAfter;
+      message = this.transloco.translate(seconds == null ? 'settings.errors.rateLimited' : 'settings.errors.rateLimitedIn', { seconds });
+    }
+    this.notify.error(message, state.correlationId ? this.transloco.translate('settings.common.correlationId', { id: state.correlationId }) : '');
   }
 }

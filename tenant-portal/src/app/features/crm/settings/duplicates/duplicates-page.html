@@ -1,18 +1,11 @@
-@if (loadFailed()) {
-  <div class="flex flex-1 flex-col items-center justify-center">
-    <div
-      class="flex flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card"
-      role="alert"
-    >
-      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
-        <ng-icon name="tablerCloudOff" size="18" aria-hidden="true" />
-      </span>
-      <p class="text-12 leading-18 text-text-muted">{{ 'dup.loadFailed' | transloco }}</p>
-      <button type="button" uiButton variant="primary" (click)="reload()">
-        {{ 'dup.retry' | transloco }}
-      </button>
-    </div>
-  </div>
+@if (loadState(); as state) {
+  <ui-full-state
+    [kind]="state.kind === 'forbidden' ? 'forbidden' : 'load-failure'"
+    [title]="(state.kind === 'forbidden' ? 'errors.forbidden.title' : 'dup.loadFailed') | transloco"
+    [text]="loadErrorText()"
+    [actionLabel]="(state.kind === 'forbidden' ? 'errors.notFound.action' : 'dup.retry') | transloco"
+    (action)="onLoadAction()"
+  />
 } @else {
   <!-- 1. Contact types to check -->
   <section class="shrink-0 rounded-10 border border-border bg-surface p-8 shadow-card">
@@ -36,12 +29,13 @@
       size="bare"
       [label]="'dup.types.label' | transloco"
       [hint]="'dup.types.hint' | transloco"
+      [error]="validationErrors()['types'] || null"
     >
       <fieldset
-        [disabled]="!canManage || loading() || !tree() || savingTypes()"
+        [disabled]="!canManage() || loading() || !tree() || savingTypes()"
         [attr.aria-label]="'dup.types.title' | transloco"
         class="m-0 flex flex-wrap items-center gap-10 border-0 p-0"
-        [class.opacity-50]="!canManage"
+        [class.opacity-50]="!canManage()"
       >
         <ui-checkbox
           [checked]="tree()?.defaults?.checkEmail ?? true"
@@ -225,7 +219,8 @@
                       [parentNodeEffective]="row.parentEffective"
                       [triggerTabIndex]="-1"
                       [saving]="isCellSaving('workspace:u')"
-                      [canManage]="canManage"
+                      [error]="validationErrors()['workspace:u'] || null"
+                      [canManage]="canManage()"
                       (chosen)="onWorkspaceChoice('allowAcrossUsers', $event, 'workspace:u')"
                     />
                   </span>
@@ -242,7 +237,8 @@
                       [parentNodeEffective]="row.parentEffective"
                       [triggerTabIndex]="-1"
                       [saving]="isCellSaving('workspace:b')"
-                      [canManage]="canManage"
+                      [error]="validationErrors()['workspace:b'] || null"
+                      [canManage]="canManage()"
                       (chosen)="onWorkspaceChoice('allowAcrossBranches', $event, 'workspace:b')"
                     />
                   </span>
@@ -259,7 +255,8 @@
                       [parentNodeEffective]="row.parentEffective"
                       [triggerTabIndex]="-1"
                       [saving]="isCellSaving('workspace:c')"
-                      [canManage]="canManage"
+                      [error]="validationErrors()['workspace:c'] || null"
+                      [canManage]="canManage()"
                       (chosen)="onWorkspaceChoice('allowAcrossCompanies', $event, 'workspace:c')"
                     />
                   </span>
@@ -332,7 +329,8 @@
                       [limit]="row.company.limits.u"
                       [subnote]="'dup.forBranches' | transloco"
                       [saving]="isCellSaving('company:' + row.company.companyId + ':u')"
-                      [canManage]="canManage"
+                      [error]="validationErrors()['company:' + row.company.companyId + ':u'] || null"
+                      [canManage]="canManage()"
                       (chosen)="onCompanyChoice(row.company.companyId, 'allowAcrossUsers', $event, 'company:' + row.company.companyId + ':u')"
                     />
                   </span>
@@ -352,7 +350,8 @@
                       [triggerTabIndex]="-1"
                       [limit]="row.company.limits.b"
                       [saving]="isCellSaving('company:' + row.company.companyId + ':b')"
-                      [canManage]="canManage"
+                      [error]="validationErrors()['company:' + row.company.companyId + ':b'] || null"
+                      [canManage]="canManage()"
                       (chosen)="onCompanyChoice(row.company.companyId, 'allowAcrossBranches', $event, 'company:' + row.company.companyId + ':b')"
                     />
                   </span>
@@ -372,7 +371,8 @@
                       [triggerTabIndex]="-1"
                       [limit]="row.company.limits.c"
                       [saving]="isCellSaving('company:' + row.company.companyId + ':c')"
-                      [canManage]="canManage"
+                      [error]="validationErrors()['company:' + row.company.companyId + ':c'] || null"
+                      [canManage]="canManage()"
                       (chosen)="onCompanyChoice(row.company.companyId, 'allowAcrossCompanies', $event, 'company:' + row.company.companyId + ':c')"
                     />
                   </span>
@@ -426,7 +426,8 @@
                       [triggerTabIndex]="-1"
                       [limit]="row.branch.limits.u"
                       [saving]="isCellSaving('branch:' + row.branch.branchId + ':u')"
-                      [canManage]="canManage"
+                      [error]="validationErrors()['branch:' + row.branch.branchId + ':u'] || null"
+                      [canManage]="canManage()"
                       (chosen)="onBranchChoice(row.branch.branchId, 'allowAcrossUsers', $event, 'branch:' + row.branch.branchId + ':u')"
                     />
                   </span>
@@ -446,7 +447,8 @@
                       [triggerTabIndex]="-1"
                       [limit]="row.branch.limits.b"
                       [saving]="isCellSaving('branch:' + row.branch.branchId + ':b')"
-                      [canManage]="canManage"
+                      [error]="validationErrors()['branch:' + row.branch.branchId + ':b'] || null"
+                      [canManage]="canManage()"
                       (chosen)="onBranchChoice(row.branch.branchId, 'allowAcrossBranches', $event, 'branch:' + row.branch.branchId + ':b')"
                     />
                   </span>
@@ -502,36 +504,8 @@
   [cancelLabel]="'settings.common.cancel' | transloco"
 />
 
-<ui-modal
-  #conflictModal
-  size="confirm"
-  icon="tablerAlertTriangle"
-  tile="bg-icon-orange"
-  [title]="'dup.conflict.title' | transloco"
-  [closeLabel]="'settings.common.close' | transloco"
-  [dismissable]="!conflictBusy()"
->
-  <p class="text-12 leading-18 text-text-muted">{{ 'dup.conflict.text' | transloco }}</p>
-
-  <button
-    modal-footer
-    type="button"
-    uiButton
-    variant="primary"
-    [loading]="conflictBusy()"
-    (click)="reloadOnConflict()"
-  >
-    {{ 'dup.conflict.reload' | transloco }}
-  </button>
-
-  <button
-    modal-footer
-    type="button"
-    uiButton
-    variant="secondary"
-    [disabled]="conflictBusy()"
-    (click)="keepChangeOnConflict()"
-  >
-    {{ 'dup.conflict.keep' | transloco }}
-  </button>
-</ui-modal>
+<ui-conflict-dialog
+  [(open)]="conflictOpen"
+  (reload)="reloadOnConflict()"
+  (keepEditing)="keepChangeOnConflict()"
+/>

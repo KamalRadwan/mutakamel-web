@@ -1,244 +1,189 @@
+import { DOCUMENT } from '@angular/common';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ApiError } from '../../../../core/api/api-errors';
+import { ApiError, fieldErrorsOf } from '../../../../core/api/api-errors';
 import { newIdempotencyKey } from '../../../../core/api/idempotency';
-import {
-  createLeadSource,
-  deleteLeadSource,
-  listLeadSources,
-  reorderLeadSources,
-  updateLeadSource,
-  uploadLeadSourceIcon,
-} from './lead-sources.api';
-import { LEAD_SOURCE_ICON_MAX_BYTES, LEAD_SOURCE_NAME_MAX } from './lead-sources.model';
+import { CrmHttp, bindCrmHttpForTest, crmQueries } from '../../shared/crm-http';
+import { createLeadSource, deleteLeadSource, listLeadSources, reorderLeadSources, updateLeadSource, uploadLeadSourceIcon } from './lead-sources.api';
+import type { LeadSource } from './lead-sources.model';
 
-/** Runs the fake timers to completion and returns (or rethrows) the settled result. */
-async function settle<T>(promise: Promise<T>): Promise<T> {
-  const guarded = promise.then(
-    (value) => ({ ok: true as const, value }),
-    (error: unknown) => ({ ok: false as const, error }),
-  );
-  await vi.runAllTimersAsync();
-  const result = await guarded;
-  if (!result.ok) throw result.error;
-  return result.value;
-}
+const base = '/api/tenant/crm/v1/acquisition-sources';
+const id = '0192b8ea-7c4f-7a7d-9c9f-51c7f2b30001';
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const row: LeadSource = { id, nameAr: 'الموقع', nameEn: 'Website', isActive: true, sortOrder: 1,
+  iconUrl: `${base}/${id}/icon?v=1234567890abcdef`, createdAt: '2026-11-18T00:00:00Z', updatedAt: '2026-11-18T00:00:00Z' };
 
-async function errorOf(promise: Promise<unknown>): Promise<ApiError | undefined> {
-  try {
-    await settle(promise);
-    return undefined;
-  } catch (error) {
-    return error instanceof ApiError ? error : undefined;
+describe('LeadSourcesApi', () => {
+  let http: HttpTestingController;
+  let dispose: () => void;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    const doc = TestBed.inject(DOCUMENT);
+    const cookie = doc.location.protocol === 'https:' ? '__Host-mutakamel-tenant-csrf' : 'mutakamel-http-tenant-csrf';
+    vi.spyOn(doc, 'cookie', 'get').mockReturnValue(`${cookie}=csrf-source`);
+    http = TestBed.inject(HttpTestingController);
+    dispose = bindCrmHttpForTest(TestBed.inject(CrmHttp));
+  });
+
+  afterEach(() => { http.verify(); dispose(); vi.restoreAllMocks(); });
+
+  function write(url: string, method: string) {
+    const request = http.expectOne(url);
+    expect(request.request.method).toBe(method);
+    expect(request.request.headers.get('x-idempotency-key')).toMatch(uuid);
+    expect(request.request.headers.get('x-csrf-token')).toBe('csrf-source');
+    expect(request.request.withCredentials).toBe(true);
+    expect(request.request.headers.has('x-mutakamel-company-id')).toBe(false);
+    expect(request.request.headers.has('x-mutakamel-branch-id')).toBe(false);
+    expect(request.request.headers.has('If-Match')).toBe(false);
+    return request;
   }
-}
 
-const WEBSITE_ID = '00000000-0000-7000-8000-000000000001'; // seeded, in use
-const OFFLINE_ID = '00000000-0000-7000-8000-00000000000c'; // seeded, not in use
-const MISSING_ID = '00000000-0000-7000-8000-0000000000ff';
-
-function file(name: string, type: string, size = 16): File {
-  return new File([new Uint8Array(size)], name, { type });
-}
-
-describe('lead sources contract (crm acquisition-sources)', () => {
-  beforeEach(() => vi.useFakeTimers());
-  afterEach(() => vi.useRealTimers());
-
-  describe('GET acquisition-sources', () => {
-    it('returns a bare array ordered by sortOrder', async () => {
-      const list = await settle(listLeadSources());
-      expect(Array.isArray(list)).toBe(true);
-      expect(list.length).toBeGreaterThan(0);
-      expect(list.map((item) => item.sortOrder)).toEqual(list.map((_, index) => index + 1));
-      expect(list[0]).toEqual({
-        id: WEBSITE_ID,
-        nameAr: expect.any(String),
-        nameEn: 'Website',
-        isActive: true,
-        sortOrder: 1,
-        iconUrl: expect.any(String),
-        createdAt: expect.any(String),
-        updatedAt: expect.any(String),
-      });
-    });
+  it('reads the bare catalogue without filters, including an empty response', async () => {
+    for (const body of [[row], []]) {
+      const result = listLeadSources();
+      http.expectOne(base).flush(body);
+      await expect(result).resolves.toEqual(body);
+    }
   });
 
-  describe('POST acquisition-sources', () => {
-    it('creates a trimmed, active source at the end with no icon', async () => {
-      const before = await settle(listLeadSources());
-      const created = await settle(createLeadSource({ nameAr: '  معرض  ', nameEn: '  Trade show  ' }));
-      expect(created).toEqual({
-        id: expect.any(String),
-        nameAr: 'معرض',
-        nameEn: 'Trade show',
-        isActive: true,
-        sortOrder: before.length + 1,
-        iconUrl: null,
-        createdAt: expect.any(String),
-        updatedAt: expect.any(String),
-      });
-      const after = await settle(listLeadSources());
-      expect(after.at(-1)?.id).toBe(created.id);
-    });
-
-    it('keeps isActive false when asked', async () => {
-      const created = await settle(createLeadSource({ nameAr: 'نشرة', nameEn: 'Newsletter', isActive: false }));
-      expect(created.isActive).toBe(false);
-    });
-
-    it('answers a name already used (any case, either language) with 409 CRM_ACQUISITION_SOURCE_NAME_TAKEN', async () => {
-      const en = await errorOf(createLeadSource({ nameAr: 'جديد', nameEn: ' website ' }));
-      expect(en?.status).toBe(409);
-      expect(en?.code).toBe('CRM_ACQUISITION_SOURCE_NAME_TAKEN');
-      expect(en?.details).toBeUndefined();
-
-      const ar = await errorOf(createLeadSource({ nameAr: 'فيسبوك', nameEn: 'Brand new' }));
-      expect(ar?.code).toBe('CRM_ACQUISITION_SOURCE_NAME_TAKEN');
-    });
-
-    it('rejects a blank or too long name', async () => {
-      const blank = await errorOf(createLeadSource({ nameAr: '   ', nameEn: 'Blank' }));
-      expect(blank).toBeInstanceOf(ApiError);
-      const long = await errorOf(createLeadSource({ nameAr: 'طويل', nameEn: 'x'.repeat(LEAD_SOURCE_NAME_MAX + 1) }));
-      expect(long).toBeInstanceOf(ApiError);
-    });
-
-    // Backend CreateAcquisitionSourceDto: @IsNotEmpty @MaxLength(120), so the ValidationPipe answers
-    // 400 CRM_VALIDATION_FAILED with details keyed by the field.
-    it('a blank name is 400 CRM_VALIDATION_FAILED keyed by nameAr', async () => {
-      const error = await errorOf(createLeadSource({ nameAr: '   ', nameEn: 'Blank' }));
-      expect(error?.status).toBe(400);
-      expect(error?.code).toBe('CRM_VALIDATION_FAILED');
-      expect(error?.details).toEqual({ nameAr: expect.any(Array) });
-    });
+  it('creates trimmed names, keeps isActive false and returns the server view', async () => {
+    const cancel = vi.spyOn(crmQueries(), 'cancelQueries');
+    const invalidate = vi.spyOn(crmQueries(), 'invalidateQueries');
+    const result = createLeadSource({ nameAr: ' الموقع ', nameEn: ' Website ', isActive: false });
+    const request = write(base, 'POST');
+    expect(request.request.body).toEqual({ nameAr: 'الموقع', nameEn: 'Website', isActive: false });
+    request.flush({ ...row, isActive: false }, { status: 201, statusText: 'Created' });
+    await expect(result).resolves.toEqual({ ...row, isActive: false });
+    expect(cancel).toHaveBeenCalledWith({ queryKey: ['crm-settings', 'lead-sources'] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['crm-settings', 'lead-sources'] });
   });
 
-  describe('PATCH acquisition-sources/:id', () => {
-    it('updates the given fields and keeps the rest', async () => {
-      const updated = await settle(updateLeadSource(OFFLINE_ID, { nameEn: ' Offline import ', isActive: false }));
-      expect(updated.id).toBe(OFFLINE_ID);
-      expect(updated.nameEn).toBe('Offline import');
-      expect(updated.nameAr).toBe('بيانات غير متصلة');
-      expect(updated.isActive).toBe(false);
-    });
-
-    it('allows keeping its own name and rejects another source name', async () => {
-      const own = await settle(updateLeadSource(OFFLINE_ID, { nameEn: 'OFFLINE IMPORT' }));
-      expect(own.nameEn).toBe('OFFLINE IMPORT');
-
-      const taken = await errorOf(updateLeadSource(OFFLINE_ID, { nameEn: 'Facebook' }));
-      expect(taken?.status).toBe(409);
-      expect(taken?.code).toBe('CRM_ACQUISITION_SOURCE_NAME_TAKEN');
-    });
-
-    it('answers an unknown id with 404 CRM_ACQUISITION_SOURCE_NOT_FOUND', async () => {
-      const error = await errorOf(updateLeadSource(MISSING_ID, { isActive: true }));
-      expect(error?.status).toBe(404);
-      expect(error?.code).toBe('CRM_ACQUISITION_SOURCE_NOT_FOUND');
-    });
-
-    // Backend UpdateAcquisitionSourceDto: @IsNotEmpty @MaxLength(120).
-    it('a too long name is 400 CRM_VALIDATION_FAILED keyed by nameEn', async () => {
-      const error = await errorOf(updateLeadSource(OFFLINE_ID, { nameEn: 'x'.repeat(LEAD_SOURCE_NAME_MAX + 1) }));
-      expect(error?.status).toBe(400);
-      expect(error?.code).toBe('CRM_VALIDATION_FAILED');
-      expect(error?.details).toEqual({ nameEn: expect.any(Array) });
-    });
+  it('updates only the supplied fields and keeps the server response intact', async () => {
+    const result = updateLeadSource(id, { nameEn: ' New name ', isActive: false });
+    const request = write(`${base}/${id}`, 'PATCH');
+    expect(request.request.body).toEqual({ nameEn: 'New name', isActive: false });
+    request.flush({ ...row, nameEn: 'New name', isActive: false });
+    await expect(result).resolves.toEqual({ ...row, nameEn: 'New name', isActive: false });
   });
 
-  describe('PATCH acquisition-sources/reorder', () => {
-    it('needs a UUID v7 x-idempotency-key at the gateway', async () => {
-      const ids = (await settle(listLeadSources())).map((item) => item.id);
-      const missing = await errorOf(reorderLeadSources(ids, ''));
-      expect(missing?.status).toBe(400);
-      expect(missing?.code).toBe('GW.IDEM.MISSING');
+  it('deletes without a body and accepts 204', async () => {
+    const result = deleteLeadSource(id);
+    const request = write(`${base}/${id}`, 'DELETE');
+    expect(request.request.body).toBeNull();
+    request.flush(null, { status: 204, statusText: 'No Content' });
+    await expect(result).resolves.toBeUndefined();
+  });
 
-      const bad = await errorOf(reorderLeadSources(ids, 'not-a-uuid'));
-      expect(bad?.status).toBe(400);
-      expect(bad?.code).toBe('GW.IDEM.BAD_VALUE');
-    });
+  it('adopts the complete server list returned by reorder', async () => {
+    const key = newIdempotencyKey();
+    const result = reorderLeadSources([id], key);
+    const request = write(`${base}/reorder`, 'PATCH');
+    expect(request.request.body).toEqual({ orderedIds: [id] });
+    expect(request.request.headers.get('x-idempotency-key')).toBe(key);
+    const server = [{ ...row, nameEn: 'Concurrent rename' }];
+    request.flush(server);
+    await expect(result).resolves.toEqual(server);
+  });
 
-    it('returns the whole list in the new order', async () => {
-      const ids = (await settle(listLeadSources())).map((item) => item.id);
-      const reversed = [...ids].reverse();
-      const list = await settle(reorderLeadSources(reversed, newIdempotencyKey()));
-      expect(list.map((item) => item.id)).toEqual(reversed);
-      expect(list.map((item) => item.sortOrder)).toEqual(reversed.map((_, index) => index + 1));
-      expect((await settle(listLeadSources())).map((item) => item.id)).toEqual(reversed);
-    });
+  it('reorder key reused on retry', async () => {
+    const key = newIdempotencyKey();
+    const result = reorderLeadSources([id], key);
+    const rejected = expect(result).rejects.toMatchObject({ status: 0 });
+    const first = write(`${base}/reorder`, 'PATCH');
+    first.error(new ProgressEvent('error'));
+    await rejected;
+    http.expectNone(() => true);
+    const retry = reorderLeadSources([id], key);
+    const second = write(`${base}/reorder`, 'PATCH');
+    expect(second.request.body).toEqual(first.request.body);
+    expect(second.request.headers.get('x-idempotency-key')).toBe(key);
+    second.flush([row]);
+    await retry;
+  });
 
-    it('answers a partial, duplicated or unknown id list with 422 CRM_ACQUISITION_SOURCE_REORDER_INVALID', async () => {
-      const ids = (await settle(listLeadSources())).map((item) => item.id);
-      const cases = [ids.slice(1), [ids[0], ...ids.slice(0, -1)], [MISSING_ID, ...ids.slice(1)]];
-      for (const orderedIds of cases) {
-        const error = await errorOf(reorderLeadSources(orderedIds, newIdempotencyKey()));
-        expect(error?.status).toBe(422);
-        expect(error?.code).toBe('CRM_ACQUISITION_SOURCE_REORDER_INVALID');
+  it('icon upload body', async () => {
+    const key = newIdempotencyKey();
+    const file = new File(['png bytes'], 'icon.png', { type: 'image/png' });
+    const result = uploadLeadSourceIcon(id, file, key);
+    const request = write(`${base}/${id}/icon`, 'POST');
+    expect(request.request.body).toBeInstanceOf(FormData);
+    expect([...request.request.body.keys()]).toEqual(['file']);
+    expect(request.request.body.get('file')).toBe(file);
+    expect(request.request.headers.get('x-idempotency-key')).toBe(key);
+    expect(request.request.headers.has('Content-Type')).toBe(false);
+    request.flush(row, { status: 201, statusText: 'Created' });
+    await expect(result).resolves.toEqual(row);
+  });
+
+  it.each(['POST', 'PATCH', 'DELETE'] as const)('%s keeps its key and body after each retryable failure and 401', async (method) => {
+    const send = () => method === 'POST' ? createLeadSource({ nameAr: 'الموقع', nameEn: 'Website' })
+      : method === 'PATCH' ? updateLeadSource(id, { nameEn: 'Website' }) : deleteLeadSource(id);
+    const url = method === 'POST' ? base : `${base}/${id}`;
+    let key: string | null = null;
+    let body: unknown;
+    for (const [status, code] of [[0, 'NETWORK_ERROR'], [503, 'ENTITLEMENT_UNAVAILABLE'], [409, 'GW.IDEM.IN_FLIGHT'], [401, 'UNAUTHORIZED']] as const) {
+      const result = send();
+      const rejected = expect(result).rejects.toMatchObject({ status, code });
+      const request = write(url, method);
+      if (key) {
+        expect(request.request.headers.get('x-idempotency-key')).toBe(key);
+        expect(request.request.body).toEqual(body);
       }
-    });
+      key = request.request.headers.get('x-idempotency-key');
+      body = request.request.body;
+      if (status === 0) request.error(new ProgressEvent('error'));
+      else request.flush({ errorCode: code }, { status, statusText: 'Failure' });
+      await rejected;
+      http.expectNone(() => true);
+    }
+    const result = send();
+    const request = write(url, method);
+    expect(request.request.headers.get('x-idempotency-key')).toBe(key);
+    request.flush(method === 'DELETE' ? null : row, { status: method === 'DELETE' ? 204 : 200, statusText: 'OK' });
+    await result;
+    const fresh = send();
+    const next = write(url, method);
+    expect(next.request.headers.get('x-idempotency-key')).not.toBe(key);
+    next.flush(method === 'DELETE' ? null : row, { status: method === 'DELETE' ? 204 : 200, statusText: 'OK' });
+    await fresh;
   });
 
-  describe('DELETE acquisition-sources/:id', () => {
-    it('answers a source used by leads with 409 CRM_ACQUISITION_SOURCE_IN_USE', async () => {
-      const error = await errorOf(deleteLeadSource(WEBSITE_ID));
-      expect(error?.status).toBe(409);
-      expect(error?.code).toBe('CRM_ACQUISITION_SOURCE_IN_USE');
-    });
-
-    it('deletes an unused source and renumbers the rest', async () => {
-      const result = await settle(deleteLeadSource(OFFLINE_ID));
-      expect(result).toBeUndefined();
-      const list = await settle(listLeadSources());
-      expect(list.some((item) => item.id === OFFLINE_ID)).toBe(false);
-      expect(list.map((item) => item.sortOrder)).toEqual(list.map((_, index) => index + 1));
-    });
-
-    it('answers an unknown id with 404 CRM_ACQUISITION_SOURCE_NOT_FOUND', async () => {
-      const error = await errorOf(deleteLeadSource(OFFLINE_ID));
-      expect(error?.status).toBe(404);
-      expect(error?.code).toBe('CRM_ACQUISITION_SOURCE_NOT_FOUND');
-    });
+  it.each(['POST', 'PATCH'] as const)('%s gives changed values a new key', async (method) => {
+    const send = (nameEn: string) => method === 'POST'
+      ? createLeadSource({ nameAr: 'الموقع', nameEn }) : updateLeadSource(id, { nameEn });
+    const url = method === 'POST' ? base : `${base}/${id}`;
+    const failed = send('First');
+    const rejected = expect(failed).rejects.toBeInstanceOf(ApiError);
+    const first = write(url, method);
+    first.error(new ProgressEvent('error'));
+    await rejected;
+    const changed = send('Changed');
+    const second = write(url, method);
+    expect(second.request.headers.get('x-idempotency-key')).not.toBe(first.request.headers.get('x-idempotency-key'));
+    second.flush(row);
+    await changed;
   });
 
-  describe('POST acquisition-sources/:id/icon', () => {
-    it('needs a UUID v7 x-idempotency-key at the gateway', async () => {
-      const missing = await errorOf(uploadLeadSourceIcon(WEBSITE_ID, file('a.png', 'image/png'), ''));
-      expect(missing?.code).toBe('GW.IDEM.MISSING');
-      const bad = await errorOf(uploadLeadSourceIcon(WEBSITE_ID, file('a.png', 'image/png'), 'abc'));
-      expect(bad?.code).toBe('GW.IDEM.BAD_VALUE');
-    });
-
-    it('stores the icon and returns the bare updated source', async () => {
-      const updated = await settle(uploadLeadSourceIcon(WEBSITE_ID, file('logo.png', 'image/png'), newIdempotencyKey()));
-      expect(updated.id).toBe(WEBSITE_ID);
-      expect(typeof updated.iconUrl).toBe('string');
-      expect(updated.iconUrl).not.toBe('');
-    });
-
-    it('accepts a file without a type when the extension is known', async () => {
-      const updated = await settle(uploadLeadSourceIcon(WEBSITE_ID, file('logo.jpeg', ''), newIdempotencyKey()));
-      expect(updated.iconUrl).toBeTruthy();
-    });
-
-    it('maps each icon problem to its status and code', async () => {
-      const key = () => newIdempotencyKey();
-      const cases: [File, number, string][] = [
-        [file('empty.png', 'image/png', 0), 400, 'CRM_ACQUISITION_SOURCE_ICON_EMPTY'],
-        [file('big.png', 'image/png', LEAD_SOURCE_ICON_MAX_BYTES + 1), 413, 'CRM_ACQUISITION_SOURCE_ICON_TOO_LARGE'],
-        [file('icon.svg', 'image/svg+xml'), 415, 'CRM_ACQUISITION_SOURCE_ICON_TYPE_UNSUPPORTED'],
-        [file('icon.gif', 'image/png'), 415, 'CRM_ACQUISITION_SOURCE_ICON_EXTENSION_UNSUPPORTED'],
-      ];
-      for (const [icon, status, code] of cases) {
-        const error = await errorOf(uploadLeadSourceIcon(WEBSITE_ID, icon, key()));
-        expect(error?.status).toBe(status);
-        expect(error?.code).toBe(code);
-      }
-    });
-
-    it('answers an unknown id with 404 CRM_ACQUISITION_SOURCE_NOT_FOUND', async () => {
-      const error = await errorOf(uploadLeadSourceIcon(MISSING_ID, file('a.png', 'image/png'), newIdempotencyKey()));
-      expect(error?.status).toBe(404);
-      expect(error?.code).toBe('CRM_ACQUISITION_SOURCE_NOT_FOUND');
-    });
+  it.each([
+    [400, 'CRM_VALIDATION_FAILED'], [404, 'CRM_ACQUISITION_SOURCE_NOT_FOUND'],
+    [409, 'CRM_ACQUISITION_SOURCE_NAME_TAKEN'], [422, 'CRM_ACQUISITION_SOURCE_LIMIT_EXCEEDED'],
+    [422, 'GW.IDEM.MISMATCH'], [429, 'GW.RATE.LIMIT_EXCEEDED'], [403, 'CRM_SUBSCRIPTION_READ_ONLY'],
+  ])('preserves %s %s without an automatic retry', async (status, code) => {
+    const result = updateLeadSource(id, { nameEn: 'Test' });
+    const rejected = expect(result).rejects.toMatchObject({ status, code, correlationId: 'source-ref' });
+    const request = write(`${base}/${id}`, 'PATCH');
+    request.flush({ errorCode: code, details: { nameEn: ['Name must be shorter'] }, correlationId: 'source-ref' }, { status: Number(status), statusText: 'Failure' });
+    await rejected;
+    if (code === 'CRM_VALIDATION_FAILED') expect(Object.keys(fieldErrorsOf(await result.catch((error: unknown) => error)))).toEqual(['nameEn']);
+    http.expectNone(() => true);
+    const fresh = updateLeadSource(id, { nameEn: 'Test' });
+    const next = write(`${base}/${id}`, 'PATCH');
+    expect(next.request.headers.get('x-idempotency-key')).not.toBe(request.request.headers.get('x-idempotency-key'));
+    next.flush(row);
+    await fresh;
   });
 });

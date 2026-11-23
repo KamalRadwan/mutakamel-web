@@ -11,12 +11,15 @@ import { DASH, formatDate, formatDateTime } from '../../../../../shared/ui/chart
 import { DataCell, DataColumn, DataTable } from '../../../../../shared/ui/data-table/data-table';
 import { FullState } from '../../../../../shared/ui/full-state/full-state';
 import { Modal } from '../../../../../shared/ui/modal/modal';
+import { errorCodeOf } from '../../../../../core/api/api-errors';
+import { crmSettingsError } from '../../shared/settings-api';
 import { listReleases, targetErrorMessage } from '../targets.api';
 import {
   SalesTarget,
   TargetRelease,
   TargetableMetric,
   formatTargetPeriod,
+  targetDateInZone,
   formatTargetValue,
   resolveMetricLabel,
   resolvePersonName,
@@ -47,6 +50,7 @@ export class ReleasesModal {
   protected readonly loading = signal(false);
   protected readonly loadingMore = signal(false);
   protected readonly loadError = signal(false);
+  protected readonly failure = signal<ReturnType<typeof crmSettingsError> | null>(null);
 
   private loadSeq = 0;
 
@@ -135,6 +139,7 @@ export class ReleasesModal {
     if (!current) return;
     const seq = ++this.loadSeq;
     this.loading.set(true);
+    this.loadingMore.set(false);
     this.loadError.set(false);
     try {
       const page = await listReleases(current.id, null);
@@ -142,8 +147,9 @@ export class ReleasesModal {
       this.releases.set(page.items);
       this.nextCursor.set(page.pageInfo.nextCursor);
       this.hasMore.set(page.pageInfo.hasMore);
-    } catch {
+    } catch (error) {
       if (seq !== this.loadSeq) return;
+      this.failure.set(crmSettingsError(this.transloco, error, 'targets'));
       this.loadError.set(true);
     } finally {
       if (seq === this.loadSeq) {
@@ -166,6 +172,10 @@ export class ReleasesModal {
       this.hasMore.set(page.pageInfo.hasMore);
     } catch (error) {
       if (seq === this.loadSeq) {
+        if (errorCodeOf(error) === 'CRM_DASHBOARD_LIST_CURSOR_INVALID') {
+          await this.reload();
+          return;
+        }
         this.notify.error(targetErrorMessage(this.transloco, error));
       }
     } finally {
@@ -194,8 +204,8 @@ export class ReleasesModal {
 
   protected formatPeriodRange(release: TargetRelease): string {
     const lang = this.language();
-    const start = formatDate(release.periodStartAt, lang);
-    const end = formatDate(release.periodEndAt, lang);
+    const start = formatDate(targetDateInZone(release.periodStartAt, release.periodTimeZone), lang);
+    const end = formatDate(targetDateInZone(release.periodEndAt, release.periodTimeZone), lang);
     return `${start} – ${end} (${release.periodTimeZone})`;
   }
 }

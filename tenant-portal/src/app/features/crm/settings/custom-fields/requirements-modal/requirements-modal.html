@@ -8,11 +8,7 @@
 >
   @if (field(); as current) {
     <div class="flex flex-col gap-8">
-      @if (isArchived()) {
-        <app-settings-notice tone="warning">
-          {{ 'customFields.requirements.archivedNotice' | transloco }}
-        </app-settings-notice>
-      }
+
 
       <div class="flex flex-col gap-8">
         <ui-field
@@ -31,6 +27,8 @@
               {{ (createRequired() ? 'settings.common.yes' : 'settings.common.no') | transloco }}
             </span>
             <ui-switch
+              [id]="'req-create'"
+              [describedBy]="'req-create-hint'"
               [checked]="createRequired()"
               [disabled]="!canManage() || isArchived() || pendingOp() !== null"
               [label]="'customFields.requirements.create' | transloco"
@@ -55,6 +53,8 @@
               {{ (updateRequired() ? 'settings.common.yes' : 'settings.common.no') | transloco }}
             </span>
             <ui-switch
+              [id]="'req-update'"
+              [describedBy]="'req-update-hint'"
               [checked]="updateRequired()"
               [disabled]="!canManage() || isArchived() || pendingOp() !== null"
               [label]="'customFields.requirements.update' | transloco"
@@ -80,7 +80,9 @@
                 {{ (convertRequired() ? 'settings.common.yes' : 'settings.common.no') | transloco }}
               </span>
               <ui-switch
-                [checked]="convertRequired()"
+                [id]="'req-convert'"
+              [describedBy]="'req-convert-hint'"
+              [checked]="convertRequired()"
                 [disabled]="!canManage() || isArchived() || pendingOp() !== null"
                 [label]="'customFields.requirements.convert' | transloco"
                 (checkedChange)="toggleRequirement('CONVERT', $event)"

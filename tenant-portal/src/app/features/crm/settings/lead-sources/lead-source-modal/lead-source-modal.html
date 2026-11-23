@@ -16,14 +16,15 @@
             [for]="uid + '-icon'"
             [label]="'leadSources.icon.label' | transloco"
             [hint]="'leadSources.icon.hint' | transloco"
+            [error]="iconMessage()"
           >
             <div class="flex items-center gap-10">
               <!-- Reuses --table-row-h (40px) via size-table-row for the 40x40 icon preview box. -->
               <div class="relative flex size-table-row shrink-0 items-center justify-center overflow-hidden rounded-8 border border-border bg-surface-muted text-text-muted">
                 @if (uploadingIcon()) {
                   <ng-icon name="tablerLoader2" size="16" class="animate-spin text-accent" aria-hidden="true" />
-                } @else if (baseSource()?.iconUrl; as iconUrl) {
-                  <img [src]="iconUrl" alt="" class="size-full object-cover" />
+                } @else if (baseSource()?.iconUrl !== brokenIconUrl() ? baseSource()?.iconUrl : null; as iconUrl) {
+                  <img [src]="iconUrl" (error)="brokenIconUrl.set(iconUrl)" alt="" class="size-full object-cover" />
                 } @else {
                   <ng-icon name="tablerTrendingUp" size="16" aria-hidden="true" />
                 }
@@ -31,11 +32,13 @@
 
               <ui-file-drop
                 class="min-w-0 flex-1"
+                [id]="uid + '-icon'"
+                [describedBy]="uid + '-icon-hint' + (iconMessage() ? ' ' + uid + '-icon-error' : '')"
                 [accept]="iconAccept"
                 [maxBytes]="iconMaxBytes"
                 [title]="'leadSources.icon.dropTitle' | transloco"
                 [hint]="'leadSources.icon.dropHint' | transloco"
-                [disabled]="!canManage() || uploadingIcon()"
+                [disabled]="!canEdit() || saving() || uploadingIcon()"
                 (picked)="onIconPicked($event)"
                 (rejected)="onIconRejected($event)"
               />
@@ -103,6 +106,8 @@
         >
           <div class="flex h-field items-center">
             <ui-switch
+              [id]="uid + '-active'"
+              [describedBy]="uid + '-active-hint'"
               [formField]="sourceForm.isActive"
               [label]="'settings.common.active' | transloco"
             />
@@ -113,7 +118,7 @@
   </form>
 
   <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
-    @if (canManage()) {
+    @if (canEdit()) {
       <button
         type="submit"
         [attr.form]="uid + '-form'"

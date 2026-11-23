@@ -1,144 +1,117 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ApiError } from '../../../../core/api/api-errors';
-import { createLeadStage, listLeadStages, reorderLeadStages, updateLeadStage } from '../lead-stages/lead-stages.api';
-import { addPipelineStage } from '../pipelines/pipelines.api';
-import { createTag, deleteTag, listTags, updateTag } from '../tags/tags.api';
-import { SYSTEM_STAGE_IDS } from './opportunity-stages.fake';
+import { ApiError, fieldErrorsOf } from '../../../../core/api/api-errors';
+import { bindCrmHttpForTest, crmQueries } from '../../shared/crm-http';
+import { CrmHttpStub } from '../../shared/testing/crm-http-testing';
+import { CRM_SETTINGS_FIXTURES } from '../../shared/testing/crm-settings-fixtures';
+import { listPipelinesConfiguration } from '../pipelines/pipelines.api';
 import {
-  createOpportunityStage,
-  deleteOpportunityStage,
-  listOpportunityStages,
-  updateOpportunityStage,
+  beginOpportunityStageEdit, createOpportunityStage, deleteOpportunityStage,
+  listOpportunityStages, stageUsage, updateOpportunityStage,
 } from './opportunity-stages.api';
+import type { OpportunityStage } from './opportunity-stages.model';
 
-async function settle<T>(promise: Promise<T>): Promise<T> {
-  const guarded = promise.then(
-    (value) => ({ ok: true as const, value }),
-    (error: unknown) => ({ ok: false as const, error }),
-  );
-  await vi.runAllTimersAsync();
-  const result = await guarded;
-  if (!result.ok) throw result.error;
-  return result.value;
-}
+const id = '018f0000-0000-7000-8000-000000000421';
+const row: OpportunityStage = {
+  id, nameAr: 'جديدة', nameEn: 'New', flag: 'NEW', category: 'OPEN',
+  isActive: true, isSystem: true, createdAt: '2026-11-18T00:00:00Z', updatedAt: '2026-11-18T00:00:00Z',
+};
+const input = { nameAr: 'مراجعة', nameEn: 'Review', flag: 'DISCOVERY', category: 'IN_PROGRESS' } as const;
+const uuidV7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
-async function errorOf(promise: Promise<unknown>): Promise<ApiError | undefined> {
-  try {
-    await settle(promise);
-    return undefined;
-  } catch (error) {
-    return error instanceof ApiError ? error : undefined;
+describe('opportunity stages transport contract', () => {
+  let stub: CrmHttpStub;
+  let dispose: () => void;
+  beforeEach(() => {
+    stub = new CrmHttpStub({ '/opportunity-stages': [row], '/pipelines/configuration': CRM_SETTINGS_FIXTURES['/pipelines/configuration'] });
+    dispose = bindCrmHttpForTest(stub);
+  });
+  afterEach(() => { crmQueries().clear(); dispose(); vi.restoreAllMocks(); });
+
+  it('reads the bare list through the settings query cache', async () => {
+    const read = vi.spyOn(stub, 'read');
+    expect(await listOpportunityStages()).toEqual([row]);
+    expect(read).toHaveBeenCalledWith('/opportunity-stages');
+    expect(crmQueries().getQueryData(['crm-settings', 'opportunity-stages'])).toEqual([row]);
+  });
+
+  it('groups usage from the exported pipeline configuration API', async () => {
+    const pipelines = await listPipelinesConfiguration();
+    const usage = await stageUsage();
+    expect(pipelines.length).toBeGreaterThan(0);
+    expect(Object.keys(usage).length).toBeGreaterThan(0);
+    for (const pipeline of pipelines) {
+      for (const membership of pipeline.stages) {
+        expect(usage[membership.opportunityStageId]).toContainEqual({
+          id: pipeline.id, nameAr: pipeline.nameAr, nameEn: pipeline.nameEn,
+        });
+      }
+    }
+  });
+
+  it('preserves POST, PATCH and DELETE paths and invalidates successful writes', async () => {
+    const cancel = vi.spyOn(crmQueries(), 'cancelQueries');
+    const invalidate = vi.spyOn(crmQueries(), 'invalidateQueries');
+    await createOpportunityStage(input);
+    await updateOpportunityStage(id, { nameEn: 'Renamed' });
+    await deleteOpportunityStage(id);
+    const writes = stub.recordedWrites();
+    expect(writes.map(({ method, path, body }) => ({ method, path, body }))).toEqual([
+      { method: 'POST', path: '/opportunity-stages', body: input },
+      { method: 'PATCH', path: `/opportunity-stages/${id}`, body: { nameEn: 'Renamed' } },
+      { method: 'DELETE', path: `/opportunity-stages/${id}`, body: undefined },
+    ]);
+    for (const write of writes) {
+      expect(write.options.key).toMatch(uuidV7);
+      expect(write.options.scope).toBeUndefined();
+    }
+    expect(new Set(writes.map((write) => write.options.key)).size).toBe(3);
+    expect(cancel).toHaveBeenCalledTimes(3);
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['crm-settings', 'opportunity-stages'] });
+  });
+
+  for (const method of ['POST', 'PATCH', 'DELETE'] as const) {
+    for (const failure of [new ApiError(0, 'NETWORK_ERROR'), new ApiError(503, 'INTERNAL_ERROR'), new ApiError(409, 'GW.IDEM.IN_FLIGHT'), new ApiError(401, 'UNAUTHORIZED')]) {
+      it(`${method} keeps the key and body after ${failure.code}, without an automatic retry`, async () => {
+        const write = vi.spyOn(stub, 'write').mockRejectedValueOnce(failure);
+        const action = () => method === 'POST' ? createOpportunityStage(input)
+          : method === 'PATCH' ? updateOpportunityStage(id, { nameEn: 'Renamed' }) : deleteOpportunityStage(id);
+        await expect(action()).rejects.toBe(failure);
+        expect(write).toHaveBeenCalledTimes(1);
+        await action();
+        expect(write.mock.calls[0][3].key).toMatch(uuidV7);
+        expect(write.mock.calls[1]).toEqual(write.mock.calls[0]);
+      });
+    }
   }
-}
 
-const MISSING_ID = '01950000-0000-7000-8000-0000000004ff';
-const DEFAULT_PIPELINE_ID = '01950000-0000-7000-8000-000000000201';
-
-describe('opportunity stages, lead stages and tags fakes follow the crm-app code', () => {
-  beforeEach(() => vi.useFakeTimers());
-  afterEach(() => vi.useRealTimers());
-
-  describe('crm/opportunity-stages', () => {
-    it('lists system stages first, then by English name', async () => {
-      const list = await settle(listOpportunityStages());
-      const system = list.filter((stage) => stage.isSystem).map((stage) => stage.nameEn);
-      expect(system).toEqual([...system].sort((a, b) => a.localeCompare(b, 'en')));
-      const firstCustom = list.findIndex((stage) => !stage.isSystem);
-      if (firstCustom >= 0) expect(list.slice(firstCustom).every((stage) => !stage.isSystem)).toBe(true);
-    });
-
-    it('validates the body (400) before the 404 and the category rule', async () => {
-      const error = await errorOf(updateOpportunityStage(MISSING_ID, { nameAr: '   ' }));
-      expect([error?.status, error?.code, error?.details]).toEqual([400, 'CRM_VALIDATION_FAILED', { nameAr: ['is_not_empty'] }]);
-      const create = await errorOf(createOpportunityStage({ nameAr: 'أ', nameEn: '', flag: 'DISCOVERY', category: 'IN_PROGRESS' }));
-      expect(create?.details).toEqual({ nameEn: ['is_not_empty'] });
-    });
-
-    it('answers OPPORTUNITY_STAGE_IN_USE with no details', async () => {
-      const created = await settle(
-        createOpportunityStage({ nameAr: 'مراجعة', nameEn: 'Review', flag: 'DISCOVERY', category: 'IN_PROGRESS' }),
-      );
-      await settle(addPipelineStage(DEFAULT_PIPELINE_ID, created.id));
-      const error = await errorOf(deleteOpportunityStage(created.id));
-      expect([error?.status, error?.code, error?.details]).toEqual([409, 'OPPORTUNITY_STAGE_IN_USE', undefined]);
-      const system = await errorOf(updateOpportunityStage(SYSTEM_STAGE_IDS.QUALIFICATION, { isActive: false }));
-      expect([system?.status, system?.code]).toEqual([422, 'OPPORTUNITY_STAGE_SYSTEM_PROTECTED']);
-    });
-
-    it('treats isActive false on an inactive stage as no deactivation', async () => {
-      const created = await settle(
-        createOpportunityStage({ nameAr: 'تعليق', nameEn: 'Paused', flag: 'ON_HOLD', category: 'IN_PROGRESS' }),
-      );
-      await settle(updateOpportunityStage(created.id, { isActive: false }));
-      const again = await settle(updateOpportunityStage(created.id, { isActive: false, nameEn: 'Paused 2' }));
-      expect(again.nameEn).toBe('Paused 2');
-    });
+  it('changes the key when the body changes or a new form opens', async () => {
+    const write = vi.spyOn(stub, 'write').mockRejectedValueOnce(new ApiError(503, 'INTERNAL_ERROR'));
+    await expect(createOpportunityStage(input)).rejects.toBeInstanceOf(ApiError);
+    await createOpportunityStage({ ...input, nameEn: 'Changed' });
+    expect(write.mock.calls[1][3].key).not.toBe(write.mock.calls[0][3].key);
+    write.mockRejectedValueOnce(new ApiError(0, 'NETWORK_ERROR'));
+    await expect(createOpportunityStage(input)).rejects.toBeInstanceOf(ApiError);
+    beginOpportunityStageEdit(null);
+    await createOpportunityStage(input);
+    expect(write.mock.calls[3][3].key).not.toBe(write.mock.calls[2][3].key);
   });
 
-  describe('crm/lead-stages', () => {
-    it('answers DTO errors with 400 keyed by field (names are not trimmed by this DTO)', async () => {
-      const error = await errorOf(createLeadStage({ nameAr: '', nameEn: 'x'.repeat(81), flag: 'CONTACTED', category: 'IN_PROGRESS' }));
-      expect([error?.status, error?.details]).toEqual([400, { nameAr: ['is_not_empty'], nameEn: ['max_length'] }]);
+  for (const [status, code] of [
+    [400, 'CRM_VALIDATION_FAILED'], [403, 'CRM_PERMISSION_DENIED'], [404, 'OPPORTUNITY_STAGE_NOT_FOUND'],
+    [409, 'OPPORTUNITY_STAGE_IN_USE'], [422, 'OPPORTUNITY_STAGE_SYSTEM_PROTECTED'],
+    [422, 'OPPORTUNITY_STAGE_CATEGORY_INVALID'], [422, 'OPPORTUNITY_STAGE_LIMIT_EXCEEDED'],
+    [422, 'GW.IDEM.MISMATCH'], [429, 'RATE_LIMITED'],
+  ] as const) {
+    it(`preserves ${code} without retrying or invalidating`, async () => {
+      const error = new ApiError(status, code, code === 'CRM_VALIDATION_FAILED' ? { nameEn: ['The name must not be empty'] } : undefined);
+      const write = vi.spyOn(stub, 'write').mockRejectedValueOnce(error);
+      const invalidate = vi.spyOn(crmQueries(), 'invalidateQueries');
+      await expect(updateOpportunityStage(id, { nameEn: '' })).rejects.toBe(error);
+      expect(write).toHaveBeenCalledTimes(1);
+      expect(invalidate).not.toHaveBeenCalled();
+      if (code === 'CRM_VALIDATION_FAILED') expect(Object.keys(fieldErrorsOf(error))).toEqual(['nameEn']);
+      await updateOpportunityStage(id, { nameEn: '' });
+      expect(write.mock.calls[1][3].key).not.toBe(write.mock.calls[0][3].key);
     });
-
-    it('lets OPEN through the DTO and refuses it with 422 LEAD_STAGE_CATEGORY_INVALID before the protected check', async () => {
-      const error = await errorOf(createLeadStage({ nameAr: 'أ', nameEn: 'A', flag: 'NEW', category: 'OPEN' }));
-      expect([error?.status, error?.code]).toEqual([422, 'LEAD_STAGE_CATEGORY_INVALID']);
-      const unknown = await errorOf(
-        createLeadStage({ nameAr: 'أ', nameEn: 'A', flag: 'CONTACTED', category: 'OTHER' as unknown as 'IN_PROGRESS' }),
-      );
-      expect([unknown?.status, unknown?.details]).toEqual([400, { category: ['is_enum'] }]);
-    });
-
-    it('validates an update before the 404', async () => {
-      const error = await errorOf(updateLeadStage(MISSING_ID, { nameEn: '' }));
-      expect([error?.status, error?.details]).toEqual([400, { nameEn: ['is_not_empty'] }]);
-      const list = await settle(listLeadStages());
-      expect(list[0]?.flag).toBe('NEW');
-    });
-
-    it('refuses a reorder with duplicate ids with 400 CRM_VALIDATION_FAILED {orderedIds:[array_unique]}', async () => {
-      const ids = (await settle(listLeadStages())).map((stage) => stage.id);
-      const duplicated = [...ids.slice(0, -1), ids[0]!];
-      const error = await errorOf(reorderLeadStages(duplicated, crypto.randomUUID()));
-      expect([error?.status, error?.code, error?.details]).toEqual([400, 'CRM_VALIDATION_FAILED', { orderedIds: ['array_unique'] }]);
-      const short = await errorOf(reorderLeadStages(ids.slice(1), crypto.randomUUID()));
-      expect([short?.status, short?.code]).toEqual([422, 'LEAD_STAGE_REORDER_INVALID']);
-    });
-  });
-
-  describe('crm/tags', () => {
-    it('answers a blank name or a bad colour with 400 CRM_VALIDATION_FAILED keyed by field', async () => {
-      const blank = await errorOf(createTag({ name: '   ' }));
-      expect([blank?.status, blank?.code, blank?.details]).toEqual([400, 'CRM_VALIDATION_FAILED', { name: ['is_not_empty'] }]);
-      const colour = await errorOf(createTag({ name: 'Colour', backgroundColor: 'red', textColor: '#FFFFFF' }));
-      expect(colour?.details).toEqual({ backgroundColor: ['matches'] });
-    });
-
-    it('checks the colour pair on the request only (422 CRM_TAG_COLOR_INCOMPLETE), before the 404', async () => {
-      const tags = await settle(listTags());
-      const coloured = tags.find((tag) => tag.backgroundColor !== null)!;
-      const half = await errorOf(updateTag(coloured.id, { backgroundColor: '#112233' }));
-      expect([half?.status, half?.code]).toEqual([422, 'CRM_TAG_COLOR_INCOMPLETE']);
-      const missing = await errorOf(updateTag(MISSING_ID, { backgroundColor: '#112233' }));
-      expect(missing?.code).toBe('CRM_TAG_COLOR_INCOMPLETE');
-      const empty = await errorOf(updateTag(MISSING_ID, {}));
-      expect(empty?.code).toBe('CRM_TAG_UPDATE_EMPTY');
-    });
-
-    it('stores colours upper-cased and clears them with a null pair', async () => {
-      const created = await settle(createTag({ name: 'Spec colour', backgroundColor: '#aabbcc', textColor: '#112233' }));
-      expect([created.backgroundColor, created.textColor]).toEqual(['#AABBCC', '#112233']);
-      const cleared = await settle(updateTag(created.id, { backgroundColor: null, textColor: null }));
-      expect([cleared.backgroundColor, cleared.textColor]).toEqual([null, null]);
-      await settle(deleteTag(created.id));
-    });
-
-    it('sends the detach count as a decimal string array', async () => {
-      const tags = await settle(listTags());
-      const hot = tags.find((tag) => tag.name === 'Hot lead')!;
-      const error = await errorOf(deleteTag(hot.id));
-      expect([error?.status, error?.details]).toEqual([422, { count: ['140'] }]);
-    });
-  });
+  }
 });

@@ -5,8 +5,6 @@ import {
   formatPercent,
   formatShortDate,
 } from '../../../../shared/ui/chart/chart-format';
-import { FAKE_NOW } from '../../../../shared/widgets/dashboard/analytics-api';
-import { FAKE_BRANCHES, FAKE_PEOPLE, FAKE_TEAMS } from '../../../../shared/widgets/dashboard/fake/fake-org';
 
 export type TargetSubjectType = 'USER' | 'TEAM' | 'BRANCH' | 'TEAM_SET';
 export type TargetMeasureKind = 'MONEY' | 'COUNT' | 'RATE';
@@ -21,7 +19,7 @@ export type TargetWireSortDir = 'ASC' | 'DESC';
 /** Metric unit the backend returns next to each target (`targetView`). */
 export type TargetMetricUnit = 'MONEY' | 'COUNT' | 'PERCENT';
 
-/** Decimal values are sent as text (`round(x, 2)::text`), never as numbers. */
+/** The server returns decimal target values as text (`round(x, 2)::text`). */
 export interface TargetLatestRelease {
   id: string;
   releaseNumber: number;
@@ -94,6 +92,20 @@ export interface TargetableMetric {
   labelEn: string;
   labelAr: string;
   measureKind: TargetMeasureKind;
+  unit: TargetMetricUnit;
+}
+
+export interface TargetSubjectOptions {
+  users: { id: string; displayName: string }[];
+  teams: { id: string; name: string }[];
+}
+
+export interface TargetCurrency {
+  code: string;
+  nameEn: string;
+  nameAr: string;
+  decimals: number;
+  isDefault: boolean;
 }
 
 /** ListDashboardSalesTargetsDto: `branchId` is required (BranchListQueryDto). */
@@ -110,11 +122,6 @@ export interface ListTargetsQuery {
   approvalState?: TargetApprovalState;
   periodFrom?: string;
   periodTo?: string;
-  /**
-   * FAKE-ONLY filter: the backend whitelists `search` (PaginationQueryDto) but the target
-   * service never filters on it, so the real list ignores it.
-   */
-  search?: string;
 }
 
 export interface CreateTargetBody {
@@ -130,28 +137,28 @@ export interface CreateTargetBody {
   targetValue: number;
 }
 
-/** `revision` (or If-Match) is required: without it the service answers 400 CRM_DASHBOARD_REVISION_MISMATCH. */
+/** `revision` in the body is required: without it the service answers 400 CRM_DASHBOARD_REVISION_MISMATCH. */
 export interface UpdateTargetBody {
-  revision?: number;
+  revision: number;
   targetValue: number;
 }
 
 export interface SubmitTargetBody {
-  revision?: number;
+  revision: number;
 }
 
 export interface ApproveTargetBody {
-  revision?: number;
+  revision: number;
   note?: string;
 }
 
 export interface RejectTargetBody {
-  revision?: number;
+  revision: number;
   note?: string;
 }
 
 export interface CorrectTargetBody {
-  revision?: number;
+  revision: number;
   value: number;
   reason?: string;
 }
@@ -167,32 +174,11 @@ export const TARGET_MIN_YEAR = 2000;
 export const TARGET_MAX_YEAR = 2100;
 export const TARGET_MIN_TEAMS = 2;
 export const TARGET_MAX_TEAMS = 50;
-export const TARGET_TIME_ZONE = 'Africa/Cairo';
-export const TARGET_CURRENCIES = ['EGP', 'USD', 'SAR', 'EUR'] as const;
-
-/**
- * FAKE-ONLY list, no backend route: there is no GET /crm/targets/metrics. The keys are the
- * backend TARGETABLE_KEYS (dashboard-sales-targets.service.ts) with the registry labels and units.
- */
-export const TARGETABLE_METRICS: readonly TargetableMetric[] = [
-  { key: 'crm.opportunities.won.estimated_value', labelEn: 'Won opportunity value', labelAr: 'قيمة الفرص الرابحة', measureKind: 'MONEY' },
-  { key: 'crm.opportunities.won.count.trend', labelEn: 'Won', labelAr: 'اتجاه الفرص الرابحة', measureKind: 'COUNT' },
-  { key: 'crm.opportunities.created.count.trend', labelEn: 'Created opportunities', labelAr: 'اتجاه الفرص المنشأة', measureKind: 'COUNT' },
-  { key: 'crm.opportunities.created.estimated_value.trend', labelEn: 'Created opportunity value', labelAr: 'اتجاه قيمة الفرص', measureKind: 'MONEY' },
-  { key: 'crm.leads.created.count', labelEn: 'New leads', labelAr: 'العملاء المحتملون الجدد', measureKind: 'COUNT' },
-  { key: 'crm.leads.converted.count', labelEn: 'Converted leads', labelAr: 'العملاء المحتملون المحولون', measureKind: 'COUNT' },
-  { key: 'crm.customer_profiles.created.count', labelEn: 'New customer profiles', labelAr: 'ملفات العملاء الجديدة', measureKind: 'COUNT' },
-  { key: 'crm.activities.created.count', labelEn: 'CRM activities', labelAr: 'أنشطة CRM', measureKind: 'COUNT' },
-  { key: 'crm.activities.core_completed.trend', labelEn: 'Work completed over time', labelAr: 'العمل المنجز عبر الزمن', measureKind: 'COUNT' },
-  { key: 'crm.opportunities.win.rate', labelEn: 'Win rate', labelAr: 'معدل الفوز', measureKind: 'RATE' },
-  { key: 'crm.leads.conversion.rate', labelEn: 'Lead conversion rate', labelAr: 'معدل تحويل العملاء المحتملين', measureKind: 'RATE' },
-  { key: 'crm.leads.first_response_sla.compliance_rate', labelEn: 'First response SLA compliance', labelAr: 'نسبة الالتزام بمهلة الاستجابة الأولى', measureKind: 'RATE' },
-  { key: 'crm.tasks.on_time_completion.rate', labelEn: 'On-time task completion', labelAr: 'نسبة إنجاز المهام في موعدها', measureKind: 'RATE' },
-];
-
 const QUARTER_START_MONTHS = new Set([1, 4, 7, 10]);
 
-export function parsePeriodStart(periodStart: string): { year: number; month: number; day: number } | null {
+export function parsePeriodStart(
+  periodStart: string,
+): { year: number; month: number; day: number } | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(periodStart.trim());
   if (!match) return null;
   const year = Number(match[1]);
@@ -235,16 +221,45 @@ export function periodBounds(
 export function isPeriodClosed(
   grain: TargetPeriodGrain,
   periodStart: string,
-  nowIso = FAKE_NOW,
+  nowIso = new Date().toISOString(),
+  timeZone = 'UTC',
+  periodEndExclusive?: string,
 ): boolean {
   const bounds = periodBounds(grain, periodStart);
   if (!bounds) return false;
-  return Date.parse(bounds.endAt) < Date.parse(nowIso);
+  const end =
+    periodEndExclusive ?? new Date(Date.parse(bounds.endAt) + 1).toISOString().slice(0, 10);
+  return targetDateInZone(nowIso, timeZone) >= end;
+}
+
+export function targetDateInZone(iso: string, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date(iso));
+  const part = (name: string) => parts.find((p) => p.type === name)?.value ?? '';
+  return `${part('year')}-${part('month')}-${part('day')}`;
+}
+
+export function targetBranchAllowed(
+  target: Pick<SalesTarget, 'branchId' | 'subjectType' | 'subjects'>,
+  grants: 'ALL' | Set<string>,
+): boolean {
+  const ids =
+    target.subjectType === 'TEAM_SET' ? target.subjects.map((s) => s.branchId) : [target.branchId];
+  return ids.length > 0 && ids.every((id) => !!id && (grants === 'ALL' || grants.has(id)));
 }
 
 export function validateTargetValue(value: number, measureKind: TargetMeasureKind): boolean {
   // targetValueForMeasure: at most two decimals (cents) as well.
-  if (!Number.isFinite(value) || value <= 0 || value > TARGET_MAX_VALUE || Math.round(value * 100) / 100 !== value) {
+  if (
+    !Number.isFinite(value) ||
+    value <= 0 ||
+    value > TARGET_MAX_VALUE ||
+    Math.round(value * 100) / 100 !== value
+  ) {
     return false;
   }
   if (measureKind === 'COUNT' && !Number.isInteger(value)) {
@@ -287,7 +302,7 @@ export function formatTargetValue(
   if (!Number.isFinite(num)) return DASH;
   switch (measureKind) {
     case 'MONEY':
-      return formatMoney(num, currencyCode ?? 'EGP');
+      return currencyCode ? formatMoney(num, currencyCode) : DASH;
     case 'RATE':
       return formatPercent(num, 1);
     case 'COUNT':
@@ -296,57 +311,26 @@ export function formatTargetValue(
   }
 }
 
-export function resolvePersonName(userId: string | null, lang: 'ar' | 'en'): string {
-  if (!userId) return DASH;
-  const person = FAKE_PEOPLE.find((p) => p.id === userId);
-  if (!person) return userId;
-  return lang === 'ar' ? person.nameAr : person.name;
-}
-
-export function resolveBranchName(branchId: string | null, lang: 'ar' | 'en'): string {
-  if (!branchId) return DASH;
-  const branch = FAKE_BRANCHES.find((b) => b.id === branchId);
-  if (!branch) return branchId;
-  return branch.name[lang];
-}
-
-export function resolveTeamName(teamId: string | null, lang: 'ar' | 'en'): string {
-  if (!teamId) return DASH;
-  const team = FAKE_TEAMS.find((t) => t.id === teamId);
-  if (!team) return teamId;
-  return team.name[lang];
+export function resolvePersonName(userId: string | null, _lang: 'ar' | 'en'): string {
+  return userId || DASH;
 }
 
 export function resolveTargetSubjectName(
-  target: Pick<SalesTarget, 'subjectType' | 'subjectId' | 'branchId' | 'subjects'>,
-  lang: 'ar' | 'en',
+  target: Pick<SalesTarget, 'subjectType' | 'subjectId' | 'branchId' | 'subjects'> &
+    Partial<Pick<SalesTarget, 'subjectName' | 'branchName'>>,
+  _lang: 'ar' | 'en',
 ): string {
-  switch (target.subjectType) {
-    case 'USER':
-      return resolvePersonName(target.subjectId, lang);
-    case 'TEAM':
-      return resolveTeamName(target.subjectId, lang);
-    case 'BRANCH':
-      return resolveBranchName(target.subjectId ?? target.branchId, lang);
-    case 'TEAM_SET': {
-      const subjects = target.subjects ?? [];
-      if (subjects.length === 0) return DASH;
-      const names = subjects.map((item) => {
-        const team = FAKE_TEAMS.find((t) => t.id === item.teamId);
-        return team ? team.name[lang] : item.teamName;
-      });
-      if (names.length <= 2) return names.join(' · ');
-      return `${names.slice(0, 2).join(' · ')} (+${names.length - 2})`;
-    }
-  }
+  if (target.subjectName) return target.subjectName;
+  if (target.subjectType === 'TEAM_SET')
+    return target.subjects.map((s) => s.teamName).join(' · ') || DASH;
+  return (target.subjectType === 'BRANCH' ? target.branchName : null) || target.subjectId || DASH;
 }
 
 export function resolveMetricLabel(
   metricKey: string,
   lang: 'ar' | 'en',
-  metrics: readonly TargetableMetric[] = TARGETABLE_METRICS,
+  metrics: readonly TargetableMetric[] = [],
 ): string {
-  const found = metrics.find((m) => m.key === metricKey) ?? TARGETABLE_METRICS.find((m) => m.key === metricKey);
-  if (!found) return metricKey;
-  return lang === 'ar' ? found.labelAr : found.labelEn;
+  const found = metrics.find((m) => m.key === metricKey);
+  return found ? (lang === 'ar' ? found.labelAr : found.labelEn) : metricKey;
 }

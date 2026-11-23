@@ -3,12 +3,14 @@ import {
   DestroyRef,
   Directive,
   ElementRef,
+  Injector,
   afterNextRender,
   computed,
   effect,
   inject,
   input,
   output,
+  runInInjectionContext,
   signal,
   untracked,
   viewChild,
@@ -46,13 +48,18 @@ import { Modal } from '../../../../../shared/ui/modal/modal';
 import { Segmented, SegmentedOption } from '../../../../../shared/ui/segmented/segmented';
 import { listOpportunityStages } from '../../opportunity-stages/opportunity-stages.api';
 import { OpportunityStage, OpportunityStageFlag, StageCategory } from '../../opportunity-stages/opportunity-stages.model';
-import { errorCodeOf, newIdempotencyKey } from '../../shared/settings-api';
+import { crmSettingsError, errorCodeOf, newIdempotencyKey } from '../../shared/settings-api';
+import { tenantWide } from '../../shared/settings-access';
+import { ApiError, isRetryableWriteError } from '../../../../../core/api/api-errors';
+import { FullState } from '../../../../../shared/ui/full-state/full-state';
+import { pipelineErrorTranslator, pipelineWriteMessage } from '../pipelines-errors';
 import { PipelineModal } from '../pipeline-modal/pipeline-modal';
 import {
   addPipelineStage,
   assignmentOptions,
   deletePipeline,
   getPipelineConfiguration,
+  getPipelineAssignments,
   removePipelineStage,
   reorderPipelineStages,
   replaceAssignments,
@@ -69,7 +76,6 @@ import {
   nameIn,
 } from '../pipelines.model';
 
-const CAN_MANAGE = true; // later from the session permissions
 const REQUIRED_FLAGS = new Set<OpportunityStageFlag>(['NEW', 'WON', 'LOST']);
 
 const CATEGORY_BADGE: Record<StageCategory, string> = {
@@ -215,6 +221,7 @@ export class StageDrop {
     Modal,
     Segmented,
     PipelineModal,
+    FullState,
     StageDrag,
     StageDrop,
   ],
@@ -248,6 +255,7 @@ export class PipelineDetailPage {
   private readonly router = inject(Router);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
+  private readonly translateError = pipelineErrorTranslator(this.transloco);
   private readonly i18n = translationEvents(this.transloco);
   protected readonly language = inject(LanguageState).current;
 
@@ -262,7 +270,20 @@ export class PipelineDetailPage {
 
   readonly id = input.required<string>();
 
-  protected readonly canManage = CAN_MANAGE;
+  private readonly injector = inject(Injector);
+  private readonly hasAccess = computed(() => runInInjectionContext(this.injector, () => tenantWide('crm.pipelines.manage')));
+  protected readonly readOnly = signal(false);
+  protected readonly canManage = computed(() => this.hasAccess() && !this.readOnly());
+  protected readonly loadError = signal<unknown>(null);
+  protected readonly loadState = computed(() => {
+    this.i18n();
+    return crmSettingsError(this.translateError, this.loadError(), 'pipelines');
+  });
+  protected readonly optionsError = signal<unknown>(null);
+  protected readonly optionsMessage = computed(() => {
+    this.i18n();
+    return this.optionsError() ? crmSettingsError(this.translateError, this.optionsError(), 'pipelines').message : null;
+  });
   protected readonly searchMax = PIPELINE_SEARCH_MAX;
 
   protected readonly pipeline = signal<Pipeline | null>(null);
@@ -332,11 +353,11 @@ export class PipelineDetailPage {
     this.i18n();
     const isDefault = this.pipeline()?.isDefault ?? false;
     return [
-      { value: 'ALL', label: this.transloco.translate('pipelines.access.ALL'), disabled: !this.canManage },
+      { value: 'ALL', label: this.transloco.translate('pipelines.access.ALL'), disabled: !this.canManage() },
       {
         value: 'RESTRICTED',
         label: this.transloco.translate('pipelines.access.RESTRICTED'),
-        disabled: !this.canManage || isDefault,
+        disabled: !this.canManage() || isDefault,
       },
     ];
   });
@@ -392,6 +413,8 @@ export class PipelineDetailPage {
 
   constructor() {
     this.destroyRef.onDestroy(() => {
+      ++this.optionsSeq;
+      ++this.loadSeq;
       if (this.searchTimer !== null) clearTimeout(this.searchTimer);
     });
     effect(() => {
@@ -409,32 +432,40 @@ export class PipelineDetailPage {
     this.loading.set(true);
     this.notFound.set(false);
     this.failed.set(false);
+    this.loadError.set(null);
+    if (this.hasAccess()) void this.refreshAssignmentOptions(this.accessSearch());
 
     try {
-      const [pipeline, stages, options] = await Promise.all([
+      if (!this.hasAccess()) throw new ApiError(403, 'CRM_PERMISSION_DENIED');
+      const [configuration, assignments, stages] = await Promise.all([
         getPipelineConfiguration(pipelineId),
+        getPipelineAssignments(pipelineId),
         listOpportunityStages(),
-        assignmentOptions(this.accessSearch()),
       ]);
       if (seq !== this.loadSeq) return;
+      const pipeline = { ...configuration, assignments, accessMode: assignments.accessMode };
       this.pipeline.set(pipeline);
       this.catalogue.set(stages);
-      this.applyAssignmentOptions(options);
       this.syncDraftAssignments(pipeline);
     } catch (error) {
       if (seq !== this.loadSeq) return;
-      if (errorCodeOf(error) === 'PIPELINE_NOT_FOUND') {
-        this.pipeline.set(null);
-        this.notFound.set(true);
-      } else {
-        this.failed.set(true);
-        this.showErrorToast(error);
-      }
+      this.loadError.set(error);
+      this.pipeline.set(null);
+      if (error instanceof ApiError && error.status === 404) this.notFound.set(true);
+      else this.failed.set(true);
     } finally {
       if (seq === this.loadSeq) {
         this.loading.set(false);
       }
     }
+  }
+
+  protected backToList(): void {
+    void this.router.navigate(['/crm/settings/pipelines']);
+  }
+
+  protected retryAssignmentOptions(): void {
+    void this.refreshAssignmentOptions(this.accessSearch());
   }
 
   protected primaryName(item: { nameAr: string; nameEn: string }): string {
@@ -459,7 +490,7 @@ export class PipelineDetailPage {
 
   protected openEdit(): void {
     const current = this.pipeline();
-    if (!current || !this.canManage) return;
+    if (!current || !this.canManage()) return;
     this.pipelineModal().openEdit(current);
   }
 
@@ -472,7 +503,7 @@ export class PipelineDetailPage {
   }
 
   protected async onDeleteFromModal(pipeline: Pipeline): Promise<void> {
-    if (!this.canManage || this.deletingPipeline() || pipeline.isDefault) return;
+    if (!this.canManage() || this.deletingPipeline() || pipeline.isDefault) return;
     if (!(await this.deletePipelineDialog().open())) return;
 
     this.deletingPipeline.set(true);
@@ -493,7 +524,7 @@ export class PipelineDetailPage {
 
   protected async deactivateInUsePipeline(): Promise<void> {
     const current = this.pipeline();
-    if (!current || this.deletingPipeline() || !current.isActive) return;
+    if (!current || !this.canManage() || this.deletingPipeline() || !current.isActive) return;
     this.pipelineInUseModal().close();
     this.deletingPipeline.set(true);
     try {
@@ -513,17 +544,17 @@ export class PipelineDetailPage {
 
   protected async confirmReset(): Promise<void> {
     const current = this.pipeline();
-    if (!current || !current.isDefault || !this.canManage || this.resetting()) return;
+    if (!current || !current.isDefault || !this.canManage() || this.resetting()) return;
     if (!(await this.resetDialog().open())) return;
 
     this.resetting.set(true);
     try {
-      const [reset, stages] = await Promise.all([resetPipeline(current.id), listOpportunityStages()]);
+      const reset = await resetPipeline(current.id);
       this.pipeline.set(reset);
-      this.catalogue.set(stages);
       this.syncDraftAssignments(reset);
       this.selectedAddStageId.set('');
       this.notify.success(this.transloco.translate('pipelines.toasts.reset'));
+      this.catalogue.set(await listOpportunityStages());
     } catch (error) {
       if (errorCodeOf(error) === 'PIPELINE_RESET_BLOCKED') {
         this.resetBlockedModal().open();
@@ -542,12 +573,12 @@ export class PipelineDetailPage {
   protected async addStage(): Promise<void> {
     const current = this.pipeline();
     const stageId = this.selectedAddStageId();
-    if (!current || !stageId || !this.canManage || this.stageBusy()) return;
+    if (!current || !stageId || !this.canManage() || this.stageBusy()) return;
 
     this.stageBusy.set(true);
     try {
-      const added = await addPipelineStage(current.id, stageId);
-      this.pipeline.update((item) => (item ? { ...item, stages: [...item.stages, added] } : item));
+      await addPipelineStage(current.id, stageId);
+      await this.refreshPipeline();
       this.selectedAddStageId.set('');
       this.notify.success(this.transloco.translate('pipelines.toasts.stageAdded'));
     } catch (error) {
@@ -559,7 +590,7 @@ export class PipelineDetailPage {
 
   protected moveStageStep(index: number, delta: -1 | 1): void {
     const current = this.pipeline();
-    if (!current || !this.canManage || this.stageBusy()) return;
+    if (!current || !this.canManage() || this.stageBusy()) return;
     const target = index + delta;
     if (index === 0 || target <= 0 || target >= current.stages.length) return;
 
@@ -571,7 +602,7 @@ export class PipelineDetailPage {
 
   protected onStageDropped(draggedId: string, targetId: string): void {
     const current = this.pipeline();
-    if (!current || !this.canManage || this.stageBusy()) return;
+    if (!current || !this.canManage() || this.stageBusy()) return;
 
     const fromIndex = current.stages.findIndex((item) => item.id === draggedId);
     const toIndex = current.stages.findIndex((item) => item.id === targetId);
@@ -585,7 +616,7 @@ export class PipelineDetailPage {
 
   protected async removeStage(stage: PipelineStage): Promise<void> {
     const current = this.pipeline();
-    if (!current || !this.canManage || this.stageBusy() || this.isRequiredStage(stage)) return;
+    if (!current || !this.canManage() || this.stageBusy() || this.isRequiredStage(stage)) return;
 
     this.removingStageName.set(this.primaryName(stage));
     if (!(await this.removeStageDialog().open())) return;
@@ -593,16 +624,7 @@ export class PipelineDetailPage {
     this.stageBusy.set(true);
     try {
       await removePipelineStage(current.id, stage.id);
-      this.pipeline.update((item) =>
-        item
-          ? {
-              ...item,
-              stages: item.stages
-                .filter((s) => s.id !== stage.id)
-                .map((s, idx) => ({ ...s, rank: idx + 1 })),
-            }
-          : item,
-      );
+      await this.refreshPipeline();
       this.notify.success(this.transloco.translate('pipelines.toasts.stageRemoved'));
     } catch (error) {
       if (errorCodeOf(error) === 'PIPELINE_STAGE_IN_USE') {
@@ -621,7 +643,7 @@ export class PipelineDetailPage {
 
   protected setAccessMode(mode: string | null): void {
     const current = this.pipeline();
-    if (!current || !this.canManage || current.isDefault) return;
+    if (!current || !this.canManage() || current.isDefault) return;
     if (mode !== 'ALL' && mode !== 'RESTRICTED') return;
     this.draftAccessMode.set(mode);
   }
@@ -629,6 +651,7 @@ export class PipelineDetailPage {
   protected onAccessSearchInput(event: Event): void {
     const value = (event.target as HTMLInputElement).value.slice(0, this.searchMax);
     this.accessSearch.set(value);
+    ++this.optionsSeq;
     if (this.searchTimer !== null) clearTimeout(this.searchTimer);
     this.searchTimer = setTimeout(() => {
       this.searchTimer = null;
@@ -645,12 +668,12 @@ export class PipelineDetailPage {
   }
 
   protected toggleUser(id: string): void {
-    if (!this.canManage) return;
+    if (!this.canManage()) return;
     this.draftUserIds.update((list) => (list.includes(id) ? list.filter((item) => item !== id) : [...list, id]));
   }
 
   protected toggleTeam(id: string): void {
-    if (!this.canManage) return;
+    if (!this.canManage()) return;
     this.draftTeamIds.update((list) => (list.includes(id) ? list.filter((item) => item !== id) : [...list, id]));
   }
 
@@ -661,7 +684,7 @@ export class PipelineDetailPage {
   }
 
   protected openAssignConfirm(): void {
-    if (!this.canManage || !this.assignmentsDirty() || this.restrictedWithoutTargets() || this.savingAssignments()) {
+    if (!this.canManage() || !this.assignmentsDirty() || this.restrictedWithoutTargets() || this.savingAssignments()) {
       return;
     }
     this.assignConfirmModal().open();
@@ -674,13 +697,13 @@ export class PipelineDetailPage {
 
   protected async confirmSaveAssignments(): Promise<void> {
     const current = this.pipeline();
-    if (!current || !this.canManage || this.savingAssignments()) return;
+    if (!current || !this.canManage() || this.savingAssignments()) return;
 
     const mode = this.draftAccessMode();
     const input = {
       accessMode: mode,
-      userIds: mode === 'ALL' ? [] : this.draftUserIds(),
-      teamIds: mode === 'ALL' ? [] : this.draftTeamIds(),
+      userIds: mode === 'ALL' ? [] : [...new Set(this.draftUserIds())],
+      teamIds: mode === 'ALL' ? [] : [...new Set(this.draftTeamIds())],
     };
     const key = this.idempotencyKeyFor({ action: 'replaceAssignments', id: current.id, input });
 
@@ -715,6 +738,7 @@ export class PipelineDetailPage {
     } catch (error) {
       this.pipeline.set(before);
       this.showErrorToast(error);
+      if (errorCodeOf(error) === 'PIPELINE_STAGE_REORDER_INVALID') await this.refreshPipeline();
     } finally {
       this.stageBusy.set(false);
     }
@@ -731,12 +755,13 @@ export class PipelineDetailPage {
   private async refreshAssignmentOptions(search: string): Promise<void> {
     const seq = ++this.optionsSeq;
     this.searchingAccess.set(true);
+    this.optionsError.set(null);
     try {
       const options = await assignmentOptions(search);
       if (seq !== this.optionsSeq) return;
       this.applyAssignmentOptions(options);
     } catch (error) {
-      if (seq === this.optionsSeq) this.showErrorToast(error);
+      if (seq === this.optionsSeq) this.optionsError.set(error);
     } finally {
       if (seq === this.optionsSeq) this.searchingAccess.set(false);
     }
@@ -763,23 +788,28 @@ export class PipelineDetailPage {
     this.draftTeamIds.set([...pipeline.assignments.teamIds]);
   }
 
-  private showErrorToast(error: unknown): void {
-    const code = errorCodeOf(error);
-    if (code) {
-      const key = `pipelines.errors.${code}`;
-      const translated = this.transloco.translate(key);
-      if (translated !== key) {
-        this.notify.error(translated);
-        return;
-      }
-      const sharedKey = `settings.errors.${code}`;
-      const shared = this.transloco.translate(sharedKey);
-      if (shared !== sharedKey) {
-        this.notify.error(shared);
-        return;
-      }
+  private async refreshPipeline(): Promise<void> {
+    try {
+      const pipeline = await getPipelineConfiguration(this.id());
+      this.pipeline.set(pipeline);
+    } catch (error) {
+      this.pipeline.set(null);
+      this.loadError.set(error);
+      this.notFound.set(error instanceof ApiError && error.status === 404);
+      this.failed.set(!this.notFound());
     }
-    this.notify.error(this.transloco.translate('settings.errors.generic'));
+  }
+
+  private showErrorToast(error: unknown): void {
+    if (!isRetryableWriteError(error) && !(error instanceof ApiError && error.status === 401)) this.pendingKey = null;
+    const state = crmSettingsError(this.translateError, error, 'pipelines');
+    if (state.readOnly) this.readOnly.set(true);
+    this.notify.error(pipelineWriteMessage(error, this.translateError));
+    if (errorCodeOf(error) === 'OPPORTUNITY_STAGE_NOT_FOUND') {
+      void listOpportunityStages().then((stages) => this.catalogue.set(stages)).catch((failure: unknown) => {
+        this.notify.error(crmSettingsError(this.translateError, failure, 'pipelines').message);
+      });
+    } else if (error instanceof ApiError && error.status === 404) void this.refreshPipeline();
   }
 }
 

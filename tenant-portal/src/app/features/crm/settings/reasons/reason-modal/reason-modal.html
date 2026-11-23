@@ -41,7 +41,7 @@
           dir="ltr"
           class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
           [value]="form().sortOrder"
-          [readonly]="!canManage()"
+          [readonly]="!canEdit()"
           [disabled]="saving()"
           [attr.aria-invalid]="errorText('sortOrder') ? 'true' : null"
           [attr.aria-describedby]="uid + '-order-hint' + (errorText('sortOrder') ? ' ' + uid + '-order-error' : '')"
@@ -66,7 +66,7 @@
           class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
           [placeholder]="mode() === 'create' ? ('reasons.placeholders.code' | transloco) : ''"
           [value]="form().code"
-          [readonly]="mode() === 'edit' || !canManage()"
+          [readonly]="mode() === 'edit' || !canEdit()"
           [disabled]="saving()"
           [attr.aria-invalid]="errorText('code') ? 'true' : null"
           [attr.aria-describedby]="uid + '-code-hint' + (errorText('code') ? ' ' + uid + '-code-error' : '')"
@@ -95,7 +95,7 @@
           dir="rtl"
           class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
           [value]="form().nameAr"
-          [readonly]="!canManage()"
+          [readonly]="!canEdit()"
           [disabled]="saving()"
           [attr.aria-invalid]="errorText('nameAr') ? 'true' : null"
           [attr.aria-describedby]="uid + '-name-ar-hint' + (errorText('nameAr') ? ' ' + uid + '-name-ar-error' : '')"
@@ -121,7 +121,7 @@
           dir="ltr"
           class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
           [value]="form().nameEn"
-          [readonly]="!canManage()"
+          [readonly]="!canEdit()"
           [disabled]="saving()"
           [attr.aria-invalid]="errorText('nameEn') ? 'true' : null"
           [attr.aria-describedby]="uid + '-name-en-hint' + (errorText('nameEn') ? ' ' + uid + '-name-en-error' : '')"
@@ -159,6 +159,7 @@
             [label]="'reasons.fields.activityType' | transloco"
             [for]="uid + '-activity-type'"
             [hint]="'reasons.hints.activityType' | transloco"
+            [error]="errorText('activityType')"
           >
             <ui-dropdown
               class="w-full"
@@ -167,8 +168,8 @@
               [options]="activityTypeOptions()"
               [value]="form().activityType"
               [label]="'reasons.fields.activityType' | transloco"
-              [describedBy]="uid + '-activity-type-hint'"
-              [disabled]="!canManage() || saving()"
+              [describedBy]="uid + '-activity-type-hint' + (errorText('activityType') ? ' ' + uid + '-activity-type-error' : '')"
+              [disabled]="!canEdit() || saving()"
               (valueChange)="setActivityType($event)"
             />
           </ui-field>
@@ -228,7 +229,7 @@
           dir="rtl"
           class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
           [value]="form().definitionAr"
-          [readonly]="!canManage()"
+          [readonly]="!canEdit()"
           [disabled]="saving()"
           [attr.aria-invalid]="errorText('definitionAr') ? 'true' : null"
           [attr.aria-describedby]="uid + '-def-ar-hint' + (errorText('definitionAr') ? ' ' + uid + '-def-ar-error' : '')"
@@ -254,7 +255,7 @@
           dir="ltr"
           class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
           [value]="form().definitionEn"
-          [readonly]="!canManage()"
+          [readonly]="!canEdit()"
           [disabled]="saving()"
           [attr.aria-invalid]="errorText('definitionEn') ? 'true' : null"
           [attr.aria-describedby]="uid + '-def-en-hint' + (errorText('definitionEn') ? ' ' + uid + '-def-en-error' : '')"
@@ -278,7 +279,7 @@
               [label]="'settings.common.active' | transloco"
               [describedBy]="uid + '-active-hint'"
               [checked]="form().isActive"
-              [disabled]="reason.isSystem || !canManage() || saving()"
+              [disabled]="reason.isSystem || !canEdit() || saving()"
               (checkedChange)="setActive($event)"
             />
             <div class="flex min-w-0 flex-1 flex-col gap-2">
@@ -298,7 +299,7 @@
   </div>
 
   <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
-    @if (canManage()) {
+    @if (canEdit()) {
       <button
         type="button"
         uiButton
@@ -345,41 +346,12 @@
   </div>
 </ui-modal>
 
-<ui-modal
-  #conflictModal
-  size="confirm"
-  icon="tablerAlertTriangle"
-  tile="bg-icon-orange"
-  [title]="'reasons.conflict.title' | transloco"
-  [closeLabel]="'settings.common.close' | transloco"
-  [dismissable]="!conflictBusy()"
-  (closed)="onConflictClosed()"
->
-  <p class="text-12 leading-18 text-text-muted">{{ 'reasons.conflict.text' | transloco }}</p>
-
-  <button
-    modal-footer
-    type="button"
-    uiButton
-    variant="primary"
-    [loading]="conflictBusy()"
-    (click)="reloadLatest()"
-  >
-    {{ 'reasons.conflict.reload' | transloco }}
-  </button>
-
-  <button
-    modal-footer
-    type="button"
-    uiButton
-    variant="secondary"
-    [disabled]="conflictBusy()"
-    (click)="saveMineOverStale()"
-  >
-    {{ 'reasons.conflict.keepMine' | transloco }}
-  </button>
-</ui-modal>
-
+<ui-conflict-dialog
+  [(open)]="conflictOpen"
+  [recordLabel]="baseReason()?.code ?? null"
+  (reload)="reloadLatest()"
+  (keepEditing)="saveMineOverStale()"
+/>
 <ui-confirm-dialog
   #discardDialog
   tone="warning"

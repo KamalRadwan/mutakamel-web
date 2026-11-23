@@ -1,4 +1,4 @@
-@if (!canRead) {
+@if (!canRead || forbidden()) {
   <ui-full-state
     kind="forbidden"
     [title]="'sla.page.forbiddenTitle' | transloco"
@@ -9,7 +9,7 @@
 } @else {
   <app-settings-frame
     [addLabel]="'sla.page.newPolicy' | transloco"
-    [showAdd]="canManage"
+    [showAdd]="canManage()"
     [searchPlaceholder]="'sla.page.searchPlaceholder' | transloco"
     [loading]="loading()"
     [(search)]="search"
@@ -17,7 +17,9 @@
     (reload)="load()"
   >
     <!-- Filter bar -->
-    <div class="grid grid-cols-2 gap-x-10 gap-y-8 rounded-10 border border-border bg-surface p-8 shadow-card desktop:grid-cols-4">
+    <div
+      class="grid grid-cols-2 gap-x-10 gap-y-8 rounded-10 border border-border bg-surface p-8 shadow-card desktop:grid-cols-4"
+    >
       <ui-field
         size="bare"
         [label]="'sla.filters.kind' | transloco"
@@ -52,22 +54,28 @@
         />
       </ui-field>
 
-      <ui-field
-        size="bare"
-        [label]="'sla.filters.branch' | transloco"
-        [for]="uid + '-filter-branch'"
-        [hint]="'sla.filters.branchHint' | transloco"
-      >
-        <ui-dropdown
-          [id]="uid + '-filter-branch'"
-          size="field"
+      @if (canChooseBranch) {
+        <ui-field
+          size="bare"
           [label]="'sla.filters.branch' | transloco"
-          [describedBy]="uid + '-filter-branch-hint'"
-          [options]="branchOptions()"
-          [value]="branchFilter()"
-          (valueChange)="onBranchFilterChange($event)"
-        />
-      </ui-field>
+          [for]="uid + '-filter-branch'"
+          [hint]="'sla.filters.branchHint' | transloco"
+        >
+          <ui-dropdown
+            [id]="uid + '-filter-branch'"
+            size="field"
+            [label]="'sla.filters.branch' | transloco"
+            [describedBy]="uid + '-filter-branch-hint'"
+            [options]="branchOptions()"
+            [value]="branchFilter()"
+            (valueChange)="onBranchFilterChange($event)"
+          />
+        </ui-field>
+      } @else {
+        <p class="text-12 text-text-muted">
+          {{ 'sla.errors.branchLookupUnavailable' | transloco }}
+        </p>
+      }
 
       <ui-field
         size="bare"
@@ -89,7 +97,9 @@
       @if (activeFilterChips().length > 0) {
         <div class="col-span-2 flex flex-wrap items-center gap-6 desktop:col-span-4">
           @for (chip of activeFilterChips(); track chip.key) {
-            <span class="inline-flex h-filter-chip items-center gap-4 rounded-8 bg-brand-soft px-8 text-12 font-medium text-on-brand-soft">
+            <span
+              class="inline-flex h-filter-chip items-center gap-4 rounded-8 bg-brand-soft px-8 text-12 font-medium text-on-brand-soft"
+            >
               <span>{{ chip.label }}</span>
               <button
                 type="button"
@@ -113,10 +123,15 @@
       <ui-full-state
         kind="load-failure"
         [title]="'sla.page.loadFailedTitle' | transloco"
-        [text]="'sla.page.loadFailedText' | transloco"
+        [text]="failureText()"
         [actionLabel]="'settings.common.retry' | transloco"
         (action)="load()"
       />
+      @if (correlationId(); as id) {
+        <p class="text-11 text-text-muted">
+          <bdi dir="ltr">{{ id }}</bdi>
+        </p>
+      }
     } @else {
       <ui-data-table
         [columns]="columns()"
@@ -137,7 +152,9 @@
         </ng-template>
 
         <ng-template uiCell="record" let-row>
-          <span class="truncate text-12 text-text">{{ 'sla.record.' + row.appliesToRecord | transloco }}</span>
+          <span class="truncate text-12 text-text">{{
+            'sla.record.' + row.appliesToRecord | transloco
+          }}</span>
         </ng-template>
 
         <ng-template uiCell="branch" let-row>
@@ -190,8 +207,10 @@
 
   <app-sla-modal
     #slaModal
-    [canManage]="canManage"
+    [canManage]="canManage()"
     [allPolicies]="policies()"
+    [branches]="branches()"
+    (readOnlyRequested)="serverReadOnly.set(true)"
     (published)="onPublished()"
     (reloadRequested)="load()"
   />

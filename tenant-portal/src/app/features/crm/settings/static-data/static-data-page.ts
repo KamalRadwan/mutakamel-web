@@ -5,7 +5,6 @@ import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   tablerArrowsSplit,
   tablerBolt,
-  tablerCloudOff,
   tablerEye,
   tablerFolders,
   tablerList,
@@ -17,18 +16,17 @@ import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
 import { ActionItem, ActionSelection, ActionsMenu } from '../../../../shared/ui/actions-menu/actions-menu';
 import { Button } from '../../../../shared/ui/button/button';
-import { errorMessage } from '../shared/settings-api';
+import { crmSettingsError } from '../shared/settings-api';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { SettingsFrame } from '../../../../shared/ui/settings-frame/settings-frame';
 import { GroupDetailsModal } from './group-details-modal/group-details-modal';
-import { getCrmStaticData } from './static-data.api';
+import { getCrmStaticData, reloadCrmStaticData } from './static-data.api';
 import { StaticDataGroup, buildStaticDataGroups, matchesGroupSearch } from './static-data.groups';
 import { CrmStaticData, Opt, labelIn } from './static-data.model';
 
-const CAN_READ = true; // later from the session permissions
-
 @Component({
   selector: 'app-static-data-page',
-  imports: [TranslocoPipe, NgIcon, Button, ActionsMenu, SettingsFrame, GroupDetailsModal],
+  imports: [TranslocoPipe, NgIcon, Button, ActionsMenu, SettingsFrame, GroupDetailsModal, FullState],
   providers: [
     provideTranslocoScope('settings', { scope: 'settings-static-data', alias: 'staticData' }),
     provideIcons({
@@ -39,12 +37,11 @@ const CAN_READ = true; // later from the session permissions
       tablerPaperclip,
       tablerArrowsSplit,
       tablerLock,
-      tablerCloudOff,
       tablerEye,
     }),
   ],
   templateUrl: './static-data-page.html',
-  host: { class: 'flex min-h-0 flex-1 flex-col' },
+  host: { class: 'flex flex-1 shrink-0 flex-col' },
 })
 export class StaticDataPage {
   private readonly notify = inject(Notify);
@@ -54,7 +51,6 @@ export class StaticDataPage {
 
   private readonly detailsModal = viewChild.required(GroupDetailsModal);
 
-  protected readonly canRead = CAN_READ;
   protected readonly skeletonRows = [1, 2, 3, 4, 5];
   // Uses --table-head-h (36px) for the actions column.
 
@@ -82,11 +78,13 @@ export class StaticDataPage {
   protected readonly initialLoadFailed = computed(
     () => !this.loading() && !this.data() && this.loadError() !== null,
   );
-  protected readonly loadErrorText = computed(() => {
+  protected readonly loadFailure = computed(() => {
     this.i18n();
     const error = this.loadError();
-    if (!error) return '';
-    return errorMessage(error, 'staticData', this.transloco);
+    const messages = this.transloco.getTranslation(this.language());
+    // The mapper probes optional page keys before falling back to shared messages.
+    return crmSettingsError((key, params) => Object.hasOwn(messages, key)
+      ? this.transloco.translate(key, params) : key, error, 'staticData');
   });
   protected readonly isSearching = computed(() => this.search().trim().length > 0);
   protected readonly isEmptyCatalogue = computed(
@@ -106,19 +104,21 @@ export class StaticDataPage {
   });
 
   constructor() {
-    if (this.canRead) {
-      void this.reload();
-    }
+    void this.load();
   }
 
-  protected async reload(): Promise<void> {
-    if (!this.canRead || this.loading()) return;
+  protected reload(): Promise<void> {
+    return this.load(true);
+  }
+
+  private async load(refresh = false): Promise<void> {
+    if (this.loading()) return;
     this.loading.set(true);
     if (!this.data()) {
       this.loadError.set(null);
     }
     try {
-      const result = await getCrmStaticData();
+      const result = await (refresh ? reloadCrmStaticData() : getCrmStaticData());
       this.data.set(result);
       this.loadError.set(null);
     } catch (error) {

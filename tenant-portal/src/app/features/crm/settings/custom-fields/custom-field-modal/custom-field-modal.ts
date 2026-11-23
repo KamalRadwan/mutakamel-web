@@ -43,12 +43,15 @@ import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { rectInPage, viewport } from '../../../../../shared/ui/overlay/zoom';
 import { Switch } from '../../../../../shared/ui/switch/switch';
-import { ApiError, errorCodeOf, fakeId } from '../../shared/settings-api';
-import { createCustomField, updateCustomField } from '../custom-fields.api';
+import { ApiError, errorCodeOf, fieldErrorsOf, isValidationError } from '../../../../../core/api/api-errors';
+import { CrmModules } from '../../../shared/crm-modules/crm-modules';
+import { customFieldsError } from '../custom-fields-errors';
+import { CustomFieldSubmission, createCustomField, updateCustomField } from '../custom-fields.api';
 import {
   CREATABLE_OWNER_TYPES,
   CUSTOM_FIELD_TYPES,
   CreatableOwnerType,
+  CreateCustomFieldInput,
   CustomField,
   CustomFieldDefinition,
   CustomFieldType,
@@ -100,7 +103,7 @@ function emptyDraft(): FieldDraft {
 }
 
 function toEditableOptions(options: readonly FieldOption[]): EditableFieldOption[] {
-  return options.map((opt) => ({ ...opt, uid: fakeId(), isSaved: true }));
+  return options.map((opt) => ({ ...opt, uid: crypto.randomUUID(), isSaved: true }));
 }
 
 @Component({
@@ -160,7 +163,11 @@ export class CustomFieldModal {
   private readonly typeTrigger = viewChild<ElementRef<HTMLButtonElement>>('typeTrigger');
   private readonly typeListEl = viewChild<ElementRef<HTMLElement>>('typeListEl');
 
-  readonly canManage = input(true);
+  readonly canManage = input(false);
+  readonly readOnly = output<void>();
+  readonly reload = output<void>();
+  private readonly modules = inject(CrmModules);
+  private readonly submission = new CustomFieldSubmission();
   readonly saved = output<CustomField>();
 
   protected readonly maxNameLen = MAX_NAME_LEN;
@@ -177,6 +184,13 @@ export class CustomFieldModal {
   protected readonly saving = signal(false);
   protected readonly revealErrors = signal(false);
   protected readonly serverKeyError = signal<string | null>(null);
+  protected readonly serverOptionsCode = signal<string | null>(null);
+  protected readonly serverErrors = signal<Record<string, string[]>>({});
+  protected readonly optionsError = computed(() => {
+    this.i18n();
+    const code = this.serverOptionsCode();
+    return code ? this.transloco.translate(`customFields.errors.${code}`) : this.serverFieldError('options');
+  });
   protected readonly inUseOptionKeys = signal<string[]>([]);
   protected readonly typeMenuOpen = signal(false);
   protected readonly typeMenuPlace = signal({ top: 0, start: 0, width: 240 });
@@ -204,7 +218,10 @@ export class CustomFieldModal {
 
   protected readonly ownerTypeOptions = computed<DropdownOption<CreatableOwnerType>[]>(() => {
     this.i18n();
-    return CREATABLE_OWNER_TYPES.map((type) => ({
+    return CREATABLE_OWNER_TYPES.filter(type =>
+      (type !== 'LEAD' || this.modules.leadsAnywhere()) &&
+      (type !== 'OPPORTUNITY' || this.modules.opportunitiesAnywhere())
+    ).map((type) => ({
       value: type,
       label: this.transloco.translate(`customFields.ownerTypes.${type}`),
     }));
@@ -222,7 +239,7 @@ export class CustomFieldModal {
           d.placeholderAr.trim() ||
           d.placeholderEn.trim() ||
           d.sortOrder !== DEFAULT_SORT_ORDER ||
-          d.ownerType !== 'LEAD' ||
+          d.ownerType !== this.ownerTypeOptions()[0].value ||
           d.type !== 'TEXT' ||
           opts.length > 0,
       );
@@ -241,6 +258,8 @@ export class CustomFieldModal {
 
   protected readonly nameArError = computed(() => {
     this.i18n();
+    const server = this.serverFieldError('nameAr');
+    if (server) return server;
     if (!this.revealErrors()) return null;
     const val = this.draft().nameAr.trim();
     if (!val) return this.transloco.translate('customFields.validation.required');
@@ -250,6 +269,8 @@ export class CustomFieldModal {
 
   protected readonly nameEnError = computed(() => {
     this.i18n();
+    const server = this.serverFieldError('nameEn');
+    if (server) return server;
     if (!this.revealErrors()) return null;
     const val = this.draft().nameEn.trim();
     if (!val) return this.transloco.translate('customFields.validation.required');
@@ -259,7 +280,7 @@ export class CustomFieldModal {
 
   protected readonly keyError = computed(() => {
     this.i18n();
-    const serverErr = this.serverKeyError();
+    const serverErr = this.serverKeyError() ?? this.serverFieldError('fieldKey');
     if (serverErr) return serverErr;
     if (!this.revealErrors()) return null;
     const normalized = normalizeFieldKey(this.draft().fieldKey);
@@ -270,6 +291,8 @@ export class CustomFieldModal {
 
   protected readonly placeholderArError = computed(() => {
     this.i18n();
+    const server = this.serverFieldError('placeholderAr');
+    if (server) return server;
     if (!this.revealErrors()) return null;
     if (this.draft().placeholderAr.trim().length > MAX_PLACEHOLDER_LEN) {
       return this.transloco.translate('customFields.validation.maxLength', { max: MAX_PLACEHOLDER_LEN });
@@ -279,6 +302,8 @@ export class CustomFieldModal {
 
   protected readonly placeholderEnError = computed(() => {
     this.i18n();
+    const server = this.serverFieldError('placeholderEn');
+    if (server) return server;
     if (!this.revealErrors()) return null;
     if (this.draft().placeholderEn.trim().length > MAX_PLACEHOLDER_LEN) {
       return this.transloco.translate('customFields.validation.maxLength', { max: MAX_PLACEHOLDER_LEN });
@@ -293,12 +318,15 @@ export class CustomFieldModal {
 
   protected readonly sortOrderError = computed(() => {
     this.i18n();
+    const server = this.serverFieldError('sortOrder');
+    if (server) return server;
     if (!this.revealErrors()) return null;
-    if (!Number.isInteger(this.draft().sortOrder)) return this.transloco.translate('customFields.validation.sortOrder');
+    if (!Number.isInteger(this.draft().sortOrder) || this.draft().sortOrder < 1) return this.transloco.translate('customFields.validation.sortOrder');
     return null;
   });
 
   constructor() {
+    void this.modules.ensureLoaded();
     const closeTypeMenu = () => this.typeMenuOpen.set(false);
     document.addEventListener('scroll', closeTypeMenu, { capture: true, passive: true });
     inject(DestroyRef).onDestroy(() => document.removeEventListener('scroll', closeTypeMenu, { capture: true }));
@@ -306,7 +334,7 @@ export class CustomFieldModal {
 
   openCreate(): void {
     this.editingField.set(null);
-    this.draft.set(emptyDraft());
+    this.draft.set({ ...emptyDraft(), ownerType: this.ownerTypeOptions()[0].value });
     this.draftOptions.set([]);
     this.moreOpen.set(false);
     this.keyManuallyEdited = false;
@@ -324,17 +352,20 @@ export class CustomFieldModal {
   }
 
   protected undo(): void {
+    this.submission.reset();
     const base = this.editingField();
     if (base) {
       this.loadFromField(base);
       this.keyManuallyEdited = true;
     } else {
-      this.draft.set(emptyDraft());
+      this.draft.set({ ...emptyDraft(), ownerType: this.ownerTypeOptions()[0].value });
       this.draftOptions.set([]);
       this.keyManuallyEdited = false;
     }
     this.revealErrors.set(false);
     this.serverKeyError.set(null);
+    this.serverErrors.set({});
+    this.serverOptionsCode.set(null);
     this.inUseOptionKeys.set([]);
   }
 
@@ -354,20 +385,27 @@ export class CustomFieldModal {
     });
     if (!this.isEdit() && !this.keyManuallyEdited) {
       this.serverKeyError.set(null);
+    this.serverErrors.set({});
+    this.serverOptionsCode.set(null);
     }
   }
 
   protected onKeyInput(value: string): void {
+    if (this.isEdit() || !this.canManage()) return;
     this.keyManuallyEdited = true;
     this.serverKeyError.set(null);
+    this.serverErrors.set({});
+    this.serverOptionsCode.set(null);
     this.draft.update((d) => ({ ...d, fieldKey: liveNormalizeFieldKey(value) }));
   }
 
   protected onKeyBlur(): void {
+    if (this.isEdit() || !this.canManage()) return;
     this.draft.update((d) => ({ ...d, fieldKey: normalizeFieldKey(d.fieldKey).replace(/_+$/, '') }));
   }
 
   protected onOwnerTypeChange(ownerType: CreatableOwnerType): void {
+    if (this.isEdit() || !this.canManage() || !this.ownerTypeOptions().some(option => option.value === ownerType)) return;
     this.draft.update((d) => ({ ...d, ownerType }));
   }
 
@@ -423,6 +461,8 @@ export class CustomFieldModal {
   protected onOptionsModelChange(options: EditableFieldOption[]): void {
     this.draftOptions.set(options);
     this.inUseOptionKeys.set([]);
+    this.serverOptionsCode.set(null);
+    this.serverErrors.set({});
   }
 
   protected restoreRemovedOptions(): void {
@@ -435,7 +475,7 @@ export class CustomFieldModal {
     const restored = current.map((opt) => (blocking.has(opt.key.trim()) ? { ...opt, isActive: true } : opt));
     for (const orig of base.options) {
       if (blocking.has(orig.key) && !byKey.has(orig.key)) {
-        restored.push({ ...orig, uid: fakeId(), isSaved: true });
+        restored.push({ ...orig, uid: crypto.randomUUID(), isSaved: true });
       }
     }
 
@@ -448,6 +488,8 @@ export class CustomFieldModal {
     if (!this.canManage() || this.saving()) return;
     this.revealErrors.set(true);
     this.serverKeyError.set(null);
+    this.serverErrors.set({});
+    this.serverOptionsCode.set(null);
     this.inUseOptionKeys.set([]);
 
     const normalizedKey = normalizeFieldKey(this.draft().fieldKey);
@@ -463,6 +505,7 @@ export class CustomFieldModal {
     }
 
     const base = this.editingField();
+    if (!base && !this.ownerTypeOptions().some(option => option.value === this.draft().ownerType)) return;
     this.saving.set(true);
     try {
       let result: CustomField;
@@ -478,7 +521,7 @@ export class CustomFieldModal {
           return;
         }
         // PATCH returns the definition only, so keep the requirements already loaded.
-        result = { ...(await updateCustomField(base.id, patch)), requirements: base.requirements };
+        result = { ...(await this.submission.run(patch, body => updateCustomField(base.id, body))), requirements: base.requirements };
         this.notify.success(this.transloco.translate('customFields.toasts.saved'));
       }
       this.allowClose = true;
@@ -539,7 +582,7 @@ export class CustomFieldModal {
     const d = this.draft();
     const placeholderAr = d.placeholderAr.trim();
     const placeholderEn = d.placeholderEn.trim();
-    return createCustomField({
+    const body: CreateCustomFieldInput = {
       ownerType: d.ownerType,
       fieldKey: normalizeFieldKey(d.fieldKey),
       nameAr: d.nameAr.trim(),
@@ -549,15 +592,13 @@ export class CustomFieldModal {
       ...(placeholderEn ? { placeholderEn } : {}),
       sortOrder: d.sortOrder,
       ...(isChoicesType(d.type) ? { options: this.cleanOptions(this.draftOptions()) } : {}),
-    });
+    };
+    return this.submission.run(body, createCustomField);
   }
 
   private buildPatch(base: CustomField): UpdateCustomFieldPatch {
     const d = this.draft();
     const patch: UpdateCustomFieldPatch = {};
-
-    const nextKey = normalizeFieldKey(d.fieldKey);
-    if (nextKey !== base.fieldKey) patch.fieldKey = nextKey;
 
     const nextNameAr = d.nameAr.trim();
     if (nextNameAr !== base.nameAr) patch.nameAr = nextNameAr;
@@ -605,37 +646,39 @@ export class CustomFieldModal {
     });
   }
 
+  protected serverFieldError(field: string): string | null {
+    return this.serverErrors()[field]?.join(' ') || null;
+  }
+
   private handleSaveError(error: unknown): void {
     const code = errorCodeOf(error);
     if (code === 'CUSTOM_FIELD_KEY_INVALID' || code === 'CUSTOM_FIELD_KEY_TAKEN') {
       this.serverKeyError.set(this.transloco.translate(`customFields.errors.${code}`));
       return;
     }
-    if (code === 'CUSTOM_FIELD_OPTION_IN_USE' && error instanceof ApiError) {
-      const keys = error.details?.['optionKeys'];
-      if (Array.isArray(keys)) {
-        this.inUseOptionKeys.set(keys.filter((item): item is string => typeof item === 'string'));
-      }
-      this.notify.error(this.transloco.translate('customFields.errors.CUSTOM_FIELD_OPTION_IN_USE'));
+    if (code === 'CUSTOM_FIELD_OPTIONS_REQUIRED' || code === 'CUSTOM_FIELD_OPTIONS_INVALID') {
+      this.serverOptionsCode.set(code);
       return;
     }
-    if (code) {
-      const key = `customFields.errors.${code}`;
-      const translated = this.transloco.translate(key);
-      if (translated !== key) {
-        this.notify.error(translated);
-        return;
-      }
-      if (code === 'CUSTOM_FIELD_NOT_FOUND') {
-        this.notify.error(this.transloco.translate('settings.errors.notFound'));
-        return;
-      }
-      if (code === 'CRM_VALIDATION_FAILED') {
-        this.notify.error(this.transloco.translate('settings.errors.validation'));
-        return;
-      }
+    if (code === 'CUSTOM_FIELD_OPTION_IN_USE') {
+      const draft = new Map(this.draftOptions().map(option => [option.key.trim(), option]));
+      const candidates = this.editingField()?.options.filter(option =>
+        !draft.has(option.key) || (option.isActive && !draft.get(option.key)?.isActive),
+      ).map(option => option.key) ?? [];
+      this.inUseOptionKeys.set(candidates);
+      return;
     }
-    this.notify.error(this.transloco.translate('settings.errors.generic'));
+    if (isValidationError(error)) {
+      const errors = fieldErrorsOf(error);
+      this.serverErrors.set(errors);
+      if (Object.keys(errors).some(key => key.startsWith('placeholder') || key === 'sortOrder')) this.moreOpen.set(true);
+      if (Object.keys(errors).some(key => key !== '_' &&
+        (key in this.draft() || key === 'options' || key.startsWith('options.')))) return;
+    }
+    const result = customFieldsError(this.transloco, error);
+    if (result.readOnly) this.readOnly.emit();
+    this.notify.error(result.message);
+    if (error instanceof ApiError && error.status === 404) this.reload.emit();
   }
 
   private loadFromField(field: CustomField): void {
@@ -654,10 +697,13 @@ export class CustomFieldModal {
   }
 
   private resetTransientState(): void {
+    this.submission.reset();
     this.allowClose = false;
     this.saving.set(false);
     this.revealErrors.set(false);
     this.serverKeyError.set(null);
+    this.serverErrors.set({});
+    this.serverOptionsCode.set(null);
     this.inUseOptionKeys.set([]);
     this.typeMenuOpen.set(false);
   }

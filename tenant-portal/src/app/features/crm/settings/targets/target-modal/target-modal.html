@@ -14,9 +14,55 @@
     </ui-badge>
   }
 
+  @if (!isEdit() && metricsError()) {
+    <ui-full-state
+      [kind]="metricsFailure()?.kind ?? 'load-failure'"
+      [title]="
+        (metricsFailure()?.kind === 'forbidden'
+          ? 'targets.forbiddenTitle'
+          : 'analytics.common.loadFailed'
+        ) | transloco
+      "
+      [text]="
+        ('targets.metricsUnavailable' | transloco) +
+        (metricsFailure()?.correlationId ? ' · ' + metricsFailure()!.correlationId : '')
+      "
+      [actionLabel]="'analytics.common.retry' | transloco"
+      (action)="reloadMetrics.emit()"
+    />
+  }
+  @if (!isEdit() && subjectsFailed()) {
+    <p class="text-12 text-text-muted">{{ 'targets.subjectsUnavailable' | transloco }}</p>
+    <button type="button" uiButton variant="secondary" (click)="loadSubjects()">
+      {{ 'analytics.common.retry' | transloco }}
+    </button>
+  }
+  @if (!isEdit() && currenciesError() && activeMeasureKind() === 'MONEY') {
+    <p class="text-12 text-text-muted">{{ 'targets.currenciesUnavailable' | transloco }}</p>
+    <button type="button" uiButton variant="secondary" (click)="loadCurrencies()">
+      {{ 'analytics.common.retry' | transloco }}
+    </button>
+  }
+  @if (!isEdit() && !formReadOnly() && subjectType() !== 'BRANCH') {
+    <ui-field
+      [label]="'targets.form.subjectSearch' | transloco"
+      [hint]="'targets.form.subjectSearchHint' | transloco"
+      [for]="uid + '-subject-search'"
+    >
+      <input
+        [id]="uid + '-subject-search'"
+        class="w-full bg-transparent text-12 text-text outline-none"
+        type="search"
+        maxlength="200"
+        [value]="subjectSearch()"
+        [attr.aria-describedby]="uid + '-subject-search-hint'"
+        (input)="searchSubjects($event)"
+      />
+    </ui-field>
+  }
   <form class="grid grid-cols-3 gap-x-10 gap-y-8" (submit)="$event.preventDefault(); save()">
     <div class="col-span-1">
-      @if (isEdit()) {
+      @if (isEdit() || formReadOnly()) {
         <ui-field
           [label]="'targets.form.subjectType' | transloco"
           [for]="uid + '-subject-type'"
@@ -63,14 +109,16 @@
           [required]="!isEdit()"
           [error]="teamsError()"
         >
-          @if (isEdit()) {
+          @if (isEdit() || formReadOnly()) {
             <div
               [id]="uid + '-teams'"
               class="flex min-h-field flex-wrap items-center gap-4 rounded-8 border border-border-field bg-surface-field px-8 py-2"
               [attr.aria-describedby]="uid + '-teams-hint'"
             >
               @for (chip of selectedTeamChips(); track chip.id) {
-                <span class="inline-flex h-chip items-center rounded-6 bg-brand-soft px-6 text-11 font-medium text-on-brand-soft">
+                <span
+                  class="inline-flex h-chip items-center rounded-6 bg-brand-soft px-6 text-11 font-medium text-on-brand-soft"
+                >
                   {{ chip.label }}
                 </span>
               }
@@ -89,7 +137,9 @@
               (click)="onTeamsBoxClick($event)"
             >
               @for (chip of selectedTeamChips(); track chip.id) {
-                <span class="inline-flex h-chip items-center gap-4 rounded-6 bg-brand-soft px-6 text-11 font-medium text-on-brand-soft">
+                <span
+                  class="inline-flex h-chip items-center gap-4 rounded-6 bg-brand-soft px-6 text-11 font-medium text-on-brand-soft"
+                >
                   <span class="truncate">{{ chip.label }}</span>
                   <button
                     type="button"
@@ -113,14 +163,20 @@
                 [attr.aria-expanded]="teamsOpen()"
                 [attr.aria-label]="'targets.form.teams' | transloco"
                 [attr.aria-invalid]="teamsError() ? 'true' : null"
-                [attr.aria-describedby]="uid + '-teams-hint' + (teamsError() ? ' ' + uid + '-teams-error' : '')"
+                [attr.aria-describedby]="
+                  uid + '-teams-hint' + (teamsError() ? ' ' + uid + '-teams-error' : '')
+                "
                 (click)="toggleTeamsMenu()"
               >
-                <span class="truncate" [class]="selectedTeamChips().length === 0 ? 'text-text-placeholder' : 'sr-only'">
+                <span
+                  class="truncate"
+                  [class]="selectedTeamChips().length === 0 ? 'text-text-placeholder' : 'sr-only'"
+                >
                   {{
                     selectedTeamChips().length === 0
                       ? ('targets.form.selectTeams' | transloco)
-                      : ('targets.form.teamsSelected' | transloco: { count: selectedTeamChips().length })
+                      : ('targets.form.teamsSelected'
+                        | transloco: { count: selectedTeamChips().length })
                   }}
                 </span>
                 <span class="ms-auto inline-flex shrink-0 text-text-muted">
@@ -147,7 +203,11 @@
                     <button
                       type="button"
                       class="flex h-menu-item w-full cursor-pointer items-center justify-between gap-8 rounded-6 px-8 text-12 whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
-                      [class]="isTeamSelected(team.id) ? 'bg-brand-soft text-on-brand-soft' : 'text-text hover:bg-row-hover'"
+                      [class]="
+                        isTeamSelected(team.id)
+                          ? 'bg-brand-soft text-on-brand-soft'
+                          : 'text-text hover:bg-row-hover'
+                      "
                       (click)="toggleTeam(team.id)"
                     >
                       <span class="flex min-w-0 items-center gap-6 truncate">
@@ -169,7 +229,7 @@
       </div>
     } @else if (subjectType() === 'BRANCH') {
       <div class="col-span-2">
-        @if (isEdit()) {
+        @if (isEdit() || formReadOnly() || branches().length === 0) {
           <ui-field
             [label]="'targets.form.branch' | transloco"
             [for]="uid + '-branch'"
@@ -200,7 +260,9 @@
               [label]="'targets.form.branch' | transloco"
               [options]="branchOptions()"
               [value]="branchId()"
-              [describedBy]="uid + '-branch-hint' + (subjectError() ? ' ' + uid + '-branch-error' : '')"
+              [describedBy]="
+                uid + '-branch-hint' + (subjectError() ? ' ' + uid + '-branch-error' : '')
+              "
               (valueChange)="onBranchChange($event)"
             />
           </ui-field>
@@ -208,7 +270,7 @@
       </div>
     } @else {
       <div class="col-span-1">
-        @if (isEdit()) {
+        @if (isEdit() || formReadOnly() || branches().length === 0) {
           <ui-field
             [label]="'targets.form.branch' | transloco"
             [for]="uid + '-branch'"
@@ -246,7 +308,7 @@
       </div>
 
       <div class="col-span-1">
-        @if (isEdit()) {
+        @if (isEdit() || formReadOnly()) {
           <ui-field
             [label]="'targets.form.subject' | transloco"
             [for]="uid + '-subject'"
@@ -277,7 +339,9 @@
               [label]="'targets.form.subject' | transloco"
               [options]="subjectOptions()"
               [value]="subjectId()"
-              [describedBy]="uid + '-subject-hint' + (subjectError() ? ' ' + uid + '-subject-error' : '')"
+              [describedBy]="
+                uid + '-subject-hint' + (subjectError() ? ' ' + uid + '-subject-error' : '')
+              "
               (valueChange)="onSubjectChange($event)"
             />
           </ui-field>
@@ -286,7 +350,7 @@
     }
 
     <div class="col-span-2">
-      @if (isEdit()) {
+      @if (isEdit() || formReadOnly()) {
         <ui-field
           [label]="'targets.form.metric' | transloco"
           [for]="uid + '-metric'"
@@ -317,7 +381,9 @@
             [label]="'targets.form.metric' | transloco"
             [options]="metricOptions()"
             [value]="metricKey()"
-            [describedBy]="uid + '-metric-hint' + (metricError() ? ' ' + uid + '-metric-error' : '')"
+            [describedBy]="
+              uid + '-metric-hint' + (metricError() ? ' ' + uid + '-metric-error' : '')
+            "
             (valueChange)="onMetricChange($event)"
           />
         </ui-field>
@@ -342,7 +408,7 @@
     </div>
 
     <div class="col-span-1">
-      @if (isEdit()) {
+      @if (isEdit() || formReadOnly()) {
         <ui-field
           [label]="'targets.form.periodGrain' | transloco"
           [for]="uid + '-grain'"
@@ -380,7 +446,7 @@
     </div>
 
     <div class="col-span-2">
-      @if (isEdit()) {
+      @if (isEdit() || formReadOnly()) {
         <ui-field
           [label]="'targets.form.periodStart' | transloco"
           [for]="uid + '-period'"
@@ -412,7 +478,9 @@
               [label]="'targets.form.year' | transloco"
               [options]="yearOptions()"
               [value]="periodYear()"
-              [describedBy]="uid + '-period-hint' + (periodError() ? ' ' + uid + '-period-error' : '')"
+              [describedBy]="
+                uid + '-period-hint' + (periodError() ? ' ' + uid + '-period-error' : '')
+              "
               (valueChange)="onYearChange($event)"
             />
           } @else {
@@ -421,10 +489,15 @@
                 [id]="uid + '-period'"
                 size="field"
                 class="w-full"
-                [label]="(periodGrain() === 'QUARTER' ? 'targets.form.quarterLabel' : 'targets.form.month') | transloco"
+                [label]="
+                  (periodGrain() === 'QUARTER' ? 'targets.form.quarterLabel' : 'targets.form.month')
+                    | transloco
+                "
                 [options]="monthOptions()"
                 [value]="periodMonth()"
-                [describedBy]="uid + '-period-hint' + (periodError() ? ' ' + uid + '-period-error' : '')"
+                [describedBy]="
+                  uid + '-period-hint' + (periodError() ? ' ' + uid + '-period-error' : '')
+                "
                 (valueChange)="onMonthChange($event)"
               />
               <ui-dropdown
@@ -434,7 +507,9 @@
                 [label]="'targets.form.year' | transloco"
                 [options]="yearOptions()"
                 [value]="periodYear()"
-                [describedBy]="uid + '-period-hint' + (periodError() ? ' ' + uid + '-period-error' : '')"
+                [describedBy]="
+                  uid + '-period-hint' + (periodError() ? ' ' + uid + '-period-error' : '')
+                "
                 (valueChange)="onYearChange($event)"
               />
             </div>
@@ -443,9 +518,9 @@
       }
     </div>
 
-    @if (activeMeasureKind() === 'MONEY') {
+    @if (activeMeasureKind() === 'MONEY' && (isEdit() || !currenciesError())) {
       <div class="col-span-1">
-        @if (isEdit()) {
+        @if (isEdit() || formReadOnly()) {
           <ui-field
             [label]="'targets.form.currency' | transloco"
             [for]="uid + '-currency'"
@@ -477,7 +552,9 @@
               [label]="'targets.form.currency' | transloco"
               [options]="currencyOptions()"
               [value]="currencyCode()"
-              [describedBy]="uid + '-currency-hint' + (currencyError() ? ' ' + uid + '-currency-error' : '')"
+              [describedBy]="
+                uid + '-currency-hint' + (currencyError() ? ' ' + uid + '-currency-error' : '')
+              "
               (valueChange)="onCurrencyChange($event)"
             />
           </ui-field>
@@ -493,7 +570,7 @@
         [required]="canEditValue()"
         [error]="valueError()"
       >
-        @if (activeMeasureKind() === 'MONEY') {
+        @if (activeMeasureKind() === 'MONEY' && (isEdit() || !currenciesError())) {
           <span dir="ltr" class="shrink-0 text-12 font-medium tabular-nums text-text-muted">
             {{ currencyCode() }}
           </span>
@@ -509,7 +586,9 @@
           [readOnly]="!canEditValue()"
           [attr.aria-readonly]="!canEditValue() ? 'true' : null"
           [attr.aria-invalid]="valueError() ? 'true' : null"
-          [attr.aria-describedby]="uid + '-value-hint' + (valueError() ? ' ' + uid + '-value-error' : '')"
+          [attr.aria-describedby]="
+            uid + '-value-hint' + (valueError() ? ' ' + uid + '-value-error' : '')
+          "
           (input)="onValueInput($event)"
           (blur)="onValueBlur()"
         />
@@ -545,7 +624,13 @@
         type="button"
         uiButton
         [loading]="saving()"
-        [disabled]="isEdit() ? !dirty() : false"
+        [disabled]="
+          isEdit()
+            ? !dirty()
+            : subjectsLoading() ||
+              metricsError() ||
+              (currenciesError() && activeMeasureKind() === 'MONEY')
+        "
         (click)="save()"
       >
         {{ 'settings.common.save' | transloco }}
@@ -553,16 +638,12 @@
     }
 
     @if (isEdit() && canEditValue() && dirty()) {
-      <button
-        type="button"
-        uiButton
-        variant="secondary"
-        [disabled]="saving()"
-        (click)="undo()"
-      >
+      <button type="button" uiButton variant="secondary" [disabled]="saving()" (click)="undo()">
         {{ 'settings.common.undo' | transloco }}
       </button>
-      <span class="text-12 leading-18 text-text-muted">{{ 'settings.common.unsaved' | transloco }}</span>
+      <span class="text-12 leading-18 text-text-muted">{{
+        'settings.common.unsaved' | transloco
+      }}</span>
     }
 
     <button
@@ -576,7 +657,7 @@
     </button>
 
     @if (isEdit() && canManage() && editingTarget(); as target) {
-      @if (target.approvalState !== 'SUBMITTED') {
+      @if (target.approvalState === 'DRAFT' && canEditValue()) {
         <button
           type="button"
           uiButton
@@ -601,11 +682,17 @@
   [cancelLabel]="'targets.discard.cancel' | transloco"
 />
 
+<ui-conflict-dialog
+  [(open)]="conflictOpen"
+  (openChange)="conflictClosed($event)"
+  (reload)="resolveConflict(true)"
+  (keepEditing)="resolveConflict(false)"
+/>
 <ui-confirm-dialog
-  #conflictDialog
+  #approvedConfirm
   tone="warning"
-  [title]="'analytics.common.conflictTitle' | transloco"
-  [text]="'analytics.common.conflictText' | transloco"
-  [confirmLabel]="'analytics.common.reload' | transloco"
-  [cancelLabel]="'analytics.common.keepMine' | transloco"
+  [title]="'targets.approvedEdit.title' | transloco"
+  [text]="'targets.approvedEdit.text' | transloco"
+  [confirmLabel]="'settings.common.save' | transloco"
+  [cancelLabel]="'settings.common.cancel' | transloco"
 />

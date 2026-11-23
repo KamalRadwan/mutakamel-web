@@ -1,4 +1,4 @@
-@if (!canView) {
+@if (!canView || accessDenied()) {
   <ui-full-state
     kind="forbidden"
     [title]="'readiness.forbidden.title' | transloco"
@@ -10,7 +10,7 @@
   <ui-full-state
     kind="load-failure"
     [title]="'readiness.loadFailure.title' | transloco"
-    [text]="'analytics.common.loadFailed' | transloco"
+    [text]="loadFailureText()"
     [actionLabel]="'analytics.common.retry' | transloco"
     (action)="reload()"
   />

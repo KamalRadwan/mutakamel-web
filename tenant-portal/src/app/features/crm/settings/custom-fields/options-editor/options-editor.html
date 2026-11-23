@@ -20,21 +20,19 @@
   }
 </div>
 
-@if (inUseOptionKeys().length) {
-  <div role="alert" class="flex flex-col gap-6 rounded-8 border border-danger-border bg-danger-soft p-8 text-12 text-on-danger-soft">
-    <div class="flex items-start gap-6">
-      <ng-icon name="tablerAlertTriangle" size="14" class="mt-2 shrink-0 text-danger-text" aria-hidden="true" />
-      <span>{{ 'customFields.options.inUseNotice' | transloco: { keys: inUseOptionKeys().join(', ') } }}</span>
-    </div>
-    @if (!readOnly()) {
-      <div>
-        <button type="button" uiButton variant="secondary" size="small" (click)="restoreRemoved.emit()">
-          <ng-icon name="tablerArrowBackUp" size="14" aria-hidden="true" />
-          {{ 'customFields.options.restoreRemoved' | transloco }}
-        </button>
-      </div>
-    }
-  </div>
+@if (error(); as message) {
+  <p role="alert" class="text-11 leading-16 text-danger-text">{{ message }}</p>
+}
+@for (key of removedKeys(); track key) {
+  <p role="alert" class="text-11 leading-16 text-danger-text">
+    <span dir="ltr">{{ key }}</span>: {{ 'customFields.options.inUseNotice' | transloco }}
+  </p>
+}
+@if (inUseOptionKeys().length && !readOnly()) {
+  <button type="button" uiButton variant="secondary" size="small" (click)="restoreRemoved.emit()">
+    <ng-icon name="tablerArrowBackUp" size="14" aria-hidden="true" />
+    {{ 'customFields.options.restoreRemoved' | transloco }}
+  </button>
 }
 
 @if (options().length === 0) {
@@ -47,7 +45,7 @@
 } @else {
   <div class="flex flex-col gap-6">
     @for (option of options(); track option.uid) {
-      @let err = errorsFor(option);
+      @let err = errorsFor(option, $index);
       <div class="flex flex-col gap-8 rounded-8 border border-border bg-surface-muted p-8">
         <div class="grid grid-cols-12 items-start gap-x-10 gap-y-8">
           <div class="col-span-5">
@@ -106,6 +104,8 @@
             >
               <div class="flex h-field items-center justify-between gap-4">
                 <ui-switch
+                  [id]="'opt-active-' + option.uid"
+                  [describedBy]="'opt-active-' + option.uid + '-hint'"
                   [checked]="option.isActive"
                   [disabled]="readOnly()"
                   [label]="'customFields.options.active' | transloco"

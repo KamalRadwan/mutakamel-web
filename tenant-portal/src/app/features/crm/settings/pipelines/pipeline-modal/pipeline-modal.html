@@ -25,8 +25,8 @@
           [class.cursor-default]="mode() === 'edit'"
           [placeholder]="'pipelines.modal.codePlaceholder' | transloco"
           [value]="code()"
-          [readonly]="mode() === 'edit' || !canManage()"
-          [attr.aria-readonly]="mode() === 'edit' || !canManage() ? 'true' : null"
+          [readonly]="mode() === 'edit' || !editable()"
+          [attr.aria-readonly]="mode() === 'edit' || !editable() ? 'true' : null"
           [attr.maxlength]="codeMax"
           [attr.aria-invalid]="errorOf('code') ? 'true' : null"
           [attr.aria-describedby]="errorOf('code') ? uid + '-code-error ' + uid + '-code-hint' : uid + '-code-hint'"
@@ -51,7 +51,7 @@
           dir="rtl"
           class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
           [value]="nameAr()"
-          [readonly]="!canManage()"
+          [readonly]="!editable()"
           [attr.maxlength]="nameMax"
           [attr.aria-invalid]="errorOf('nameAr') ? 'true' : null"
           [attr.aria-describedby]="errorOf('nameAr') ? uid + '-name-ar-error ' + uid + '-name-ar-hint' : uid + '-name-ar-hint'"
@@ -76,7 +76,7 @@
           dir="ltr"
           class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
           [value]="nameEn()"
-          [readonly]="!canManage()"
+          [readonly]="!editable()"
           [attr.maxlength]="nameMax"
           [attr.aria-invalid]="errorOf('nameEn') ? 'true' : null"
           [attr.aria-describedby]="errorOf('nameEn') ? uid + '-name-en-error ' + uid + '-name-en-hint' : uid + '-name-en-hint'"
@@ -102,7 +102,7 @@
           class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
           [placeholder]="'pipelines.modal.descriptionPlaceholder' | transloco"
           [value]="description()"
-          [readonly]="!canManage()"
+          [readonly]="!editable()"
           [attr.maxlength]="descriptionMax"
           [attr.aria-invalid]="errorOf('description') ? 'true' : null"
           [attr.aria-describedby]="errorOf('description') ? uid + '-description-error ' + uid + '-description-hint' : uid + '-description-hint'"
@@ -121,8 +121,9 @@
           <div class="flex h-field items-center gap-8">
             <ui-switch
               [(checked)]="isDefault"
-              [disabled]="!canManage()"
+              [disabled]="!editable()"
               [label]="'pipelines.modal.makeDefault' | transloco"
+              [describedBy]="uid + '-default-hint'"
             />
             <span class="text-12 text-text">{{ (isDefault() ? 'settings.common.yes' : 'settings.common.no') | transloco }}</span>
           </div>
@@ -137,8 +138,9 @@
           <div class="flex h-field items-center gap-8">
             <ui-switch
               [(checked)]="isActive"
-              [disabled]="base.isDefault || !canManage()"
+              [disabled]="base.isDefault || !editable()"
               [label]="'pipelines.modal.activeLabel' | transloco"
+              [describedBy]="uid + '-active-hint'"
             />
             <span class="text-12 text-text">{{ (isActive() ? 'settings.common.active' : 'settings.common.inactive') | transloco }}</span>
           </div>
@@ -197,7 +199,7 @@
                 <button
                   type="button"
                   class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder"
-                  [disabled]="first"
+                  [disabled]="first || !editable()"
                   [attr.aria-label]="'pipelines.modal.moveUp' | transloco"
                   [title]="'pipelines.modal.moveUp' | transloco"
                   (click)="moveChosenStage(index, -1)"
@@ -207,7 +209,7 @@
                 <button
                   type="button"
                   class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder"
-                  [disabled]="last"
+                  [disabled]="last || !editable()"
                   [attr.aria-label]="'pipelines.modal.moveDown' | transloco"
                   [title]="'pipelines.modal.moveDown' | transloco"
                   (click)="moveChosenStage(index, 1)"
@@ -219,6 +221,7 @@
                   class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-danger-text outline-none transition-colors duration-fast hover:bg-danger-soft focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
                   [attr.aria-label]="'pipelines.modal.removeStage' | transloco"
                   [title]="'pipelines.modal.removeStage' | transloco"
+                  [disabled]="!editable()"
                   (click)="removeChosenStage(stage.id)"
                 >
                   <ng-icon name="tablerTrash" size="14" aria-hidden="true" />
@@ -240,6 +243,7 @@
                 size="field"
                 [describedBy]="uid + '-add-stage-hint'"
                 [options]="addStageOptions()"
+                [disabled]="!editable()"
                 [(value)]="selectedStageToAdd"
                 [label]="'pipelines.modal.addStagePlaceholder' | transloco"
               />
@@ -248,7 +252,7 @@
               type="button"
               uiButton
               variant="secondary"
-              [disabled]="!selectedStageToAdd()"
+              [disabled]="!selectedStageToAdd() || !editable()"
               (click)="addChosenStage()"
             >
               <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
@@ -269,7 +273,7 @@
   </div>
 
   <div modal-footer class="flex flex-1 flex-wrap items-center justify-between gap-8">
-    @if (canManage()) {
+    @if (editable()) {
       <div class="flex flex-wrap items-center gap-8">
         <button
           type="button"

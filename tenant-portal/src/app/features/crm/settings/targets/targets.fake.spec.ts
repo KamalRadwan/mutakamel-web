@@ -1,292 +1,264 @@
+import { DOCUMENT } from '@angular/common';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, newIdempotencyKey } from '../../../../shared/widgets/dashboard/analytics-api';
-import { FAKE_BRANCHES, FAKE_PEOPLE, FAKE_TEAMS } from '../../../../shared/widgets/dashboard/fake/fake-org';
-import { isTargetGone, targetFieldErrors } from './targets.api';
+import { ApiError } from '../../../../core/api/api-errors';
+import { newIdempotencyKey } from '../../../../core/api/idempotency';
+import { CoreHttp } from '../../../../core/api/core-http';
+import { CrmHttp, bindCrmHttpForTest, crmQueries } from '../../shared/crm-http';
+import { CrmHttpStub } from '../../shared/testing/crm-http-testing';
 import {
-  fakeApproveTarget,
-  fakeCorrectTarget,
-  fakeCreateTarget,
-  fakeDeleteTarget,
-  fakeGetTarget,
-  fakeListReleases,
-  fakeListTargets,
-  fakeRejectTarget,
-  fakeSubmitTarget,
-  fakeUpdateTarget,
-  resetTargetsFake,
-} from './targets.fake';
+  approveTarget,
+  beginTargetAction,
+  correctTarget,
+  createTarget,
+  deleteTarget,
+  getTarget,
+  listReleases,
+  listTargets,
+  rejectTarget,
+  submitTarget,
+  targetableMetrics,
+  targetCurrencies,
+  targetFieldErrors,
+  targetSubjectOptions,
+  updateTarget,
+} from './targets.api';
 import type { CreateTargetBody } from './targets.model';
 
-// Contract: crm-app crm/dashboards/dashboard-sales-targets.controller.ts, dashboard-sales-targets.service.ts,
-// dto/dashboard-sales-target.dto.ts, governance/targets/target-approval.service.ts and targets-approval.dto.ts.
-
-const CAIRO = FAKE_BRANCHES[0].id;
-const APPROVED_CLOSED = '01934c00-0000-7000-8000-000000000001'; // APPROVED, 2026-09, rev 3
-const SUBMITTED_OPEN = '01934c00-0000-7000-8000-000000000006'; // SUBMITTED, 2026-12, rev 2
-const SUBMITTED_CLOSED = '01934c00-0000-7000-8000-000000000010'; // SUBMITTED, 2026-10, rev 2
-const DRAFT_OPEN = '01934c00-0000-7000-8000-000000000014'; // DRAFT, 2026-12, rev 1
-const UNKNOWN = '01934c00-0000-7000-8000-0000000000ff';
-
-async function settle<T>(promise: Promise<T>): Promise<T> {
-  const guarded = promise.catch((error: unknown) => {
-    throw error;
-  });
-  await vi.advanceTimersByTimeAsync(1000);
-  return guarded;
-}
-
-async function rejection(promise: Promise<unknown>): Promise<ApiError> {
-  const outcome = promise.then(
-    () => {
-      throw new Error('expected an ApiError');
-    },
-    (error: unknown) => {
-      if (error instanceof ApiError) return error;
-      throw error;
-    },
-  );
-  await vi.advanceTimersByTimeAsync(1000);
-  return outcome;
-}
-
-function createBody(overrides: Partial<CreateTargetBody> = {}): CreateTargetBody {
-  return {
-    subjectType: 'USER',
-    branchId: CAIRO,
-    subjectId: FAKE_PEOPLE[0].id,
-    metricKey: 'crm.leads.created.count',
-    periodGrain: 'MONTH',
-    periodStart: '2027-01-01',
-    targetValue: 40,
-    ...overrides,
-  };
-}
-
+const body: CreateTargetBody = {
+  subjectType: 'BRANCH',
+  branchId: 'branch',
+  subjectId: 'branch',
+  metricKey: 'crm.leads.created.count',
+  periodGrain: 'MONTH',
+  periodStart: '2027-01-01',
+  targetValue: 50,
+};
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+let stub: CrmHttpStub;
+let dispose: () => void;
 beforeEach(() => {
-  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-  resetTargetsFake();
+  stub = new CrmHttpStub({
+    '/targets': { items: [], total: 0, page: 1, limit: 12 },
+    '/targets/id': { id: 'id' },
+    '/targets/id/releases': { items: [], pageInfo: { hasMore: false } },
+    '/targets/metrics': [],
+    '/targets/subject-options': { users: [], teams: [] },
+  });
+  dispose = bindCrmHttpForTest(stub);
 });
-
 afterEach(() => {
-  vi.useRealTimers();
+  dispose();
+  TestBed.resetTestingModule();
+  vi.restoreAllMocks();
+  crmQueries().clear();
 });
 
-describe('targets fake: list', () => {
-  it('returns the flat page shape with decimal text values and backend labels', async () => {
-    const page = await settle(fakeListTargets({ branchId: CAIRO, limit: 5 }));
-    expect(Object.keys(page).sort()).toEqual(['hasNext', 'hasPrev', 'items', 'limit', 'page', 'total', 'totalPages']);
-    const first = page.items[0];
-    expect(typeof first.targetValue).toBe('string');
-    expect(first.targetValue).toMatch(/^\d+\.\d{2}$/);
-    expect(Array.isArray(first.subjects)).toBe(true);
-    expect(first).toHaveProperty('metricLabel');
-    expect(first).toHaveProperty('periodEndExclusive');
+describe('TargetsApi', () => {
+  it('reads the real routes and passes list, subject and cursor filters without a scope header', async () => {
+    await listTargets({
+      branchId: 'branch',
+      page: 3,
+      limit: 24,
+      sortDir: 'DESC',
+      approvalState: 'DRAFT',
+    });
+    await getTarget('id');
+    await listReleases('id', 'cursor', 10);
+    await targetableMetrics();
+    await targetSubjectOptions('branch', 'Ali', 50);
+    expect(stub.recordedReads().map((r) => r.path)).toEqual([
+      '/targets',
+      '/targets/id',
+      '/targets/id/releases',
+      '/targets/metrics',
+      '/targets/subject-options',
+    ]);
+    expect(stub.recordedReads()[0].query).toEqual({
+      branchId: 'branch',
+      page: 3,
+      limit: 24,
+      sortDir: 'DESC',
+      approvalState: 'DRAFT',
+    });
+    expect(stub.recordedReads()[2].query).toEqual({ cursor: 'cursor', limit: 10 });
+    expect(stub.recordedReads()[4].query).toEqual({ branchId: 'branch', search: 'Ali', limit: 50 });
+    expect(stub.recordedReads().every((r) => r.scope === undefined)).toBe(true);
   });
-
-  it('requires branchId (400 is_uuid)', async () => {
-    const error = await rejection(fakeListTargets({ branchId: '' }));
-    expect(error.status).toBe(400);
-    expect(error.code).toBe('CRM_VALIDATION_FAILED');
-    expect(error.details).toEqual({ branchId: ['is_uuid'] });
-  });
-
-  it('takes upper-case sortDir and rejects lower case (is_enum)', async () => {
-    await settle(fakeListTargets({ branchId: CAIRO, sortDir: 'ASC' }));
-    const error = await rejection(fakeListTargets({ branchId: CAIRO, sortDir: 'asc' as never }));
-    expect(error.details).toEqual({ sortDir: ['is_enum'] });
-  });
-
-  it('rejects limit above 100 and reversed period bounds', async () => {
-    expect((await rejection(fakeListTargets({ branchId: CAIRO, limit: 101 }))).details).toEqual({ limit: ['max'] });
-    const reversed = await rejection(fakeListTargets({ branchId: CAIRO, periodFrom: '2026-12-01', periodTo: '2026-01-01' }));
-    expect([reversed.status, reversed.code]).toEqual([422, 'CRM_TARGET_PERIOD_INVALID']);
-  });
-
-  it('does not clamp a page past the end (empty items, totalPages from the total)', async () => {
-    const page = await settle(fakeListTargets({ branchId: CAIRO, page: 99, limit: 10 }));
-    expect(page.items).toEqual([]);
-    expect(page.page).toBe(99);
-    expect(page.totalPages).toBe(Math.ceil(page.total / 10));
-  });
-
-  it('shows TEAM_SET heads in the branches of their member teams', async () => {
-    const giza = await settle(fakeListTargets({ branchId: FAKE_BRANCHES[2].id, subjectType: 'TEAM_SET' }));
-    const cairo = await settle(fakeListTargets({ branchId: CAIRO, subjectType: 'TEAM_SET' }));
-    expect(giza.total).toBe(0);
-    expect(cairo.total).toBe(1);
-  });
-});
-
-describe('targets fake: read', () => {
-  it('answers an unknown id with 403 BRANCH_CONTEXT_REQUIRED, which the UI treats as gone', async () => {
-    const error = await rejection(fakeGetTarget(UNKNOWN));
-    expect([error.status, error.code]).toEqual([403, 'BRANCH_CONTEXT_REQUIRED']);
-    expect(isTargetGone(error)).toBe(true);
-  });
-
-  it('validates the id param (is_uuid)', async () => {
-    expect((await rejection(fakeGetTarget('nope'))).details).toEqual({ id: ['is_uuid'] });
-  });
-
-  it('pages releases with pageInfo, newest first', async () => {
-    const page = await settle(fakeListReleases(APPROVED_CLOSED));
-    expect(page.items.map((r) => r.releaseNumber)).toEqual([2, 1]);
-    expect(page.pageInfo.hasMore).toBe(false);
-    expect(page.items[0]).toHaveProperty('legacyLastEditedAt', null);
-    expect((await rejection(fakeListReleases(APPROVED_CLOSED, null, 101))).details).toEqual({ limit: ['max'] });
-  });
-});
-
-describe('targets fake: create', () => {
-  it('runs the pipe first: every failing property path with its constraints', async () => {
-    const error = await rejection(
-      fakeCreateTarget(createBody({ targetValue: Number.NaN, periodStart: '2027/01/01', teamIds: [FAKE_TEAMS[0].id] })),
-    );
-    expect(error.code).toBe('CRM_VALIDATION_FAILED');
-    expect(error.details).toEqual({
-      targetValue: ['is_number'],
-      teamIds: ['array_min_size'],
-      periodStart: ['matches', 'is_date_string'],
+  it('approve and correct keys', async () => {
+    const key = newIdempotencyKey();
+    await approveTarget('id', { revision: 2, note: 'Reviewed' }, key);
+    await correctTarget('id', { revision: 2, value: 75.25, reason: 'Correction' }, key);
+    expect(stub.recordedWrites().map((w) => [w.path, w.options.key])).toEqual([
+      ['/targets/id/approve', key],
+      ['/targets/id/corrections', key],
+    ]);
+    expect(key).toMatch(uuid);
+    expect(stub.recordedWrites()[1].body).toEqual({
+      revision: 2,
+      value: 75.25,
+      reason: 'Correction',
     });
   });
-
-  it('checks metric, value, currency, period, then subject, in the service order', async () => {
-    const metric = await rejection(fakeCreateTarget(createBody({ metricKey: 'crm.opportunities.won.value' })));
-    expect(metric.code).toBe('CRM_TARGET_METRIC_NOT_TARGETABLE');
-    const value = await rejection(fakeCreateTarget(createBody({ targetValue: 1.5 })));
-    expect(value.code).toBe('CRM_TARGET_VALUE_INVALID');
-    const currency = await rejection(fakeCreateTarget(createBody({ currencyCode: 'EGP' })));
-    expect(currency.code).toBe('CRM_TARGET_CURRENCY_INVALID');
-    const period = await rejection(fakeCreateTarget(createBody({ periodGrain: 'QUARTER', periodStart: '2027-02-01' })));
-    expect(period.code).toBe('CRM_TARGET_PERIOD_INVALID');
-    const subject = await rejection(fakeCreateTarget(createBody({ subjectId: FAKE_PEOPLE.find((p) => p.branchId !== CAIRO)!.id })));
-    expect(subject.code).toBe('CRM_TARGET_SUBJECT_INVALID');
+  it('sends every other write with UUID v7 and revision bodies, accepting 204 deletion', async () => {
+    const invalidate = vi.spyOn(crmQueries(), 'invalidateQueries');
+    await createTarget(body);
+    await updateTarget('id', { revision: 3, targetValue: 60.5 });
+    await submitTarget('id', { revision: 4 });
+    await rejectTarget('id', { revision: 4, note: 'Update it' });
+    await expect(deleteTarget('id', 5)).resolves.toBeUndefined();
+    const writes = stub.recordedWrites();
+    expect(writes.map((w) => w.method)).toEqual(['POST', 'PATCH', 'POST', 'POST', 'DELETE']);
+    expect(writes.every((w) => uuid.test(w.options.key) && !w.options.scope)).toBe(true);
+    expect(writes[1].body).toEqual({ revision: 3, targetValue: 60.5 });
+    expect(writes[1].options.ifMatch).toBe('"3"');
+    expect(writes[4].options.ifMatch).toBe('"5"');
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['crm-settings', 'targets'] });
   });
-
-  it('needs branchId and subjectId for single subjects and teamIds only for TEAM_SET', async () => {
-    const noBranch = await rejection(fakeCreateTarget(createBody({ branchId: undefined })));
-    expect(noBranch.code).toBe('CRM_TARGET_SUBJECT_INVALID');
-    const setWithBranch = await rejection(
-      fakeCreateTarget(createBody({ subjectType: 'TEAM_SET', subjectId: undefined, teamIds: [FAKE_TEAMS[0].id, FAKE_TEAMS[2].id] })),
+  it.each([0, 503, 409, 401])(
+    'reuses the key and body after a retryable failure or 401 (%s)',
+    async (status) => {
+      const original = stub.write.bind(stub);
+      const seen: { key: string; body: unknown }[] = [];
+      let fail = true;
+      vi.spyOn(stub, 'write').mockImplementation(async (method, path, payload, options) => {
+        seen.push({ key: options.key, body: structuredClone(payload) });
+        if (fail) {
+          fail = false;
+          throw new ApiError(status, status === 409 ? 'GW.IDEM.IN_FLIGHT' : 'NETWORK');
+        }
+        return original(method, path, payload, options);
+      });
+      await expect(createTarget(body)).rejects.toBeInstanceOf(ApiError);
+      await createTarget(body);
+      expect(seen[1]).toEqual(seen[0]);
+    },
+  );
+  it.each(['patch', 'delete', 'submit', 'reject', 'approve', 'correct'] as const)(
+    'keeps the key and exact body on a manual %s retry after 5xx',
+    async (kind) => {
+      const seen: { key: string; body: unknown }[] = [];
+      const original = stub.write.bind(stub);
+      let failed = false;
+      vi.spyOn(stub, 'write').mockImplementation(async (method, path, payload, options) => {
+        seen.push({ key: options.key, body: structuredClone(payload) });
+        if (!failed) {
+          failed = true;
+          throw new ApiError(503, 'NETWORK');
+        }
+        return original(method, path, payload, options);
+      });
+      const key = newIdempotencyKey();
+      const calls = {
+        patch: () => updateTarget('retry', { revision: 3, targetValue: 60 }),
+        delete: () => deleteTarget('retry', 3),
+        submit: () => submitTarget('retry', { revision: 3 }),
+        reject: () => rejectTarget('retry', { revision: 3, note: 'Retry' }),
+        approve: () => approveTarget('retry', { revision: 3 }, key),
+        correct: () => correctTarget('retry', { revision: 3, value: 60, reason: 'Retry' }, key),
+      };
+      await expect(calls[kind]()).rejects.toBeInstanceOf(ApiError);
+      expect(seen).toHaveLength(1);
+      await calls[kind]();
+      expect(seen[1]).toEqual(seen[0]);
+      expect(seen[0].key).toMatch(uuid);
+    },
+  );
+  it('uses a new key for changed bodies and after a non-retryable 4xx, with no automatic resend', async () => {
+    const seen: string[] = [];
+    vi.spyOn(stub, 'write').mockImplementation(async (_method, _path, _body, options) => {
+      seen.push(options.key);
+      throw new ApiError(422, 'CRM_TARGET_VALUE_INVALID');
+    });
+    await expect(createTarget(body)).rejects.toBeInstanceOf(ApiError);
+    expect(seen).toHaveLength(1);
+    await expect(createTarget(body)).rejects.toBeInstanceOf(ApiError);
+    expect(seen[1]).not.toBe(seen[0]);
+    await expect(createTarget({ ...body, targetValue: 51 })).rejects.toBeInstanceOf(ApiError);
+    expect(seen[2]).not.toBe(seen[1]);
+  });
+  it('changes the key when the body changes after a 5xx', async () => {
+    const seen: string[] = [];
+    vi.spyOn(stub, 'write').mockImplementation(async (_method, _path, _body, options) => {
+      seen.push(options.key);
+      throw new ApiError(503, 'CRM_TARGET_SOURCE_NOT_READY');
+    });
+    await expect(updateTarget('id', { revision: 2, targetValue: 20 })).rejects.toBeInstanceOf(
+      ApiError,
     );
-    expect(setWithBranch.code).toBe('CRM_TARGET_TEAM_SET_INVALID');
-  });
-
-  it('creates a DRAFT at revision 1 and refuses the same tuple (409)', async () => {
-    const created = await settle(fakeCreateTarget(createBody()));
-    expect(created).toMatchObject({ approvalState: 'DRAFT', revision: 1, targetValue: '40.00', unit: 'COUNT', subjects: [] });
-    const duplicate = await rejection(fakeCreateTarget(createBody()));
-    expect([duplicate.status, duplicate.code]).toEqual([409, 'CRM_TARGET_DUPLICATE']);
-  });
-});
-
-describe('targets fake: update, delete, submit, reject', () => {
-  it('needs a revision (400 CRM_DASHBOARD_REVISION_MISMATCH) and checks it after authority', async () => {
-    expect((await rejection(fakeUpdateTarget(DRAFT_OPEN, { targetValue: 20 }))).code).toBe('CRM_DASHBOARD_REVISION_MISMATCH');
-    expect((await rejection(fakeUpdateTarget(UNKNOWN, { revision: 1, targetValue: 20 }))).code).toBe('BRANCH_CONTEXT_REQUIRED');
-    expect((await rejection(fakeUpdateTarget(DRAFT_OPEN, { revision: 9, targetValue: 20 }))).code).toBe('CRM_TARGET_REVISION_CONFLICT');
-  });
-
-  it('locks a SUBMITTED value only when it changes', async () => {
-    const locked = await rejection(fakeUpdateTarget(SUBMITTED_OPEN, { revision: 2, targetValue: 1 }));
-    expect(locked.code).toBe('CRM_TARGET_LOCKED_SUBMITTED');
-    const same = await settle(fakeUpdateTarget(SUBMITTED_OPEN, { revision: 2, targetValue: 1_400_000 }));
-    expect(same).toMatchObject({ revision: 3, approvalState: 'SUBMITTED' });
-  });
-
-  it('drops a changed APPROVED head to DRAFT', async () => {
-    const updated = await settle(fakeUpdateTarget(APPROVED_CLOSED, { revision: 3, targetValue: 1_900_000 }));
-    expect(updated).toMatchObject({ revision: 4, approvalState: 'DRAFT', targetValue: '1900000.00' });
-  });
-
-  it('deletes with an optional revision, then the id reads as gone', async () => {
-    expect((await rejection(fakeDeleteTarget(DRAFT_OPEN, 5))).code).toBe('CRM_TARGET_REVISION_CONFLICT');
-    await settle(fakeDeleteTarget(DRAFT_OPEN));
-    expect((await rejection(fakeGetTarget(DRAFT_OPEN))).code).toBe('BRANCH_CONTEXT_REQUIRED');
-  });
-
-  it('submits a DRAFT and answers LOCKED_SUBMITTED for a submitted one', async () => {
-    expect((await rejection(fakeSubmitTarget(SUBMITTED_OPEN, { revision: 2 }))).code).toBe('CRM_TARGET_LOCKED_SUBMITTED');
-    expect((await rejection(fakeSubmitTarget(APPROVED_CLOSED, { revision: 3 }))).code).toBe('CRM_TARGET_NOT_DRAFT');
-    const submitted = await settle(fakeSubmitTarget(DRAFT_OPEN, { revision: 1 }));
-    expect(submitted).toMatchObject({ approvalState: 'SUBMITTED', revision: 2, reviewNote: null });
-  });
-
-  it('checks the revision before the reject note, and keeps the submitter on reject', async () => {
-    expect((await rejection(fakeRejectTarget(SUBMITTED_OPEN, { note: '' }))).code).toBe('CRM_DASHBOARD_REVISION_MISMATCH');
-    expect((await rejection(fakeRejectTarget(SUBMITTED_OPEN, { revision: 2, note: '  ' }))).code).toBe(
-      'CRM_TARGET_REJECT_NOTE_REQUIRED',
+    await expect(updateTarget('id', { revision: 2, targetValue: 21 })).rejects.toBeInstanceOf(
+      ApiError,
     );
-    const rejected = await settle(fakeRejectTarget(SUBMITTED_OPEN, { revision: 2, note: 'Too high' }));
-    expect(rejected).toMatchObject({ approvalState: 'DRAFT', revision: 3, reviewNote: 'Too high' });
-    expect(rejected.submittedByUserId).not.toBeNull();
+    expect(seen[1]).not.toBe(seen[0]);
   });
-
-  it('rejects a note over 500 characters in the pipe', async () => {
-    const error = await rejection(fakeRejectTarget(SUBMITTED_OPEN, { revision: 2, note: 'x'.repeat(501) }));
-    expect(error.details).toEqual({ note: ['max_length'] });
-    expect(targetFieldErrors(error)).toEqual({ note: ['max_length'] });
+  it('sends enforced approve and correction HTTP headers without organization scope', async () => {
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting()],
+    });
+    const doc = TestBed.inject(DOCUMENT);
+    const name =
+      doc.location.protocol === 'https:'
+        ? '__Host-mutakamel-tenant-csrf'
+        : 'mutakamel-http-tenant-csrf';
+    vi.spyOn(doc, 'cookie', 'get').mockReturnValue(`${name}=target-csrf`);
+    const http = TestBed.inject(HttpTestingController);
+    const restore = bindCrmHttpForTest(TestBed.inject(CrmHttp));
+    try {
+      const key = newIdempotencyKey();
+      for (const action of ['approve', 'corrections'] as const) {
+        const pending =
+          action === 'approve'
+            ? approveTarget('wire', { revision: 2 }, key)
+            : correctTarget('wire', { revision: 2, value: 51, reason: 'Correct' }, key);
+        const request = http.expectOne(`/api/tenant/crm/v1/targets/wire/${action}`);
+        expect(request.request.headers.get('x-idempotency-key')).toBe(key);
+        expect(request.request.headers.get('x-csrf-token')).toBe('target-csrf');
+        expect(request.request.headers.get('x-mutakamel-company-id')).toBeNull();
+        expect(request.request.headers.get('x-mutakamel-branch-id')).toBeNull();
+        expect(request.request.body.revision).toBe(2);
+        expect(request.request.headers.get('If-Match')).toBe('"2"');
+        request.flush({ target: { id: 'wire' }, release: { id: 'release' } });
+        await pending;
+      }
+      http.verify();
+    } finally {
+      restore();
+    }
   });
-});
-
-describe('targets fake: approve and corrections (x-idempotency-key)', () => {
-  it('enforces the Gateway key before anything else', async () => {
-    expect((await rejection(fakeApproveTarget(SUBMITTED_OPEN, { revision: 2 }, ''))).code).toBe('GW.IDEM.MISSING');
-    expect((await rejection(fakeApproveTarget(SUBMITTED_OPEN, { revision: 2 }, 'abc'))).code).toBe('GW.IDEM.BAD_VALUE');
-    expect((await rejection(fakeCorrectTarget(APPROVED_CLOSED, { revision: 3, value: 1 }, ''))).code).toBe('GW.IDEM.MISSING');
+  it('starts a new key when the failed form is explicitly reopened', async () => {
+    const keys: string[] = [];
+    vi.spyOn(stub, 'write').mockImplementation(async (_method, _path, _body, options) => {
+      keys.push(options.key);
+      throw new ApiError(503, 'NETWORK');
+    });
+    await expect(createTarget(body)).rejects.toBeInstanceOf(ApiError);
+    beginTargetAction('create');
+    await expect(createTarget(body)).rejects.toBeInstanceOf(ApiError);
+    expect(keys[1]).not.toBe(keys[0]);
   });
-
-  it('approves at the same revision with a REVIEWED release', async () => {
-    const result = await settle(fakeApproveTarget(SUBMITTED_OPEN, { revision: 2, note: ' ok ' }, newIdempotencyKey()));
-    expect(result.target).toMatchObject({ approvalState: 'APPROVED', revision: 2, reviewNote: 'ok' });
-    expect(result.release).toMatchObject({ approvalBasis: 'REVIEWED', headRevision: 2, targetValue: '1400000.00' });
-    expect(result.target.latestRelease?.id).toBe(result.release.id);
+  it('reads currencies through the enveloped Core boundary', async () => {
+    const read = vi
+      .fn()
+      .mockResolvedValue([
+        { code: 'JPY', nameEn: 'Yen', nameAr: 'ين', decimals: 0, isDefault: true },
+      ]);
+    await expect(targetCurrencies({ read } as unknown as CoreHttp)).resolves.toEqual([
+      expect.objectContaining({ code: 'JPY' }),
+    ]);
+    expect(read).toHaveBeenCalledWith('/api/tenant/core/v1/currencies/options');
   });
-
-  it('replays the same key and body, and refuses the same key with another body (422)', async () => {
-    const key = newIdempotencyKey();
-    const first = await settle(fakeApproveTarget(SUBMITTED_OPEN, { revision: 2 }, key));
-    const replay = await settle(fakeApproveTarget(SUBMITTED_OPEN, { revision: 2 }, key));
-    expect(replay.release.id).toBe(first.release.id);
-    const reused = await rejection(fakeApproveTarget(SUBMITTED_OPEN, { revision: 2, note: 'x' }, key));
-    expect([reused.status, reused.code]).toEqual([422, 'CRM_IDEMPOTENCY_KEY_REUSED']);
-  });
-
-  it('stores nothing on failure, so a retry with the same key runs again', async () => {
-    const key = newIdempotencyKey();
-    expect((await rejection(fakeApproveTarget(SUBMITTED_CLOSED, { revision: 2 }, key))).code).toBe('CRM_TARGET_PERIOD_CLOSED');
-    expect((await rejection(fakeApproveTarget(SUBMITTED_CLOSED, { revision: 2 }, key))).code).toBe('CRM_TARGET_PERIOD_CLOSED');
-  });
-
-  it('approve answers NOT_SUBMITTED for a draft', async () => {
-    expect((await rejection(fakeApproveTarget(DRAFT_OPEN, { revision: 1 }, newIdempotencyKey()))).code).toBe(
-      'CRM_TARGET_NOT_SUBMITTED',
-    );
-  });
-
-  it('corrections: revision, then reason, then period and value', async () => {
-    const key = newIdempotencyKey();
-    expect((await rejection(fakeCorrectTarget(APPROVED_CLOSED, { value: 1, reason: 'r' }, key))).code).toBe(
-      'CRM_DASHBOARD_REVISION_MISMATCH',
-    );
-    expect((await rejection(fakeCorrectTarget(APPROVED_CLOSED, { revision: 3, value: 1 }, key))).code).toBe(
-      'CRM_TARGET_CORRECTION_REASON_REQUIRED',
-    );
-    expect((await rejection(fakeCorrectTarget(SUBMITTED_OPEN, { revision: 2, value: 1, reason: 'r' }, newIdempotencyKey()))).code).toBe(
-      'CRM_TARGET_PERIOD_OPEN',
-    );
+  it('reads validation field keys from message arrays', () => {
     expect(
-      (await rejection(fakeCorrectTarget(APPROVED_CLOSED, { revision: 3, value: 1_850_000, reason: 'r' }, newIdempotencyKey()))).code,
-    ).toBe('CRM_TARGET_VALUE_INVALID');
-  });
-
-  it('corrects an APPROVED head (+1 revision) and a SUBMITTED one (+2) with a CORRECTION release', async () => {
-    const approved = await settle(fakeCorrectTarget(APPROVED_CLOSED, { revision: 3, value: 1_900_000, reason: 'Re-split' }, newIdempotencyKey()));
-    expect(approved.target).toMatchObject({ approvalState: 'APPROVED', revision: 4, targetValue: '1900000.00' });
-    expect(approved.release).toMatchObject({ approvalBasis: 'CORRECTION', headRevision: 4, correctionReason: 'Re-split', releaseNumber: 3 });
-
-    const submitted = await settle(fakeCorrectTarget(SUBMITTED_CLOSED, { revision: 2, value: 420_000, reason: 'Late deal' }, newIdempotencyKey()));
-    expect(submitted.target).toMatchObject({ approvalState: 'APPROVED', revision: 4 });
-    expect(submitted.release.headRevision).toBe(4);
+      Object.keys(
+        targetFieldErrors(
+          new ApiError(400, 'CRM_VALIDATION_FAILED', {
+            targetValue: ['Enter a number'],
+            periodStart: ['Invalid date'],
+          }),
+        ),
+      ),
+    ).toEqual(['targetValue', 'periodStart']);
   });
 });

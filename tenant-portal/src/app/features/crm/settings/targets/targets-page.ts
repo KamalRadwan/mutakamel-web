@@ -31,28 +31,47 @@ import {
   tablerUsers,
   tablerUsersGroup,
   tablerX,
+  tablerPlus,
+  tablerRefresh,
 } from '@ng-icons/tabler-icons';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
-import { ActionItem, ActionSelection, ActionsMenu } from '../../../../shared/ui/actions-menu/actions-menu';
+import {
+  ActionItem,
+  ActionSelection,
+  ActionsMenu,
+} from '../../../../shared/ui/actions-menu/actions-menu';
 import { Badge, BadgeTone } from '../../../../shared/ui/badge/badge';
 import { Button } from '../../../../shared/ui/button/button';
 import { DASH, formatNumber } from '../../../../shared/ui/chart/chart-format';
 import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
-import { DataCell, DataColumn, DataSort, DataTable } from '../../../../shared/ui/data-table/data-table';
+import {
+  DataCell,
+  DataColumn,
+  DataSort,
+  DataTable,
+} from '../../../../shared/ui/data-table/data-table';
 import { Field } from '../../../../shared/ui/field/field';
 import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { Modal } from '../../../../shared/ui/modal/modal';
 import { rectInPage, viewport } from '../../../../shared/ui/overlay/zoom';
 import { Pagination } from '../../../../shared/ui/pagination/pagination';
-import { SettingsFrame } from '../../../../shared/ui/settings-frame/settings-frame';
-import { errorCodeOf, newIdempotencyKey } from '../../../../shared/widgets/dashboard/analytics-api';
-import { can } from '../../../../shared/widgets/dashboard/analytics-permissions';
+import { ConflictDialog } from '../../../../shared/ui/conflict-dialog/conflict-dialog';
+import { ApiError, isRetryableWriteError } from '../../../../core/api/api-errors';
+import { TenantScopeState } from '../../../../core/scope/tenant-scope';
+import { anyGrant as can, branchGrants } from '../shared/settings-access';
+import { crmSettingsError } from '../shared/settings-api';
+import { settingsTimeZone } from '../shared/settings-time-zone';
+import { WorkspaceLookups } from '../../../../shared/widgets/workspace-lookups/workspace-lookups.api';
+import type { WorkspaceBranch } from '../../../../shared/widgets/workspace-lookups/workspace-lookups.model';
+import { errorCodeOf } from '../../../../core/api/api-errors';
+import { newIdempotencyKey } from '../../../../core/api/idempotency';
 import { ReleasesModal } from './releases-modal/releases-modal';
 import { TargetModal } from './target-modal/target-modal';
 import {
   approveTarget,
+  beginTargetAction,
   correctTarget,
   deleteTarget,
   getTarget,
@@ -62,10 +81,12 @@ import {
   targetErrorMessage,
   isTargetGone,
   targetableMetrics,
+  targetBranches,
+  listReleases,
+  targetFieldErrors,
 } from './targets.api';
 import {
   SalesTarget,
-  TARGETABLE_METRICS,
   TARGET_MAX_VALUE,
   TargetApprovalState,
   TargetPeriodGrain,
@@ -80,8 +101,8 @@ import {
   resolveMetricLabel,
   resolveTargetSubjectName,
   validateTargetValue,
+  targetBranchAllowed,
 } from './targets.model';
-import { OrgApi } from '../../../../shared/widgets/dashboard/org.api';
 
 type FilterMenuKey = 'grain' | 'state' | 'subjectType' | 'branch' | 'sort';
 type SortOptionKey =
@@ -157,7 +178,7 @@ function parseNumericInput(raw: string): number | null {
     FullState,
     Modal,
     Pagination,
-    SettingsFrame,
+    ConflictDialog,
     ReleasesModal,
     TargetModal,
   ],
@@ -171,6 +192,8 @@ function parseNumericInput(raw: string): number | null {
       tablerSend,
       tablerCheck,
       tablerX,
+      tablerPlus,
+      tablerRefresh,
       tablerEdit,
       tablerHistory,
       tablerTrash,
@@ -182,14 +205,30 @@ function parseNumericInput(raw: string): number | null {
   ],
   templateUrl: './targets-page.html',
   host: {
-    class: 'flex min-h-0 flex-1 flex-col',
+    class: 'flex flex-1 shrink-0 flex-col',
     '(document:click)': 'onDocumentClick($event)',
     '(window:resize)': 'closeFilterMenu()',
     '(keydown.escape)': 'onHostEscape($event)',
   },
 })
 export class TargetsPage {
-  private readonly org = inject(OrgApi);
+  private readonly scope = inject(TenantScopeState);
+  private readonly lookups = inject(WorkspaceLookups);
+  private readonly readGrants = branchGrants('crm.targets.read');
+  private readonly manageGrants = branchGrants('crm.targets.manage');
+  private readonly approveGrants = branchGrants('crm.targets.approve');
+  protected readonly canChooseBranch = can('org.branch.read');
+  protected readonly branches = signal<WorkspaceBranch[]>([]);
+  protected readonly branchesLoading = signal(true);
+  private branchesFailed = false;
+  protected readonly writeReadOnly = signal(false);
+  protected readonly loadFailure = signal<ReturnType<typeof crmSettingsError> | null>(null);
+  protected readonly metricsError = signal(false);
+  protected readonly metricsFailure = signal<ReturnType<typeof crmSettingsError> | null>(null);
+  protected readonly timeZone = signal<string | null>(null);
+  private readonly releaseZones = new Map<string, string>();
+  protected readonly conflictOpen = signal(false);
+  private conflictResolve: ((reload: boolean) => void) | null = null;
   private static nextId = 0;
   protected readonly uid = `targets-page-${++TargetsPage.nextId}`;
 
@@ -205,7 +244,6 @@ export class TargetsPage {
   private readonly targetModal = viewChild(TargetModal);
   private readonly releasesModal = viewChild(ReleasesModal);
   private readonly deleteDialog = viewChild<ConfirmDialog>('deleteDialog');
-  private readonly conflictDialog = viewChild<ConfirmDialog>('conflictDialog');
   private readonly approveModal = viewChild<Modal>('approveModal');
   private readonly rejectModal = viewChild<Modal>('rejectModal');
   private readonly correctModal = viewChild<Modal>('correctModal');
@@ -218,25 +256,29 @@ export class TargetsPage {
   protected readonly canApprove = can('crm.targets.approve');
   protected readonly dash = DASH;
 
-  protected readonly metrics = signal<TargetableMetric[]>([...TARGETABLE_METRICS]);
+  protected readonly metrics = signal<TargetableMetric[]>([]);
   protected readonly targets = signal<SalesTarget[]>([]);
   protected readonly total = signal(0);
   protected readonly loading = signal(false);
   protected readonly loadError = signal(false);
+  protected readonly periodFilterError = signal<string | null>(null);
 
-  protected readonly search = signal('');
   protected readonly grainFilter = signal<TargetPeriodGrain | null>(null);
   protected readonly stateFilter = signal<TargetApprovalState | null>(null);
   protected readonly subjectTypeFilter = signal<TargetSubjectType | null>(null);
-  /** The list route requires `branchId` (BranchListQueryDto), so a branch is always selected. */
-  private readonly defaultBranchId = this.org.branches[0]?.id ?? null;
+  private defaultBranchId = this.initialBranchId();
   protected readonly branchFilter = signal<string | null>(this.defaultBranchId);
   protected readonly sortBy = signal<TargetSortBy>('periodStart');
   protected readonly sortDir = signal<TargetSortDir>('desc');
 
   protected readonly openMenu = signal<FilterMenuKey | null>(null);
   protected readonly menuPlaced = signal(false);
-  protected readonly menuPlace = signal<FilterMenuPlace>({ top: 0, start: 0, minWidth: 160, maxHeight: null });
+  protected readonly menuPlace = signal<FilterMenuPlace>({
+    top: 0,
+    start: 0,
+    minWidth: 160,
+    maxHeight: null,
+  });
 
   protected readonly pendingDeleteTarget = signal<SalesTarget | null>(null);
   protected readonly activeActionTarget = signal<SalesTarget | null>(null);
@@ -250,7 +292,10 @@ export class TargetsPage {
   protected readonly correctValueInput = signal('');
   protected readonly correctReason = signal('');
   protected readonly correctTouched = signal<{ value?: boolean; reason?: boolean }>({});
-  protected readonly correctServerErrors = signal<{ value?: string | null; reason?: string | null }>({});
+  protected readonly correctServerErrors = signal<{
+    value?: string | null;
+    reason?: string | null;
+  }>({});
 
   private activeTriggerEl: HTMLElement | null = null;
   private menuSeq = 0;
@@ -292,8 +337,18 @@ export class TargetsPage {
     this.i18n();
     const cols: DataColumn[] = [
       { key: 'subject', label: this.transloco.translate('targets.table.subject'), width: 2.3 },
-      { key: 'metricKey', label: this.transloco.translate('targets.table.metric'), width: 2.2, sortable: true },
-      { key: 'periodStart', label: this.transloco.translate('targets.table.period'), width: 1.4, sortable: true },
+      {
+        key: 'metricKey',
+        label: this.transloco.translate('targets.table.metric'),
+        width: 2.2,
+        sortable: true,
+      },
+      {
+        key: 'periodStart',
+        label: this.transloco.translate('targets.table.period'),
+        width: 1.4,
+        sortable: true,
+      },
       {
         key: 'targetValue',
         label: this.transloco.translate('targets.table.target'),
@@ -316,10 +371,19 @@ export class TargetsPage {
 
   protected readonly rowKey = (row: SalesTarget) => row.id;
 
+  protected readonly canCreate = computed(
+    () =>
+      !this.writeReadOnly() &&
+      this.canManage &&
+      !!this.branchFilter() &&
+      (this.manageGrants === 'ALL' || this.manageGrants.has(this.branchFilter()!)),
+  );
   protected readonly emptyText = computed(() => {
     this.i18n();
-    const hasFilterOrSearch = this.search().trim().length > 0 || this.hasActiveFilters();
-    return this.transloco.translate(hasFilterOrSearch ? 'settings.common.noResults' : 'targets.empty');
+    const hasFilterOrSearch = this.hasActiveFilters();
+    return this.transloco.translate(
+      hasFilterOrSearch ? 'settings.common.noResults' : 'targets.empty',
+    );
   });
 
   protected readonly filterMenuOptions = computed<FilterOptionItem[]>(() => {
@@ -356,11 +420,10 @@ export class TargetsPage {
           })),
         ];
       case 'branch': {
-        const lang = this.language();
         return [
-          ...this.org.branches.map((branch) => ({
+          ...this.branches().map((branch) => ({
             value: branch.id,
-            label: branch.name[lang],
+            label: branch.name,
           })),
         ];
       }
@@ -384,13 +447,17 @@ export class TargetsPage {
       this.closeFilterMenu();
     };
     document.addEventListener('scroll', onScroll, { capture: true, passive: true });
-    inject(DestroyRef).onDestroy(() => document.removeEventListener('scroll', onScroll, { capture: true }));
+    inject(DestroyRef).onDestroy(() =>
+      document.removeEventListener('scroll', onScroll, { capture: true }),
+    );
 
     if (this.canRead) {
       void this.loadMetrics();
-      let prevSearch = this.search();
+      void this.loadBranches();
+      void settingsTimeZone()
+        .then((zone) => this.timeZone.set(zone))
+        .catch(() => this.timeZone.set(null));
       effect(() => {
-        const search = this.search();
         const grain = this.grainFilter();
         const state = this.stateFilter();
         const subjectType = this.subjectTypeFilter();
@@ -399,14 +466,6 @@ export class TargetsPage {
         const sortDir = this.sortDir();
         const page = this.page();
         const limit = this.pageSize();
-
-        if (search !== prevSearch) {
-          prevSearch = search;
-          if (page !== DEFAULT_PAGE) {
-            untracked(() => this.setPage(DEFAULT_PAGE));
-            return;
-          }
-        }
 
         untracked(() => {
           void this.fetchTargets({
@@ -418,7 +477,6 @@ export class TargetsPage {
             ...(grain ? { periodGrain: grain } : {}),
             ...(state ? { approvalState: state } : {}),
             ...(subjectType ? { subjectType } : {}),
-            ...(search.trim() ? { search: search.trim() } : {}),
           });
         });
       });
@@ -431,6 +489,10 @@ export class TargetsPage {
 
   protected load(): void {
     if (!this.canRead) return;
+    if (this.branchesFailed) {
+      void this.loadBranches();
+      return;
+    }
     void this.fetchTargets({
       branchId: this.branchFilter() ?? '',
       page: this.page(),
@@ -440,13 +502,12 @@ export class TargetsPage {
       ...(this.grainFilter() ? { periodGrain: this.grainFilter()! } : {}),
       ...(this.stateFilter() ? { approvalState: this.stateFilter()! } : {}),
       ...(this.subjectTypeFilter() ? { subjectType: this.subjectTypeFilter()! } : {}),
-      ...(this.search().trim() ? { search: this.search().trim() } : {}),
     });
   }
 
   protected openNew(): void {
-    if (!this.canManage) return;
-    this.targetModal()?.openCreate();
+    if (!this.canCreate()) return;
+    this.targetModal()?.openCreate(this.branchFilter() ?? undefined);
   }
 
   protected openTarget(target: SalesTarget): void {
@@ -575,8 +636,10 @@ export class TargetsPage {
   protected branchFilterLabel(): string {
     const id = this.branchFilter();
     if (!id) return '';
-    const lang = this.language();
-    return this.org.branches.find((b) => b.id === id)?.name[lang] ?? id;
+    return (
+      this.branches().find((b) => b.id === id)?.name ??
+      this.transloco.translate('targets.yourBranch')
+    );
   }
 
   protected onDocumentClick(event: Event): void {
@@ -610,6 +673,8 @@ export class TargetsPage {
   }
 
   protected metricLabel(metricKey: string): string {
+    const row = this.targets().find((t) => t.metricKey === metricKey);
+    if (row) return this.language() === 'ar' ? row.metricLabelAr : row.metricLabel;
     return resolveMetricLabel(metricKey, this.language(), this.metrics());
   }
 
@@ -645,7 +710,7 @@ export class TargetsPage {
     this.i18n();
     const items: ActionItem[] = [];
 
-    if (this.canManage && target.approvalState === 'DRAFT') {
+    if (this.canManageTarget(target) && target.approvalState === 'DRAFT') {
       items.push({
         id: 'submit',
         title: this.transloco.translate('targets.actions.submit'),
@@ -654,7 +719,7 @@ export class TargetsPage {
       });
     }
 
-    if (this.canApprove && target.approvalState === 'SUBMITTED') {
+    if (this.canApproveTarget(target) && target.approvalState === 'SUBMITTED') {
       items.push({
         id: 'approve',
         title: this.transloco.translate('targets.actions.approve'),
@@ -669,11 +734,7 @@ export class TargetsPage {
       });
     }
 
-    if (
-      this.canApprove &&
-      target.approvalState === 'APPROVED' &&
-      isPeriodClosed(target.periodGrain, target.periodStart)
-    ) {
+    if (this.canApproveTarget(target) && this.closed(target)) {
       items.push({
         id: 'correct',
         title: this.transloco.translate('targets.actions.correct'),
@@ -689,8 +750,8 @@ export class TargetsPage {
       tile: 'bg-icon-navy',
     });
 
-    if (this.canManage) {
-      const locked = target.approvalState === 'SUBMITTED';
+    if (this.canManageTarget(target)) {
+      const locked = target.approvalState !== 'DRAFT';
       items.push({
         id: 'delete',
         title: this.transloco.translate('targets.actions.delete'),
@@ -698,7 +759,9 @@ export class TargetsPage {
         tile: locked ? 'bg-icon-gray' : 'bg-icon-red',
         danger: true,
         disabled: locked,
-        reason: locked ? this.transloco.translate('targets.actions.cannotDeleteSubmitted') : undefined,
+        reason: locked
+          ? this.transloco.translate('targets.errors.CRM_TARGET_NOT_DRAFT')
+          : undefined,
       });
     }
 
@@ -733,7 +796,12 @@ export class TargetsPage {
   }
 
   protected async requestDelete(target: SalesTarget): Promise<void> {
-    if (!this.canManage || target.approvalState === 'SUBMITTED') return;
+    if (
+      !this.canManageTarget(target) ||
+      target.approvalState !== 'DRAFT' ||
+      this.pendingDeleteTarget()
+    )
+      return;
     this.pendingDeleteTarget.set(target);
     const confirmed = await this.deleteDialog()?.open();
     if (!confirmed) {
@@ -751,13 +819,13 @@ export class TargetsPage {
     } catch (error) {
       const code = errorCodeOf(error);
       if (code === 'CRM_TARGET_REVISION_CONFLICT') {
-        const reload = await this.conflictDialog()?.open();
+        const reload = await this.askConflict();
         this.load();
         if (!reload) {
           this.notify.info(this.transloco.translate('analytics.common.reload'));
         }
       } else {
-        this.notify.error(targetErrorMessage(this.transloco, error));
+        this.showWriteError(error);
         if (isTargetGone(error)) {
           if (this.targetModal()?.editingId() === target.id) {
             this.targetModal()?.close();
@@ -796,7 +864,7 @@ export class TargetsPage {
     const parsed = parseNumericInput(this.correctValueInput());
     if (target && parsed !== null && Number.isFinite(parsed) && parsed > 0) {
       if (target.measureKind === 'MONEY') {
-        this.correctValueInput.set(formatNumber(parsed, 'en', 3));
+        this.correctValueInput.set(formatNumber(parsed, 'en', 2));
       } else if (target.measureKind === 'COUNT' && Number.isInteger(parsed)) {
         this.correctValueInput.set(formatNumber(parsed, 'en', 0));
       }
@@ -811,7 +879,7 @@ export class TargetsPage {
   protected rejectNoteError(): string | null {
     this.i18n();
     const serverCode = this.rejectServerError();
-    if (serverCode) return this.transloco.translate(`analytics.error.${serverCode}`);
+    if (serverCode) return this.transloco.translate(`targets.errors.${serverCode}`);
     if (!this.rejectTouched()) return null;
     if (!this.rejectNote().trim()) {
       return this.transloco.translate('targets.validation.rejectNoteRequired');
@@ -822,14 +890,17 @@ export class TargetsPage {
   protected correctValueError(): string | null {
     this.i18n();
     const serverCode = this.correctServerErrors().value;
-    if (serverCode) return this.transloco.translate(`analytics.error.${serverCode}`);
+    if (serverCode) return this.transloco.translate(`targets.errors.${serverCode}`);
     if (!this.correctTouched().value) return null;
     const target = this.activeActionTarget();
     if (!target) return null;
     const parsed = parseNumericInput(this.correctValueInput());
     if (parsed === null) return this.transloco.translate('targets.validation.valueRequired');
-    if (Number.isNaN(parsed) || parsed <= 0) return this.transloco.translate('targets.validation.valuePositive');
+    if (Number.isNaN(parsed) || parsed <= 0)
+      return this.transloco.translate('targets.validation.valuePositive');
     if (parsed > TARGET_MAX_VALUE) return this.transloco.translate('targets.validation.valueMax');
+    if (Math.round(parsed * 100) / 100 !== parsed)
+      return this.transloco.translate('targets.validation.valuePrecision');
     if (target.measureKind === 'COUNT' && !Number.isInteger(parsed)) {
       return this.transloco.translate('targets.validation.valueInteger');
     }
@@ -842,7 +913,7 @@ export class TargetsPage {
   protected correctReasonError(): string | null {
     this.i18n();
     const serverCode = this.correctServerErrors().reason;
-    if (serverCode) return this.transloco.translate(`analytics.error.${serverCode}`);
+    if (serverCode) return this.transloco.translate(`targets.errors.${serverCode}`);
     if (!this.correctTouched().reason) return null;
     if (!this.correctReason().trim()) {
       return this.transloco.translate('targets.validation.correctionReasonRequired');
@@ -865,7 +936,7 @@ export class TargetsPage {
 
   protected async confirmApprove(): Promise<void> {
     const target = this.activeActionTarget();
-    if (!target || this.actionBusy() || !this.canApprove) return;
+    if (!target || this.actionBusy() || !this.canApproveTarget(target)) return;
     this.actionBusy.set(true);
     try {
       const note = this.approveNote().trim();
@@ -875,6 +946,8 @@ export class TargetsPage {
       this.closeActionModals();
       this.load();
     } catch (error) {
+      if (!isRetryableWriteError(error) && !(error instanceof ApiError && error.status === 401))
+        this.pendingIdem = null;
       await this.handleActionError(error, 'approve', target.id);
     } finally {
       this.actionBusy.set(false);
@@ -883,11 +956,11 @@ export class TargetsPage {
 
   protected async confirmReject(): Promise<void> {
     const target = this.activeActionTarget();
-    if (!target || this.actionBusy() || !this.canApprove) return;
+    if (!target || this.actionBusy() || !this.canApproveTarget(target)) return;
     this.rejectTouched.set(true);
     this.rejectServerError.set(null);
     const note = this.rejectNote().trim();
-    if (!note) return;
+    if (!note || note.length > 500) return;
 
     this.actionBusy.set(true);
     try {
@@ -897,8 +970,8 @@ export class TargetsPage {
       this.load();
     } catch (error) {
       const code = errorCodeOf(error);
-      if (code === 'CRM_TARGET_REJECT_NOTE_REQUIRED') {
-        this.rejectServerError.set(code);
+      if (code === 'CRM_TARGET_REJECT_NOTE_REQUIRED' || 'note' in targetFieldErrors(error)) {
+        this.rejectServerError.set(code ?? 'CRM_VALIDATION_FAILED');
         return;
       }
       await this.handleActionError(error, 'reject', target.id);
@@ -909,15 +982,23 @@ export class TargetsPage {
 
   protected async confirmCorrect(): Promise<void> {
     const target = this.activeActionTarget();
-    if (!target || this.actionBusy() || !this.canApprove) return;
+    if (!target || this.actionBusy() || !this.canApproveTarget(target)) return;
     this.correctTouched.set({ value: true, reason: true });
     this.correctServerErrors.set({});
     const parsed = parseNumericInput(this.correctValueInput());
     const reason = this.correctReason().trim();
-    if (parsed === null || Number.isNaN(parsed) || !validateTargetValue(parsed, target.measureKind)) {
+    if (
+      parsed === null ||
+      Number.isNaN(parsed) ||
+      !validateTargetValue(parsed, target.measureKind)
+    ) {
       return;
     }
-    if (!reason) return;
+    if (!reason || reason.length > 500) return;
+    if (target.approvalState === 'APPROVED' && parsed === Number(target.targetValue)) {
+      this.correctServerErrors.set({ value: 'CRM_TARGET_CORRECTION_VALUE_UNCHANGED' });
+      return;
+    }
 
     this.actionBusy.set(true);
     try {
@@ -927,13 +1008,24 @@ export class TargetsPage {
       this.closeActionModals();
       this.load();
     } catch (error) {
+      if (!isRetryableWriteError(error) && !(error instanceof ApiError && error.status === 401))
+        this.pendingIdem = null;
       const code = errorCodeOf(error);
-      if (code === 'CRM_TARGET_VALUE_INVALID') {
-        this.correctServerErrors.update((curr) => ({ ...curr, value: code }));
+      if (code === 'CRM_TARGET_VALUE_INVALID' || 'value' in targetFieldErrors(error)) {
+        this.correctServerErrors.update((curr) => ({
+          ...curr,
+          value: code ?? 'CRM_VALIDATION_FAILED',
+        }));
         return;
       }
-      if (code === 'CRM_TARGET_CORRECTION_REASON_REQUIRED') {
-        this.correctServerErrors.update((curr) => ({ ...curr, reason: code }));
+      if (
+        code === 'CRM_TARGET_CORRECTION_REASON_REQUIRED' ||
+        'reason' in targetFieldErrors(error)
+      ) {
+        this.correctServerErrors.update((curr) => ({
+          ...curr,
+          reason: code ?? 'CRM_VALIDATION_FAILED',
+        }));
         return;
       }
       await this.handleActionError(error, 'correct', target.id);
@@ -943,24 +1035,27 @@ export class TargetsPage {
   }
 
   private async runSubmit(target: SalesTarget): Promise<void> {
-    if (!this.canManage) return;
+    if (!this.canManageTarget(target) || this.actionBusy()) return;
+    this.actionBusy.set(true);
     try {
       await submitTarget(target.id, { revision: target.revision });
       this.notify.success(this.transloco.translate('targets.toasts.submitted'));
       this.load();
     } catch (error) {
       if (errorCodeOf(error) === 'CRM_TARGET_REVISION_CONFLICT') {
-        await this.conflictDialog()?.open();
+        await this.askConflict();
         this.load();
         return;
       }
-      this.notify.error(targetErrorMessage(this.transloco, error));
+      this.showWriteError(error);
       this.load();
+    } finally {
+      this.actionBusy.set(false);
     }
   }
 
   private openApprove(target: SalesTarget): void {
-    if (!this.canApprove) return;
+    if (!this.canApproveTarget(target)) return;
     this.activeActionTarget.set(target);
     this.approveNote.set('');
     this.pendingIdem = null;
@@ -968,7 +1063,8 @@ export class TargetsPage {
   }
 
   private openReject(target: SalesTarget): void {
-    if (!this.canApprove) return;
+    if (!this.canApproveTarget(target)) return;
+    beginTargetAction('reject', target.id);
     this.activeActionTarget.set(target);
     this.rejectNote.set('');
     this.rejectTouched.set(false);
@@ -977,13 +1073,13 @@ export class TargetsPage {
   }
 
   private openCorrect(target: SalesTarget): void {
-    if (!this.canApprove) return;
+    if (!this.canApproveTarget(target)) return;
     this.activeActionTarget.set(target);
     this.correctValueInput.set(
       target.measureKind === 'MONEY'
-        ? formatNumber(Number(target.targetValue), 'en', 3)
+        ? formatNumber(Number(target.targetValue), 'en', 2)
         : target.measureKind === 'RATE'
-          ? formatNumber(Number(target.targetValue), 'en', 1)
+          ? formatNumber(Number(target.targetValue), 'en', 2)
           : formatNumber(Number(target.targetValue), 'en', 0),
     );
     this.correctReason.set('');
@@ -1009,7 +1105,7 @@ export class TargetsPage {
   ): Promise<void> {
     const code = errorCodeOf(error);
     if (code === 'CRM_TARGET_REVISION_CONFLICT') {
-      const reload = await this.conflictDialog()?.open();
+      const reload = await this.askConflict();
       this.load();
       if (reload) {
         this.closeActionModals();
@@ -1017,7 +1113,7 @@ export class TargetsPage {
       }
       try {
         const fresh = await getTarget(targetId);
-        this.activeActionTarget.set(fresh);
+        this.activeActionTarget.set({ ...this.activeActionTarget()!, revision: fresh.revision });
       } catch (fetchError) {
         this.notify.error(targetErrorMessage(this.transloco, fetchError));
         this.closeActionModals();
@@ -1025,7 +1121,13 @@ export class TargetsPage {
       return;
     }
 
-    this.notify.error(targetErrorMessage(this.transloco, error));
+    this.showWriteError(error);
+    if (code === 'CRM_TARGET_PERIOD_CLOSED' && kind === 'approve') {
+      const target = this.activeActionTarget();
+      this.closeActionModals();
+      if (target) this.openCorrect(target);
+      return;
+    }
     if (isTargetGone(error)) {
       this.closeActionModals();
       this.load();
@@ -1065,31 +1167,126 @@ export class TargetsPage {
     panelEl.classList.remove('invisible');
   }
 
-  private async loadMetrics(): Promise<void> {
+  protected async loadMetrics(): Promise<void> {
+    this.metricsError.set(false);
     try {
-      const list = await targetableMetrics();
-      if (list.length) {
-        this.metrics.set(list);
-      }
-    } catch {
-      // keep fallback metrics list
+      this.metrics.set(await targetableMetrics());
+    } catch (error) {
+      this.metricsFailure.set(crmSettingsError(this.transloco, error, 'targets'));
+      this.metricsError.set(true);
     }
   }
-
+  private initialBranchId(): string | null {
+    const me = this.scope.me();
+    if (this.canChooseBranch) return this.scope.selection()?.branchId ?? null;
+    if (me?.accessScope.branchesTruncated) return null;
+    if (this.readGrants !== 'ALL' && this.readGrants.size === 1) return [...this.readGrants][0];
+    return me?.accessibleBranches.length === 1 ? me.accessibleBranches[0] : null;
+  }
+  private async loadBranches(): Promise<void> {
+    this.branchesLoading.set(true);
+    this.branchesFailed = false;
+    try {
+      if (this.canChooseBranch) {
+        const all = await targetBranches(this.lookups);
+        const grants = this.readGrants;
+        const rows = all.filter(
+          (b) =>
+            b.status === 'ACTIVE' &&
+            (this.scope.me()?.accessScope.branchesTruncated ||
+              grants === 'ALL' ||
+              grants.has(b.id)),
+        );
+        this.branches.set(rows);
+        if (!rows.some((b) => b.id === this.branchFilter()))
+          this.branchFilter.set(rows[0]?.id ?? null);
+        this.defaultBranchId = this.branchFilter();
+      }
+    } catch (error) {
+      this.branchesFailed = true;
+      this.loadFailure.set(crmSettingsError(this.transloco, error, 'targets'));
+      this.loadError.set(true);
+    } finally {
+      this.branchesLoading.set(false);
+    }
+    if (!this.branchesFailed) this.load();
+  }
+  protected canManageTarget(target: SalesTarget): boolean {
+    return (
+      !this.writeReadOnly() && this.canManage && targetBranchAllowed(target, this.manageGrants)
+    );
+  }
+  protected canApproveTarget(target: SalesTarget): boolean {
+    return (
+      !!target &&
+      !this.writeReadOnly() &&
+      this.canApprove &&
+      targetBranchAllowed(target, this.approveGrants)
+    );
+  }
+  protected closed(target: SalesTarget, now = new Date().toISOString()): boolean {
+    return isPeriodClosed(
+      target.periodGrain,
+      target.periodStart,
+      now,
+      this.releaseZones.get(target.id) ?? this.timeZone() ?? 'UTC',
+      target.periodEndExclusive,
+    );
+  }
+  private showWriteError(error: unknown): void {
+    if (crmSettingsError(this.transloco, error, 'targets').readOnly) this.writeReadOnly.set(true);
+    this.notify.error(targetErrorMessage(this.transloco, error));
+  }
+  private askConflict(): Promise<boolean> {
+    this.conflictOpen.set(true);
+    return new Promise((resolve) => {
+      this.conflictResolve = resolve;
+    });
+  }
+  protected conflictClosed(open: boolean): void {
+    if (!open) this.resolveConflict(false);
+  }
+  protected resolveConflict(reload: boolean): void {
+    this.conflictOpen.set(false);
+    this.conflictResolve?.(reload);
+    this.conflictResolve = null;
+  }
   private async fetchTargets(query: Parameters<typeof listTargets>[0]): Promise<void> {
+    if (!query.branchId || this.branchesLoading()) return;
     const seq = ++this.loadSeq;
     this.loading.set(true);
     this.loadError.set(false);
+    this.periodFilterError.set(null);
     try {
       const res = await listTargets(query);
       if (seq !== this.loadSeq) return;
       this.targets.set(res.items);
+      for (const target of res.items) {
+        if (target.latestRelease && !this.releaseZones.has(target.id)) {
+          void listReleases(target.id, null, 1)
+            .then((page) => {
+              const zone = page.items[0]?.periodTimeZone;
+              if (seq === this.loadSeq && zone) {
+                this.releaseZones.set(target.id, zone);
+                this.targets.set([...this.targets()]);
+              }
+            })
+            .catch(() => {});
+        }
+      }
       this.total.set(res.total);
       if (res.page !== this.page()) {
         this.setPage(res.page);
       }
-    } catch {
+    } catch (error) {
       if (seq !== this.loadSeq) return;
+      if (errorCodeOf(error) === 'CRM_TARGET_PERIOD_INVALID') {
+        this.periodFilterError.set(
+          this.transloco.translate('targets.errors.CRM_TARGET_PERIOD_INVALID'),
+        );
+        return;
+      }
+      this.loadFailure.set(crmSettingsError(this.transloco, error, 'targets'));
       this.loadError.set(true);
     } finally {
       if (seq === this.loadSeq) {

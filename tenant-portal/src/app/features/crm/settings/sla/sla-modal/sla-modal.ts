@@ -8,6 +8,12 @@ import { Notify } from '../../../../../core/notify/notify';
 import { Badge } from '../../../../../shared/ui/badge/badge';
 import { Button } from '../../../../../shared/ui/button/button';
 import { DASH, formatDateTime } from '../../../../../shared/ui/chart/chart-format';
+import { ConflictDialog } from '../../../../../shared/ui/conflict-dialog/conflict-dialog';
+import { RouterLink } from '@angular/router';
+import { TenantScopeState } from '../../../../../core/scope/tenant-scope';
+import { WorkspaceBranch } from '../../../../../shared/widgets/workspace-lookups/workspace-lookups.model';
+import { anyGrant, branchGrants, tenantWide } from '../../shared/settings-access';
+import { slaError } from '../sla-error';
 import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { DateField } from '../../../../../shared/ui/date-time/date-field';
 import { TimeField } from '../../../../../shared/ui/date-time/time-field';
@@ -15,10 +21,13 @@ import { Dropdown, DropdownOption } from '../../../../../shared/ui/dropdown/drop
 import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import {
+  ApiError,
   errorCodeOf,
-  newIdempotencyKey,
-} from '../../../../../shared/widgets/dashboard/analytics-api';
-import { errorKey } from '../../../../../shared/widgets/dashboard/panel-state';
+  fieldErrorsOf,
+  isRetryableWriteError,
+  isValidationError,
+} from '../../../../../core/api/api-errors';
+import { newIdempotencyKey } from '../../../../../core/api/idempotency';
 import { listPolicies, previewClock, publishPolicy } from '../sla.api';
 import {
   PublishSlaPolicy,
@@ -50,7 +59,6 @@ import {
   slaPolicyShape,
   toPublishBody,
 } from '../sla.model';
-import { OrgApi } from '../../../../../shared/widgets/dashboard/org.api';
 
 interface PolicySnapshot {
   nameEn: string;
@@ -92,6 +100,8 @@ function sameStringArray(a: readonly string[], b: readonly string[]): boolean {
     Badge,
     Button,
     ConfirmDialog,
+    ConflictDialog,
+    RouterLink,
     DateField,
     Dropdown,
     Field,
@@ -102,7 +112,19 @@ function sameStringArray(a: readonly string[], b: readonly string[]): boolean {
   templateUrl: './sla-modal.html',
 })
 export class SlaModal {
-  private readonly org = inject(OrgApi);
+  private readonly scope = inject(TenantScopeState);
+  protected readonly canChooseBranch = anyGrant('org.branch.read');
+  protected readonly tenantManage = tenantWide('crm.sla.manage');
+  private readonly grants = branchGrants('crm.sla.manage');
+  private readonly manageGranted = anyGrant('crm.sla.manage');
+  private readonly planReadOnly = signal(false);
+  readonly readOnlyRequested = output<void>();
+  readonly branches = input<readonly WorkspaceBranch[]>([]);
+  protected readonly conflictOpen = signal(false);
+  protected readonly resolvingConflict = signal(false);
+  protected readonly serverFields = signal<Record<string, string[]>>({});
+  protected readonly clockServerError = signal<string | null>(null);
+  private staleAttempt: PublishSlaPolicy | null = null;
   private static nextId = 0;
   protected readonly uid = `sla-modal-${++SlaModal.nextId}`;
 
@@ -113,7 +135,6 @@ export class SlaModal {
 
   private readonly modal = viewChild.required<Modal>('modal');
   private readonly discardDialog = viewChild.required<ConfirmDialog>('discardDialog');
-  private readonly conflictDialog = viewChild.required<ConfirmDialog>('conflictDialog');
 
   readonly canManage = input(false);
   readonly allPolicies = input<readonly SlaPolicy[]>([]);
@@ -121,7 +142,7 @@ export class SlaModal {
   readonly published = output<SlaPolicy>();
   readonly reloadRequested = output<void>();
 
-  protected readonly todayIso = this.org.now().slice(0, 10);
+  protected readonly todayIso = new Date().toISOString().slice(0, 10);
   protected readonly maxNameLength = SLA_LIMITS.maxNameLength;
   protected readonly directionOptions = SLA_DIRECTIONS;
   protected readonly touchSourceOptions = SLA_TOUCH_SOURCES;
@@ -153,7 +174,7 @@ export class SlaModal {
   protected readonly saving = signal(false);
 
   // Clock preview fields
-  protected readonly clockBranchId = signal(this.org.branches[0]?.id ?? '');
+  protected readonly clockBranchId = signal('');
   protected readonly clockFromDate = signal(this.todayIso);
   protected readonly clockFromTime = signal('09:00');
   protected readonly clockMinutesInput = signal('30');
@@ -184,9 +205,10 @@ export class SlaModal {
   private pendingPublish: { key: string; bodyJson: string } | null = null;
 
   protected readonly readOnly = computed(() => {
-    if (!this.canManage()) return true;
+    if (!this.canManage() || !this.manageGranted || this.planReadOnly()) return true;
     const current = this.editingPolicy();
-    return current !== null && current.nextPolicyId !== null;
+    if (current && (current.nextPolicyId !== null || current.state === 'RETIRED')) return true;
+    return current !== null && !this.canManageBranch(current.branchId);
   });
 
   protected readonly lineageLocked = computed(
@@ -214,26 +236,79 @@ export class SlaModal {
     }));
   });
 
+  protected readonly manageableBranches = computed(() =>
+    this.branches().filter(
+      (branch) => branch.status === 'ACTIVE' && this.canManageBranch(branch.id),
+    ),
+  );
+
   protected readonly branchOptions = computed<DropdownOption<string>[]>(() => {
     this.i18n();
-    const lang = this.language();
     return [
-      { value: TENANT_BRANCH_KEY, label: this.transloco.translate('sla.filters.tenantDefault') },
-      ...this.org.branches.map((branch) => ({
-        value: branch.id,
-        label: lang === 'ar' ? branch.name.ar : branch.name.en,
-      })),
+      ...(this.tenantManage
+        ? [
+            {
+              value: TENANT_BRANCH_KEY,
+              label: this.transloco.translate('sla.filters.tenantDefault'),
+            },
+          ]
+        : []),
+      ...this.manageableBranches().map((branch) => ({ value: branch.id, label: branch.name })),
     ];
   });
 
-  protected readonly previewBranchOptions = computed<DropdownOption<string>[]>(() => {
+  protected readonly previewBranchOptions = computed<DropdownOption<string>[]>(() =>
+    this.manageableBranches().map((branch) => ({ value: branch.id, label: branch.name })),
+  );
+
+  protected readonly branchDisplay = computed(() => {
     this.i18n();
-    const lang = this.language();
-    return this.org.branches.map((branch) => ({
-      value: branch.id,
-      label: lang === 'ar' ? branch.name.ar : branch.name.en,
-    }));
+    return this.branchKey() === TENANT_BRANCH_KEY
+      ? this.transloco.translate('sla.filters.tenantDefault')
+      : (this.branches().find((branch) => branch.id === this.branchKey())?.name ??
+          this.transloco.translate('sla.filters.branch'));
   });
+
+  protected readonly effectiveDateDisplay = computed(() =>
+    this.effectiveFrom().split('-').reverse().join('/'),
+  );
+
+  protected serverFieldError(field: string): string | null {
+    const messages = Object.entries(this.serverFields())
+      .filter(([key]) => key === field || key.startsWith(`${field}.`))
+      .flatMap(([, values]) => values);
+    return messages.length ? messages.join(' ') : null;
+  }
+
+  protected optionLabel(
+    options: readonly { value: unknown; label: string }[],
+    value: unknown,
+  ): string {
+    return options.find((option) => option.value === value)?.label ?? '';
+  }
+
+  protected readonly branchError = computed(() => {
+    const server = this.serverFields()['branchId'];
+    if (server) return server.join(' ');
+    if (!this.submitAttempted() || this.readOnly()) return null;
+    const id = this.branchKey();
+    return id && this.canManageBranch(id === TENANT_BRANCH_KEY ? null : id)
+      ? null
+      : this.transloco.translate('sla.errors.BRANCH_PERMISSION_DENIED');
+  });
+
+  protected readonly previewAllowed = computed(
+    () => this.canManage() && this.manageGranted && !this.planReadOnly(),
+  );
+
+  private canManageBranch(branchId: string | null): boolean {
+    if (!branchId) return this.tenantManage;
+    return (
+      this.grants === 'ALL' ||
+      this.grants.has(branchId) ||
+      !!this.scope.me()?.accessScope.branchesTruncated
+    );
+  }
 
   protected readonly clockKindOptions = computed<DropdownOption<SlaClockKind>[]>(() => {
     this.i18n();
@@ -376,12 +451,19 @@ export class SlaModal {
   protected readonly targetError = computed(() => {
     this.i18n();
     if (this.retiring()) return null;
+    if (this.serverFields()['targetMinutes']) return this.serverFields()['targetMinutes'].join(' ');
     if (!this.submitAttempted() && !this.touched()['target']) return null;
     const raw = this.targetValueInput().trim();
     if (!raw) return this.transloco.translate('sla.validation.required');
     const minutes = this.resolvedTargetMinutes();
     const max = maxMinutesForClock(this.clockKind());
-    if (minutes == null || Number.isNaN(minutes) || !Number.isInteger(minutes) || minutes < 1 || minutes > max) {
+    if (
+      minutes == null ||
+      Number.isNaN(minutes) ||
+      !Number.isInteger(minutes) ||
+      minutes < 1 ||
+      minutes > max
+    ) {
       return this.transloco.translate('sla.validation.targetRange', { max });
     }
     return null;
@@ -390,6 +472,8 @@ export class SlaModal {
   protected readonly touchesError = computed(() => {
     this.i18n();
     if (this.policyKind() !== 'FOLLOW_UP_CADENCE' || this.retiring()) return null;
+    if (this.serverFields()['requiredTouchCount'])
+      return this.serverFields()['requiredTouchCount'].join(' ');
     if (!this.submitAttempted() && !this.touched()['touches']) return null;
     const raw = this.requiredTouchCountInput().trim();
     if (!raw) return this.transloco.translate('sla.validation.required');
@@ -409,6 +493,7 @@ export class SlaModal {
   protected readonly complianceError = computed(() => {
     this.i18n();
     if (this.policyKind() !== 'FOLLOW_UP_CADENCE' || this.retiring()) return null;
+    if (this.serverFields()['compliancePct']) return this.serverFields()['compliancePct'].join(' ');
     if (!this.submitAttempted() && !this.touched()['compliance']) return null;
     const raw = this.compliancePctInput().trim();
     if (!raw) return this.transloco.translate('sla.validation.required');
@@ -423,6 +508,7 @@ export class SlaModal {
     this.i18n();
     const serverErr = this.effectiveFromServerError();
     if (serverErr) return serverErr;
+    if (this.serverFields()['effectiveFrom']) return this.serverFields()['effectiveFrom'].join(' ');
     if (this.readOnly()) return null;
     if (!this.submitAttempted() && !this.touched()['effectiveFrom']) return null;
     const date = this.effectiveFrom().trim();
@@ -442,6 +528,7 @@ export class SlaModal {
 
   protected readonly clockMinutesError = computed(() => {
     this.i18n();
+    if (this.clockServerError()) return this.clockServerError();
     if (!this.clockSubmitted()) return null;
     const raw = this.clockMinutesInput().trim();
     const parsed = Number(raw);
@@ -449,7 +536,9 @@ export class SlaModal {
       return this.transloco.translate('sla.validation.minutesInvalid');
     }
     if (parsed > SLA_LIMITS.maxPreviewMinutes) {
-      return this.transloco.translate('sla.validation.minutesRange', { max: SLA_LIMITS.maxPreviewMinutes });
+      return this.transloco.translate('sla.validation.minutesRange', {
+        max: SLA_LIMITS.maxPreviewMinutes,
+      });
     }
     return null;
   });
@@ -477,7 +566,7 @@ export class SlaModal {
     this.applyDefaults();
     this.baselineSnapshot.set(null);
     this.resetValidation();
-    this.resetClockPreview(this.org.branches[0]?.id ?? '', 30);
+    this.resetClockPreview(this.manageableBranches()[0]?.id ?? '', 30);
     this.allowClose = false;
     this.modal().open();
   }
@@ -490,7 +579,7 @@ export class SlaModal {
     this.baselineSnapshot.set(snapshot);
     this.resetValidation();
     this.resetClockPreview(
-      policy.branchId ?? this.org.branches[0]?.id ?? '',
+      policy.branchId ?? this.manageableBranches()[0]?.id ?? '',
       policy.targetMinutes ?? 30,
     );
     this.allowClose = false;
@@ -529,6 +618,7 @@ export class SlaModal {
   protected onBranchChange(next: string): void {
     if (this.lineageLocked()) return;
     this.branchKey.set(next);
+    this.serverFields.set({});
   }
 
   protected onClockKindChange(next: SlaClockKind): void {
@@ -621,12 +711,14 @@ export class SlaModal {
   }
 
   protected async publish(): Promise<void> {
-    if (this.saving() || this.readOnly()) return;
+    if (this.saving() || this.readOnly() || this.conflictOpen() || this.resolvingConflict()) return;
 
     this.submitAttempted.set(true);
     this.effectiveFromServerError.set(null);
+    this.serverFields.set({});
 
     if (
+      this.branchError() ||
       this.nameEnError() ||
       this.nameArError() ||
       this.targetError() ||
@@ -674,28 +766,63 @@ export class SlaModal {
       this.close();
     } catch (error) {
       const code = errorCodeOf(error);
+      if (!isRetryableWriteError(error) && !(error instanceof ApiError && error.status === 401)) {
+        this.pendingPublish = null;
+      }
+      const failure = this.writeFailure(error);
       if (code === 'CRM_SLA_BACKDATED') {
         this.effectiveFromServerError.set(this.transloco.translate('sla.validation.backdated'));
         return;
       }
       if (code === 'CRM_SLA_POLICY_STALE') {
-        await this.handleStaleConflict(payload);
+        this.staleAttempt = payload;
+        this.conflictOpen.set(true);
         return;
       }
-      if (code === 'CRM_SLA_QUALIFIER_UNKNOWN') {
-        this.notify.error(this.transloco.translate('sla.errors.qualifierUnknown'));
+      if (code === 'BRANCH_PERMISSION_DENIED') {
+        this.serverFields.set({ branchId: [failure.message] });
         return;
       }
-      this.notify.error(this.transloco.translate(errorKey(code)));
+      if (isValidationError(error)) {
+        const fields = fieldErrorsOf(error);
+        this.serverFields.set(fields);
+        const inline = [
+          'nameEn',
+          'nameAr',
+          'targetMinutes',
+          'requiredTouchCount',
+          'compliancePct',
+          'effectiveFrom',
+          'branchId',
+          'policyKind',
+          'appliesToRecord',
+          'clockKind',
+          'qualifyingTouchBy',
+          'state',
+          'qualifying.activityTypes',
+          'qualifying.directions',
+          'qualifying.touchSources',
+        ];
+        if (
+          Object.keys(fields).length &&
+          Object.keys(fields).every((key) =>
+            inline.some((field) => key === field || key.startsWith(`${field}.`)),
+          )
+        )
+          return;
+      }
+      this.notify.error(failure.message);
     } finally {
       this.saving.set(false);
     }
   }
 
   protected async calculateClock(): Promise<void> {
-    if (!this.canManage() || this.clockBusy()) return;
+    if (!this.previewAllowed() || !this.canChooseBranch || this.clockBusy()) return;
+    if (!this.clockBranchId() || !this.canManageBranch(this.clockBranchId())) return;
     this.clockSubmitted.set(true);
     this.clockMissingReason.set(null);
+    this.clockServerError.set(null);
 
     if (this.clockFromError() || this.clockMinutesError()) {
       return;
@@ -717,46 +844,85 @@ export class SlaModal {
     } catch (error) {
       this.clockDeadlineIso.set(null);
       this.clockMissingReason.set(null);
-      this.notify.error(this.transloco.translate(errorKey(errorCodeOf(error))));
+      const failure = this.writeFailure(error);
+      if (errorCodeOf(error) === 'CRM_SLA_CLOCK_RANGE_EXCEEDED') {
+        this.clockServerError.set(failure.message);
+      } else {
+        this.notify.error(failure.message);
+      }
     } finally {
       this.clockBusy.set(false);
     }
+  }
+
+  private writeFailure(error: unknown) {
+    const failure = slaError(this.transloco, error);
+    if (failure.readOnly) {
+      this.planReadOnly.set(true);
+      this.readOnlyRequested.emit();
+    }
+    if (error instanceof ApiError && error.status === 401) {
+      failure.message = this.transloco.translate('settings.errors.notSaved');
+    }
+    if (error instanceof ApiError && error.status === 429) {
+      const retryAfter = error.details?.['retryAfterSeconds'];
+      const seconds = Array.isArray(retryAfter) ? retryAfter[0] : retryAfter;
+      if (seconds !== undefined) {
+        failure.message = this.transloco.translate('settings.errors.rateLimitedIn', { seconds });
+      }
+    }
+    return failure;
   }
 
   protected onClockMinutesInput(event: Event): void {
     this.clockMinutesInput.set((event.target as HTMLInputElement).value);
   }
 
-  private async handleStaleConflict(attempted: PublishSlaPolicy): Promise<void> {
-    const reload = await this.conflictDialog().open();
+  protected async resolveConflict(reload: boolean): Promise<void> {
+    const attempted = this.staleAttempt;
+    if (!attempted || this.resolvingConflict()) return;
+    this.resolvingConflict.set(true);
     try {
-      const page = await listPolicies({
-        kind: attempted.policyKind,
-        record: attempted.appliesToRecord,
-        branchId: attempted.branchId ?? 'tenant',
-      });
-      const latestHead = page.items.find((item) => item.nextPolicyId === null) ?? page.items[0] ?? null;
+      let cursor: string | undefined;
+      let latestHead: SlaPolicy | undefined;
+      do {
+        const page = await listPolicies({
+          kind: attempted.policyKind,
+          record: attempted.appliesToRecord,
+          branchId: attempted.branchId ?? 'tenant',
+          limit: 100,
+          ...(cursor ? { cursor } : {}),
+        });
+        latestHead = page.items.find((item) => item.nextPolicyId === null);
+        cursor = page.pageInfo.nextCursor ?? undefined;
+      } while (!latestHead && cursor);
       this.reloadRequested.emit();
-      if (!latestHead) {
-        if (reload) this.close();
-        return;
-      }
+      this.expectedSupersedesId.set(latestHead?.id ?? null);
+      this.pendingPublish = null;
       if (reload) {
-        this.editingPolicy.set(latestHead);
-        this.expectedSupersedesId.set(latestHead.id);
-        const snap = this.applyPolicyToForm(latestHead);
-        this.baselineSnapshot.set(snap);
+        if (latestHead) {
+          this.editingPolicy.set(latestHead);
+          this.baselineSnapshot.set(this.applyPolicyToForm(latestHead));
+        } else {
+          this.editingPolicy.set(null);
+          this.applyDefaults();
+          this.baselineSnapshot.set(null);
+        }
         this.resetValidation();
-      } else {
-        this.expectedSupersedesId.set(latestHead.id);
       }
+      this.staleAttempt = null;
+      this.conflictOpen.set(false);
     } catch (error) {
-      this.notify.error(this.transloco.translate(errorKey(errorCodeOf(error))));
+      this.notify.error(slaError(this.transloco, error).message);
+      this.conflictOpen.set(true);
+    } finally {
+      this.resolvingConflict.set(false);
     }
   }
 
   private nameError(field: 'nameEn' | 'nameAr', value: string): string | null {
     this.i18n();
+    if (this.serverFields()[field]) return this.serverFields()[field].join(' ');
     if (!this.submitAttempted() && !this.touched()[field]) return null;
     const len = [...value.trim()].length;
     if (len === 0) return this.transloco.translate('sla.validation.required');
@@ -771,7 +937,9 @@ export class SlaModal {
     this.nameAr.set('');
     this.policyKind.set('FIRST_RESPONSE');
     this.appliesToRecord.set('LEAD');
-    this.branchKey.set(TENANT_BRANCH_KEY);
+    this.branchKey.set(
+      this.tenantManage ? TENANT_BRANCH_KEY : (this.manageableBranches()[0]?.id ?? ''),
+    );
     this.clockKind.set('WORKING_MINUTES');
     this.targetValueInput.set('30');
     this.targetUnit.set('minutes');
@@ -786,7 +954,7 @@ export class SlaModal {
   }
 
   private applyPolicyToForm(policy: SlaPolicy): PolicySnapshot {
-    const isHistorical = !this.canManage() || policy.nextPolicyId !== null;
+    const isHistorical = this.readOnly();
     const rawEffective = isoDateOnly(policy.effectiveFrom) || this.todayIso;
     const resolvedEffective =
       !isHistorical && rawEffective < this.todayIso ? this.todayIso : rawEffective;
@@ -832,18 +1000,20 @@ export class SlaModal {
 
   private resetValidation(): void {
     this.touched.set({});
+    this.serverFields.set({});
     this.submitAttempted.set(false);
     this.effectiveFromServerError.set(null);
   }
 
   private resetClockPreview(branchId: string, minutes: number): void {
-    this.clockBranchId.set(branchId || this.org.branches[0]?.id || '');
+    this.clockBranchId.set(branchId || this.manageableBranches()[0]?.id || '');
     this.clockFromDate.set(this.todayIso);
     this.clockFromTime.set('09:00');
     this.clockMinutesInput.set(String(minutes > 0 ? minutes : 30));
     this.clockDeadlineIso.set(null);
     this.clockMissingReason.set(null);
     this.clockSubmitted.set(false);
+    this.clockServerError.set(null);
   }
 
   private async confirmDiscardAndClose(): Promise<void> {

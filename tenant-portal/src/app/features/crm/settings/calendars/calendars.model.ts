@@ -41,13 +41,11 @@ export interface PublishWorkingCalendarRequest {
   windows?: CalendarWindowInput[];
 }
 
-export const CALENDAR_YEARS: readonly number[] = [2025, 2026, 2027];
 export const WEEKDAY_INDICES: readonly number[] = [0, 1, 2, 3, 4, 5, 6]; // Sunday first
 
 export const DEFAULT_WEEKDAY_MASK = 31; // Sun..Thu (bits 0..4)
 export const DEFAULT_WORKDAY_START_MINUTE = 9 * 60; // 09:00
 export const DEFAULT_WORKDAY_END_MINUTE = 17 * 60; // 17:00
-export const DEFAULT_TIME_ZONE = 'Africa/Cairo';
 /** WorkingCalendarWindowDto label @MaxLength(80). */
 export const MAX_WINDOW_LABEL_LENGTH = 80;
 /** WORKING_CALENDAR_MAX_LAYER: a window layer is 1 through 9. */

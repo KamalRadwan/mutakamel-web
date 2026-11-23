@@ -4,15 +4,19 @@ import {
   DestroyRef,
   Directive,
   ElementRef,
+  Injector,
   afterNextRender,
   computed,
   inject,
   input,
   output,
   resource,
+  runInInjectionContext,
   signal,
   viewChild,
 } from '@angular/core';
+import { Router } from '@angular/router';
+import { ApiError } from '../../../../core/api/api-errors';
 import { translationEvents } from '../../../../core/i18n/translation-events';
 import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/adapter/element-adapter';
 import { preserveOffsetOnSource } from '@atlaskit/pragmatic-drag-and-drop/utils/preserve-offset-on-source';
@@ -29,13 +33,13 @@ import { Dropdown, DropdownOption } from '../../../../shared/ui/dropdown/dropdow
 import { Field } from '../../../../shared/ui/field/field';
 import { Modal } from '../../../../shared/ui/modal/modal';
 import { errorCodeOf } from '../shared/settings-api';
+import { anyGrant, tenantWide } from '../shared/settings-access';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { SettingsFrame } from '../../../../shared/ui/settings-frame/settings-frame';
 import { SettingsNotice } from '../../../../shared/ui/settings-notice/settings-notice';
 import { LeadSourceModal } from './lead-source-modal/lead-source-modal';
 import { deleteLeadSource, listLeadSources, reorderLeadSources, updateLeadSource } from './lead-sources.api';
-import { LEAD_SOURCE_LIMIT, LeadSource, nameIn, translateSourceError } from './lead-sources.model';
-
-const CAN_MANAGE = true; // later from the session permissions
+import { LEAD_SOURCE_LIMIT, LeadSource, keepSourceWriteKey, nameIn, sourceError, translateSourceError } from './lead-sources.model';
 
 interface DraggedSource {
   sourceId: string;
@@ -144,6 +148,7 @@ class SourceRowDrop {
     Modal,
     SettingsFrame,
     SettingsNotice,
+    FullState,
     LeadSourceModal,
     SourceRowDrag,
     SourceRowDrop,
@@ -153,13 +158,15 @@ class SourceRowDrop {
     provideIcons({ tablerTrendingUp, tablerGripVertical, tablerArrowsRightLeft, tablerAlertTriangle }),
   ],
   templateUrl: './lead-sources-page.html',
-  host: { class: 'flex min-h-0 flex-1 flex-col' },
+  host: { class: 'flex flex-1 shrink-0 flex-col' },
 })
 export class LeadSourcesPage {
   private static nextId = 0;
   protected readonly uid = `lead-sources-page-${++LeadSourcesPage.nextId}`;
 
   private readonly notify = inject(Notify);
+  private readonly injector = inject(Injector);
+  private readonly router = inject(Router);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly language = inject(LanguageState).current;
@@ -169,13 +176,15 @@ export class LeadSourcesPage {
   private readonly moveModal = viewChild.required<Modal>('moveModal');
   private readonly inUseModal = viewChild.required<Modal>('inUseModal');
 
-  protected readonly canManage = CAN_MANAGE;
+  private readonly readOnly = signal(false);
+  protected readonly canRead = computed(() => runInInjectionContext(this.injector, () => anyGrant('crm.acquisition_sources.read')));
+  protected readonly canManage = computed(() => !this.readOnly() && runInInjectionContext(this.injector, () => tenantWide('crm.acquisition_sources.manage')));
   protected readonly maxSources = LEAD_SOURCE_LIMIT;
   protected readonly skeletonRows = [1, 2, 3, 4, 5];
   // Uses --table-head-h (36px) for grip/actions columns and reuses --time-dd-w (44px) for the # order column.
-  protected readonly gridColumnsClass = CAN_MANAGE
+  protected readonly gridColumnsClass = computed(() => this.canManage()
     ? 'grid-cols-crm-lead-source-row-manage'
-    : 'grid-cols-crm-lead-source-row';
+    : 'grid-cols-crm-lead-source-row');
 
   protected readonly search = signal('');
   protected readonly reordering = signal(false);
@@ -186,14 +195,27 @@ export class LeadSourcesPage {
   protected readonly targetPosition = signal(1);
   protected readonly inUseSource = signal<LeadSource | null>(null);
 
-  private readonly loaded = resource({ loader: () => listLeadSources() });
+  private readonly loaded = resource({ params: () => this.canRead() ? true : undefined, loader: () => listLeadSources() });
+  private pendingReorder: { key: string; bodyJson: string } | null = null;
+  protected readonly brokenIcons = signal<ReadonlySet<string>>(new Set());
   private readonly localSources = signal<LeadSource[] | null>(null);
 
   protected readonly sources = computed(() =>
     this.localSources() ?? (this.loaded.hasValue() ? this.loaded.value() : []),
   );
   protected readonly loading = this.loaded.isLoading;
-  protected readonly loadFailed = computed(() => !this.loading() && !!this.loaded.error());
+  protected readonly loadError = computed(() => {
+    this.i18n();
+    const error = this.canRead() ? this.loaded.error() : new ApiError(403, 'CRM_PERMISSION_DENIED');
+    return error ? sourceError(error, this.transloco) : null;
+  });
+  protected readonly loadFailed = computed(() => !!this.loadError());
+  protected readonly loadErrorText = computed(() => {
+    const error = this.loadError();
+    return error?.correlationId
+      ? `${error.message} ${this.transloco.translate('settings.common.correlationId', { id: error.correlationId })}`
+      : error?.message ?? '';
+  });
   protected readonly isSearching = computed(() => this.search().trim().length > 0);
   protected readonly atLimit = computed(() => this.sources().length >= LEAD_SOURCE_LIMIT);
 
@@ -218,12 +240,31 @@ export class LeadSourcesPage {
     this.loaded.reload();
   }
 
+  protected onLoadAction(): void {
+    if (this.loadError()?.kind === 'forbidden') void this.router.navigateByUrl('/workspace/home');
+    else this.reload();
+  }
+
+  protected iconFailed(url: string): void {
+    this.brokenIcons.update((urls) => new Set([...urls, url]));
+  }
+
+  protected onReadOnly(): void {
+    this.readOnly.set(true);
+  }
+
+  private writeFailed(error: unknown): void {
+    if (sourceError(error, this.transloco).readOnly) this.onReadOnly();
+    this.notify.error(translateSourceError(error, this.transloco));
+    if (error instanceof ApiError && error.status === 404) this.reload();
+  }
+
   protected displayName(source: LeadSource): string {
     return nameIn(source, this.language());
   }
 
   protected openCreate(): void {
-    if (!this.canManage || this.atLimit()) return;
+    if (!this.canManage() || this.atLimit() || this.loadFailed()) return;
     this.sourceModal().openCreate();
   }
 
@@ -308,7 +349,7 @@ export class LeadSourcesPage {
   }
 
   protected onAction(source: LeadSource, selection: ActionSelection): void {
-    if (!this.canManage) return;
+    if (!this.canManage()) return;
     switch (selection.id) {
       case 'open':
       case 'edit':
@@ -330,7 +371,7 @@ export class LeadSourcesPage {
   }
 
   protected async dropOnRow(fromId: string, toId: string): Promise<void> {
-    if (!this.canManage || this.isSearching() || this.reordering() || fromId === toId) return;
+    if (!this.canManage() || this.isSearching() || this.reordering() || fromId === toId) return;
     const list = this.sources();
     const fromIndex = list.findIndex((item) => item.id === fromId);
     const toIndex = list.findIndex((item) => item.id === toId);
@@ -343,7 +384,7 @@ export class LeadSourcesPage {
   }
 
   protected openMoveModal(source: LeadSource): void {
-    if (this.isSearching() || this.reordering() || this.sources().length <= 1) return;
+    if (!this.canManage() || this.isSearching() || this.reordering() || this.sources().length <= 1) return;
     this.movingSource.set(source);
     this.targetPosition.set(source.sortOrder);
     this.moveModal().open();
@@ -351,7 +392,7 @@ export class LeadSourcesPage {
 
   protected async confirmMove(): Promise<void> {
     const source = this.movingSource();
-    if (!source || this.isSearching() || this.reordering() || this.sources().length <= 1) return;
+    if (!this.canManage() || !source || this.isSearching() || this.reordering() || this.sources().length <= 1) return;
     const list = this.sources();
     const fromIndex = list.findIndex((item) => item.id === source.id);
     const toIndex = Math.max(0, Math.min(list.length - 1, this.targetPosition() - 1));
@@ -368,17 +409,15 @@ export class LeadSourcesPage {
   }
 
   protected async requestDelete(source: LeadSource): Promise<void> {
-    if (!this.canManage) return;
+    if (!this.canManage()) return;
     this.deletingSource.set(source);
     if (!(await this.deleteConfirm().open())) return;
+    if (!this.canManage()) return;
 
     try {
       await deleteLeadSource(source.id);
       this.sourceModal().closeImmediate();
-      const remaining = this.sources()
-        .filter((item) => item.id !== source.id)
-        .map((item, index) => ({ ...item, sortOrder: index + 1 }));
-      this.localSources.set(remaining);
+      this.reload();
       this.notify.success(this.transloco.translate('leadSources.toasts.deleted'));
     } catch (error) {
       if (errorCodeOf(error) === 'CRM_ACQUISITION_SOURCE_IN_USE') {
@@ -387,13 +426,13 @@ export class LeadSourcesPage {
         this.inUseModal().open();
         return;
       }
-      this.notify.error(translateSourceError(error, this.transloco));
+      this.writeFailed(error);
     }
   }
 
   protected async makeInUseInactive(): Promise<void> {
     const source = this.inUseSource();
-    if (!source || this.makingInactive()) return;
+    if (!this.canManage() || !source || this.makingInactive()) return;
     this.makingInactive.set(true);
     try {
       const updated = await updateLeadSource(source.id, { isActive: false });
@@ -402,14 +441,14 @@ export class LeadSourcesPage {
       this.inUseModal().close();
       this.notify.success(this.transloco.translate('leadSources.toasts.deactivated'));
     } catch (error) {
-      this.notify.error(translateSourceError(error, this.transloco));
+      this.writeFailed(error);
     } finally {
       this.makingInactive.set(false);
     }
   }
 
   private async toggleActive(source: LeadSource): Promise<void> {
-    if (this.togglingIds().has(source.id)) return;
+    if (!this.canManage() || this.togglingIds().has(source.id)) return;
     this.togglingIds.update((ids) => {
       const next = new Set(ids);
       next.add(source.id);
@@ -423,7 +462,7 @@ export class LeadSourcesPage {
         this.transloco.translate(nextActive ? 'leadSources.toasts.activated' : 'leadSources.toasts.deactivated'),
       );
     } catch (error) {
-      this.notify.error(translateSourceError(error, this.transloco));
+      this.writeFailed(error);
     } finally {
       this.togglingIds.update((ids) => {
         const next = new Set(ids);
@@ -438,16 +477,19 @@ export class LeadSourcesPage {
     const optimistic = reordered.map((item, index) => ({ ...item, sortOrder: index + 1 }));
     this.localSources.set(optimistic);
     this.reordering.set(true);
+    const orderedIds = optimistic.map((item) => item.id);
+    const bodyJson = JSON.stringify({ orderedIds });
+    if (this.pendingReorder?.bodyJson !== bodyJson) this.pendingReorder = { key: newIdempotencyKey(), bodyJson };
     try {
-      const saved = await reorderLeadSources(
-        optimistic.map((item) => item.id),
-        newIdempotencyKey(),
-      );
+      const saved = await reorderLeadSources(orderedIds, this.pendingReorder.key);
+      this.pendingReorder = null;
       this.localSources.set(saved);
       this.notify.success(this.transloco.translate('leadSources.toasts.reordered'));
     } catch (error) {
       this.localSources.set(before);
-      this.notify.error(translateSourceError(error, this.transloco));
+      if (!keepSourceWriteKey(error)) this.pendingReorder = null;
+      this.writeFailed(error);
+      if (errorCodeOf(error) === 'CRM_ACQUISITION_SOURCE_REORDER_INVALID') this.reload();
     } finally {
       this.reordering.set(false);
     }

@@ -69,6 +69,7 @@
         [label]="'leadStages.modal.meaning' | transloco"
         [for]="uid + '-meaning'"
         [hint]="'leadStages.modal.meaningHint' | transloco"
+        [error]="fieldError('flag')"
       >
         <input
           [id]="uid + '-meaning'"
@@ -86,10 +87,12 @@
         [for]="uid + '-meaning'"
         [required]="true"
         [hint]="'leadStages.modal.meaningHint' | transloco"
+        [error]="fieldError('flag')"
       >
         <ui-dropdown
           class="w-full"
           size="field"
+          [id]="uid + '-meaning'"
           [describedBy]="uid + '-meaning-hint'"
           [options]="flagOptions()"
           [value]="flag()"
@@ -104,6 +107,7 @@
         [label]="'leadStages.modal.category' | transloco"
         [for]="uid + '-category'"
         [hint]="'leadStages.modal.categoryHint' | transloco"
+        [error]="fieldError('category')"
       >
         <input
           [id]="uid + '-category'"
@@ -121,12 +125,14 @@
         [for]="uid + '-category'"
         [required]="true"
         [hint]="'leadStages.modal.categoryHint' | transloco"
+        [error]="fieldError('category')"
       >
         <ui-dropdown
           class="w-full"
           size="field"
           [describedBy]="uid + '-category-hint'"
           [options]="categoryOptions()"
+          [id]="uid + '-category'"
           [value]="category()"
           [label]="'leadStages.modal.category' | transloco"
           (valueChange)="onCategoryChange($event)"
@@ -140,9 +146,10 @@
         [label]="'leadStages.table.default' | transloco"
         [for]="uid + '-default'"
         [hint]="'leadStages.modal.defaultHint' | transloco"
+        [error]="fieldError('isDefault')"
       >
         <div class="flex h-field items-center">
-          <ui-checkbox [(checked)]="isDefault">
+          <ui-checkbox [(checked)]="isDefault" [disabled]="isReadOnly()" (checkedChange)="clearFieldError('isDefault')">
             {{ 'leadStages.modal.defaultCheckbox' | transloco }}
           </ui-checkbox>
         </div>
@@ -153,10 +160,14 @@
         [label]="'settings.common.active' | transloco"
         [for]="uid + '-active'"
         [hint]="(isDefaultStage() ? 'leadStages.modal.activeDefaultHint' : 'leadStages.modal.activeHint') | transloco"
+        [error]="fieldError('isActive')"
       >
         <div class="flex h-field items-center gap-8">
           <ui-switch
             [(checked)]="isActive"
+            [id]="uid + '-active'"
+            [describedBy]="uid + '-active-hint'"
+            (checkedChange)="clearFieldError('isActive')"
             [disabled]="isReadOnly() || isDefaultStage()"
             [label]="'settings.common.active' | transloco"
           />

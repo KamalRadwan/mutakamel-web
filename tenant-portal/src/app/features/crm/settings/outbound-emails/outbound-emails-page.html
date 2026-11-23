@@ -1,6 +1,6 @@
 <app-settings-frame
   [addLabel]="'outboundEmails.newEmail' | transloco"
-  [showAdd]="canManage && !featureDisabled()"
+  [showAdd]="canManage() && !featureDisabled()"
   [addDisabled]="!canSendCrm()"
   [addHint]="!canSendCrm() ? ('outboundEmails.sender.notReadyHint' | transloco) : null"
   [searchPlaceholder]="'outboundEmails.searchPlaceholder' | transloco"
@@ -16,6 +16,7 @@
       <ui-field
         class="min-w-0 flex-1"
         size="bare"
+        [for]="uid + '-status'"
         [label]="'outboundEmails.filters.status' | transloco"
         [hint]="'outboundEmails.filters.statusHint' | transloco"
       >
@@ -24,6 +25,7 @@
           size="field"
           [options]="statusOptions()"
           [value]="statusFilter()"
+          [id]="uid + '-status'" [describedBy]="uid + '-status-hint'"
           [label]="'outboundEmails.filters.status' | transloco"
           (valueChange)="onStatusFilterChange($event)"
         />
@@ -32,6 +34,7 @@
       <ui-field
         class="min-w-0 flex-1"
         size="bare"
+        [for]="uid + '-type'"
         [label]="'outboundEmails.filters.sourceType' | transloco"
         [hint]="'outboundEmails.filters.sourceTypeHint' | transloco"
       >
@@ -40,24 +43,42 @@
           size="field"
           [options]="sourceTypeOptions()"
           [value]="sourceTypeFilter()"
+          [id]="uid + '-type'" [describedBy]="uid + '-type-hint'"
           [label]="'outboundEmails.filters.sourceType' | transloco"
           (valueChange)="onSourceTypeFilterChange($event)"
         />
       </ui-field>
 
+      @if (sources.canChooseBranch()) {
+        <ui-field class="min-w-0 flex-1" size="bare" [for]="uid + '-branch'"
+          [label]="'outboundEmails.source.branch' | transloco" [hint]="'outboundEmails.source.branchHint' | transloco">
+          <ui-dropdown class="w-full" size="field" [id]="uid + '-branch'" [describedBy]="uid + '-branch-hint'"
+            [options]="branchOptions()" [value]="sources.branchId()" [label]="'outboundEmails.source.branch' | transloco"
+            (valueChange)="onBranchChange($event)" />
+        </ui-field>
+      }
       @if (sourceTypeFilter() !== 'ALL') {
+        <ui-field class="min-w-0 flex-1" [for]="uid + '-record-search'"
+          [label]="'outboundEmails.compose.recordSearchLabel' | transloco" [hint]="'outboundEmails.compose.recordSearchHint' | transloco">
+          <input [id]="uid + '-record-search'" [attr.aria-describedby]="uid + '-record-search-hint'"
+            class="h-full min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+            [disabled]="!sources.branchId()" (input)="onRecordSearch($event)" />
+        </ui-field>
         <ui-field
           class="min-w-0 flex-1"
           size="bare"
-          [label]="'outboundEmails.filters.record' | transloco"
-          [hint]="'outboundEmails.filters.recordHint' | transloco"
+          [for]="uid + '-record'"
+        [label]="'outboundEmails.filters.record' | transloco"
+          [hint]="(sources.branchId() ? 'outboundEmails.filters.recordHint' : 'outboundEmails.source.noBranchHint') | transloco"
         >
           <ui-dropdown
             class="w-full"
             size="field"
             [options]="recordOptions()"
             [value]="sourceIdFilter()"
-            [label]="'outboundEmails.filters.record' | transloco"
+            [disabled]="!sources.branchId()"
+            [id]="uid + '-record'" [describedBy]="uid + '-record-hint'"
+          [label]="'outboundEmails.filters.record' | transloco"
             (valueChange)="onSourceIdFilterChange($event)"
           />
         </ui-field>
@@ -68,7 +89,7 @@
         size="bare"
         [for]="uid + '-filter-from-date'"
         [label]="'outboundEmails.filters.fromDate' | transloco"
-        [hint]="'outboundEmails.filters.fromDateHint' | transloco"
+        [hint]="dateHint('fromDateHint')"
         [error]="rangeError()"
       >
         <ui-date-field
@@ -89,7 +110,7 @@
         size="bare"
         [for]="uid + '-filter-to-date'"
         [label]="'outboundEmails.filters.toDate' | transloco"
-        [hint]="'outboundEmails.filters.toDateHint' | transloco"
+        [hint]="dateHint('toDateHint')"
       >
         <ui-date-field
           [id]="uid + '-filter-to-date'"
@@ -120,17 +141,11 @@
     </div>
   </div>
 
-  @if (featureDisabled()) {
-    <app-settings-notice tone="warning">
-      {{ errorText() || ('outboundEmails.errors.CRM_FEATURE_DISABLED' | transloco) }}
-    </app-settings-notice>
-  } @else if (failed()) {
-    <div class="flex flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card" role="alert">
-      <p class="text-12 text-danger-text">{{ errorText() || ('settings.common.loadFailed' | transloco) }}</p>
-      <button type="button" uiButton variant="secondary" size="small" (click)="reloadAll()">
-        {{ 'settings.common.retry' | transloco }}
-      </button>
-    </div>
+  @if (featureDisabled() || failed()) {
+    <ui-full-state [kind]="featureDisabled() ? 'forbidden' : 'load-failure'"
+      [title]="errorText() || ('settings.errors.permission' | transloco)"
+      [text]="correlationId() || ''" [actionLabel]="'settings.common.retry' | transloco"
+      (action)="reloadAll()" />
   } @else {
     <div class="overflow-x-auto pb-4">
       <div
@@ -162,7 +177,7 @@
           <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
             {{ 'outboundEmails.table.requested' | transloco }}
           </span>
-          @if (canManage) {
+          @if (canManage()) {
             <span role="columnheader" class="border-s border-on-nav-line">
               <span class="sr-only">{{ 'outboundEmails.table.actions' | transloco }}</span>
             </span>
@@ -195,7 +210,7 @@
               <span role="cell" class="flex items-center border-s border-border px-10">
                 <span class="h-skeleton-line w-full rounded-4 bg-neutral-soft"></span>
               </span>
-              @if (canManage) {
+              @if (canManage()) {
                 <span role="cell" class="flex items-center justify-center border-s border-border">
                   <span class="size-btn-h-sm rounded-6 bg-neutral-soft"></span>
                 </span>
@@ -267,7 +282,7 @@
                 <span dir="auto" class="truncate text-start text-11 leading-16 text-text-muted">{{ row.requestedBy.displayName }}</span>
               </span>
 
-              @if (canManage) {
+              @if (canManage()) {
                 <span
                   role="cell"
                   class="flex items-center justify-center border-s border-border"
@@ -285,7 +300,7 @@
             @if (!loading()) {
               <div role="row" class="p-16 text-center text-12 text-text-muted">
                 <span role="cell">
-                  {{ (searchQuery().trim() ? 'settings.common.noResults' : 'outboundEmails.empty') | transloco }}
+                  {{ (hasActiveFilters() ? 'settings.common.noResults' : 'outboundEmails.empty') | transloco }}
                 </span>
               </div>
             }
@@ -309,14 +324,16 @@
     }
   }
 
-  <div footer class="flex flex-wrap items-center gap-6">
-    <span>{{ 'outboundEmails.retentionFooter' | transloco: { days: retentionDays() } }}</span>
-    <a routerLink="/crm/settings/general" class="font-medium text-accent hover:underline">
-      {{ 'outboundEmails.changeRetention' | transloco }}
-    </a>
-  </div>
+  @if (retentionDays() !== null) {
+    <div footer class="flex flex-wrap items-center gap-6">
+      <span>{{ 'outboundEmails.retentionFooter' | transloco: { days: retentionDays() } }}</span>
+      <a routerLink="/crm/settings/general" class="font-medium text-accent hover:underline">
+        {{ 'outboundEmails.changeRetention' | transloco }}
+      </a>
+    </div>
+  }
 </app-settings-frame>
 
-<app-email-detail-modal [canManage]="canManage" (retryRequested)="openRetry($event)" />
-<app-retry-modal (retried)="onEmailQueued()" (openExisting)="openDetail($event)" />
-<app-compose-modal (sent)="onEmailQueued()" />
+<app-email-detail-modal [canManage]="canManage()" (retryRequested)="openRetry($event)" />
+<app-retry-modal (becameReadOnly)="readOnly.set(true)" (retried)="onEmailQueued()" (openExisting)="openDetail($event)" />
+<app-compose-modal (becameReadOnly)="readOnly.set(true)" (refreshLog)="onEmailQueued()" (sent)="onEmailQueued()" />

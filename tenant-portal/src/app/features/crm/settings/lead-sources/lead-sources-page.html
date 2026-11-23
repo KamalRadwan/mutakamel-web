@@ -1,6 +1,6 @@
 <app-settings-frame
   [addLabel]="'leadSources.new' | transloco"
-  [showAdd]="canManage"
+  [showAdd]="canManage() && !loadFailed()"
   [addDisabled]="atLimit()"
   [addHint]="atLimit() ? ('leadSources.limitReached' | transloco: { max: maxSources }) : null"
   [searchPlaceholder]="'leadSources.search' | transloco"
@@ -16,12 +16,13 @@
   }
 
   @if (loadFailed()) {
-    <div class="flex flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card" role="alert">
-      <p class="text-12 text-danger-text">{{ 'settings.common.loadFailed' | transloco }}</p>
-      <button type="button" uiButton variant="secondary" size="small" (click)="reload()">
-        {{ 'settings.common.retry' | transloco }}
-      </button>
-    </div>
+    <ui-full-state
+      [kind]="loadError()!.kind"
+      [title]="(loadError()!.kind === 'forbidden' ? 'errors.forbidden.title' : 'settings.common.loadFailed') | transloco"
+      [text]="loadErrorText()"
+      [actionLabel]="(loadError()!.kind === 'forbidden' ? 'errors.notFound.action' : 'settings.common.retry') | transloco"
+      (action)="onLoadAction()"
+    />
   } @else {
     <div class="overflow-x-auto pb-4">
       <div
@@ -33,9 +34,9 @@
         <div
           role="row"
           class="grid h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
-          [class]="gridColumnsClass"
+          [class]="gridColumnsClass()"
         >
-          @if (canManage) {
+          @if (canManage()) {
             <span role="columnheader" class="flex items-center justify-center">
               <span class="sr-only">{{ 'leadSources.dragHandle' | transloco }}</span>
             </span>
@@ -43,8 +44,8 @@
           <span
             role="columnheader"
             class="flex min-w-0 items-center justify-center px-10"
-            [class.border-s]="canManage"
-            [class.border-on-nav-line]="canManage"
+            [class.border-s]="canManage()"
+            [class.border-on-nav-line]="canManage()"
           >
             {{ 'leadSources.table.order' | transloco }}
           </span>
@@ -57,7 +58,7 @@
           <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
             {{ 'settings.common.status' | transloco }}
           </span>
-          @if (canManage) {
+          @if (canManage()) {
             <span role="columnheader" class="border-s border-on-nav-line">
               <span class="sr-only">{{ 'settings.common.actions' | transloco }}</span>
             </span>
@@ -69,15 +70,15 @@
             <div
               role="row"
               class="mt-6 grid h-table-row items-center rounded-10 border border-border bg-surface shadow-card"
-              [class]="gridColumnsClass"
+              [class]="gridColumnsClass()"
               aria-hidden="true"
             >
-              @if (canManage) {
+              @if (canManage()) {
                 <span role="cell" class="flex items-center justify-center">
                   <span class="h-skeleton-line w-12 rounded-4 bg-neutral-soft"></span>
                 </span>
               }
-              <span role="cell" class="flex items-center justify-center px-10" [class.border-s]="canManage" [class.border-border]="canManage">
+              <span role="cell" class="flex items-center justify-center px-10" [class.border-s]="canManage()" [class.border-border]="canManage()">
                 <span class="h-skeleton-line w-16 rounded-4 bg-neutral-soft"></span>
               </span>
               <span role="cell" class="flex items-center gap-8 border-s border-border px-10">
@@ -90,7 +91,7 @@
               <span role="cell" class="flex items-center border-s border-border px-10">
                 <span class="h-badge w-time-dd rounded-8 bg-neutral-soft"></span>
               </span>
-              @if (canManage) {
+              @if (canManage()) {
                 <span role="cell" class="flex items-center justify-center border-s border-border">
                   <span class="size-icon-tile-sm rounded-6 bg-neutral-soft"></span>
                 </span>
@@ -102,16 +103,16 @@
             <div
               role="row"
               [sourceRowDrag]="source.id"
-              [dragDisabled]="!canManage || isSearching() || reordering()"
+              [dragDisabled]="!canManage() || isSearching() || reordering()"
               [sourceRowDrop]="source.id"
-              [dropDisabled]="!canManage || isSearching() || reordering()"
+              [dropDisabled]="!canManage() || isSearching() || reordering()"
               #rowDrop="sourceRowDrop"
               (dropped)="dropOnRow($event, source.id)"
               class="mt-6 grid h-table-row cursor-pointer rounded-10 border text-14 leading-20 text-text transition-colors duration-fast"
-              [class]="gridColumnsClass + (rowDrop.over() ? ' border-brand bg-brand-soft ring-2 ring-inset ring-brand' : ' border-border bg-surface shadow-card hover:bg-row-hover')"
+              [class]="gridColumnsClass() + (rowDrop.over() ? ' border-brand bg-brand-soft ring-2 ring-inset ring-brand' : ' border-border bg-surface shadow-card hover:bg-row-hover')"
               (click)="onRowClick(source, $event)"
             >
-              @if (canManage) {
+              @if (canManage()) {
                 <span
                   role="cell"
                   data-drag-handle
@@ -128,15 +129,15 @@
                 role="cell"
                 dir="ltr"
                 class="flex min-w-0 items-center justify-center px-10 text-12 tabular-nums text-text-muted"
-                [class.border-s]="canManage"
-                [class.border-border]="canManage"
+                [class.border-s]="canManage()"
+                [class.border-border]="canManage()"
               >
                 {{ source.sortOrder }}
               </span>
 
               <span role="cell" class="flex min-w-0 items-center gap-8 border-s border-border px-10">
-                @if (source.iconUrl; as iconUrl) {
-                  <img [src]="iconUrl" alt="" class="size-icon-tile-sm shrink-0 rounded-8 object-cover" />
+                @if (source.iconUrl && !brokenIcons().has(source.iconUrl) ? source.iconUrl : null; as iconUrl) {
+                  <img [src]="iconUrl" (error)="iconFailed(iconUrl)" alt="" class="size-icon-tile-sm shrink-0 rounded-8 object-cover" />
                 } @else {
                   <span class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-neutral-soft text-text-muted">
                     <ng-icon name="tablerTrendingUp" size="14" aria-hidden="true" />
@@ -167,7 +168,7 @@
                 </span>
               </span>
 
-              @if (canManage) {
+              @if (canManage()) {
                 <span
                   role="cell"
                   data-no-drag
@@ -200,7 +201,9 @@
 </app-settings-frame>
 
 <app-lead-source-modal
-  [canManage]="canManage"
+  [canManage]="canManage()"
+  (becameReadOnly)="onReadOnly()"
+  (reloadRequested)="reload()"
   (saved)="onModalSaved($event)"
   (iconUpdated)="onIconUpdated($event)"
   (deleteRequested)="requestDelete($event)"
@@ -247,7 +250,7 @@
       type="button"
       uiButton
       [loading]="reordering()"
-      [disabled]="reordering() || targetPosition() === movingSource()?.sortOrder"
+      [disabled]="!canManage() || reordering() || targetPosition() === movingSource()?.sortOrder"
       (click)="confirmMove()"
     >
       {{ 'settings.common.moveTo' | transloco }}
@@ -278,7 +281,7 @@
   </p>
 
   <div modal-footer class="flex items-center gap-8">
-    @if (inUseSource()?.isActive) {
+    @if (canManage() && inUseSource()?.isActive) {
       <button
         type="button"
         uiButton

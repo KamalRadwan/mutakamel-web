@@ -1,6 +1,6 @@
 import { Component, computed, inject, input, output, signal, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
-import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
+import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   tablerArrowDown,
@@ -19,8 +19,10 @@ import { Modal } from '../../../../../shared/ui/modal/modal';
 import { Segmented, SegmentedOption } from '../../../../../shared/ui/segmented/segmented';
 import { Switch } from '../../../../../shared/ui/switch/switch';
 import { OpportunityStage, OpportunityStageFlag, StageCategory } from '../../opportunity-stages/opportunity-stages.model';
-import { errorCodeOf } from '../../shared/settings-api';
-import { createPipeline, updatePipeline } from '../pipelines.api';
+import { crmSettingsError, errorCodeOf } from '../../shared/settings-api';
+import { fieldErrorsOf, isValidationError } from '../../../../../core/api/api-errors';
+import { pipelineErrorTranslator, pipelineWriteMessage } from '../pipelines-errors';
+import { beginPipelineEdit, createPipeline, updatePipeline } from '../pipelines.api';
 import {
   PIPELINE_CODE_MAX,
   PIPELINE_CODE_PATTERN,
@@ -57,7 +59,10 @@ const REQUIRED_FLAGS = new Set<OpportunityStageFlag>(['NEW', 'WON', 'LOST']);
 @Component({
   selector: 'app-pipeline-modal',
   imports: [NgIcon, TranslocoPipe, Button, ConfirmDialog, Dropdown, Field, Modal, Segmented, Switch],
-  providers: [provideIcons({ tablerHierarchy2, tablerArrowUp, tablerArrowDown, tablerTrash, tablerPlus })],
+  providers: [
+    provideTranslocoScope('settings', { scope: 'settings-pipelines', alias: 'pipelines' }),
+    provideIcons({ tablerHierarchy2, tablerArrowUp, tablerArrowDown, tablerTrash, tablerPlus }),
+  ],
   templateUrl: './pipeline-modal.html',
 })
 export class PipelineModal {
@@ -65,6 +70,7 @@ export class PipelineModal {
   protected readonly uid = `pipeline-modal-${++PipelineModal.nextId}`;
 
   private readonly transloco = inject(TranslocoService);
+  private readonly translateError = pipelineErrorTranslator(this.transloco);
   private readonly i18n = translationEvents(this.transloco);
   private readonly notify = inject(Notify);
   protected readonly language = inject(LanguageState).current;
@@ -72,7 +78,12 @@ export class PipelineModal {
   private readonly modal = viewChild.required(Modal);
   private readonly discardDialog = viewChild.required<ConfirmDialog>('discardDialog');
 
-  readonly canManage = input(true);
+  readonly canManage = input(false);
+  readonly readOnlyChange = output<void>();
+  readonly missing = output<void>();
+  private readonly readOnly = signal(false);
+  protected readonly editable = computed(() => this.canManage() && !this.readOnly());
+  private readonly serverErrors = signal<Record<string, string[]>>({});
   readonly saved = output<Pipeline>();
   readonly deleteRequested = output<Pipeline>();
 
@@ -105,7 +116,7 @@ export class PipelineModal {
   protected readonly modalTitle = computed(() => {
     this.i18n();
     if (this.mode() === 'create') return this.transloco.translate('pipelines.modal.createTitle');
-    return this.transloco.translate(this.canManage() ? 'pipelines.modal.editTitle' : 'pipelines.modal.viewTitle');
+    return this.transloco.translate(this.editable() ? 'pipelines.modal.editTitle' : 'pipelines.modal.viewTitle');
   });
 
   protected readonly standardStages = computed<OpportunityStage[]>(() => {
@@ -116,8 +127,8 @@ export class PipelineModal {
   protected readonly stageModeOptions = computed<SegmentedOption[]>(() => {
     this.i18n();
     return [
-      { value: 'standard', label: this.transloco.translate('pipelines.modal.standardStages') },
-      { value: 'choose', label: this.transloco.translate('pipelines.modal.chooseStages') },
+      { value: 'standard', label: this.transloco.translate('pipelines.modal.standardStages'), disabled: !this.editable() },
+      { value: 'choose', label: this.transloco.translate('pipelines.modal.chooseStages'), disabled: !this.editable() },
     ];
   });
 
@@ -238,6 +249,7 @@ export class PipelineModal {
   });
 
   openCreate(catalogueStages: OpportunityStage[]): void {
+    beginPipelineEdit(null);
     this.catalogue.set(catalogueStages);
     this.mode.set('create');
     this.editing.set(null);
@@ -256,6 +268,7 @@ export class PipelineModal {
   }
 
   openEdit(pipeline: Pipeline): void {
+    beginPipelineEdit(pipeline.id);
     this.mode.set('edit');
     this.editing.set(pipeline);
     this.populateFromPipeline(pipeline);
@@ -265,6 +278,8 @@ export class PipelineModal {
   }
 
   protected errorOf(field: FieldName): string | null {
+    const messages = this.serverErrors()[field];
+    if (messages) return messages.join(' ') || this.transloco.translate('pipelines.errors.CRM_VALIDATION_FAILED');
     if (field === 'code' && this.codeTakenError()) {
       return this.fieldErrors().code ?? null;
     }
@@ -285,11 +300,13 @@ export class PipelineModal {
       input.value = upper;
       if (start !== null && end !== null) input.setSelectionRange(start, end);
     }
+    this.clearServerError('code');
     this.code.set(upper);
     this.codeTakenError.set(false);
   }
 
   protected onTextInput(field: 'nameAr' | 'nameEn' | 'description', event: Event): void {
+    this.clearServerError(field);
     const value = (event.target as HTMLInputElement | HTMLTextAreaElement).value;
     if (field === 'nameAr') this.nameAr.set(value);
     else if (field === 'nameEn') this.nameEn.set(value);
@@ -297,6 +314,7 @@ export class PipelineModal {
   }
 
   protected onStageModeChange(value: string | null): void {
+    if (!this.editable()) return;
     if (value !== 'standard' && value !== 'choose') return;
     this.stageMode.set(value);
     if (value === 'choose' && this.chosenStages().length === 0) {
@@ -305,6 +323,7 @@ export class PipelineModal {
   }
 
   protected addChosenStage(): void {
+    if (!this.editable()) return;
     const id = this.selectedStageToAdd();
     if (!id) return;
     const stage = this.catalogue().find((item) => item.id === id && item.isActive);
@@ -316,6 +335,7 @@ export class PipelineModal {
   }
 
   protected moveChosenStage(index: number, delta: -1 | 1): void {
+    if (!this.editable()) return;
     const target = index + delta;
     const list = this.chosenStages();
     if (target < 0 || target >= list.length) return;
@@ -326,6 +346,7 @@ export class PipelineModal {
   }
 
   protected removeChosenStage(id: string): void {
+    if (!this.editable()) return;
     this.chosenStages.update((list) => list.filter((item) => item.id !== id));
   }
 
@@ -352,7 +373,7 @@ export class PipelineModal {
   }
 
   protected async save(): Promise<void> {
-    if (this.saving() || !this.canManage()) return;
+    if (this.saving() || !this.editable()) return;
     this.revealErrors.set(true);
 
     if (Object.keys(this.fieldErrors()).length > 0) return;
@@ -404,7 +425,19 @@ export class PipelineModal {
         this.codeTakenError.set(true);
         return;
       }
-      this.showErrorToast(code);
+      if (isValidationError(error)) this.serverErrors.set(fieldErrorsOf(error));
+      if (code === 'PIPELINE_DEFAULT_DEACTIVATE') this.isActive.set(this.editing()?.isActive ?? true);
+      if (code === 'PIPELINE_NOT_FOUND') {
+        this.allowClose = true;
+        this.modal().close();
+        this.missing.emit();
+      }
+      const state = crmSettingsError(this.translateError, error, 'pipelines');
+      if (state.readOnly) {
+        this.readOnly.set(true);
+        this.readOnlyChange.emit();
+      }
+      this.notify.error(pipelineWriteMessage(error, this.translateError));
     } finally {
       this.saving.set(false);
     }
@@ -412,7 +445,7 @@ export class PipelineModal {
 
   protected async requestCancel(): Promise<void> {
     if (this.saving()) return;
-    if (this.canManage() && this.dirty()) {
+    if (this.editable() && this.dirty()) {
       if (!(await this.confirmDiscard())) return;
     }
     this.allowClose = true;
@@ -421,14 +454,14 @@ export class PipelineModal {
 
   protected requestDelete(): void {
     const base = this.editing();
-    if (!base || base.isDefault || this.saving() || !this.canManage()) return;
+    if (!base || base.isDefault || this.saving() || !this.editable()) return;
     this.allowClose = true;
     this.modal().close();
     this.deleteRequested.emit(base);
   }
 
   protected onModalClosed(): void {
-    if (!this.allowClose && this.canManage() && this.dirty()) {
+    if (!this.allowClose && this.editable() && this.dirty()) {
       this.modal().open();
       void this.confirmDiscardAndClose();
       return;
@@ -463,26 +496,17 @@ export class PipelineModal {
   }
 
   private resetValidation(): void {
+    this.serverErrors.set({});
     this.touched.set({});
     this.revealErrors.set(false);
     this.codeTakenError.set(false);
   }
 
-  private showErrorToast(code: string | null): void {
-    if (code) {
-      const key = `pipelines.errors.${code}`;
-      const translated = this.transloco.translate(key);
-      if (translated !== key) {
-        this.notify.error(translated);
-        return;
-      }
-      const sharedKey = `settings.errors.${code}`;
-      const shared = this.transloco.translate(sharedKey);
-      if (shared !== sharedKey) {
-        this.notify.error(shared);
-        return;
-      }
-    }
-    this.notify.error(this.transloco.translate('settings.errors.generic'));
+  private clearServerError(field: FieldName): void {
+    this.serverErrors.update((errors) => {
+      const next = { ...errors };
+      delete next[field];
+      return next;
+    });
   }
 }

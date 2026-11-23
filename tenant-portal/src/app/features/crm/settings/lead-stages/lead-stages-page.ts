@@ -3,16 +3,21 @@ import {
   DestroyRef,
   Directive,
   ElementRef,
+  Injector,
   afterNextRender,
   computed,
   inject,
   input,
   output,
+  runInInjectionContext,
   signal,
   viewChild,
 } from '@angular/core';
 import { translationEvents } from '../../../../core/i18n/translation-events';
-import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/adapter/element-adapter';
+import {
+  draggable,
+  dropTargetForElements,
+} from '@atlaskit/pragmatic-drag-and-drop/adapter/element-adapter';
 import { preserveOffsetOnSource } from '@atlaskit/pragmatic-drag-and-drop/utils/preserve-offset-on-source';
 import { setCustomNativeDragPreview } from '@atlaskit/pragmatic-drag-and-drop/utils/set-custom-native-drag-preview';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
@@ -27,22 +32,31 @@ import {
   tablerTrash,
 } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../core/i18n/language';
+import { Router } from '@angular/router';
+import { ApiError } from '../../../../core/api/api-errors';
 import { Notify } from '../../../../core/notify/notify';
-import { ActionItem, ActionSelection, ActionsMenu } from '../../../../shared/ui/actions-menu/actions-menu';
+import {
+  ActionItem,
+  ActionSelection,
+  ActionsMenu,
+} from '../../../../shared/ui/actions-menu/actions-menu';
 import { Button } from '../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { Dropdown, DropdownOption } from '../../../../shared/ui/dropdown/dropdown';
 import { Field } from '../../../../shared/ui/field/field';
 import { Modal } from '../../../../shared/ui/modal/modal';
-import { errorCodeOf, newIdempotencyKey } from '../shared/settings-api';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
+import { crmSettingsError, errorCodeOf, newIdempotencyKey } from '../shared/settings-api';
+import { tenantWide } from '../shared/settings-access';
 import { SettingsFrame } from '../../../../shared/ui/settings-frame/settings-frame';
 import { SettingsNotice } from '../../../../shared/ui/settings-notice/settings-notice';
 import { LeadStageModal } from './lead-stage-modal/lead-stage-modal';
 import {
   deleteLeadStage,
+  LEAD_STAGE_SETTINGS_READER,
   listLeadStages,
   reorderLeadStages,
-  requireQualifiedForConversion,
+  loadQualifiedConversionRequirement,
   setDefaultLeadStage,
   updateLeadStage,
 } from './lead-stages.api';
@@ -53,10 +67,9 @@ import {
   isProtectedStage,
   isTerminalStage,
   stageErrorMessage,
+  stageErrorTranslator,
   stageNameIn,
 } from './lead-stages.model';
-
-const CAN_MANAGE = true; // later from the session permissions
 
 interface DraggedStage {
   stageId: string;
@@ -68,7 +81,9 @@ export interface StageDropEvent {
   edge: 'before' | 'after';
 }
 
-function isDraggedStage(data: Record<string | symbol, unknown>): data is Record<string | symbol, unknown> & DraggedStage {
+function isDraggedStage(
+  data: Record<string | symbol, unknown>,
+): data is Record<string | symbol, unknown> & DraggedStage {
   return typeof data['stageId'] === 'string';
 }
 
@@ -94,7 +109,10 @@ export class StageRowDrag {
         canDrag: () => !this.dragDisabled(),
         getInitialData: () => ({ stageId: this.stageRowDrag() }),
         onGenerateDragPreview: ({ location, source, nativeSetDragImage }) => {
-          const offset = preserveOffsetOnSource({ element: source.element, input: location.current.input });
+          const offset = preserveOffsetOnSource({
+            element: source.element,
+            input: location.current.input,
+          });
           setCustomNativeDragPreview({
             nativeSetDragImage,
             getOffset: offset,
@@ -138,7 +156,9 @@ export class StageRowDrop {
       const cleanup = dropTargetForElements({
         element,
         canDrop: ({ source }) =>
-          !this.dropDisabled() && isDraggedStage(source.data) && source.data.stageId !== this.stageRowDrop(),
+          !this.dropDisabled() &&
+          isDraggedStage(source.data) &&
+          source.data.stageId !== this.stageRowDrop(),
         getData: () => ({ stageId: this.stageRowDrop() }),
         onDragEnter: ({ source, location }) => {
           if (isDraggedStage(source.data) && source.data.stageId !== this.stageRowDrop()) {
@@ -182,6 +202,7 @@ export class StageRowDrop {
     ConfirmDialog,
     Dropdown,
     Field,
+    FullState,
     LeadStageModal,
     Modal,
     SettingsFrame,
@@ -202,14 +223,16 @@ export class StageRowDrop {
     }),
   ],
   templateUrl: './lead-stages-page.html',
-  host: { class: 'flex min-h-0 flex-1 flex-col' },
+  host: { class: 'flex flex-1 shrink-0 flex-col' },
 })
 export class LeadStagesPage {
   private static nextId = 0;
   protected readonly uid = `lead-stages-page-${++LeadStagesPage.nextId}`;
 
   private readonly notify = inject(Notify);
+  private readonly router = inject(Router);
   private readonly transloco = inject(TranslocoService);
+  private readonly translateError = stageErrorTranslator(this.transloco);
   private readonly i18n = translationEvents(this.transloco);
   protected readonly language = inject(LanguageState).current;
 
@@ -218,7 +241,20 @@ export class LeadStagesPage {
   private readonly inUseModal = viewChild.required<Modal>('inUseModal');
   private readonly moveModal = viewChild.required<Modal>('moveModal');
 
-  protected readonly canManage = CAN_MANAGE;
+  private readonly injector = inject(Injector);
+  private readonly readSettings = inject(LEAD_STAGE_SETTINGS_READER);
+  protected readonly readOnly = signal(false);
+  protected readonly canManage = computed(
+    () =>
+      !this.readOnly() &&
+      runInInjectionContext(this.injector, () => tenantWide('crm.lead_stages.manage')),
+  );
+  private readonly canRead = computed(() =>
+    runInInjectionContext(this.injector, () => tenantWide('crm.lead_stages.read')),
+  );
+  private readonly canReadSettings = computed(() =>
+    runInInjectionContext(this.injector, () => tenantWide('crm.settings.read')),
+  );
   protected readonly stageLimit = LEAD_STAGE_LIMIT;
   protected readonly skeletonRows = [1, 2, 3, 4, 5];
   protected readonly categoryBadges = STAGE_CATEGORY_BADGE;
@@ -228,6 +264,24 @@ export class LeadStagesPage {
   protected readonly stages = signal<LeadStage[]>([]);
   protected readonly loading = signal(true);
   protected readonly loadFailed = signal(false);
+  private readonly loadFailure = signal<unknown>(null);
+  protected readonly loadError = computed(() => {
+    this.i18n();
+    const error = this.loadFailure();
+    return error ? crmSettingsError(this.translateError, error, 'leadStages') : null;
+  });
+  protected readonly loadErrorText = computed(() => {
+    const error = this.loadError();
+    if (!error) return '';
+    return [
+      error.message,
+      error.correlationId
+        ? this.transloco.translate('settings.common.correlationId', { id: error.correlationId })
+        : '',
+    ]
+      .filter(Boolean)
+      .join(' · ');
+  });
   protected readonly search = signal('');
   protected readonly busy = signal(false);
   protected readonly deletingName = signal('');
@@ -237,30 +291,39 @@ export class LeadStagesPage {
   protected readonly moveTargetPosition = signal(2);
   protected readonly savingMove = signal(false);
 
-  private readonly conversionRequiresQualified = requireQualifiedForConversion();
+  private readonly conversionRequiresQualified = signal(false);
   private loadSeq = 0;
 
   protected readonly gridColumns = computed(() =>
-    this.canManage
+    this.canManage()
       ? 'grid-cols-[var(--table-head-h)_var(--select-col-w)_minmax(0,1.5fr)_minmax(0,1.5fr)_minmax(0,1.1fr)_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,1.2fr)_var(--table-head-h)]'
       : 'grid-cols-[var(--table-head-h)_var(--select-col-w)_minmax(0,1.5fr)_minmax(0,1.5fr)_minmax(0,1.1fr)_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,1.2fr)]',
   );
 
   protected readonly isSearching = computed(() => this.search().trim().length > 0);
   protected readonly atLimit = computed(() => this.stages().length >= this.stageLimit);
-  protected readonly customStagesCount = computed(() => this.stages().filter((s) => !isProtectedStage(s)).length);
+  protected readonly customStagesCount = computed(
+    () => this.stages().filter((s) => !isProtectedStage(s)).length,
+  );
 
   protected readonly filteredStages = computed(() => {
     const term = this.search().trim().toLowerCase();
     const list = this.stages();
     if (!term) return list;
     return list.filter(
-      (stage) => stage.nameAr.toLowerCase().includes(term) || stage.nameEn.toLowerCase().includes(term),
+      (stage) =>
+        stage.nameAr.toLowerCase().includes(term) || stage.nameEn.toLowerCase().includes(term),
     );
   });
 
   protected readonly showMissingQualifiedWarning = computed(() => {
-    if (!this.conversionRequiresQualified || this.loading() || this.loadFailed()) return false;
+    if (
+      !this.canReadSettings() ||
+      !this.conversionRequiresQualified() ||
+      this.loading() ||
+      this.loadFailed()
+    )
+      return false;
     return !this.stages().some((stage) => stage.isActive && stage.flag === 'QUALIFIED');
   });
 
@@ -276,14 +339,21 @@ export class LeadStagesPage {
 
   constructor() {
     void this.load();
+    void this.loadWarning();
   }
 
   protected reload(): void {
     void this.load();
+    void this.loadWarning();
+  }
+
+  protected onLoadAction(): void {
+    if (this.loadError()?.kind === 'forbidden') void this.router.navigateByUrl('/');
+    else this.reload();
   }
 
   protected openCreate(): void {
-    if (!this.canManage || this.atLimit()) return;
+    if (!this.canManage() || this.atLimit()) return;
     this.stageModal().openCreate();
   }
 
@@ -303,7 +373,7 @@ export class LeadStagesPage {
 
   protected canRowDrag(stage: LeadStage): boolean {
     return (
-      this.canManage &&
+      this.canManage() &&
       !this.isSearching() &&
       !this.busy() &&
       !isProtectedStage(stage) &&
@@ -312,15 +382,16 @@ export class LeadStagesPage {
   }
 
   protected canRowDrop(stage: LeadStage): boolean {
-    return this.canManage && !this.isSearching() && !this.busy() && !isProtectedStage(stage);
+    return this.canManage() && !this.isSearching() && !this.busy() && !isProtectedStage(stage);
   }
 
   protected canSetDefault(stage: LeadStage): boolean {
-    return this.canManage && !stage.isDefault && stage.isActive && !isTerminalStage(stage);
+    return this.canManage() && !stage.isDefault && stage.isActive && !isTerminalStage(stage);
   }
 
   protected rowActions(stage: LeadStage): ActionItem[] {
     this.i18n();
+    if (!this.canManage()) return [];
     const items: ActionItem[] = [
       {
         id: 'open',
@@ -412,7 +483,7 @@ export class LeadStagesPage {
   }
 
   protected onRowDrop(event: StageDropEvent): void {
-    if (!this.canManage || this.isSearching() || this.busy()) return;
+    if (!this.canManage() || this.isSearching() || this.busy()) return;
     const current = this.stages();
     const custom = current.filter((item) => !isProtectedStage(item));
     const sourceIndex = custom.findIndex((item) => item.id === event.sourceId);
@@ -431,6 +502,7 @@ export class LeadStagesPage {
   }
 
   protected openMoveModal(stage: LeadStage): void {
+    if (!this.canRowDrag(stage)) return;
     this.movingStage.set(stage);
     this.moveTargetPosition.set(stage.sortOrder);
     this.moveModal().open();
@@ -443,7 +515,7 @@ export class LeadStagesPage {
 
   protected async saveMovePosition(): Promise<void> {
     const stage = this.movingStage();
-    if (!stage || this.savingMove() || this.busy()) return;
+    if (!this.canManage() || !stage || this.savingMove() || this.busy()) return;
     const targetPos = this.moveTargetPosition();
     if (targetPos === stage.sortOrder) {
       this.closeMoveModal();
@@ -475,7 +547,7 @@ export class LeadStagesPage {
   }
 
   protected async requestDelete(stage: LeadStage): Promise<void> {
-    if (!this.canManage || this.busy()) return;
+    if (!this.canManage() || this.busy()) return;
     this.deletingName.set(stageNameIn(stage, this.language()));
     if (!(await this.confirmDelete().open())) return;
 
@@ -487,9 +559,7 @@ export class LeadStagesPage {
       await this.load();
     } catch (error) {
       if (errorCodeOf(error) === 'LEAD_STAGE_IN_USE') {
-        this.stageModal().close();
-        this.inUseStage.set(stage);
-        this.inUseModal().open();
+        this.onStageInUse(stage);
         return;
       }
       this.showErrorToast(error);
@@ -507,9 +577,15 @@ export class LeadStagesPage {
     this.inUseStage.set(null);
   }
 
+  protected onStageInUse(stage: LeadStage): void {
+    this.stageModal().close();
+    this.inUseStage.set(stage);
+    this.inUseModal().open();
+  }
+
   protected async deactivateInUseStage(): Promise<void> {
     const stage = this.inUseStage();
-    if (!stage || this.deactivating()) return;
+    if (!this.canManage() || !stage || this.deactivating()) return;
 
     this.deactivating.set(true);
     try {
@@ -529,7 +605,7 @@ export class LeadStagesPage {
   }
 
   private async runSetDefault(stage: LeadStage): Promise<void> {
-    if (!this.canManage || this.busy()) return;
+    if (!this.canManage() || this.busy()) return;
     this.busy.set(true);
     try {
       await setDefaultLeadStage(stage.id);
@@ -543,7 +619,10 @@ export class LeadStagesPage {
     }
   }
 
-  private buildOrderedStages(current: readonly LeadStage[], reorderedCustom: readonly LeadStage[]): LeadStage[] {
+  private buildOrderedStages(
+    current: readonly LeadStage[],
+    reorderedCustom: readonly LeadStage[],
+  ): LeadStage[] {
     const first = current.filter((item) => item.flag === 'NEW');
     const disqualified = current.filter((item) => item.flag === 'DISQUALIFIED');
     const converted = current.filter((item) => item.flag === 'CONVERTED');
@@ -569,6 +648,7 @@ export class LeadStagesPage {
     } catch (error) {
       this.stages.set(before);
       this.showErrorToast(error);
+      if (errorCodeOf(error) === 'LEAD_STAGE_REORDER_INVALID') await this.load();
       return false;
     } finally {
       this.busy.set(false);
@@ -579,6 +659,13 @@ export class LeadStagesPage {
     const seq = ++this.loadSeq;
     this.loading.set(true);
     this.loadFailed.set(false);
+    this.loadFailure.set(null);
+    if (!this.canRead()) {
+      this.loadFailed.set(true);
+      this.loadFailure.set(new ApiError(403, 'CRM_PERMISSION_DENIED'));
+      this.loading.set(false);
+      return;
+    }
     try {
       const items = await listLeadStages();
       if (seq !== this.loadSeq) return;
@@ -586,7 +673,7 @@ export class LeadStagesPage {
     } catch (error) {
       if (seq !== this.loadSeq) return;
       this.loadFailed.set(true);
-      this.showErrorToast(error);
+      this.loadFailure.set(error);
     } finally {
       if (seq === this.loadSeq) {
         this.loading.set(false);
@@ -595,6 +682,15 @@ export class LeadStagesPage {
   }
 
   private showErrorToast(error: unknown): void {
-    this.notify.error(stageErrorMessage(error, (key) => this.transloco.translate(key)));
+    if (crmSettingsError(this.translateError, error, 'leadStages').readOnly)
+      this.readOnly.set(true);
+    this.notify.error(stageErrorMessage(error, this.translateError));
+  }
+
+  private async loadWarning(): Promise<void> {
+    if (!this.canReadSettings() || !this.canRead()) return;
+    this.conversionRequiresQualified.set(
+      await loadQualifiedConversionRequirement(this.readSettings),
+    );
   }
 }

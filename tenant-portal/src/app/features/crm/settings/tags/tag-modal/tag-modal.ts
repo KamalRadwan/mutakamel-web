@@ -1,4 +1,4 @@
-import { Component, computed, inject, input, output, signal, viewChild } from '@angular/core';
+import { Component, Injector, computed, inject, input, output, runInInjectionContext, signal, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerAlertTriangle, tablerCheck, tablerTag } from '@ng-icons/tabler-icons';
@@ -9,9 +9,10 @@ import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-d
 import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { fieldErrorsOf, isValidationError } from '../../../../../core/api/api-errors';
-import { errorCodeOf } from '../../shared/settings-api';
+import { ApiError, errorCodeOf } from '../../shared/settings-api';
+import { tenantWide } from '../../shared/settings-access';
 import { TAG_PRESETS, contrastRatio, isValidHexColor, normalizeHexColor, presetOf } from '../tag-colors';
-import { createTag, tagErrorMessage, updateTag } from '../tags.api';
+import { beginTagEdit, createTag, tagErrorMessage, tagErrorState, updateTag } from '../tags.api';
 import { CreateTagInput, MAX_TAG_NAME_LENGTH, MIN_CONTRAST_RATIO, Tag, UpdateTagInput } from '../tags.model';
 
 type ColorMode = 'none' | 'preset' | 'custom';
@@ -39,11 +40,16 @@ export class TagModal {
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
+  private readonly injector = inject(Injector);
   private readonly modal = viewChild.required<Modal>('modal');
   private readonly discardDialog = viewChild.required<ConfirmDialog>('discardDialog');
 
-  readonly canManage = input(true);
+  readonly canManage = input(false);
+  private readonly readOnly = signal(false);
+  protected readonly canWrite = computed(() => this.canManage() && !this.readOnly()
+    && runInInjectionContext(this.injector, () => tenantWide('crm.tags.manage')));
   readonly saved = output<Tag>();
+  readonly readOnlyChanged = output<void>();
   readonly deletedRemotely = output<void>();
   readonly deleteRequested = output<Tag>();
 
@@ -59,6 +65,7 @@ export class TagModal {
   protected readonly touched = signal<{ name?: boolean; bg?: boolean; text?: boolean }>({});
   protected readonly submitAttempted = signal(false);
   protected readonly nameServerError = signal<string | null>(null);
+  protected readonly colorServerError = signal<string | null>(null);
   protected readonly saving = signal(false);
 
   private allowClose = false;
@@ -112,6 +119,7 @@ export class TagModal {
   });
 
   openCreate(): void {
+    beginTagEdit(null);
     this.editingTag.set(null);
     this.name.set('');
     this.colorMode.set('none');
@@ -124,6 +132,7 @@ export class TagModal {
   }
 
   openEdit(tag: Tag): void {
+    beginTagEdit(tag.id);
     this.editingTag.set(tag);
     this.applyTagToForm(tag);
     this.resetValidation();
@@ -148,7 +157,7 @@ export class TagModal {
   }
 
   protected requestClose(): void {
-    if (!this.canManage() || !this.dirty()) {
+    if (!this.canWrite() || !this.dirty()) {
       this.close();
       return;
     }
@@ -156,7 +165,7 @@ export class TagModal {
   }
 
   protected onModalClosed(): void {
-    if (!this.allowClose && this.canManage() && this.dirty()) {
+    if (!this.allowClose && this.canWrite() && this.dirty()) {
       this.modal().open();
       void this.confirmDiscardAndClose();
       return;
@@ -167,37 +176,41 @@ export class TagModal {
   }
 
   protected onNameInput(event: Event): void {
-    if (!this.canManage()) return;
+    if (!this.canWrite()) return;
     const inputEl = event.target as HTMLInputElement;
     this.name.set(inputEl.value);
     this.nameServerError.set(null);
   }
 
   protected selectNoColor(): void {
-    if (!this.canManage()) return;
+    if (!this.canWrite()) return;
     this.colorMode.set('none');
+    this.colorServerError.set(null);
   }
 
   protected selectPreset(key: string): void {
-    if (!this.canManage()) return;
+    if (!this.canWrite()) return;
     this.selectedPreset.set(key);
     this.colorMode.set('preset');
+    this.colorServerError.set(null);
   }
 
   protected selectCustom(): void {
-    if (!this.canManage()) return;
+    if (!this.canWrite()) return;
     if (this.colorMode() === 'preset') {
       const preset = this.activePreset();
       this.customBg.set(preset.bg);
       this.customText.set(preset.text);
     }
     this.colorMode.set('custom');
+    this.colorServerError.set(null);
   }
 
   protected onHexInput(field: 'bg' | 'text', event: Event): void {
-    if (!this.canManage()) return;
+    if (!this.canWrite()) return;
     const inputEl = event.target as HTMLInputElement;
     const upper = inputEl.value.toUpperCase();
+    this.colorServerError.set(null);
     if (field === 'bg') {
       this.customBg.set(upper);
     } else {
@@ -261,10 +274,11 @@ export class TagModal {
   }
 
   protected async save(): Promise<void> {
-    if (this.saving() || !this.canManage()) return;
+    if (this.saving() || !this.canWrite()) return;
 
     this.submitAttempted.set(true);
     this.nameServerError.set(null);
+    this.colorServerError.set(null);
 
     const trimmedName = this.name().trim();
     const nameLen = [...trimmedName].length;
@@ -315,17 +329,27 @@ export class TagModal {
       this.close();
     } catch (error) {
       const code = errorCodeOf(error);
+      if (tagErrorState(this.transloco, error).readOnly) {
+        this.readOnly.set(true);
+        this.readOnlyChanged.emit();
+      }
       if (code === 'CRM_TAG_NAME_TAKEN') {
         this.nameServerError.set(code);
         return;
       }
-      // 400 CRM_VALIDATION_FAILED keyed by `name`: show it under the name field.
-      if (isValidationError(error) && Object.keys(fieldErrorsOf(error)).includes('name')) {
-        this.nameServerError.set('CRM_TAG_NAME_INVALID');
+      const fields = isValidationError(error) ? Object.keys(fieldErrorsOf(error)) : [];
+      if (fields.includes('name')) this.nameServerError.set('CRM_TAG_NAME_INVALID');
+      if (fields.includes('backgroundColor') || fields.includes('textColor')) {
+        this.colorServerError.set('CRM_TAG_COLOR_INVALID');
+      }
+      if (code === 'CRM_TAG_COLOR_INCOMPLETE') {
+        this.colorServerError.set(code);
+      }
+      if (this.nameServerError() || this.colorServerError()) {
         return;
       }
       this.notify.error(tagErrorMessage(this.transloco, error));
-      if (code === 'CRM_TAG_NOT_FOUND') {
+      if (error instanceof ApiError && error.status === 404) {
         this.deletedRemotely.emit();
         this.close();
       }
@@ -378,6 +402,7 @@ export class TagModal {
     this.touched.set({});
     this.submitAttempted.set(false);
     this.nameServerError.set(null);
+    this.colorServerError.set(null);
   }
 
   private async confirmDiscardAndClose(): Promise<void> {

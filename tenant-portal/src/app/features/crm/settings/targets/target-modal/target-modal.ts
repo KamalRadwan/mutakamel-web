@@ -26,19 +26,20 @@ import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { rectInPage, viewport } from '../../../../../shared/ui/overlay/zoom';
 import { UnsavedDialog } from '../../../../../shared/ui/unsaved-dialog/unsaved-dialog';
-import { errorCodeOf } from '../../../../../shared/widgets/dashboard/analytics-api';
+import { errorCodeOf } from '../../../../../core/api/api-errors';
 import {
   createTarget,
+  beginTargetAction,
   getTarget,
   isTargetGone,
   targetErrorMessage,
   targetFieldErrors,
   updateTarget,
+  targetCurrencies,
+  targetSubjectOptions,
 } from '../targets.api';
 import {
   SalesTarget,
-  TARGETABLE_METRICS,
-  TARGET_CURRENCIES,
   TARGET_MAX_TEAMS,
   TARGET_MAX_VALUE,
   TARGET_MIN_TEAMS,
@@ -49,14 +50,20 @@ import {
   TargetableMetric,
   formatTargetPeriod,
   isValidPeriodStart,
-  resolveBranchName,
-  resolveMetricLabel,
   resolveTargetSubjectName,
   validateTargetValue,
+  isPeriodClosed,
+  targetBranchAllowed,
+  TargetSubjectOptions,
+  TargetCurrency,
 } from '../targets.model';
-import { OrgApi } from '../../../../../shared/widgets/dashboard/org.api';
+import { CoreHttp } from '../../../../../core/api/core-http';
+import { ConflictDialog } from '../../../../../shared/ui/conflict-dialog/conflict-dialog';
+import { FullState } from '../../../../../shared/ui/full-state/full-state';
+import { branchGrants } from '../../shared/settings-access';
+import { crmSettingsError } from '../../shared/settings-api';
+import type { WorkspaceBranch } from '../../../../../shared/widgets/workspace-lookups/workspace-lookups.model';
 
-const PICKER_YEARS = Array.from({ length: 16 }, (_, idx) => 2020 + idx);
 const MONTH_NUMBERS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
 const QUARTER_START_MONTHS = [1, 4, 7, 10] as const;
 
@@ -70,9 +77,9 @@ interface TeamsPopoverPlace {
 function formatInitialValue(target: SalesTarget): string {
   switch (target.measureKind) {
     case 'MONEY':
-      return formatNumber(Number(target.targetValue), 'en', 3);
+      return formatNumber(Number(target.targetValue), 'en', 2);
     case 'RATE':
-      return formatNumber(Number(target.targetValue), 'en', 1);
+      return formatNumber(Number(target.targetValue), 'en', 2);
     case 'COUNT':
     default:
       return formatNumber(Number(target.targetValue), 'en', 0);
@@ -88,7 +95,19 @@ function parseNumericInput(raw: string): number | null {
 
 @Component({
   selector: 'app-target-modal',
-  imports: [NgIcon, TranslocoPipe, Badge, Button, ConfirmDialog, Dropdown, Field, Modal, UnsavedDialog],
+  imports: [
+    NgIcon,
+    TranslocoPipe,
+    Badge,
+    Button,
+    ConfirmDialog,
+    ConflictDialog,
+    FullState,
+    Dropdown,
+    Field,
+    Modal,
+    UnsavedDialog,
+  ],
   providers: [provideIcons({ tablerTarget, tablerCheck, tablerChevronDown, tablerX })],
   templateUrl: './target-modal.html',
   host: {
@@ -98,7 +117,28 @@ function parseNumericInput(raw: string): number | null {
   },
 })
 export class TargetModal {
-  private readonly org = inject(OrgApi);
+  private readonly core = inject(CoreHttp);
+  private readonly manageGrants = branchGrants('crm.targets.manage');
+  readonly branches = input<readonly WorkspaceBranch[]>([]);
+  readonly metricsError = input(false);
+  readonly metricsFailure = input<ReturnType<typeof crmSettingsError> | null>(null);
+  readonly timeZone = input<string | null>(null);
+  readonly reloadMetrics = output<void>();
+  readonly readOnly = output<void>();
+  protected readonly writeReadOnly = signal(false);
+  protected readonly currencies = signal<TargetCurrency[]>([]);
+  protected readonly currenciesError = signal(false);
+  protected readonly subjectSearch = signal('');
+  protected readonly subjectsLoading = signal(false);
+  protected readonly subjectsFailed = signal(false);
+  protected readonly subjects = signal<TargetSubjectOptions>({ users: [], teams: [] });
+  protected readonly teams = signal<
+    { id: string; name: string; branchId: string; branchName: string }[]
+  >([]);
+  private subjectsSeq = 0;
+  protected readonly conflictOpen = signal(false);
+  private conflictResolve: ((reload: boolean) => void) | null = null;
+  private readonly approvedConfirm = viewChild.required<ConfirmDialog>('approvedConfirm');
   private static nextId = 0;
   protected readonly uid = `target-modal-${++TargetModal.nextId}`;
 
@@ -111,12 +151,11 @@ export class TargetModal {
 
   private readonly modal = viewChild.required<Modal>('modal');
   private readonly unsavedDialog = viewChild.required<UnsavedDialog>('unsavedDialog');
-  private readonly conflictDialog = viewChild.required<ConfirmDialog>('conflictDialog');
   private readonly teamsBox = viewChild<ElementRef<HTMLElement>>('teamsBox');
   private readonly teamsTrigger = viewChild<ElementRef<HTMLButtonElement>>('teamsTrigger');
   private readonly teamsPanel = viewChild<ElementRef<HTMLElement>>('teamsPanel');
 
-  readonly canManage = input(true);
+  readonly canManage = input(false);
   readonly metrics = input<readonly TargetableMetric[]>([]);
 
   readonly saved = output<SalesTarget>();
@@ -125,14 +164,14 @@ export class TargetModal {
 
   protected readonly editingTarget = signal<SalesTarget | null>(null);
   protected readonly subjectType = signal<TargetSubjectType>('USER');
-  protected readonly branchId = signal<string>(this.org.branches[0]?.id ?? '');
-  protected readonly subjectId = signal<string>(this.org.users[0]?.id ?? '');
+  protected readonly branchId = signal<string>('');
+  protected readonly subjectId = signal<string>('');
   protected readonly selectedTeamIds = signal<string[]>([]);
-  protected readonly metricKey = signal<string>(TARGETABLE_METRICS[0].key);
+  protected readonly metricKey = signal<string>('');
   protected readonly periodGrain = signal<TargetPeriodGrain>('MONTH');
-  protected readonly periodYear = signal<number>(2026);
-  protected readonly periodMonth = signal<number>(11);
-  protected readonly currencyCode = signal<string>('EGP');
+  protected readonly periodYear = signal<number>(new Date().getUTCFullYear());
+  protected readonly periodMonth = signal<number>(new Date().getUTCMonth() + 1);
+  protected readonly currencyCode = signal<string>('');
   protected readonly valueInput = signal<string>('');
 
   protected readonly touched = signal<Record<string, boolean>>({});
@@ -142,27 +181,30 @@ export class TargetModal {
 
   protected readonly teamsOpen = signal(false);
   protected readonly teamsPlaced = signal(false);
-  protected readonly teamsPlace = signal<TeamsPopoverPlace>({ top: 0, start: 0, width: 0, maxHeight: null });
+  protected readonly teamsPlace = signal<TeamsPopoverPlace>({
+    top: 0,
+    start: 0,
+    width: 0,
+    maxHeight: null,
+  });
 
   private teamsSeq = 0;
   private allowClose = false;
   private confirmingDiscard = false;
 
+  protected readonly formReadOnly = computed(() => !this.canManage() || this.writeReadOnly());
   protected readonly isEdit = computed(() => this.editingTarget() !== null);
   protected readonly canEditValue = computed(() => {
-    if (!this.canManage()) return false;
+    if (!this.canManage() || this.writeReadOnly()) return false;
     const base = this.editingTarget();
-    return !base || base.approvalState !== 'SUBMITTED';
-  });
-
-  protected readonly availableMetrics = computed<readonly TargetableMetric[]>(() => {
-    const list = this.metrics();
-    return list.length ? list : TARGETABLE_METRICS;
+    return base
+      ? base.approvalState !== 'SUBMITTED' && targetBranchAllowed(base, this.manageGrants)
+      : !!this.branchId() &&
+          (this.manageGrants === 'ALL' || this.manageGrants.has(this.branchId()));
   });
 
   protected readonly activeMetric = computed<TargetableMetric | undefined>(() =>
-    this.availableMetrics().find((m) => m.key === this.metricKey()) ??
-    TARGETABLE_METRICS.find((m) => m.key === this.metricKey()),
+    this.metrics().find((m) => m.key === this.metricKey()),
   );
 
   protected readonly activeMeasureKind = computed<TargetMeasureKind>(() => {
@@ -206,75 +248,36 @@ export class TargetModal {
   });
 
   protected readonly branchOptions = computed<DropdownOption<string>[]>(() => {
-    const lang = this.language();
-    return this.org.branches.map((branch) => ({
-      value: branch.id,
-      label: branch.name[lang],
-    }));
+    return this.branches()
+      .filter((b) => this.manageGrants === 'ALL' || this.manageGrants.has(b.id))
+      .map((branch) => ({
+        value: branch.id,
+        label: branch.name,
+      }));
   });
 
   protected readonly subjectOptions = computed<DropdownOption<string>[]>(() => {
-    this.i18n();
-    const type = this.subjectType();
-    const branch = this.branchId();
-    const lang = this.language();
-    if (type === 'USER') {
-      const items = this.org.users.filter((p) => !branch || p.branchId === branch).map((person) => ({
-        value: person.id,
-        label: lang === 'ar' ? person.nameAr : person.name,
-      }));
-      return items.length
-        ? items
-        : [{ value: '', label: this.transloco.translate('targets.form.selectSubject'), disabled: true }];
-    }
-    if (type === 'TEAM') {
-      const items = this.org.teams.filter((t) => !branch || t.branchId === branch).map((team) => ({
-        value: team.id,
-        label: team.name[lang],
-      }));
-      return items.length
-        ? items
-        : [{ value: '', label: this.transloco.translate('targets.form.selectSubject'), disabled: true }];
-    }
+    if (this.subjectType() === 'USER')
+      return this.subjects().users.map((u) => ({ value: u.id, label: u.displayName }));
+    if (this.subjectType() === 'TEAM')
+      return this.subjects().teams.map((t) => ({ value: t.id, label: t.name }));
     return [];
   });
-
-  protected readonly teamChoices = computed(() => {
-    const lang = this.language();
-    return this.org.teams.map((team) => {
-      const branch = this.org.branches.find((b) => b.id === team.branchId);
-      return {
-        id: team.id,
-        label: team.name[lang],
-        branchLabel: branch ? branch.name[lang] : '',
-      };
-    });
-  });
-
+  protected readonly teamChoices = computed(() =>
+    this.teams().map((t) => ({ id: t.id, label: t.name, branchLabel: t.branchName })),
+  );
   protected readonly selectedTeamChips = computed(() => {
-    const lang = this.language();
     const base = this.editingTarget();
-    if (base?.subjectType === 'TEAM_SET') {
-      return (base.subjects ?? []).map((item) => {
-        const team = this.org.teams.find((t) => t.id === item.teamId);
-        return {
-          id: item.teamId,
-          label: team ? team.name[lang] : item.teamName,
-        };
-      });
-    }
-    return this.selectedTeamIds().map((id) => {
-      const team = this.org.teams.find((t) => t.id === id);
-      return {
-        id,
-        label: team ? team.name[lang] : id,
-      };
-    });
+    if (base?.subjectType === 'TEAM_SET')
+      return base.subjects.map((t) => ({ id: t.teamId, label: t.teamName }));
+    return this.selectedTeamIds().map((id) => ({
+      id,
+      label: this.teams().find((t) => t.id === id)?.name ?? id,
+    }));
   });
-
   protected readonly metricOptions = computed<DropdownOption<string>[]>(() => {
     const lang = this.language();
-    return this.availableMetrics().map((metric) => ({
+    return this.metrics().map((metric) => ({
       value: metric.key,
       label: lang === 'ar' ? metric.labelAr : metric.labelEn,
     }));
@@ -293,26 +296,32 @@ export class TargetModal {
     this.i18n();
     const grain = this.periodGrain();
     if (grain === 'QUARTER') {
-      return QUARTER_START_MONTHS.map((m) => ({
+      return QUARTER_START_MONTHS.filter((m) =>
+        this.periodAvailable(this.periodYear(), m, 'QUARTER'),
+      ).map((m) => ({
         value: m,
         label: this.transloco.translate(`targets.quarters.${m}`),
       }));
     }
-    return MONTH_NUMBERS.map((m) => ({
-      value: m,
-      label: this.transloco.translate(`targets.months.${m}`),
-    }));
+    return MONTH_NUMBERS.filter((m) => this.periodAvailable(this.periodYear(), m, 'MONTH')).map(
+      (m) => ({
+        value: m,
+        label: this.transloco.translate(`targets.months.${m}`),
+      }),
+    );
   });
 
   protected readonly yearOptions = computed<DropdownOption<number>[]>(() =>
-    PICKER_YEARS.map((y) => ({
-      value: y,
-      label: String(y),
-    })),
+    Array.from({ length: 2101 - this.currentYear() }, (_, i) => this.currentYear() + i).map(
+      (y) => ({
+        value: y,
+        label: String(y),
+      }),
+    ),
   );
 
   protected readonly currencyOptions = computed<DropdownOption<string>[]>(() =>
-    TARGET_CURRENCIES.map((code) => ({
+    this.currencies().map(({ code }) => ({
       value: code,
       label: code,
     })),
@@ -321,25 +330,31 @@ export class TargetModal {
   protected readonly editSubjectTypeLabel = computed(() => {
     this.i18n();
     const base = this.editingTarget();
-    return base ? this.transloco.translate(`targets.subjectTypes.${base.subjectType}`) : '';
+    return this.transloco.translate(
+      `targets.subjectTypes.${base?.subjectType ?? this.subjectType()}`,
+    );
   });
 
   protected readonly editBranchLabel = computed(() => {
     const base = this.editingTarget();
-    if (!base) return '';
-    return resolveBranchName(base.branchId, this.language());
+    if (base) return base.branchName ?? base.branchId ?? '';
+    return (
+      this.branches().find((b) => b.id === this.branchId())?.name ??
+      this.transloco.translate('targets.yourBranch')
+    );
   });
 
   protected readonly editSubjectLabel = computed(() => {
     const base = this.editingTarget();
-    if (!base) return '';
-    return resolveTargetSubjectName(base, this.language());
+    return base
+      ? resolveTargetSubjectName(base, this.language())
+      : (this.subjectOptions().find((o) => o.value === this.subjectId())?.label ?? '');
   });
 
   protected readonly editMetricLabel = computed(() => {
     const base = this.editingTarget();
-    if (!base) return '';
-    return resolveMetricLabel(base.metricKey, this.language(), this.availableMetrics());
+    if (base) return this.language() === 'ar' ? base.metricLabelAr : base.metricLabel;
+    return this.metricOptions().find((o) => o.value === this.metricKey())?.label ?? '';
   });
 
   protected readonly measureLabel = computed(() => {
@@ -350,15 +365,17 @@ export class TargetModal {
   protected readonly editGrainLabel = computed(() => {
     this.i18n();
     const base = this.editingTarget();
-    return base ? this.transloco.translate(`targets.grains.${base.periodGrain}`) : '';
+    return this.transloco.translate(`targets.grains.${base?.periodGrain ?? this.periodGrain()}`);
   });
 
   protected readonly editPeriodLabel = computed(() => {
     this.i18n();
     const base = this.editingTarget();
-    if (!base) return '';
-    return formatTargetPeriod(base.periodGrain, base.periodStart, this.language(), (n, year) =>
-      this.transloco.translate('targets.quarter', { n, year }),
+    return formatTargetPeriod(
+      base?.periodGrain ?? this.periodGrain(),
+      base?.periodStart ?? this.computedPeriodStart(),
+      this.language(),
+      (n, year) => this.transloco.translate('targets.quarter', { n, year }),
     );
   });
 
@@ -382,31 +399,42 @@ export class TargetModal {
       this.closeTeamsMenu();
     };
     document.addEventListener('scroll', onScroll, { capture: true, passive: true });
-    inject(DestroyRef).onDestroy(() => document.removeEventListener('scroll', onScroll, { capture: true }));
+    inject(DestroyRef).onDestroy(() =>
+      document.removeEventListener('scroll', onScroll, { capture: true }),
+    );
   }
 
-  openCreate(): void {
+  openCreate(branchId?: string): void {
+    beginTargetAction('create');
     this.editingTarget.set(null);
-    const defaultBranch = this.org.branches[0]?.id ?? '';
-    const defaultPerson = this.org.users.find((p) => p.branchId === defaultBranch)?.id ?? this.org.users[0]?.id ?? '';
-    const defaultMetric = this.availableMetrics()[0]?.key ?? TARGETABLE_METRICS[0].key;
+    this.subjectSearch.set('');
+    this.teams.set([]);
+    const defaultBranch = branchId ?? this.branchOptions()[0]?.value ?? '';
+    const defaultPerson = '';
+    const defaultMetric = this.metrics()[0]?.key ?? '';
     this.subjectType.set('USER');
     this.branchId.set(defaultBranch);
     this.subjectId.set(defaultPerson);
     this.selectedTeamIds.set([]);
     this.metricKey.set(defaultMetric);
     this.periodGrain.set('MONTH');
-    this.periodYear.set(2026);
-    this.periodMonth.set(11);
-    this.currencyCode.set('EGP');
+    this.periodYear.set(this.currentYear());
+    this.periodMonth.set(this.currentMonth());
+    this.currencyCode.set(
+      this.currencies().find((c) => c.isDefault)?.code ?? this.currencies()[0]?.code ?? '',
+    );
     this.valueInput.set('');
     this.resetValidation();
     this.closeTeamsMenu();
     this.allowClose = false;
     this.modal().open();
+    void this.loadCurrencies();
+    void this.loadSubjects();
   }
 
   openEdit(target: SalesTarget): void {
+    beginTargetAction('update', target.id);
+    this.subjectsSeq++;
     this.editingTarget.set(target);
     this.applyTargetToForm(target);
     this.resetValidation();
@@ -416,6 +444,10 @@ export class TargetModal {
   }
 
   close(): void {
+    this.subjectsSeq++;
+    this.conflictResolve?.(false);
+    this.conflictResolve = null;
+    this.conflictOpen.set(false);
     this.closeTeamsMenu();
     this.allowClose = true;
     this.modal().close();
@@ -467,6 +499,8 @@ export class TargetModal {
   protected onSubjectTypeChange(next: TargetSubjectType): void {
     if (this.isEdit()) return;
     this.subjectType.set(next);
+    this.subjectsFailed.set(false);
+    if (next === 'TEAM_SET') void this.loadTeamSetOptions();
     this.clearServerError('subject');
     this.clearServerError('teams');
     if (next === 'BRANCH') {
@@ -474,7 +508,7 @@ export class TargetModal {
       return;
     }
     if (next === 'USER' || next === 'TEAM') {
-      this.syncSubjectToBranch(next, this.branchId());
+      this.syncSubjectToBranch(next);
     }
   }
 
@@ -482,11 +516,13 @@ export class TargetModal {
     if (this.isEdit()) return;
     this.branchId.set(nextBranch);
     this.clearServerError('subject');
+    this.subjectId.set('');
+    void this.loadSubjects();
     const type = this.subjectType();
     if (type === 'BRANCH') {
       this.subjectId.set(nextBranch);
     } else if (type === 'USER' || type === 'TEAM') {
-      this.syncSubjectToBranch(type, nextBranch);
+      this.syncSubjectToBranch(type);
     }
   }
 
@@ -503,7 +539,9 @@ export class TargetModal {
     this.clearServerError('metric');
     this.clearServerError('currency');
     if (this.activeMeasureKind() === 'MONEY' && !this.currencyCode()) {
-      this.currencyCode.set('EGP');
+      this.currencyCode.set(
+        this.currencies().find((c) => c.isDefault)?.code ?? this.currencies()[0]?.code ?? '',
+      );
     }
   }
 
@@ -529,6 +567,9 @@ export class TargetModal {
   protected onYearChange(nextYear: number): void {
     if (this.isEdit()) return;
     this.periodYear.set(nextYear);
+    const first = this.monthOptions()[0]?.value;
+    if (first && !this.monthOptions().some((o) => o.value === this.periodMonth()))
+      this.periodMonth.set(first);
     this.clearServerError('period');
   }
 
@@ -549,7 +590,7 @@ export class TargetModal {
     const parsed = this.parsedValue();
     if (parsed !== null && Number.isFinite(parsed) && parsed > 0) {
       if (this.activeMeasureKind() === 'MONEY') {
-        this.valueInput.set(formatNumber(parsed, 'en', 3));
+        this.valueInput.set(formatNumber(parsed, 'en', 2));
       } else if (this.activeMeasureKind() === 'COUNT' && Number.isInteger(parsed)) {
         this.valueInput.set(formatNumber(parsed, 'en', 0));
       }
@@ -557,7 +598,7 @@ export class TargetModal {
   }
 
   protected toggleTeamsMenu(): void {
-    if (this.isEdit() || !this.canManage()) return;
+    if (this.isEdit() || !this.canEditValue()) return;
     if (this.teamsOpen()) {
       this.closeTeamsMenu();
       return;
@@ -599,7 +640,7 @@ export class TargetModal {
   }
 
   protected toggleTeam(teamId: string): void {
-    if (this.isEdit() || !this.canManage()) return;
+    if (this.isEdit() || !this.canEditValue()) return;
     this.markTouched('teams');
     this.clearServerError('teams');
     this.selectedTeamIds.update((list) =>
@@ -609,7 +650,7 @@ export class TargetModal {
 
   protected removeTeam(teamId: string, event: Event): void {
     event.stopPropagation();
-    if (this.isEdit() || !this.canManage()) return;
+    if (this.isEdit() || !this.canEditValue()) return;
     this.markTouched('teams');
     this.clearServerError('teams');
     this.selectedTeamIds.update((list) => list.filter((id) => id !== teamId));
@@ -640,7 +681,7 @@ export class TargetModal {
   protected subjectError(): string | null {
     this.i18n();
     const serverCode = this.serverErrors()['subject'];
-    if (serverCode) return this.transloco.translate(`analytics.error.${serverCode}`);
+    if (serverCode) return this.transloco.translate(`targets.errors.${serverCode}`);
     if (this.isEdit()) return null;
     const type = this.subjectType();
     if (type !== 'USER' && type !== 'TEAM') return null;
@@ -654,7 +695,7 @@ export class TargetModal {
   protected teamsError(): string | null {
     this.i18n();
     const serverCode = this.serverErrors()['teams'];
-    if (serverCode) return this.transloco.translate(`analytics.error.${serverCode}`);
+    if (serverCode) return this.transloco.translate(`targets.errors.${serverCode}`);
     if (this.isEdit() || this.subjectType() !== 'TEAM_SET') return null;
     if (!this.submitAttempted() && !this.touched()['teams']) return null;
     const count = this.selectedTeamIds().length;
@@ -667,7 +708,7 @@ export class TargetModal {
   protected metricError(): string | null {
     this.i18n();
     const serverCode = this.serverErrors()['metric'];
-    if (serverCode) return this.transloco.translate(`analytics.error.${serverCode}`);
+    if (serverCode) return this.transloco.translate(`targets.errors.${serverCode}`);
     if (this.isEdit()) return null;
     if (!this.submitAttempted() && !this.touched()['metric']) return null;
     if (!this.metricKey()) {
@@ -679,10 +720,13 @@ export class TargetModal {
   protected periodError(): string | null {
     this.i18n();
     const serverCode = this.serverErrors()['period'];
-    if (serverCode) return this.transloco.translate(`analytics.error.${serverCode}`);
+    if (serverCode) return this.transloco.translate(`targets.errors.${serverCode}`);
     if (this.isEdit()) return null;
     if (!this.submitAttempted() && !this.touched()['period']) return null;
-    if (!isValidPeriodStart(this.periodGrain(), this.computedPeriodStart())) {
+    if (
+      !isValidPeriodStart(this.periodGrain(), this.computedPeriodStart()) ||
+      !this.periodAvailable(this.periodYear(), this.periodMonth(), this.periodGrain())
+    ) {
       return this.transloco.translate('targets.validation.periodRequired');
     }
     return null;
@@ -691,7 +735,7 @@ export class TargetModal {
   protected currencyError(): string | null {
     this.i18n();
     const serverCode = this.serverErrors()['currency'];
-    if (serverCode) return this.transloco.translate(`analytics.error.${serverCode}`);
+    if (serverCode) return this.transloco.translate(`targets.errors.${serverCode}`);
     if (this.isEdit() || this.activeMeasureKind() !== 'MONEY') return null;
     if (!this.submitAttempted() && !this.touched()['currency']) return null;
     if (!this.currencyCode()) {
@@ -703,7 +747,7 @@ export class TargetModal {
   protected valueError(): string | null {
     this.i18n();
     const serverCode = this.serverErrors()['value'];
-    if (serverCode) return this.transloco.translate(`analytics.error.${serverCode}`);
+    if (serverCode) return this.transloco.translate(`targets.errors.${serverCode}`);
     if (!this.canEditValue()) return null;
     if (!this.submitAttempted() && !this.touched()['value']) return null;
     const parsed = this.parsedValue();
@@ -716,6 +760,8 @@ export class TargetModal {
     if (parsed > TARGET_MAX_VALUE) {
       return this.transloco.translate('targets.validation.valueMax');
     }
+    if (Math.round(parsed * 100) / 100 !== parsed)
+      return this.transloco.translate('targets.validation.valuePrecision');
     const kind = this.activeMeasureKind();
     if (kind === 'COUNT' && !Number.isInteger(parsed)) {
       return this.transloco.translate('targets.validation.valueInteger');
@@ -746,11 +792,37 @@ export class TargetModal {
         const count = this.selectedTeamIds().length;
         if (count < TARGET_MIN_TEAMS || count > TARGET_MAX_TEAMS) return false;
       }
-      if (!this.metricKey()) return false;
-      if (!isValidPeriodStart(this.periodGrain(), this.computedPeriodStart())) return false;
-      if (kind === 'MONEY' && !this.currencyCode()) return false;
+      if (
+        type === 'TEAM_SET' &&
+        this.selectedTeamIds().some(
+          (id) =>
+            !this.teams().some(
+              (t) =>
+                t.id === id && (this.manageGrants === 'ALL' || this.manageGrants.has(t.branchId)),
+            ),
+        )
+      )
+        return false;
+      if (
+        !this.activeMetric() ||
+        this.metricsError() ||
+        this.subjectsLoading() ||
+        this.subjectsFailed()
+      )
+        return false;
+      if (
+        !isValidPeriodStart(this.periodGrain(), this.computedPeriodStart()) ||
+        !this.periodAvailable(this.periodYear(), this.periodMonth(), this.periodGrain())
+      )
+        return false;
+      if (
+        kind === 'MONEY' &&
+        (this.currenciesError() || !this.currencies().some((c) => c.code === this.currencyCode()))
+      )
+        return false;
     }
 
+    if (base?.approvalState === 'APPROVED' && !(await this.approvedConfirm().open())) return false;
     this.saving.set(true);
     try {
       let result: SalesTarget;
@@ -788,6 +860,10 @@ export class TargetModal {
       return true;
     } catch (error) {
       const code = errorCodeOf(error);
+      if (crmSettingsError(this.transloco, error, 'targets').readOnly) {
+        this.writeReadOnly.set(true);
+        this.readOnly.emit();
+      }
       if (code === 'CRM_TARGET_REVISION_CONFLICT' && base) {
         this.saving.set(false);
         await this.handleRevisionConflict(base.id);
@@ -811,7 +887,10 @@ export class TargetModal {
   }
 
   private async handleRevisionConflict(targetId: string): Promise<void> {
-    const reload = await this.conflictDialog().open();
+    this.conflictOpen.set(true);
+    const reload = await new Promise<boolean>((resolve) => {
+      this.conflictResolve = resolve;
+    });
     try {
       const fresh = await getTarget(targetId);
       if (reload) {
@@ -820,10 +899,14 @@ export class TargetModal {
         this.resetValidation();
         this.reloaded.emit();
       } else {
-        this.editingTarget.set(fresh);
+        this.editingTarget.set({
+          ...this.editingTarget()!,
+          revision: fresh.revision,
+          approvalState: fresh.approvalState,
+        });
         this.reloaded.emit();
         if (fresh.approvalState === 'SUBMITTED') {
-          this.notify.error(this.transloco.translate('analytics.error.CRM_TARGET_LOCKED_SUBMITTED'));
+          this.notify.error(this.transloco.translate('targets.errors.CRM_TARGET_LOCKED_SUBMITTED'));
         }
       }
     } catch (error) {
@@ -840,7 +923,10 @@ export class TargetModal {
     const paths = Object.keys(targetFieldErrors(error));
     if (!paths.length) return false;
     const code = 'CRM_VALIDATION_FAILED';
-    const fieldOf: Record<string, 'value' | 'currency' | 'period' | 'subject' | 'teams' | 'metric'> = {
+    const fieldOf: Record<
+      string,
+      'value' | 'currency' | 'period' | 'subject' | 'teams' | 'metric'
+    > = {
       targetValue: 'value',
       currencyCode: 'currency',
       periodStart: 'period',
@@ -867,6 +953,10 @@ export class TargetModal {
       case 'CRM_TARGET_VALUE_INVALID':
         this.serverErrors.set({ value: code });
         return true;
+      case 'CRM_TARGET_DUPLICATE':
+        this.serverErrors.set({ metric: code });
+        return true;
+      case 'CRM_TARGET_SECOND_CURRENCY_AFTER_R2':
       case 'CRM_TARGET_CURRENCY_INVALID':
         this.serverErrors.set({ currency: code });
         return true;
@@ -895,20 +985,131 @@ export class TargetModal {
     this.selectedTeamIds.set((target.subjects ?? []).map((s) => s.teamId));
     this.metricKey.set(target.metricKey);
     this.periodGrain.set(target.periodGrain);
-    this.currencyCode.set(target.currencyCode ?? 'EGP');
+    this.currencyCode.set(target.currencyCode ?? '');
     this.valueInput.set(formatInitialValue(target));
   }
 
-  private syncSubjectToBranch(type: 'USER' | 'TEAM', branchId: string): void {
-    if (type === 'USER') {
-      const first = this.org.users.find((p) => !branchId || p.branchId === branchId);
-      this.subjectId.set(first?.id ?? '');
-    } else {
-      const first = this.org.teams.find((t) => !branchId || t.branchId === branchId);
-      this.subjectId.set(first?.id ?? '');
+  private syncSubjectToBranch(type: 'USER' | 'TEAM'): void {
+    const items = type === 'USER' ? this.subjects().users : this.subjects().teams;
+    this.subjectId.set(
+      items.some((item) => item.id === this.subjectId()) ? this.subjectId() : (items[0]?.id ?? ''),
+    );
+  }
+  protected conflictClosed(open: boolean): void {
+    if (!open) this.resolveConflict(false);
+  }
+  protected resolveConflict(reload: boolean): void {
+    this.conflictOpen.set(false);
+    this.conflictResolve?.(reload);
+    this.conflictResolve = null;
+  }
+  private currentParts(): { year: number; month: number } {
+    const parts = new Intl.DateTimeFormat('en', {
+      timeZone: this.timeZone() ?? 'UTC',
+      year: 'numeric',
+      month: 'numeric',
+    }).formatToParts(new Date());
+    return {
+      year: Number(parts.find((p) => p.type === 'year')!.value),
+      month: Number(parts.find((p) => p.type === 'month')!.value),
+    };
+  }
+  private currentYear(): number {
+    return this.currentParts().year;
+  }
+  private currentMonth(): number {
+    return this.currentParts().month;
+  }
+  private periodAvailable(year: number, month: number, grain: TargetPeriodGrain): boolean {
+    return !isPeriodClosed(
+      grain,
+      `${year}-${String(grain === 'YEAR' ? 1 : month).padStart(2, '0')}-01`,
+      new Date().toISOString(),
+      this.timeZone() ?? 'UTC',
+    );
+  }
+  protected searchSubjects(event: Event): void {
+    this.subjectSearch.set((event.target as HTMLInputElement).value);
+    void this.loadSubjects();
+  }
+  protected async loadCurrencies(): Promise<void> {
+    this.currenciesError.set(false);
+    try {
+      const currencies = await targetCurrencies(this.core);
+      this.currencies.set(currencies);
+      if (!currencies.some((c) => c.code === this.currencyCode()))
+        this.currencyCode.set(
+          currencies.find((c) => c.isDefault)?.code ?? currencies[0]?.code ?? '',
+        );
+      if (!currencies.length) this.currenciesError.set(true);
+    } catch {
+      this.currenciesError.set(true);
     }
   }
-
+  protected async loadSubjects(): Promise<void> {
+    if (this.subjectType() === 'TEAM_SET') {
+      await this.loadTeamSetOptions();
+      return;
+    }
+    if (!this.branchId()) return;
+    const seq = ++this.subjectsSeq;
+    this.subjectsLoading.set(true);
+    this.subjectsFailed.set(false);
+    this.subjects.set({ users: [], teams: [] });
+    try {
+      const data = await targetSubjectOptions(
+        this.branchId(),
+        this.subjectSearch().trim() || undefined,
+      );
+      if (seq !== this.subjectsSeq) return;
+      this.subjects.set(data);
+      const branchId = this.branchId();
+      const branchName = this.branches().find((b) => b.id === branchId)?.name ?? '';
+      this.teams.update((teams) => [
+        ...teams.filter((t) => t.branchId !== branchId),
+        ...data.teams.map((t) => ({ ...t, branchId, branchName })),
+      ]);
+      const type = this.subjectType();
+      if (type === 'USER' || type === 'TEAM') this.syncSubjectToBranch(type);
+    } catch (error) {
+      if (seq !== this.subjectsSeq) return;
+      this.subjectsFailed.set(true);
+      this.serverErrors.set({
+        subject: errorCodeOf(error) ?? 'SUBJECT_OPTIONS_FAILED',
+        teams: errorCodeOf(error) ?? 'SUBJECT_OPTIONS_FAILED',
+      });
+    } finally {
+      if (seq === this.subjectsSeq) this.subjectsLoading.set(false);
+    }
+  }
+  private async loadTeamSetOptions(): Promise<void> {
+    const seq = ++this.subjectsSeq;
+    this.subjectsFailed.set(false);
+    const branches = this.branchOptions().length
+      ? this.branchOptions()
+      : [{ value: this.branchId(), label: '' }];
+    this.subjectsLoading.set(true);
+    try {
+      const results = await Promise.all(
+        branches.map(async (b) => ({
+          branch: b,
+          data: await targetSubjectOptions(b.value, this.subjectSearch().trim() || undefined),
+        })),
+      );
+      if (seq !== this.subjectsSeq) return;
+      const selected = this.teams().filter((t) => this.selectedTeamIds().includes(t.id));
+      const found = results.flatMap(({ branch, data }) =>
+        data.teams.map((t) => ({ ...t, branchId: branch.value, branchName: branch.label })),
+      );
+      this.teams.set([...selected.filter((t) => !found.some((row) => row.id === t.id)), ...found]);
+    } catch (error) {
+      if (seq !== this.subjectsSeq) return;
+      this.subjectsFailed.set(true);
+      this.serverErrors.set({ teams: errorCodeOf(error) ?? 'SUBJECT_OPTIONS_FAILED' });
+    } finally {
+      if (seq === this.subjectsSeq) this.subjectsLoading.set(false);
+    }
+  }
   private placeTeamsPanel(seq: number): void {
     if (seq !== this.teamsSeq || !this.teamsOpen() || this.teamsPlaced()) return;
     const anchorEl = this.teamsBox()?.nativeElement ?? this.teamsTrigger()?.nativeElement;

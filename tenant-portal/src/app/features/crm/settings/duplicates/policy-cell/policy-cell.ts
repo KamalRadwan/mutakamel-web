@@ -46,7 +46,7 @@ interface MenuPlace {
   providers: [provideIcons({ tablerLock, tablerLoader2, tablerChevronDown, tablerCheck })],
   templateUrl: './policy-cell.html',
   host: {
-    class: 'relative flex h-full w-full min-w-0 items-center',
+    class: 'relative flex h-full w-full min-w-0 flex-col items-center',
     '(document:click)': 'closeIfOutside($event)',
     '(window:resize)': 'close()',
     '(keydown)': 'onKeydown($event)',
@@ -81,7 +81,8 @@ export class PolicyCell {
   readonly limit = input<'CHAIN' | undefined>(undefined);
   readonly subnote = input('');
   readonly saving = input(false);
-  readonly canManage = input(true);
+  readonly canManage = input(false);
+  readonly error = input<string | null>(null);
 
   readonly chosen = output<Tri>();
 

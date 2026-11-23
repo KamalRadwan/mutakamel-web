@@ -1,67 +1,75 @@
+import { ApiError } from '../../../../core/api/api-errors';
+import { newIdempotencyKey } from '../../../../core/api/idempotency';
+import { crmHttp, crmQueries } from '../../shared/crm-http';
 import {
-  fakeCreateCustomField,
-  fakeListBranches,
-  fakeListCustomFields,
-  fakeListSampleRecords,
-  fakeListValues,
-  fakeSaveValue,
-  fakeSetRequirement,
-  fakeUpdateCustomField,
-} from './custom-fields.fake';
-import {
-  CreatableOwnerType,
-  CreateCustomFieldInput,
-  CustomField,
-  CustomFieldDefinition,
-  CustomFieldValueRow,
-  FieldRequirementRow,
-  SampleBranch,
-  SampleRecord,
-  SaveCustomFieldValueInput,
-  SetRequirementInput,
-  UpdateCustomFieldPatch,
+  CreateCustomFieldInput, CustomField, CustomFieldDefinition, FieldRequirementRow,
+  SetRequirementInput, UpdateCustomFieldPatch,
 } from './custom-fields.model';
 
-// GET /api/tenant/crm/v1/custom-fields
+const queryKey = ['crm-settings', 'custom-fields'] as const;
+const requests = new WeakMap<object, { key: string; bodyJson: string; path: string }>();
+
 export function listCustomFields(): Promise<CustomField[]> {
-  return fakeListCustomFields();
+  return crmQueries().fetchQuery({ queryKey, queryFn: () => crmHttp().read<CustomField[]>('/custom-fields') });
 }
 
-// POST /api/tenant/crm/v1/custom-fields
 export function createCustomField(input: CreateCustomFieldInput): Promise<CustomFieldDefinition> {
-  return fakeCreateCustomField(input);
+  return write('POST', '/custom-fields', input);
 }
 
-// PATCH /api/tenant/crm/v1/custom-fields/:id
 export function updateCustomField(id: string, patch: UpdateCustomFieldPatch): Promise<CustomFieldDefinition> {
-  return fakeUpdateCustomField(id, patch);
+  return write('PATCH', `/custom-fields/${id}`, patch);
 }
 
-// POST /api/tenant/crm/v1/custom-fields/:id/requirements
 export function setRequirement(id: string, input: SetRequirementInput): Promise<FieldRequirementRow> {
-  return fakeSetRequirement(id, input);
+  return write('POST', `/custom-fields/${id}/requirements`, input);
 }
 
-// GET /api/tenant/crm/v1/custom-fields/values
-export function listValues(
-  branchId: string,
-  ownerType: CreatableOwnerType,
-  ownerId: string,
-): Promise<CustomFieldValueRow[]> {
-  return fakeListValues(branchId, ownerType, ownerId);
+async function write<T>(method: 'POST' | 'PATCH', path: string, body: object): Promise<T> {
+  const bodyJson = JSON.stringify(body);
+  const previous = requests.get(body);
+  const request = previous?.bodyJson === bodyJson && previous.path === path
+    ? previous : { key: newIdempotencyKey(), bodyJson, path };
+  requests.set(body, request);
+  const queries = crmQueries();
+  try {
+    const result = await queries.getMutationCache().build(queries, {
+      mutationFn: () => crmHttp().write<T>(method, path, JSON.parse(bodyJson), { key: request.key }),
+      retry: false,
+    }).execute(undefined);
+    requests.delete(body);
+    await queries.cancelQueries({ queryKey });
+    await queries.invalidateQueries({ queryKey });
+    return result.data;
+  } catch (error) {
+    if (!keepRequest(error)) requests.delete(body);
+    throw error;
+  }
 }
 
-// POST /api/tenant/crm/v1/custom-fields/values
-export function saveValue(input: SaveCustomFieldValueInput): Promise<CustomFieldValueRow | null> {
-  return fakeSaveValue(input);
+function keepRequest(error: unknown): boolean {
+  return error instanceof ApiError &&
+    (error.status === 0 || error.status === 401 || error.status >= 500 || error.code === 'GW.IDEM.IN_FLIGHT');
 }
 
-// Sample branches for the Record values selector (fake until core branches endpoint is wired)
-export function listBranches(): Promise<SampleBranch[]> {
-  return fakeListBranches();
-}
+/** Keeps the same body object (and its key) when a user retries an uncertain write. */
+export class CustomFieldSubmission {
+  private pending: { bodyJson: string; body: object } | null = null;
 
-// Sample records for the Record values selector (fake until CRM record lookup endpoints are wired)
-export function listSampleRecords(branchId: string, ownerType: CreatableOwnerType): Promise<SampleRecord[]> {
-  return fakeListSampleRecords(branchId, ownerType);
+  async run<T extends object, R>(body: T, send: (body: T) => Promise<R>): Promise<R> {
+    const bodyJson = JSON.stringify(body);
+    if (this.pending?.bodyJson !== bodyJson) this.pending = { bodyJson, body };
+    try {
+      const result = await send(this.pending.body as T);
+      this.reset();
+      return result;
+    } catch (error) {
+      if (!keepRequest(error)) this.reset();
+      throw error;
+    }
+  }
+
+  reset(): void {
+    this.pending = null;
+  }
 }

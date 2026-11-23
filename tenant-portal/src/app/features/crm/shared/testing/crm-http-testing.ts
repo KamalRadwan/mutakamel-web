@@ -1,6 +1,12 @@
 import type { CoreQuery, CoreWriteMethod, CoreWriteResult } from '../../../../core/api/core-http';
-import type { CrmHttpTransport, CrmWriteOptions } from '../crm-http';
+import type { CrmHttpTransport, CrmReadOptions, CrmWriteOptions } from '../crm-http';
 import { CRM_SETTINGS_FIXTURES } from './crm-settings-fixtures';
+
+export interface RecordedCrmRead {
+  path: string;
+  query: CoreQuery | undefined;
+  scope: CrmReadOptions['scope'];
+}
 
 export interface RecordedCrmWrite {
   method: CoreWriteMethod;
@@ -10,11 +16,13 @@ export interface RecordedCrmWrite {
 }
 
 export class CrmHttpStub implements CrmHttpTransport {
+  private reads: RecordedCrmRead[] = [];
   private writes: RecordedCrmWrite[] = [];
 
   constructor(private readonly fixtures: Readonly<Record<string, unknown>> = CRM_SETTINGS_FIXTURES) {}
 
-  async read<T>(path: string, query?: CoreQuery): Promise<T> {
+  async read<T>(path: string, query?: CoreQuery, options?: CrmReadOptions): Promise<T> {
+    this.reads.push(structuredClone({ path, query, scope: options?.scope }));
     if (!Object.hasOwn(this.fixtures, path)) throw new Error(`No CRM GET fixture for ${path}`);
     const data = structuredClone(this.fixtures[path]);
     if (!Array.isArray(data) || !query) return data as T;
@@ -24,7 +32,8 @@ export class CrmHttpStub implements CrmHttpTransport {
     )) as T;
   }
 
-  async readBlob(path: string): Promise<Blob> {
+  async readBlob(path: string, query?: CoreQuery, options?: CrmReadOptions): Promise<Blob> {
+    this.reads.push(structuredClone({ path, query, scope: options?.scope }));
     const data = this.fixtures[path];
     if (!(data instanceof Blob)) throw new Error(`No CRM Blob fixture for ${path}`);
     return data.slice(0, data.size, data.type);
@@ -44,11 +53,16 @@ export class CrmHttpStub implements CrmHttpTransport {
     return this.write<T>('POST', path, form, options);
   }
 
+  recordedReads(): readonly RecordedCrmRead[] {
+    return [...this.reads];
+  }
+
   recordedWrites(): readonly RecordedCrmWrite[] {
     return [...this.writes];
   }
 
   reset(): void {
+    this.reads = [];
     this.writes = [];
   }
 }

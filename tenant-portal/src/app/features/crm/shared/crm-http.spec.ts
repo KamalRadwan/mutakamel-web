@@ -43,6 +43,43 @@ describe('CrmHttp', () => {
     }
   });
 
+  it('read forwards scope and stays bare', async () => {
+    const scope = { companyId: 'Company-ID', branchId: 'Branch-ID' };
+    const body = { success: true, data: [{ id: 'one' }] };
+    const pending = api.read('/leads/capabilities', { branchId: scope.branchId }, { scope });
+    const request = http.expectOne(`${base}/leads/capabilities?branchId=Branch-ID`);
+    expect(request.request.headers.get('x-mutakamel-company-id')).toBe(scope.companyId);
+    expect(request.request.headers.get('x-mutakamel-branch-id')).toBe(scope.branchId);
+    expect(request.request.withCredentials).toBe(true);
+    request.flush(body);
+    await expect(pending).resolves.toEqual(body);
+  });
+
+  it('read without scope sends no scope headers', async () => {
+    for (const options of [undefined, {}, { scope: {} }, { scope: { companyId: undefined, branchId: undefined } }]) {
+      const pending = api.read('/tags', undefined, options);
+      const request = http.expectOne(`${base}/tags`);
+      expect(request.request.headers.keys()).toEqual([]);
+      request.flush([]);
+      await expect(pending).resolves.toEqual([]);
+    }
+  });
+
+  it('readBlob forwards scope only when requested', async () => {
+    const blob = new Blob(['bytes'], { type: 'image/png' });
+    for (const scope of [undefined, {}, { companyId: 'Company-ID' }, { branchId: 'Branch-ID' },
+      { companyId: 'Company-ID', branchId: 'Branch-ID' }]) {
+      const pending = api.readBlob('/icon', { size: 'thumb' }, { scope });
+      const request = http.expectOne(`${base}/icon?size=thumb`);
+      expect(request.request.headers.get('x-mutakamel-company-id')).toBe(scope?.companyId ?? null);
+      expect(request.request.headers.get('x-mutakamel-branch-id')).toBe(scope?.branchId ?? null);
+      expect(request.request.responseType).toBe('blob');
+      expect(request.request.withCredentials).toBe(true);
+      request.flush(blob);
+      await expect(pending).resolves.toBe(blob);
+    }
+  });
+
   it('read never unwraps', async () => {
     const body = { success: true, data: [{ id: 'one' }] };
     const pending = api.read('/tags');
@@ -224,6 +261,33 @@ describe('CrmHttp', () => {
   });
 });
 
+describe('CrmHttpStub', () => {
+  it('records reads with scope and resets', async () => {
+    const blob = new Blob(['bytes'], { type: 'image/png' });
+    const stub = new CrmHttpStub({ '/tags': [{ id: 'one' }, { id: 'two' }], '/icon': blob });
+    const scope = { companyId: 'Company-ID', branchId: 'Branch-ID' };
+    const query = { id: 'one' };
+    await expect(stub.read('/tags', query, { scope })).resolves.toEqual([{ id: 'one' }]);
+    query.id = 'two';
+    scope.branchId = 'Changed';
+    await expect(stub.readBlob('/icon', { size: 'thumb' }, { scope })).resolves.toBeInstanceOf(Blob);
+    await stub.read('/tags');
+    await expect(stub.read('/missing', undefined, { scope })).rejects.toThrow('No CRM GET fixture');
+    await expect(stub.readBlob('/missing')).rejects.toThrow('No CRM Blob fixture');
+    expect(stub.recordedReads()).toEqual([
+      { path: '/tags', query: { id: 'one' }, scope: { companyId: 'Company-ID', branchId: 'Branch-ID' } },
+      { path: '/icon', query: { size: 'thumb' }, scope: { companyId: 'Company-ID', branchId: 'Changed' } },
+      { path: '/tags', query: undefined, scope: undefined },
+      { path: '/missing', query: undefined, scope: { companyId: 'Company-ID', branchId: 'Changed' } },
+      { path: '/missing', query: undefined, scope: undefined },
+    ]);
+    await stub.write('POST', '/tags', {}, { key: newIdempotencyKey() });
+    stub.reset();
+    expect(stub.recordedReads()).toEqual([]);
+    expect(stub.recordedWrites()).toEqual([]);
+  });
+});
+
 describe('test-setup', () => {
   const leakedStub = new CrmHttpStub({ '/tags': ['custom'] });
 
@@ -231,15 +295,20 @@ describe('test-setup', () => {
     const stub = crmHttp() as CrmHttpStub;
     await stub.write('POST', '/tags', { name: 'One' }, { key: newIdempotencyKey() });
     expect(stub.recordedWrites()).toHaveLength(1);
+    await stub.read('/tags', undefined, { scope: { branchId: 'branch' } });
+    expect(stub.recordedReads()).toHaveLength(1);
     crmQueries().setQueryData(['crm-settings', 'tags'], ['cached']);
     bindCrmHttpForTest(leakedStub);
     await leakedStub.write('POST', '/tags', { name: 'Custom' }, { key: newIdempotencyKey() });
+    await leakedStub.read('/tags');
   });
 
   it('recorded writes reset after each spec', async () => {
     const stub = crmHttp() as CrmHttpStub;
     expect(stub.recordedWrites()).toEqual([]);
     expect(leakedStub.recordedWrites()).toEqual([]);
+    expect(stub.recordedReads()).toEqual([]);
+    expect(leakedStub.recordedReads()).toEqual([]);
     expect(crmQueries().getQueryCache().getAll()).toEqual([]);
     await expect(stub.read('/tags')).resolves.toEqual(CRM_SETTINGS_FIXTURES['/tags']);
   });

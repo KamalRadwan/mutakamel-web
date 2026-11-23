@@ -1,9 +1,10 @@
 import { Service, inject } from '@angular/core';
 import { QueryClient } from '@tanstack/angular-query';
-import { CoreHttp, type CoreQuery, type CoreWriteMethod, type CoreWriteOptions, type CoreWriteResult } from '../../../core/api/core-http';
+import { CoreHttp, type CoreQuery, type CoreReadOptions, type CoreWriteMethod, type CoreWriteOptions, type CoreWriteResult } from '../../../core/api/core-http';
 import { CrmHttpStub } from './testing/crm-http-testing';
 
 export type CrmWriteOptions = Omit<CoreWriteOptions, 'key' | 'bare' | 'noBody'> & { key: string };
+export type CrmReadOptions = Pick<CoreReadOptions, 'scope'>;
 export type CrmHttpTransport = Pick<CrmHttp, 'read' | 'readBlob' | 'write' | 'writeMultipart'>;
 
 const basePath = '/api/tenant/crm/v1';
@@ -12,12 +13,12 @@ const basePath = '/api/tenant/crm/v1';
 export class CrmHttp {
   private readonly core = inject(CoreHttp);
 
-  read<T>(path: string, query?: CoreQuery): Promise<T> {
-    return this.core.read<T>(`${basePath}${path}`, query, { bare: true });
+  read<T>(path: string, query?: CoreQuery, options?: CrmReadOptions): Promise<T> {
+    return this.core.read<T>(`${basePath}${path}`, query, { bare: true, scope: options?.scope });
   }
 
-  readBlob(path: string, query?: CoreQuery): Promise<Blob> {
-    return this.core.readBlob(`${basePath}${path}`, query);
+  readBlob(path: string, query?: CoreQuery, options?: CrmReadOptions): Promise<Blob> {
+    return this.core.readBlob(`${basePath}${path}`, query, { scope: options?.scope });
   }
 
   write<T>(method: CoreWriteMethod, path: string, body: unknown, options: CrmWriteOptions): Promise<CoreWriteResult<T>> {

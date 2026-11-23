@@ -12,7 +12,9 @@ import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { Switch } from '../../../../../shared/ui/switch/switch';
 import { errorCodeOf } from '../../shared/settings-api';
-import { createOpportunityStage, updateOpportunityStage } from '../opportunity-stages.api';
+import { ApiError, fieldErrorsOf, isValidationError } from '../../../../../core/api/api-errors';
+import { opportunityStageError } from '../opportunity-stage-errors';
+import { beginOpportunityStageEdit, createOpportunityStage, updateOpportunityStage } from '../opportunity-stages.api';
 import {
   OPPORTUNITY_STAGE_FLAGS,
   OpportunityStage,
@@ -46,7 +48,10 @@ export class OpportunityStageModal {
   private readonly modal = viewChild.required(Modal);
   private readonly discardDialog = viewChild.required<ConfirmDialog>('discardDialog');
 
-  readonly canManage = input(true);
+  readonly canManage = input(false);
+  readonly stages = input<readonly OpportunityStage[]>([]);
+  readonly usageKnown = input(false);
+  readonly readOnlyRequired = output<void>();
   readonly saved = output<OpportunityStage>();
   readonly failed = output<{ stage: OpportunityStage; error: unknown }>();
   readonly deleteRequested = output<OpportunityStage>();
@@ -61,6 +66,7 @@ export class OpportunityStageModal {
   protected readonly touched = signal<{ nameAr?: boolean; nameEn?: boolean }>({});
   protected readonly submitted = signal(false);
   protected readonly saving = signal(false);
+  protected readonly serverErrors = signal<Record<string, string[]>>({});
 
   private allowClose = false;
   private confirmingDiscard = false;
@@ -135,6 +141,8 @@ export class OpportunityStageModal {
   });
 
   openCreate(): void {
+    beginOpportunityStageEdit(null);
+    this.serverErrors.set({});
     this.stage.set(null);
     this.usedPipelines.set([]);
     this.nameAr.set('');
@@ -150,6 +158,8 @@ export class OpportunityStageModal {
   }
 
   openEdit(stage: OpportunityStage, pipelines: StageUsagePipeline[]): void {
+    beginOpportunityStageEdit(stage.id);
+    this.serverErrors.set({});
     this.stage.set(stage);
     this.usedPipelines.set(pipelines);
     this.nameAr.set(stage.nameAr);
@@ -179,8 +189,11 @@ export class OpportunityStageModal {
     this.modal().close();
   }
 
-  protected errorOf(field: 'nameAr' | 'nameEn'): string | null {
+  protected errorOf(field: 'nameAr' | 'nameEn' | 'flag' | 'category' | 'isActive'): string | null {
     this.i18n();
+    const serverError = this.serverErrors()[field]?.join(' ');
+    if (serverError) return serverError;
+    if (field !== 'nameAr' && field !== 'nameEn') return null;
     if (!this.submitted() && !this.touched()[field]) return null;
     const raw = field === 'nameAr' ? this.nameAr() : this.nameEn();
     const trimmed = raw.trim();
@@ -193,7 +206,16 @@ export class OpportunityStageModal {
     return null;
   }
 
+  protected duplicateName(field: 'nameAr' | 'nameEn'): string | null {
+    this.i18n();
+    const value = this[field]().trim();
+    return value && this.stages().some((stage) => stage.id !== this.stage()?.id && stage[field].trim() === value)
+      ? this.transloco.translate('opportunityStages.validation.duplicateName')
+      : null;
+  }
+
   protected onNameInput(field: 'nameAr' | 'nameEn', event: Event): void {
+    this.serverErrors.update((errors) => ({ ...errors, [field]: [] }));
     const value = (event.target as HTMLInputElement).value;
     if (field === 'nameAr') this.nameAr.set(value);
     else this.nameEn.set(value);
@@ -206,6 +228,7 @@ export class OpportunityStageModal {
   protected setFlag(nextFlag: OpportunityStageFlag): void {
     if (this.meaningLocked() || this.saving()) return;
     this.flag.set(nextFlag);
+    this.serverErrors.update((errors) => ({ ...errors, flag: [], category: [] }));
     const allowed = allowedCategories(nextFlag);
     if (!allowed.includes(this.category())) {
       this.category.set(allowed[0]);
@@ -216,12 +239,14 @@ export class OpportunityStageModal {
     if (this.categoryLocked() || this.saving()) return;
     if (this.allowedCats().includes(nextCategory)) {
       this.category.set(nextCategory);
+      this.serverErrors.update((errors) => ({ ...errors, category: [] }));
     }
   }
 
   protected undo(): void {
     const base = this.stage();
     if (!base || this.saving()) return;
+    this.serverErrors.set({});
     this.nameAr.set(base.nameAr);
     this.nameEn.set(base.nameEn);
     this.flag.set(base.flag);
@@ -247,6 +272,7 @@ export class OpportunityStageModal {
     }
 
     const base = this.stage();
+    this.serverErrors.set({});
     this.saving.set(true);
     try {
       let result: OpportunityStage;
@@ -273,8 +299,15 @@ export class OpportunityStageModal {
       this.modal().close();
       this.saved.emit(result);
     } catch (error) {
+      if (isValidationError(error)) {
+        this.serverErrors.set(fieldErrorsOf(error));
+        if (Object.keys(this.serverErrors()).some((key) => !['nameAr', 'nameEn', 'flag', 'category', 'isActive'].includes(key))) {
+          this.showErrorToast(error);
+        }
+        return;
+      }
       const code = errorCodeOf(error);
-      if (code !== 'OPPORTUNITY_STAGE_IN_USE' && code !== 'OPPORTUNITY_STAGE_NOT_FOUND') {
+      if (code !== 'OPPORTUNITY_STAGE_IN_USE' && !(error instanceof ApiError && error.status === 404)) {
         this.showErrorToast(error);
       }
       if (base) {
@@ -324,9 +357,8 @@ export class OpportunityStageModal {
   }
 
   private showErrorToast(error: unknown): void {
-    const code = errorCodeOf(error);
-    const key = code ? `opportunityStages.errors.${code}` : 'settings.errors.generic';
-    const message = this.transloco.translate(key);
-    this.notify.error(message !== key ? message : this.transloco.translate('settings.errors.generic'));
+    const state = opportunityStageError(this.transloco, error);
+    if (state.readOnly) this.readOnlyRequired.emit();
+    this.notify.error(state.message);
   }
 }

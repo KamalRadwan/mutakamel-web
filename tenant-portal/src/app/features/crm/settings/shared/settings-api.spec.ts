@@ -1,9 +1,84 @@
+import en from '../../../../../../public/i18n/settings/en.json';
+import ar from '../../../../../../public/i18n/settings/ar.json';
 import { ApiError, crmSettingsError, errorMessage } from './settings-api';
 
 describe('crmSettingsError', () => {
   function translator(messages: Record<string, string>) {
     return { translate: (key: string) => messages[key] ?? key };
   }
+
+  describe.each([
+    { language: 'en', direction: 'ltr', messages: en },
+    { language: 'ar', direction: 'rtl', messages: ar },
+  ])('$language ($direction)', ({ language, direction, messages }) => {
+    describe.each(['light', 'dark'])('%s', (theme) => {
+      const sharedMessages = Object.fromEntries(
+        Object.entries(messages.errors).map(([key, value]) => [`settings.errors.${key}`, value]),
+      );
+      const t = translator(sharedMessages);
+      let originalAttributes: (string | null)[];
+
+      beforeEach(() => {
+        originalAttributes = ['lang', 'dir', 'data-theme'].map((name) => document.documentElement.getAttribute(name));
+        document.documentElement.setAttribute('lang', language);
+        document.documentElement.setAttribute('dir', direction);
+        document.documentElement.setAttribute('data-theme', theme);
+      });
+
+      afterEach(() => {
+        ['lang', 'dir', 'data-theme'].forEach((name, index) => {
+          const original = originalAttributes[index];
+          if (original === null) document.documentElement.removeAttribute(name);
+          else document.documentElement.setAttribute(name, original);
+        });
+      });
+
+      it('module off makes the page read-only', () => {
+        for (const code of ['CRM_LEADS_DISABLED', 'CRM_OPPORTUNITIES_DISABLED'] as const) {
+          const error = new ApiError(403, code, { companyId: ['019ae170-7000-7000-8000-000000000001'] });
+          expect(crmSettingsError(t, error, 'record')).toEqual({
+            message: messages.errors[code],
+            readOnly: true,
+            kind: 'forbidden',
+            correlationId: null,
+          });
+        }
+      });
+
+      it('scoped denial', () => {
+        expect(crmSettingsError(t, new ApiError(403, 'CRM_SCOPED_PERMISSION_DENIED'), 'record')).toEqual({
+          message: messages.errors.CRM_SCOPED_PERMISSION_DENIED,
+          readOnly: false,
+          kind: 'forbidden',
+          correlationId: null,
+        });
+      });
+
+      it('tag codes', () => {
+        for (const [code, status] of [
+          ['CRM_RECORD_TAG_ALREADY_ATTACHED', 409],
+          ['CRM_TAG_UNKNOWN', 422],
+          ['CRM_RECORD_TAG_NOT_FOUND', 404],
+        ] as const) {
+          expect(crmSettingsError(t, new ApiError(status, code), 'record')).toEqual({
+            message: messages.errors[code],
+            readOnly: false,
+            kind: status === 404 ? 'not-found' : 'load-failure',
+            correlationId: null,
+          });
+        }
+      });
+
+      it('page key still wins', () => {
+        const pageMessage = language === 'ar' ? 'رسالة خاصة بالسجل.' : 'Record-specific message.';
+        for (const code of ['CRM_LEADS_DISABLED', 'CRM_OPPORTUNITIES_DISABLED', 'CRM_SCOPED_PERMISSION_DENIED',
+          'CRM_RECORD_TAG_ALREADY_ATTACHED', 'CRM_TAG_UNKNOWN', 'CRM_RECORD_TAG_NOT_FOUND']) {
+          const pageTranslator = translator({ ...sharedMessages, [`record.errors.${code}`]: pageMessage });
+          expect(crmSettingsError(pageTranslator, new ApiError(403, code), 'record').message).toBe(pageMessage);
+        }
+      });
+    });
+  });
 
   it('page key wins', () => {
     const t = translator({ 'general.errors.CRM_PERMISSION_DENIED': 'Page permission',

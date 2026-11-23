@@ -8,8 +8,10 @@ import { Button } from '../../../../../shared/ui/button/button';
 import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { ApiError, newIdempotencyKey } from '../../shared/settings-api';
-import { retryEmail } from '../outbound-emails.api';
-import { EmailDetail, RETRY_REASON_MAX, resolveEmailErrorMessage } from '../outbound-emails.model';
+import { anyGrant } from '../../shared/settings-access';
+import { fieldErrorsOf } from '../../../../../core/api/api-errors';
+import { getEmail, retryEmail } from '../outbound-emails.api';
+import { EmailDetail, RETRY_REASON_MAX, canRetryEmail, emailErrorState, keepEmailKey, resolveEmailErrorMessage } from '../outbound-emails.model';
 
 const CONTROL_CHARS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/;
 
@@ -31,6 +33,9 @@ export class RetryModal {
 
   readonly retried = output<string>();
   readonly openExisting = output<string>();
+  readonly becameReadOnly = output<void>();
+  protected readonly readOnly = signal(!anyGrant('crm.email.send'));
+  protected readonly serverReasonError = signal<string | null>(null);
 
   protected readonly target = signal<EmailDetail | null>(null);
   /** Retry needs retained content, so the subject is always in the detail. */
@@ -52,6 +57,7 @@ export class RetryModal {
 
   protected readonly reasonError = computed<string | null>(() => {
     this.i18n();
+    if (this.serverReasonError()) return this.serverReasonError();
     if (!this.touched() && !this.submitted()) return null;
     const trimmed = this.reason().trim();
     if (!trimmed) return this.transloco.translate('outboundEmails.retry.validationRequired');
@@ -61,12 +67,14 @@ export class RetryModal {
   });
 
   open(email: EmailDetail): void {
+    if (this.readOnly() || !canRetryEmail(email)) return;
     this.target.set(email);
     this.reason.set('');
     this.touched.set(false);
     this.submitted.set(false);
     this.submitting.set(false);
     this.existingRetryId.set(null);
+    this.serverReasonError.set(null);
     this.retryKey = newIdempotencyKey();
     this.lastTrimmedReason = '';
     this.modal().open();
@@ -81,6 +89,7 @@ export class RetryModal {
   protected onReasonInput(event: Event): void {
     const value = (event.target as HTMLTextAreaElement).value;
     this.reason.set(value);
+    this.serverReasonError.set(null);
     const trimmed = value.trim();
     if (trimmed !== this.lastTrimmedReason) {
       this.lastTrimmedReason = trimmed;
@@ -93,7 +102,7 @@ export class RetryModal {
   }
 
   protected async submit(): Promise<void> {
-    if (this.submitting()) return;
+    if (this.submitting() || this.readOnly()) return;
     this.submitted.set(true);
 
     const current = this.target();
@@ -103,19 +112,36 @@ export class RetryModal {
     }
 
     this.submitting.set(true);
+    if (!this.retryKey) this.retryKey = newIdempotencyKey();
     try {
       const result = await retryEmail(current.outboundEmailId, trimmed, this.retryKey);
       this.notify.success(this.transloco.translate('outboundEmails.toasts.retryQueued'));
       this.modal().close();
       this.retried.emit(result.outboundEmailId);
-    } catch (error) {
-      if (error instanceof ApiError && error.code === 'CRM.EMAIL.RETRY_ALREADY_CREATED') {
-        const existingId = error.details?.['existingOutboundEmailId'];
-        const resolvedExistingId = typeof existingId === 'string' ? existingId : null;
-        this.existingRetryId.set(resolvedExistingId);
-        this.retried.emit(resolvedExistingId ?? '');
+      try {
+        await getEmail(current.outboundEmailId);
+      } catch (refreshError) {
+        this.notify.error(resolveEmailErrorMessage(this.transloco, refreshError));
       }
-      this.notify.error(resolveEmailErrorMessage(this.transloco, error));
+    } catch (error) {
+      if (!keepEmailKey(error)) this.retryKey = '';
+      if (emailErrorState(this.transloco, error).readOnly) {
+        this.readOnly.set(true);
+        this.becameReadOnly.emit();
+      }
+      const reason = fieldErrorsOf(error)['reason'];
+      if (reason?.length) this.serverReasonError.set(reason.join(' '));
+      else this.notify.error(resolveEmailErrorMessage(this.transloco, error, true));
+      if (error instanceof ApiError && ['CRM.EMAIL.RETRY_ALREADY_CREATED', 'CRM.EMAIL.RETRY_NOT_ALLOWED'].includes(error.code)) {
+        this.retried.emit('');
+        try {
+          const updated = await getEmail(current.outboundEmailId);
+          this.target.set(updated);
+          this.existingRetryId.set(updated.retriedById);
+        } catch (refreshError) {
+          this.notify.error(resolveEmailErrorMessage(this.transloco, refreshError));
+        }
+      }
     } finally {
       this.submitting.set(false);
     }

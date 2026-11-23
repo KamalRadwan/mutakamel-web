@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal, viewChild } from '@angular/core';
+import { Component, Injector, computed, inject, runInInjectionContext, signal, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../core/i18n/translation-events';
 import { Router } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
@@ -21,8 +21,12 @@ import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dial
 import { Modal } from '../../../../shared/ui/modal/modal';
 import { listOpportunityStages } from '../opportunity-stages/opportunity-stages.api';
 import { OpportunityStage } from '../opportunity-stages/opportunity-stages.model';
-import { errorCodeOf, newIdempotencyKey } from '../shared/settings-api';
+import { crmSettingsError, errorCodeOf, newIdempotencyKey } from '../shared/settings-api';
+import { tenantWide } from '../shared/settings-access';
+import { ApiError, isRetryableWriteError } from '../../../../core/api/api-errors';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { SettingsFrame } from '../../../../shared/ui/settings-frame/settings-frame';
+import { pipelineErrorTranslator, pipelineWriteMessage } from './pipelines-errors';
 import { PipelineModal } from './pipeline-modal/pipeline-modal';
 import {
   deletePipeline,
@@ -32,11 +36,9 @@ import {
 } from './pipelines.api';
 import { PIPELINE_MAX_COUNT, Pipeline, nameIn } from './pipelines.model';
 
-const CAN_MANAGE = true; // later from the session permissions
-
 @Component({
   selector: 'app-pipelines-page',
-  imports: [NgIcon, TranslocoPipe, ActionsMenu, Button, ConfirmDialog, Modal, SettingsFrame, PipelineModal],
+  imports: [NgIcon, TranslocoPipe, ActionsMenu, Button, ConfirmDialog, Modal, SettingsFrame, PipelineModal, FullState],
   providers: [
     provideTranslocoScope('settings', { scope: 'settings-pipelines', alias: 'pipelines' }),
     provideIcons({
@@ -51,12 +53,13 @@ const CAN_MANAGE = true; // later from the session permissions
     }),
   ],
   templateUrl: './pipelines-page.html',
-  host: { class: 'flex min-h-0 flex-1 flex-col' },
+  host: { class: 'flex flex-1 shrink-0 flex-col' },
 })
 export class PipelinesPage {
   private readonly router = inject(Router);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
+  private readonly translateError = pipelineErrorTranslator(this.transloco);
   private readonly i18n = translationEvents(this.transloco);
   protected readonly language = inject(LanguageState).current;
 
@@ -64,7 +67,15 @@ export class PipelinesPage {
   private readonly deleteDialog = viewChild.required<ConfirmDialog>('deleteDialog');
   private readonly inUseModal = viewChild.required<Modal>('inUseModal');
 
-  protected readonly canManage = CAN_MANAGE;
+  private readonly injector = inject(Injector);
+  private readonly hasAccess = computed(() => runInInjectionContext(this.injector, () => tenantWide('crm.pipelines.manage')));
+  protected readonly readOnly = signal(false);
+  protected readonly canManage = computed(() => this.hasAccess() && !this.readOnly());
+  protected readonly loadError = signal<unknown>(null);
+  protected readonly loadState = computed(() => {
+    this.i18n();
+    return crmSettingsError(this.translateError, this.loadError(), 'pipelines');
+  });
   protected readonly maxCount = PIPELINE_MAX_COUNT;
   protected readonly skeletonRows = [0, 1, 2, 3, 4];
 
@@ -102,7 +113,9 @@ export class PipelinesPage {
     const seq = ++this.loadSeq;
     this.loading.set(true);
     this.failed.set(false);
+    this.loadError.set(null);
     try {
+      if (!this.hasAccess()) throw new ApiError(403, 'CRM_PERMISSION_DENIED');
       const [pipelines, stages] = await Promise.all([listPipelinesConfiguration(), listOpportunityStages()]);
       if (seq !== this.loadSeq) return;
       this.pipelines.set(pipelines);
@@ -110,7 +123,7 @@ export class PipelinesPage {
     } catch (error) {
       if (seq !== this.loadSeq) return;
       this.failed.set(true);
-      this.showErrorToast(error);
+      this.loadError.set(error);
     } finally {
       if (seq === this.loadSeq) {
         this.loading.set(false);
@@ -127,7 +140,7 @@ export class PipelinesPage {
   }
 
   protected openCreate(): void {
-    if (!this.canManage || this.atLimit()) return;
+    if (!this.canManage() || this.atLimit()) return;
     this.pipelineModal().openCreate(this.catalogue());
   }
 
@@ -228,7 +241,7 @@ export class PipelinesPage {
   }
 
   private async makeDefault(pipeline: Pipeline): Promise<void> {
-    if (!this.canManage || this.busy() || pipeline.isDefault) return;
+    if (!this.canManage() || this.busy() || pipeline.isDefault) return;
     if (!pipeline.isActive) {
       this.notify.warning(this.transloco.translate('pipelines.errors.PIPELINE_DEFAULT_INACTIVE'));
       return;
@@ -252,7 +265,7 @@ export class PipelinesPage {
   }
 
   private async toggleActive(pipeline: Pipeline): Promise<void> {
-    if (!this.canManage || this.busy() || pipeline.isDefault) return;
+    if (!this.canManage() || this.busy() || pipeline.isDefault) return;
     const nextActive = !pipeline.isActive;
     this.busy.set(true);
     try {
@@ -269,7 +282,7 @@ export class PipelinesPage {
   }
 
   protected async confirmDelete(pipeline: Pipeline): Promise<void> {
-    if (!this.canManage || this.busy() || pipeline.isDefault) return;
+    if (!this.canManage() || this.busy() || pipeline.isDefault) return;
     this.deletingName.set(this.primaryName(pipeline));
     if (!(await this.deleteDialog().open())) return;
 
@@ -299,21 +312,10 @@ export class PipelinesPage {
   }
 
   private showErrorToast(error: unknown): void {
-    const code = errorCodeOf(error);
-    if (code) {
-      const key = `pipelines.errors.${code}`;
-      const translated = this.transloco.translate(key);
-      if (translated !== key) {
-        this.notify.error(translated);
-        return;
-      }
-      const sharedKey = `settings.errors.${code}`;
-      const shared = this.transloco.translate(sharedKey);
-      if (shared !== sharedKey) {
-        this.notify.error(shared);
-        return;
-      }
-    }
-    this.notify.error(this.transloco.translate('settings.errors.generic'));
+    if (!isRetryableWriteError(error) && !(error instanceof ApiError && error.status === 401)) this.pendingKey = null;
+    const state = crmSettingsError(this.translateError, error, 'pipelines');
+    if (state.readOnly) this.readOnly.set(true);
+    this.notify.error(pipelineWriteMessage(error, this.translateError));
+    if (error instanceof ApiError && error.status === 404) void this.load();
   }
 }

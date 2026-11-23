@@ -1,7 +1,7 @@
 import { Injectable, Signal, computed, inject, signal } from '@angular/core';
 import { LanguageState } from '../../../../core/i18n/language';
 import { ScopeState } from '../../../../core/scope/scope';
-import { getCrmModules, syncCrmModuleDefaults, syncCrmModulesState } from './crm-modules.api';
+import { getCrmModules } from './crm-modules.api';
 import { CrmModule, CrmModuleFlags, CrmModulesState } from './crm-modules.model';
 
 @Injectable({ providedIn: 'root' })
@@ -11,9 +11,11 @@ export class CrmModules {
 
   private readonly rawState = signal<CrmModulesState | null>(null);
   private readonly loadedState = signal(false);
+  private readonly lastError = signal<unknown>(null);
   private inFlight: Promise<void> | null = null;
 
   readonly loaded: Signal<boolean> = this.loadedState.asReadonly();
+  readonly error = this.lastError.asReadonly();
 
   readonly state: Signal<CrmModulesState | null> = computed(() => {
     const current = this.rawState();
@@ -41,7 +43,9 @@ export class CrmModules {
     if (!current) return true;
     return (
       current.defaults.leadsEnabled ||
-      current.companies.some((company) => (company.override.leadsEnabled ?? current.defaults.leadsEnabled))
+      current.companies.some(
+        (company) => company.override.leadsEnabled ?? current.defaults.leadsEnabled,
+      )
     );
   });
 
@@ -51,7 +55,7 @@ export class CrmModules {
     return (
       current.defaults.opportunitiesEnabled ||
       current.companies.some(
-        (company) => (company.override.opportunitiesEnabled ?? current.defaults.opportunitiesEnabled),
+        (company) => company.override.opportunitiesEnabled ?? current.defaults.opportunitiesEnabled,
       )
     );
   });
@@ -67,12 +71,15 @@ export class CrmModules {
   }
 
   reload(): Promise<void> {
+    this.lastError.set(null);
     const promise = getCrmModules()
       .then((result) => {
         this.rawState.set(result);
         this.loadedState.set(true);
       })
-      .catch(() => {
+      .catch((error: unknown) => {
+        // Guards retain their existing fallback; settings can show and retry the failed read.
+        this.lastError.set(error);
         this.loadedState.set(true);
       })
       .finally(() => {
@@ -95,16 +102,19 @@ export class CrmModules {
   }
 
   apply(state: CrmModulesState): void {
-    const synced = syncCrmModulesState(state);
-    this.rawState.set(synced);
+    this.lastError.set(null);
+    this.rawState.set(state);
     this.loadedState.set(true);
   }
 
   applyDefaults(defaults: Partial<CrmModuleFlags>): void {
-    const synced = syncCrmModuleDefaults(defaults);
     const current = this.rawState();
     if (!current) {
-      this.rawState.set(synced);
+      this.rawState.set({
+        revision: 0,
+        defaults: { leadsEnabled: true, opportunitiesEnabled: true, ...defaults },
+        companies: [],
+      });
       this.loadedState.set(true);
       return;
     }
@@ -116,7 +126,8 @@ export class CrmModules {
         ...company,
         effective: {
           leadsEnabled: company.override.leadsEnabled ?? nextDefaults.leadsEnabled,
-          opportunitiesEnabled: company.override.opportunitiesEnabled ?? nextDefaults.opportunitiesEnabled,
+          opportunitiesEnabled:
+            company.override.opportunitiesEnabled ?? nextDefaults.opportunitiesEnabled,
         },
       })),
     });

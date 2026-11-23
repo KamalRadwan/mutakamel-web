@@ -10,8 +10,15 @@
 >
   @if (loadError()) {
     <ui-full-state
-      kind="load-failure"
-      [title]="'analytics.common.loadFailed' | transloco"
+      [kind]="failure()?.kind ?? 'load-failure'"
+      [text]="
+        (failure()?.message ?? '') +
+        (failure()?.correlationId ? ' · ' + failure()!.correlationId : '')
+      "
+      [title]="
+        (failure()?.kind === 'forbidden' ? 'targets.forbiddenTitle' : 'analytics.common.loadFailed')
+          | transloco
+      "
       [actionLabel]="'analytics.common.retry' | transloco"
       (action)="reload()"
     />
@@ -27,9 +34,7 @@
           [emptyText]="'targets.releasesModal.empty' | transloco"
           [label]="'targets.releasesModal.title' | transloco"
         >
-          <ng-template uiCell="releaseNumber" let-row>
-            #{{ row.releaseNumber }}
-          </ng-template>
+          <ng-template uiCell="releaseNumber" let-row> #{{ row.releaseNumber }} </ng-template>
 
           <ng-template uiCell="targetValue" let-row>
             {{ formatValue(row) }}
@@ -52,7 +57,10 @@
           </ng-template>
 
           <ng-template uiCell="approvedAt" let-row>
-            <span class="truncate text-12 tabular-nums text-text-muted" [title]="formatApprovedAt(row.approvedAt)">
+            <span
+              class="truncate text-12 tabular-nums text-text-muted"
+              [title]="formatApprovedAt(row.approvedAt)"
+            >
               {{ formatApprovedAt(row.approvedAt) }}
             </span>
           </ng-template>

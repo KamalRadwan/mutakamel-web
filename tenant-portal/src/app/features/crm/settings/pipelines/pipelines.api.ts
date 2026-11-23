@@ -1,18 +1,7 @@
-import {
-  fakeAddPipelineStage,
-  fakeAssignmentOptions,
-  fakeCreatePipeline,
-  fakeDeletePipeline,
-  fakeGetPipelineConfiguration,
-  fakeListPipelinesConfiguration,
-  fakeListPipelinesForRead,
-  fakeRemovePipelineStage,
-  fakeReorderPipelineStages,
-  fakeReplaceAssignments,
-  fakeResetPipeline,
-  fakeSetDefaultPipeline,
-  fakeUpdatePipeline,
-} from './pipelines.fake';
+import { ApiError, isRetryableWriteError } from '../../../../core/api/api-errors';
+import { type CoreQuery, type CoreWriteMethod } from '../../../../core/api/core-http';
+import { newIdempotencyKey } from '../../../../core/api/idempotency';
+import { crmHttp, crmQueries, type CrmHttpTransport } from '../../shared/crm-http';
 import {
   AssignmentOptions,
   CreatePipelineInput,
@@ -24,77 +13,117 @@ import {
   UpdatePipelineInput,
 } from './pipelines.model';
 
-// GET /api/tenant/crm/v1/pipelines (permission: crm.pipelines.read). Read-level list for consumers (filters,
-// pickers): active pipelines the actor can reach via ALL, a direct user or a team assignment; ordered by code;
-// no `assignments`. Gateway AUTHENTICATED.
+const queryKey = ['crm-settings', 'pipelines'] as const;
+const retries = new WeakMap<CrmHttpTransport, Map<string, { bodyJson: string | undefined; key: string }>>();
+
+function read<T>(path: string, query?: CoreQuery): Promise<T> {
+  return crmQueries().fetchQuery({
+    queryKey: [...queryKey, path, query],
+    queryFn: () => crmHttp().read<T>(path, query),
+  });
+}
+
+async function write<T>(method: CoreWriteMethod, path: string, body: unknown, key?: string): Promise<T> {
+  const http = crmHttp();
+  let pendingWrites = retries.get(http);
+  if (!pendingWrites) retries.set(http, (pendingWrites = new Map()));
+  const action = `${method} ${path}`;
+  const bodyJson = JSON.stringify(body);
+  const pending = pendingWrites.get(action);
+  const request = {
+    bodyJson,
+    key: key ?? (pending && pending.bodyJson === bodyJson ? pending.key : newIdempotencyKey()),
+  };
+  pendingWrites.set(action, request);
+  let data: T;
+  try {
+    const result = await http.write<T>(method, path, bodyJson === undefined ? undefined : JSON.parse(bodyJson), {
+      key: request.key,
+    });
+    data = result.data;
+  } catch (error) {
+    if (!isRetryableWriteError(error) && !(error instanceof ApiError && error.status === 401)) {
+      if (pendingWrites.get(action) === request) pendingWrites.delete(action);
+    }
+    throw error;
+  }
+  if (pendingWrites.get(action) === request) pendingWrites.delete(action);
+  await crmQueries().cancelQueries({ queryKey });
+  await crmQueries().invalidateQueries({ queryKey });
+  return data;
+}
+
+// A reopened form is a new user action, even if the previous response was uncertain.
+export function beginPipelineEdit(id: string | null): void {
+  retries.get(crmHttp())?.delete(id ? `PATCH /pipelines/${id}` : 'POST /pipelines');
+}
+
+// Read-level list for record pickers; assignments are available only on configuration routes.
 export function listPipelinesForRead(): Promise<PipelineReadView[]> {
-  return fakeListPipelinesForRead();
+  return read('/pipelines');
 }
 
-// GET /api/tenant/crm/v1/pipelines/configuration (permission: crm.pipelines.manage)
-export function listPipelinesConfiguration(): Promise<Pipeline[]> {
-  return fakeListPipelinesConfiguration();
+export async function listPipelinesConfiguration(): Promise<Pipeline[]> {
+  const pipelines = await read<Pipeline[]>('/pipelines/configuration');
+  return pipelines.slice().sort((a, b) => Number(b.isDefault) - Number(a.isDefault) || a.code.localeCompare(b.code, 'en'));
 }
 
-// GET /api/tenant/crm/v1/pipelines/:id/configuration (permission: crm.pipelines.manage)
 export function getPipelineConfiguration(id: string): Promise<Pipeline> {
-  return fakeGetPipelineConfiguration(id);
+  return read(`/pipelines/${id}/configuration`);
 }
 
-// POST /api/tenant/crm/v1/pipelines (permission: crm.pipelines.manage)
+export function getPipelineAssignments(id: string): Promise<PipelineAssignments> {
+  return read(`/pipelines/${id}/assignments`);
+}
+
 export function createPipeline(input: CreatePipelineInput): Promise<Pipeline> {
-  return fakeCreatePipeline(input);
+  return write('POST', '/pipelines', input);
 }
 
-// PATCH /api/tenant/crm/v1/pipelines/:id (permission: crm.pipelines.manage)
 export function updatePipeline(id: string, changes: UpdatePipelineInput): Promise<Pipeline> {
-  return fakeUpdatePipeline(id, changes);
+  return write('PATCH', `/pipelines/${id}`, changes);
 }
 
-// DELETE /api/tenant/crm/v1/pipelines/:id (permission: crm.pipelines.manage)
 export function deletePipeline(id: string): Promise<void> {
-  return fakeDeletePipeline(id);
+  return write('DELETE', `/pipelines/${id}`, undefined);
 }
 
-// PUT /api/tenant/crm/v1/pipelines/:id/default (x-idempotency-key: gateway WRITE_SENSITIVE + idempotent; permission: crm.pipelines.manage)
 export function setDefaultPipeline(id: string, idempotencyKey: string): Promise<Pipeline> {
-  return fakeSetDefaultPipeline(id, idempotencyKey);
+  return write('PUT', `/pipelines/${id}/default`, undefined, idempotencyKey);
 }
 
-// POST /api/tenant/crm/v1/pipelines/:id/reset (permission: crm.pipelines.manage)
 export function resetPipeline(id: string): Promise<Pipeline> {
-  return fakeResetPipeline(id);
+  return write('POST', `/pipelines/${id}/reset`, undefined);
 }
 
-// POST /api/tenant/crm/v1/pipelines/:id/stages (permission: crm.pipelines.manage)
 export function addPipelineStage(id: string, opportunityStageId: string): Promise<PipelineStage> {
-  return fakeAddPipelineStage(id, opportunityStageId);
+  return write('POST', `/pipelines/${id}/stages`, { opportunityStageId });
 }
 
-// PATCH /api/tenant/crm/v1/pipelines/:id/stages/reorder (body { orderedIds }; x-idempotency-key: gateway WRITE_SENSITIVE + idempotent; permission: crm.pipelines.manage)
 export function reorderPipelineStages(
   id: string,
   orderedMembershipIds: string[],
   idempotencyKey: string,
 ): Promise<PipelineStage[]> {
-  return fakeReorderPipelineStages(id, orderedMembershipIds, idempotencyKey);
+  return write('PATCH', `/pipelines/${id}/stages/reorder`, { orderedIds: orderedMembershipIds }, idempotencyKey);
 }
 
-// DELETE /api/tenant/crm/v1/pipelines/:id/stages/:pipelineStageId (permission: crm.pipelines.manage)
 export function removePipelineStage(id: string, membershipId: string): Promise<void> {
-  return fakeRemovePipelineStage(id, membershipId);
+  return write('DELETE', `/pipelines/${id}/stages/${membershipId}`, undefined);
 }
 
-// GET /api/tenant/crm/v1/pipelines/assignment-options?search=...&limit=50 (permission: crm.pipelines.manage)
 export function assignmentOptions(search = '', limit = 50): Promise<AssignmentOptions> {
-  return fakeAssignmentOptions(search, limit);
+  return read('/pipelines/assignment-options', { search, limit });
 }
 
-// PUT /api/tenant/crm/v1/pipelines/:id/assignments (answers {accessMode,userIds,teamIds}; x-idempotency-key: gateway WRITE_SENSITIVE + idempotent; permission: crm.pipelines.manage)
 export function replaceAssignments(
   id: string,
   input: ReplaceAssignmentsInput,
   idempotencyKey: string,
 ): Promise<PipelineAssignments> {
-  return fakeReplaceAssignments(id, input, idempotencyKey);
+  return write('PUT', `/pipelines/${id}/assignments`, {
+    accessMode: input.accessMode,
+    userIds: [...new Set(input.userIds)],
+    teamIds: [...new Set(input.teamIds)],
+  }, idempotencyKey);
 }

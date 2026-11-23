@@ -12,10 +12,11 @@ import { DASH, formatDateTime, formatNumber } from '../../../../../shared/ui/cha
 import { DataCell, DataColumn, DataTable } from '../../../../../shared/ui/data-table/data-table';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { rectInPage, viewport } from '../../../../../shared/ui/overlay/zoom';
-import { getReadiness, type ReadinessDetail } from '../../../../../shared/widgets/dashboard/analytics.api';
+import { getReadiness, type ReadinessDetail } from '../readiness.api';
 import type { SourceReadiness } from '../../../../../shared/widgets/dashboard/analytics.model';
-import { errorCodeOf } from '../../../../../shared/widgets/dashboard/analytics-api';
-import { errorKey, reasonKey } from '../../../../../shared/widgets/dashboard/panel-state';
+import { ApiError, errorCodeOf } from '../../../../../core/api/api-errors';
+import { readinessError } from '../readiness-error';
+import { readinessReasonKey } from '../readiness-reasons';
 
 type AffectedItem = ReadinessDetail['affected'][number];
 
@@ -128,13 +129,18 @@ export class ReadinessModal {
     const seq = this.loadSeq;
     this.loadingMore.set(true);
     try {
-      const nextPage = await getReadiness(current.sourceKey, cursor, 20);
+      const nextPage = await getReadiness(current.sourceKey, { cursor, limit: 20 });
       if (seq !== this.loadSeq) return;
       this.affected.update((items) => [...items, ...nextPage.affected]);
       this.pageInfo.set(nextPage.pageInfo);
     } catch (error) {
       if (seq !== this.loadSeq) return;
-      this.notify.error(this.transloco.translate(errorKey(errorCodeOf(error))));
+      if (error instanceof ApiError && error.status === 400 && errorCodeOf(error) === 'CRM_DASHBOARD_LIST_CURSOR_INVALID') {
+        this.open(current.sourceKey);
+      } else {
+        this.notify.error(readinessError(this.transloco, error).message);
+        if (error instanceof ApiError && error.status === 404) this.close();
+      }
     } finally {
       if (seq === this.loadSeq) {
         this.loadingMore.set(false);
@@ -161,7 +167,7 @@ export class ReadinessModal {
 
   protected reasonText(code: string | null): string {
     if (!code) return DASH;
-    return this.transloco.translate(reasonKey(code));
+    return this.transloco.translate(readinessReasonKey(code));
   }
 
   protected formatLag(lagSeconds: number | null): string {
@@ -222,14 +228,14 @@ export class ReadinessModal {
 
   private async fetchInitial(sourceKey: string, seq: number): Promise<void> {
     try {
-      const result = await getReadiness(sourceKey, null, 20);
+      const result = await getReadiness(sourceKey, { limit: 20 });
       if (seq !== this.loadSeq) return;
       this.detail.set(result);
       this.affected.set(result.affected);
       this.pageInfo.set(result.pageInfo);
     } catch (error) {
       if (seq !== this.loadSeq) return;
-      this.notify.error(this.transloco.translate(errorKey(errorCodeOf(error))));
+      this.notify.error(readinessError(this.transloco, error).message);
       this.close();
     } finally {
       if (seq === this.loadSeq) {
