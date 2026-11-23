@@ -5,13 +5,15 @@ import { of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LanguageState } from '../i18n/language';
 import { Notify } from '../notify/notify';
+import { CoreHttp } from '../api/core-http';
+import { ApiError } from '../api/api-errors';
 import { TabBus } from '../tabs/tab-bus';
 import { TabLeader } from '../tabs/tab-leader';
 import { HandoverGuard, StandDownHook, TabRole } from '../tabs/tab-leader.model';
 import { PhoneState } from './phone';
 import { listCallLogs } from './phone.api';
-import { resetPhoneFake, setFakePhoneDelay, setFakePhoneMeMode, setFakeTurnTtl } from './phone.fake';
-import { PhoneLostPayload, PhoneSyncedState } from './phone.model';
+import { fakeCreateCallLog, fakeGetMe, fakeListCallLogs, fakeLookupNumber, resetPhoneFake, setFakePhoneDelay, setFakePhoneMeMode, setFakeTurnTtl } from './phone.fake';
+import { CreateCallLogInput, ListCallLogsQuery, PhoneLostPayload, PhoneSyncedState } from './phone.model';
 import { PHONE_PREFS_STORAGE_KEY, readPhonePrefs } from './phone-preferences';
 import { SIP_ENGINE_FACTORY } from './sip-engine';
 import { FakeSipEngine, FakeSipLeg, resetFakeSipEngineState, setFakeSipTimings } from './sip-engine.fake';
@@ -159,6 +161,7 @@ function createFakeMediaStream(): MediaStream {
 }
 
 describe('PhoneState', () => {
+  const writeCallLog = vi.fn((body: CreateCallLogInput) => fakeCreateCallLog(body));
   let fakeTabLeader: FakeTabLeader;
   let fakeTabBus: FakeTabBus;
   let engines: FakeSipEngine[];
@@ -190,6 +193,7 @@ describe('PhoneState', () => {
     vi.useFakeTimers();
     localStorage.clear();
     resetPhoneFake();
+    writeCallLog.mockReset().mockImplementation((body) => fakeCreateCallLog(body));
     resetFakeSipEngineState();
     setFakePhoneDelay(0);
     setFakeSipTimings({
@@ -252,6 +256,18 @@ describe('PhoneState', () => {
         PhoneState,
         Notify,
         LanguageState,
+        // Test fixtures are injected only here. Adapter specs exercise the real transport.
+        { provide: CoreHttp, useValue: {
+          read: (path: string, query: ListCallLogsQuery & { number?: string } = {}) => {
+            if (path.endsWith('/phone-lookup')) return fakeLookupNumber(query.number ?? '');
+            if (path.endsWith('/call-logs')) return fakeListCallLogs(query);
+            if (path.endsWith('/me')) return fakeGetMe();
+            throw new Error(`Unexpected phone read: ${path}`);
+          },
+          write: async (_method: string, _path: string, body: CreateCallLogInput) => ({
+            status: 201, data: await writeCallLog(body), etag: null, location: null,
+          }),
+        } },
         { provide: TranslocoService, useClass: FakeTransloco },
         { provide: TabLeader, useValue: fakeTabLeader },
         { provide: TabBus, useValue: fakeTabBus },
@@ -952,7 +968,7 @@ describe('PhoneState', () => {
     expect(phone.speakerLevel()).toBe(0);
   });
 
-  it('opens the phone panel and answers using synthetic mic fallback when getUserMedia reports NotFoundError on FakeSipEngine', async () => {
+  it('reports a missing microphone even when a simulator is explicitly injected by a spec', async () => {
     const getUserMediaMock = vi.fn(async () => {
       throw Object.assign(new Error('Requested device not found'), { name: 'NotFoundError' });
     });
@@ -981,7 +997,8 @@ describe('PhoneState', () => {
 
     expect(phone.panelOpen()).toBe(true);
     expect(phone.tab()).toBe('phone');
-    expect(phone.callState()).toBe('active');
+    expect(phone.mediaNotice()).toBe('noMicrophone');
+    expect(phone.callState()).not.toBe('active');
     expect(TestBed.inject(Notify).toasts().some((t) => t.type === 'error')).toBe(false);
 
     phone.hangup();
@@ -1023,6 +1040,37 @@ describe('PhoneState', () => {
     expect(phone.block()).toBeNull();
     expect(phone.ringing()).not.toBeNull();
     expect(TestBed.inject(Notify).toasts().some((t) => t.type === 'error')).toBe(false);
+  });
+
+  it('never appends a captured pagehide call again when its SIP leg later ends', async () => {
+    const phone = createPhone();
+    await flush(250);
+    await phone.call('+201005550142');
+    await flush(300);
+
+    window.dispatchEvent(new Event('pagehide'));
+    window.dispatchEvent(new Event('pagehide'));
+    phone.hangup();
+    await flush();
+
+    expect(writeCallLog).toHaveBeenCalledTimes(1);
+    expect(writeCallLog).toHaveBeenCalledWith(expect.objectContaining({
+      phoneNumber: '+201005550142', cause: 'callFailed: tabClosed',
+    }));
+  });
+
+  it('does not retry a failed completed-call append or install simulator globals', async () => {
+    writeCallLog.mockRejectedValueOnce(new ApiError(500, 'WEBPHONE_INTERNAL_ERROR'));
+    const phone = createPhone();
+    await flush(250);
+    await phone.call('+201005550142');
+    await flush(300);
+    phone.hangup();
+    await flush(2_000);
+
+    expect(writeCallLog).toHaveBeenCalledTimes(1);
+    expect(phone.busy()).toBe(false);
+    expect((window as unknown as Record<string, unknown>)['__phoneFake']).toBeUndefined();
   });
 
   it('looks up typed outgoing call number at call end and enriches both ended info and call log', async () => {

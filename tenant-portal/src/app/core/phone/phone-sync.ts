@@ -1,10 +1,9 @@
 import { DOCUMENT, DestroyRef, Service, Signal, effect, inject, untracked } from '@angular/core';
 import { TabBus } from '../tabs/tab-bus';
 import { TabLeader } from '../tabs/tab-leader';
-import { appendFakeCallLog } from './phone.fake';
+import { createCallLog } from './phone.api';
 import { CreateCallLogInput, PhoneCommand, PhoneLostPayload, PhoneSyncedState } from './phone.model';
 import { PHONE_PREFS_STORAGE_KEY, PhonePrefs, readPhonePrefs } from './phone-preferences';
-import { isFakeSipEngineSelected } from './sip-engine.provider';
 
 const TOPIC_PHONE_STATE = 'phone.state';
 const TOPIC_PHONE_COMMAND = 'phone.command';
@@ -40,6 +39,7 @@ export class PhoneSync {
   private lastBusySnapshot: PhoneSyncedState | null = null;
   private wasLeader = false;
   private hasJoinedRole = false;
+  private readonly persistedLossIds = new Set<string>();
 
   private readonly onStorage = (event: StorageEvent) => {
     if (event.key !== PHONE_PREFS_STORAGE_KEY) return;
@@ -55,11 +55,14 @@ export class PhoneSync {
 
   // Use capture phase so `phone.lost` broadcasts before `TabLeader`'s bubbling `pagehide` closes the channel.
   private readonly onPageHide = () => {
+    if (!this.tabLeader.isLeader()) return;
     const info = this.hooks?.onPageHideCapture();
-    if (!info) return;
+    if (!info || this.persistedLossIds.has(info.lostPayload.lossId)) return;
+    this.persistedLossIds.add(info.lostPayload.lossId);
     this.handledLossForBusy = true;
     this.tabBus.broadcast<PhoneLostPayload>(TOPIC_PHONE_LOST, info.lostPayload);
-    this.sendLostCallKeepalive(info.callLog);
+    // Best effort through the existing authenticated transport; never queue or replay this append.
+    void createCallLog(info.callLog).catch(() => {});
   };
 
   constructor() {
@@ -166,12 +169,5 @@ export class PhoneSync {
     }
     this.cleanups = [];
     this.hooks = null;
-  }
-
-  private sendLostCallKeepalive(body: CreateCallLogInput): void {
-    // Phase 5: replace with a keepalive POST to the real call-logs endpoint (via the real adapter).
-    // The fake store only backs the fake engine; with the real jssip engine nothing is written here.
-    if (!isFakeSipEngineSelected()) return;
-    appendFakeCallLog(body);
   }
 }

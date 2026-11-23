@@ -1,3 +1,5 @@
+import { ApiError } from '../api/api-errors';
+
 export type CallLogType = 'IN_ANS' | 'IN_NOANS' | 'IN_BUSY' | 'OUT_ANS' | 'OUT_NOANS' | 'OUT_BUSY' | 'OUT';
 export type LiveCallLogType = Exclude<CallLogType, 'OUT'>;
 export type CallSourceType = 'LEAD' | 'CUSTOMER_PROFILE' | 'PARTY' | 'OPPORTUNITY';
@@ -319,13 +321,14 @@ export interface PhoneLostPayload {
   durationSeconds: number | null;
 }
 
-export class PhoneApiError extends Error {
+/** Compatibility error for test fixtures; live transport errors use the shared ApiError. */
+export class PhoneApiError extends ApiError {
   constructor(
-    readonly status: number,
-    readonly code: string,
-    readonly details?: Record<string, unknown>,
+    status: number,
+    code: string,
+    details?: Record<string, unknown>,
   ) {
-    super(code);
+    super(status, code, details);
     this.name = 'PhoneApiError';
   }
 }
@@ -350,7 +353,7 @@ const ME_ERROR_ACTIONS = new Map<string, Exclude<PhoneMeErrorAction, 'error'>>([
 
 /** Maps a `GET /me` failure to the phone's reaction by its service `errorCode`. */
 export function classifyMeError(error: unknown): PhoneMeErrorAction {
-  if (!(error instanceof PhoneApiError)) return 'error';
+  if (!(error instanceof ApiError)) return 'error';
   return ME_ERROR_ACTIONS.get(error.code) ?? 'error';
 }
 
@@ -367,7 +370,7 @@ const ME_BLOCK_STATES = new Map<string, PhoneMeBlock>([
 
 /** The blocked state for a `GET /me` failure that `classifyMeError` maps to `block`; null for any other failure. */
 export function meErrorBlock(error: unknown): PhoneMeBlock | null {
-  if (!(error instanceof PhoneApiError)) return null;
+  if (!(error instanceof ApiError)) return null;
   return ME_BLOCK_STATES.get(error.code) ?? null;
 }
 

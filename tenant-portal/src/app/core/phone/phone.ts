@@ -45,7 +45,6 @@ import { QualityEstimator, pickWorstQuality } from './phone-quality';
 import { PhoneSync } from './phone-sync';
 import { PhoneTones } from './phone-tones';
 import { SIP_ENGINE_FACTORY as CORE_SIP_ENGINE_FACTORY, SipCauseEvent, SipEngine, SipLeg } from './sip-engine';
-import { FakeSipEngine, installPhoneFakeGlobals, onFakeMeModeChange } from './sip-engine.fake';
 import { SIP_ENGINE_FACTORY } from './sip-engine.provider';
 
 export type {
@@ -114,6 +113,7 @@ interface InternalLegRecord {
   peerCleanup: (() => void) | null;
   disconnectDropTimer: ReturnType<typeof setTimeout> | null;
   finalized: boolean;
+  logSubmitted: boolean;
   localHangup: boolean;
   localDecline: boolean;
   mediaDropped: boolean;
@@ -356,9 +356,6 @@ export class PhoneState {
   };
 
   constructor() {
-    installPhoneFakeGlobals();
-    onFakeMeModeChange(() => void this.reload());
-
     this.media.init(
       (missing) => this.handleMissingDevices(missing),
       () => this._prefs(),
@@ -441,7 +438,6 @@ export class PhoneState {
 
     this.destroyRef.onDestroy(() => {
       this.disposed = true;
-      onFakeMeModeChange(null);
       win?.removeEventListener('online', this.onOnline);
       win?.removeEventListener('offline', this.onOffline);
       this.cleanupAllResources(true);
@@ -1290,7 +1286,7 @@ export class PhoneState {
     const gen = ++this.regGeneration;
     const engine = this.engineFactory();
     this.engine = engine;
-    this.media.setSyntheticMicFallback(engine instanceof FakeSipEngine);
+    this.media.setSyntheticMicFallback(false);
 
     this.engineUnsubs = [
       engine.events.on('connected', () => {
@@ -1537,6 +1533,7 @@ export class PhoneState {
       peerCleanup: null,
       disconnectDropTimer: null,
       finalized: false,
+      logSubmitted: false,
       localHangup: false,
       localDecline: false,
       mediaDropped: false,
@@ -1692,7 +1689,10 @@ export class PhoneState {
       ...(this.conferenceId ? { conferenceId: this.conferenceId } : {}),
     };
     const isLastLeg = this.liveRecords().length === 0;
-    void this.recordEndedCallLog(record.leg, logBody, isLastLeg);
+    if (!record.logSubmitted) {
+      record.logSubmitted = true;
+      void this.recordEndedCallLog(record.leg, logBody, isLastLeg);
+    }
 
     if (
       record.leg.direction === 'incoming' &&
@@ -2115,6 +2115,9 @@ export class PhoneState {
 
     const leg = this.focusedLeg() ?? this._legs()[0];
     if (!leg) return null;
+    const record = this.records.get(leg.id);
+    if (!record || record.logSubmitted) return null;
+    record.logSubmitted = true;
     const nowIso = new Date().toISOString();
     const durationSeconds = clampCallDuration(leg.answeredAt);
 
