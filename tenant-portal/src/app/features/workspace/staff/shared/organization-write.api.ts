@@ -30,6 +30,30 @@ export type UpdateTeamBody = Partial<{ name: string; leadUserId: string | null; 
 
 type OrganizationResource = 'companies' | 'branches' | 'departments' | 'teams';
 
+// Core entity writes may omit unset nullable columns, especially on creation.
+type CompanyResponse = Omit<Company, 'legalName' | 'taxNumber' | 'countryCode' | 'currencyCode'> &
+  Partial<Pick<Company, 'legalName' | 'taxNumber' | 'countryCode' | 'currencyCode'>>;
+type BranchResponse = Omit<Branch, 'address' | 'phone'> & Partial<Pick<Branch, 'address' | 'phone'>>;
+type TeamResponse = Omit<Team, 'leadUserId'> & Partial<Pick<Team, 'leadUserId'>>;
+
+function mapCompany(company: CompanyResponse): Company {
+  return {
+    ...company,
+    legalName: company.legalName ?? null,
+    taxNumber: company.taxNumber ?? null,
+    countryCode: company.countryCode ?? null,
+    currencyCode: company.currencyCode ?? null,
+  };
+}
+
+function mapBranch(branch: BranchResponse): Branch {
+  return { ...branch, address: branch.address ?? null, phone: branch.phone ?? null };
+}
+
+function mapTeam(team: TeamResponse): Team {
+  return { ...team, leadUserId: team.leadUserId ?? null };
+}
+
 @Service()
 export class OrganizationWriteApi {
   private readonly http = inject(StaffHttp);
@@ -38,7 +62,7 @@ export class OrganizationWriteApi {
 
   async createCompany(body: CreateCompanyBody, key: string): Promise<Company> {
     this.requireCompanyManage();
-    return this.write('POST', 'companies', undefined, body, key, true);
+    return mapCompany(await this.write<CompanyResponse>('POST', 'companies', undefined, body, key, true));
   }
 
   async createBranch(body: CreateBranchBody, key: string): Promise<Branch> {
@@ -46,7 +70,7 @@ export class OrganizationWriteApi {
         (body.isHeadquarters && !this.session.can('org.branch.manage', { companyId: body.companyId }))) {
       throw new ApiError(403, 'COMMON.GENERIC.FORBIDDEN');
     }
-    return this.write('POST', 'branches', undefined, body, key, true);
+    return mapBranch(await this.write<BranchResponse>('POST', 'branches', undefined, body, key, true));
   }
 
   async createDepartment(body: CreateDepartmentBody, key: string): Promise<Department> {
@@ -60,12 +84,12 @@ export class OrganizationWriteApi {
     if (!this.session.can('org.team.manage', { branchId })) {
       throw new ApiError(403, 'COMMON.GENERIC.FORBIDDEN');
     }
-    return this.write('POST', 'teams', undefined, body, key, false);
+    return mapTeam(await this.write<TeamResponse>('POST', 'teams', undefined, body, key, false));
   }
 
   async updateCompany(id: string, patch: UpdateCompanyBody, key: string, opts?: ConfirmAddonCascadeOptions): Promise<Company> {
     this.requireCompanyManage();
-    return this.write('PATCH', 'companies', id, patch, key, 'status' in patch, opts);
+    return mapCompany(await this.write<CompanyResponse>('PATCH', 'companies', id, patch, key, 'status' in patch, opts));
   }
 
   async deleteCompany(id: string, key: string, opts?: ConfirmAddonCascadeOptions): Promise<void> {
@@ -74,7 +98,7 @@ export class OrganizationWriteApi {
   }
 
   async updateBranch(id: string, patch: UpdateBranchBody, key: string, opts?: ConfirmAddonCascadeOptions): Promise<Branch> {
-    return this.write('PATCH', 'branches', id, patch, key, 'status' in patch || 'isHeadquarters' in patch, opts);
+    return mapBranch(await this.write<BranchResponse>('PATCH', 'branches', id, patch, key, 'status' in patch || 'isHeadquarters' in patch, opts));
   }
 
   async deleteBranch(id: string, key: string, opts?: ConfirmAddonCascadeOptions): Promise<void> {
@@ -90,7 +114,7 @@ export class OrganizationWriteApi {
   }
 
   async updateTeam(id: string, patch: UpdateTeamBody, key: string): Promise<Team> {
-    return this.write('PATCH', 'teams', id, patch, key, false);
+    return mapTeam(await this.write<TeamResponse>('PATCH', 'teams', id, patch, key, false));
   }
 
   async deleteTeam(id: string, key: string): Promise<void> {
@@ -115,7 +139,7 @@ export class OrganizationWriteApi {
     const auth = this.injector.get(AuthSession);
     const version = auth.requestVersion();
     const path = `/api/tenant/core/v1/organization/${resource}${id === undefined ? '' : `/${encodeURIComponent(id)}`}`;
-    const result = await this.http.write<T>(method, path, body, { key, ...opts });
+    const result = await this.http.write<T>(method, path, body, { key, confirmAddonCascade: opts?.confirmAddonCascade });
     await this.injector.get(OrganizationReadApi).invalidateScope(scope);
     if (reloadProfile) void auth.reloadProfile(version).catch(() => undefined);
     return result;
