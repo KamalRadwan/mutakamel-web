@@ -15,6 +15,10 @@ import { TranslationLoader } from './core/i18n/translation-loader';
 import { ThemeState } from './core/theme/theme';
 import { ViewScale } from './core/view/view-scale';
 import { TabLeader } from './core/tabs/tab-leader';
+import { io } from 'socket.io-client';
+import { RealtimeClient } from './core/realtime/realtime-client';
+import { REALTIME_SOCKET_FACTORY, type RealtimeSocketFactory } from './core/realtime/realtime-client.model';
+import { NotificationsFeed } from './core/realtime/notifications-feed';
 import { AppTitleStrategy } from './layout/title/app-title-strategy';
 import { provideBulkJobModules } from './shared/bulk-jobs/bulk-job-modules';
 import { CORE_USERS_BULK_MODULE } from './features/workspace/staff/users/users-bulk/users-bulk.descriptor';
@@ -25,27 +29,18 @@ import { CRM_OPPORTUNITIES_BULK_MODULE } from './features/crm/opportunities/oppo
 import { TRADE_ITEMS_BULK_MODULE } from './features/trade/foundation/items/item-bulk/items-bulk.descriptor';
 import { TRADE_ACCOUNTS_BULK_MODULE } from './features/trade/foundation/commercial-accounts/account-bulk/accounts-bulk.descriptor';
 import { provideAutomationBulkModules } from './features/trade/automation/automation-bulk-modules';
-import { registerFakeBulkModuleLoader } from './shared/bulk-jobs/bulk-jobs.fake';
 import { bindBulkJobsApi, BulkJobsApi } from './shared/bulk-jobs/bulk-jobs.api';
 import { bindSeatPreviewApi, SeatPreviewApi } from './features/workspace/seats/seats.api';
 import { routes } from './app.routes';
 
-// FAKE-ONLY, no backend route: Trade bulk gateway rows have not landed.
-registerFakeBulkModuleLoader(
-  'trading',
-  TRADE_ITEMS_BULK_MODULE.module,
-  () => import('./features/trade/foundation/items/item-bulk/items-bulk.fake-module'),
-);
-registerFakeBulkModuleLoader(
-  'trading',
-  TRADE_ACCOUNTS_BULK_MODULE.module,
-  () => import('./features/trade/foundation/commercial-accounts/account-bulk/accounts-bulk.fake-module'),
-);
+// Same-origin cookie admission; RealtimeClient alone owns connection lifetime.
+const realtimeSocketFactory: RealtimeSocketFactory = (options) => io(options);
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideHttpClient(withInterceptors([acceptLanguageInterceptor, sessionRecoveryInterceptor])),
+    { provide: REALTIME_SOCKET_FACTORY, useValue: realtimeSocketFactory },
     provideRouter(routes, withComponentInputBinding()),
     { provide: TitleStrategy, useClass: AppTitleStrategy },
     provideTransloco({
@@ -73,6 +68,8 @@ export const appConfig: ApplicationConfig = {
       inject(ThemeState);
       inject(ViewScale);
       inject(TabLeader).start();
+      inject(RealtimeClient);
+      inject(NotificationsFeed);
     }),
   ],
 };
