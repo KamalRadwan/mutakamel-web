@@ -1,4 +1,4 @@
-<header class="relative shrink-0 overflow-hidden rounded-10 border border-border bg-surface shadow-card">
+<header class="relative shrink-0 overflow-hidden rounded-10 border border-border bg-surface shadow-card" [attr.aria-label]="'opportunities.record' | transloco">
   @if (showSkeleton()) {
     <div aria-busy="true">
       <div class="flex items-center gap-8 px-10 py-8">
@@ -158,21 +158,16 @@
           </button>
         }
       }
-
-      @if (mode() === 'edit' && detail(); as currentOpp) {
-        @if (currentOpp.id === opportunityId()) {
-          <app-record-related-badges
-            headerRelated
-            layout="page"
-            recordType="OPPORTUNITY"
-            [recordId]="currentOpp.id"
-            [branchId]="currentOpp.branchId"
-            [partyLabel]="currentOpp.title"
-            [kinds]="relatedKinds"
-            [loadCounts]="loadRelatedCountsFn()"
-            [links]="relatedLinks"
-          />
-        }
+      @if (tradeCountsRecord(); as currentOpportunity) {
+        <app-record-related-badges
+          headerRelated
+          layout="page"
+          recordType="OPPORTUNITY"
+          [recordId]="currentOpportunity.id"
+          [branchId]="currentOpportunity.branchId"
+          [kinds]="['quotations', 'salesOrders']"
+          [loadCounts]="loadTradeCounts"
+        />
       }
     </app-record-page-header>
 
@@ -204,37 +199,18 @@
           </div>
         }
       </div>
+    } @else if (needsBranch()) {
+      <ui-full-state kind="forbidden" [title]="'oppForm.lookups.chooseBranch' | transloco" />
     } @else if (notFound()) {
-      <div class="mt-10 flex flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
-        <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
-          <ng-icon name="tablerTarget" size="18" aria-hidden="true" />
-        </span>
-        <p class="text-12 leading-18 text-text-muted">{{ 'oppPage.notFound.text' | transloco }}</p>
-        <button type="button" uiButton variant="secondary" (click)="goBack()">
-          {{ 'oppPage.back' | transloco }}
-        </button>
-      </div>
+      <ui-full-state kind="not-found" [title]="'oppPage.notFound.text' | transloco" [actionLabel]="'oppPage.back' | transloco" (action)="goBack()" />
     } @else if (scopeDenied()) {
-      <div class="mt-10 flex flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
-        <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-orange text-on-icon">
-          <ng-icon name="tablerLock" size="18" aria-hidden="true" />
-        </span>
-        <p class="text-12 leading-18 text-text-muted">{{ 'oppPage.scopeDenied' | transloco }}</p>
-        <button type="button" uiButton variant="secondary" (click)="goBack()">
-          {{ 'oppPage.back' | transloco }}
-        </button>
-      </div>
+      <ui-full-state kind="forbidden" [title]="'oppPage.scopeDenied' | transloco" [actionLabel]="'oppPage.back' | transloco" (action)="goBack()" />
     } @else if (loadFailed()) {
-      <div class="mt-10 flex flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
-        <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
-          <ng-icon name="tablerCloudOff" size="18" aria-hidden="true" />
-        </span>
-        <p class="text-12 leading-18 text-text-muted">{{ 'oppPage.loadFailed' | transloco }}</p>
-        <button type="button" uiButton (click)="retryLoad()">{{ 'recordPage.retry' | transloco }}</button>
-      </div>
+      <ui-full-state kind="load-failure" [title]="'oppPage.loadFailed' | transloco" [text]="loadCorrelationId() || ''" [actionLabel]="'recordPage.retry' | transloco" (action)="retryLoad()" />
     }
 
-    <div [class]="showSkeleton() || scopeDenied() || loadFailed() || notFound() ? 'hidden' : 'contents'">
+    @if (!showSkeleton() && !needsBranch() && !scopeDenied() && !loadFailed() && !notFound()) {
+    <div class="contents">
       <div
         role="tabpanel"
         [id]="uid + '-panel-overview'"
@@ -362,9 +338,11 @@
         </div>
       }
     </div>
+    }
   </div>
 </div>
 
+@if (scopesReady()) {
 <ui-unsaved-dialog
   [title]="'recordPage.unsaved.title' | transloco"
   [text]="'recordPage.unsaved.text' | transloco"
@@ -373,14 +351,12 @@
   [cancelLabel]="'recordPage.unsaved.cancel' | transloco"
 />
 
-<ui-confirm-dialog
-  #conflictDialog
-  tone="warning"
-  [title]="'oppPage.conflict.title' | transloco"
-  [text]="'oppPage.conflict.text' | transloco"
-  [confirmLabel]="'oppPage.conflict.reload' | transloco"
-  [cancelLabel]="'oppPage.conflict.keepEditing' | transloco"
-/>
+<ui-conflict-dialog
+    [open]="conflictVisible()"
+    (reload)="resolveConflict(true)"
+    (keepEditing)="resolveConflict(false)"
+    (openChange)="!$event && resolveConflict(false)"
+  />
 
 <ui-confirm-dialog
   #deleteDialog
@@ -412,3 +388,5 @@
   [confirmLabel]="reopenLabels().confirm"
   [cancelLabel]="reopenLabels().cancel"
 />
+
+}

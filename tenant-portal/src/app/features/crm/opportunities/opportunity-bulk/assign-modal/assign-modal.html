@@ -14,11 +14,12 @@
   (cancel)="closeOwnerMenu()"
   (closed)="onModalClosed()"
 >
+  <fieldset class="contents" [disabled]="submission.readOnly()">
   <ui-field
     size="bare"
     [label]="'oppBulk.assign.owner' | transloco"
     [for]="uid + '-owner'"
-    [hint]="'oppBulk.assign.ownerHint' | transloco"
+    [hint]="(ownersDenied() ? 'opportunities.search.listRestricted' : 'oppBulk.assign.ownerHint') | transloco"
     [required]="true"
     [error]="ownerFieldError()"
   >
@@ -142,4 +143,5 @@
   <p class="text-12 leading-18 text-text-muted">
     {{ 'oppBulk.assign.preview' | transloco: previewParams() }}
   </p>
+  </fieldset>
 </app-bulk-run-modal>

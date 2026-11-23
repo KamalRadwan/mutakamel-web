@@ -24,7 +24,6 @@ import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { reasonDefinitionIn, reasonNameIn } from '../../../settings/reasons/reasons.model';
 import type { OpportunityReason } from '../../opportunities.model';
-import { listReasons } from '../../opportunities.api';
 import { OPPORTUNITY_LIMITS, stageLabel } from '../../opportunities.model';
 import {
   type CloseDialogError,
@@ -328,26 +327,11 @@ export class CloseDialog {
     }
   }
 
-  /** `keepVisible` shows the reason field even when no active reason exists (server-required win reason). */
-  private async loadReasons(kind: 'WON' | 'LOST', keepVisible = false): Promise<void> {
-    const seq = ++this.loadSeq;
-    this.reasonsLoading.set(true);
-    this.reasonsHidden.set(false);
-    try {
-      // The route returns active reasons only, already ordered by sortOrder, code.
-      const { items: active } = await listReasons({ kind: kind === 'WON' ? 'WIN' : 'LOSS' });
-      if (seq !== this.loadSeq) return;
-      this.reasons.set(active);
-      this.reasonsHidden.set(!keepVisible && active.length === 0);
-    } catch {
-      if (seq !== this.loadSeq) return;
-      this.reasons.set([]);
-      this.reasonsHidden.set(!keepVisible);
-    } finally {
-      if (seq === this.loadSeq) {
-        this.reasonsLoading.set(false);
-      }
-    }
+  /** Wave A uses free-text reasons until the governed list ships. */
+  private async loadReasons(_kind: 'WON' | 'LOST', _keepVisible = false): Promise<void> {
+    this.reasons.set([]);
+    this.reasonsLoading.set(false);
+    this.reasonsHidden.set(true);
   }
 
   private dismissServerError(): void {

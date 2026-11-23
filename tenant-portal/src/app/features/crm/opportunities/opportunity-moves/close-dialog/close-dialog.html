@@ -43,9 +43,10 @@
         </ui-field>
       }
 
+      @if (!isWon()) {
       <ui-field
         size="multiline"
-        [label]="'oppMoves.close.note' | transloco"
+        [label]="(isWon() ? 'oppMoves.close.note' : 'oppMoves.close.lossReason') | transloco"
         [for]="noteId"
         [hint]="noteHintKey() | transloco"
         [required]="noteRequired()"
@@ -65,6 +66,7 @@
           (input)="onNoteInput($event)"
         ></textarea>
       </ui-field>
+      }
     </div>
   }
 

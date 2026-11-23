@@ -323,8 +323,8 @@ export interface StageHistoryItem {
   toStatus: OpportunityStatus;
   changedAt: string;
   changedByUserId: string | null;
-  changedByDisplayName: string | null;
-  changedByAvatarUrl: string | null;
+  changedByDisplayName?: string | null;
+  changedByAvatarUrl?: string | null;
   reason: string | null;
   fromStageSnapshot: StageSnapshot | null;
   toStageSnapshot: StageSnapshot | null;
@@ -364,7 +364,7 @@ export interface CustomerOption {
   profileType: CustomerProfileType;
   displayName: string;
   companyName: string | null;
-  status: 'PROSPECT' | 'ACTIVE_CUSTOMER' | 'INACTIVE' | 'BLACKLISTED';
+  status: 'PROSPECT' | 'ACTIVE_CUSTOMER' | 'INACTIVE' | 'BLACKLISTED' | null;
   phone: string | null;
   email: string | null;
 }

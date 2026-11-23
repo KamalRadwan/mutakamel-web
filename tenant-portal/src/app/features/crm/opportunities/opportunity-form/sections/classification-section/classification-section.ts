@@ -5,7 +5,7 @@ import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerAlertCircle, tablerX } from '@ng-icons/tabler-icons';
 import { GeoCountry } from '../../../../../../core/geo/geo.model';
 import { LanguageState } from '../../../../../../core/i18n/language';
-import { ScopeBranch, ScopeCompany, ScopeState } from '../../../../../../core/scope/scope';
+import type { ScopeBranch, ScopeCompany } from '../../../../../../core/scope/scope';
 import { DateField } from '../../../../../../shared/ui/date-time/date-field';
 import { Dropdown, DropdownOption } from '../../../../../../shared/ui/dropdown/dropdown';
 import { Field } from '../../../../../../shared/ui/field/field';
@@ -176,7 +176,7 @@ export class ClassificationSection {
 
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
-  private readonly scope = inject(ScopeState);
+  private readonly scope = inject(OpportunityLookups).scope;
   protected readonly language = inject(LanguageState).current;
   protected readonly lookups = inject(OpportunityLookups);
   protected readonly limits = OPPORTUNITY_LIMITS;
@@ -198,7 +198,7 @@ export class ClassificationSection {
   private readonly pickedCompany = signal<{ companyId: string; branchId: string | null } | null>(null);
   private pendingOwnerBranchCheck = false;
 
-  protected readonly canEditScope = computed(() => this.mode() === 'create' && !this.readonly());
+  protected readonly canEditScope = computed(() => false);
   protected readonly canEditPipeline = computed(() => this.mode() === 'create' && !this.readonly());
 
   protected readonly activeCompany = computed<ScopeCompany | null>(() => {

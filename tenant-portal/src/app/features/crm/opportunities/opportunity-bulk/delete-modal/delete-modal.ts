@@ -4,7 +4,7 @@ import { provideIcons } from '@ng-icons/core';
 import { tablerTrash } from '@ng-icons/tabler-icons';
 import { PluralKeyPipe } from '../../../../../core/i18n/plural';
 import { Notify } from '../../../../../core/notify/notify';
-import { ScopeState } from '../../../../../core/scope/scope';
+import { TenantScopeState } from '../../../../../core/scope/tenant-scope';
 import { BulkJobsTracker } from '../../../../../shared/bulk-jobs/bulk-jobs-tracker';
 import { BulkJobSelection } from '../../../../../shared/bulk-jobs/bulk-jobs.model';
 import { Field } from '../../../../../shared/ui/field/field';
@@ -13,7 +13,9 @@ import { ApiError, errorCodeOf } from '../../../settings/shared/settings-api';
 import { OPPORTUNITY_LIMITS, type SelectedOpportunity } from '../../opportunities.model';
 import {
   buildDeleteBulkJob,
-  submitOpportunityBulkJob,
+  OpportunityBulkSubmission,
+  opportunityBulkErrorMessage,
+  opportunityBulkFieldError,
   translateOpportunityBulkError,
 } from '../bulk-runner';
 import {
@@ -28,7 +30,7 @@ const MAX_REASON_LENGTH = OPPORTUNITY_LIMITS.reason;
 @Component({
   selector: 'app-opp-bulk-delete-modal',
   imports: [TranslocoPipe, PluralKeyPipe, BulkRunModal, Field],
-  providers: [
+  viewProviders: [
     provideTranslocoScope('opportunities', { scope: 'opportunity-bulk', alias: 'oppBulk' }),
     provideIcons({ tablerTrash }),
   ],
@@ -38,11 +40,13 @@ export class OppBulkDeleteModal {
   private static nextId = 0;
   protected readonly uid = `opp-bulk-delete-${++OppBulkDeleteModal.nextId}`;
 
-  private readonly scopeState = inject(ScopeState);
+  private readonly scopeState = inject(TenantScopeState);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly selection = inject(OpportunitySelection, { optional: true });
   private readonly tracker = inject(BulkJobsTracker);
+  protected readonly submission = new OpportunityBulkSubmission();
+  private readonly openedBranchId = signal('');
 
   private readonly modal = viewChild.required(BulkRunModal);
 
@@ -55,10 +59,15 @@ export class OppBulkDeleteModal {
   protected readonly resolving = signal(false);
   protected readonly submitting = signal(false);
   protected readonly reason = signal('');
+  private readonly serverReasonError = signal<string | null>(null);
 
   private openSeq = 0;
 
-  private readonly effectiveBranchId = computed(() => this.branchId().trim() || this.scopeState.branch().id);
+  private readonly effectiveBranchId = computed(() => {
+    const selected = this.scopeState.selection()?.branchId ?? '';
+    return selected === this.openedBranchId() && (!this.branchId().trim() || this.branchId().trim() === selected)
+      && this.scopeState.branchCompanies().has(selected) ? selected : '';
+  });
 
   protected readonly displayCount = computed(() =>
     this.resolving() && this.rows().length === 0 ? (this.selection?.count() ?? 0) : this.rows().length,
@@ -69,11 +78,13 @@ export class OppBulkDeleteModal {
   protected readonly reasonLength = computed(() => [...this.reason()].length);
 
   protected readonly reasonError = computed<string | null>(() =>
-    this.reasonLength() > MAX_REASON_LENGTH ? this.transloco.translate('oppBulk.delete.reasonTooLong') : null,
+    this.serverReasonError() ?? (this.reasonLength() > MAX_REASON_LENGTH ? this.transloco.translate('oppBulk.delete.reasonTooLong') : null),
   );
 
   protected readonly canSubmit = computed(
     () =>
+      !this.submission.readOnly() &&
+      !!this.effectiveBranchId() &&
       !this.submitting() &&
       !this.resolving() &&
       this.rows().length > 0 &&
@@ -86,6 +97,7 @@ export class OppBulkDeleteModal {
 
   protected onReasonInput(event: Event): void {
     this.reason.set((event.target as HTMLTextAreaElement).value);
+    this.serverReasonError.set(null);
   }
 
   protected close(): void {
@@ -109,7 +121,7 @@ export class OppBulkDeleteModal {
 
     this.submitting.set(true);
     try {
-      const res = await submitOpportunityBulkJob(this.tracker, body);
+      const res = await this.submission.submit(this.tracker, body);
       this.close();
       this.submitted.emit(res.jobId);
     } catch (error) {
@@ -120,9 +132,16 @@ export class OppBulkDeleteModal {
   }
 
   private async initOpen(rows?: readonly OpportunitySelectionRow[]): Promise<void> {
+    this.openedBranchId.set(this.scopeState.selection()?.branchId ?? '');
+    this.submission.reset();
+    if (!this.effectiveBranchId()) {
+      this.notify.error(this.transloco.translate('opportunities.page.chooseBranch'));
+      return;
+    }
     const seq = ++this.openSeq;
     const mapped = rows ? rows.map(toSelectedOpportunity) : [];
     this.reason.set('');
+    this.serverReasonError.set(null);
     this.submitting.set(false);
     this.rows.set(mapped);
     this.modal().open();
@@ -156,7 +175,9 @@ export class OppBulkDeleteModal {
   private handleSubmitError(error: unknown): void {
     const code = errorCodeOf(error);
     if (code === 'BULK_JOB_ACTIVE') return;
-    this.notify.error(this.translateCode(code));
+    const fieldError = opportunityBulkFieldError(this.transloco, error, 'reason');
+    if (fieldError) { this.serverReasonError.set(fieldError); return; }
+    this.notify.error(opportunityBulkErrorMessage(this.transloco, error));
   }
 
   private translateCode(code: string | null): string {

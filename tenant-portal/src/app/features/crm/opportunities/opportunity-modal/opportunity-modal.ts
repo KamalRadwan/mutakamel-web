@@ -15,7 +15,7 @@ import {
 import { translationEvents } from '../../../../core/i18n/translation-events';
 import { Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
-import { NgIcon, provideIcons } from '@ng-icons/core';
+import { provideIcons } from '@ng-icons/core';
 import {
   tablerAlertTriangle,
   tablerArrowsExchange,
@@ -25,11 +25,14 @@ import {
   tablerThumbDown,
   tablerTrophy,
 } from '@ng-icons/tabler-icons';
-import { CurrentUser } from '../../../../core/auth/current-user';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
-import { ScopeState } from '../../../../core/scope/scope';
-import { Button } from '../../../../shared/ui/button/button';
+import { TenantScopeState } from '../../../../core/scope/tenant-scope';
+import { isRetryableWriteError } from '../../../../core/api/api-errors';
+import { can } from '../../../../shared/widgets/dashboard/analytics-permissions';
+import { ConflictDialog } from '../../../../shared/ui/conflict-dialog/conflict-dialog';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
+import { sessionBranch } from '../../shared/lookups/session-branch';
 import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { UnsavedDialog } from '../../../../shared/ui/unsaved-dialog/unsaved-dialog';
 import { CrmModules } from '../../shared/crm-modules/crm-modules';
@@ -37,16 +40,14 @@ import { RecordModalExtraAction, RecordModalFrame } from '../../shared/record/mo
 import { createUnsavedGuard } from '../../shared/record/modal/record-unsaved-guard';
 import { RecordDraftStore } from '../../shared/record/nav/record-draft-store';
 import { RecordNavContext, navPosition, nextNavTarget } from '../../shared/record/nav/record-nav';
-import { RecordRelatedBadges } from '../../shared/record/related/record-related-badges';
-import { RelatedBadgeClickEvent, RelatedKind, RelatedLinkFn } from '../../shared/record/related/related-records.model';
 import { ApiError, errorCodeOf, newIdempotencyKey } from '../../settings/shared/settings-api';
 import {
   createOpportunity,
+  attachOpportunityTags,
   deleteOpportunity,
   getCustomerOption,
   getOpportunity,
   getOpportunityCapabilities,
-  getRelatedCounts,
   patchOpportunity,
 } from '../opportunities.api';
 import {
@@ -74,16 +75,16 @@ import {
   toCreateBody,
   toPatchBody,
   validateDraft,
+  restoreNonClearableFields,
 } from '../opportunity-form/opportunity-draft';
 import {
   OpportunityForm,
   type OpportunitySeedPatch,
   type OpportunityUpdatingState,
 } from '../opportunity-form/opportunity-form';
-import { mapOpportunityApiError } from '../opportunity-form/opportunity-form-errors';
+import { mapOpportunityApiError, opportunityRecordError } from '../opportunity-form/opportunity-form-errors';
 import { OpportunityLookups } from '../opportunity-form/opportunity-lookups';
 import { diffOpportunityTags, saveTags } from '../opportunity-form/opportunity-tags-diff';
-import { pickCompanyBranchId } from '../opportunity-form/sections/classification-section/classification-section';
 import { CloseDialog } from '../opportunity-moves/close-dialog/close-dialog';
 import { MoveOutcome, OpportunityMoves } from '../opportunity-moves/opportunity-moves';
 import { PipelineMoveDialog } from '../opportunity-moves/pipeline-move-dialog/pipeline-move-dialog';
@@ -110,13 +111,12 @@ const BLANK_DRAFT: OpportunityDraft = emptyDraft({
 @Component({
   selector: 'app-opportunity-modal',
   imports: [
-    NgIcon,
     TranslocoPipe,
-    Button,
     ConfirmDialog,
+    ConflictDialog,
+    FullState,
     UnsavedDialog,
     RecordModalFrame,
-    RecordRelatedBadges,
     OpportunityForm,
     CloseDialog,
     PipelineMoveDialog,
@@ -128,7 +128,10 @@ const BLANK_DRAFT: OpportunityDraft = emptyDraft({
       'opportunities',
       { scope: 'opportunity-modal', alias: 'oppModal' },
       { scope: 'opportunity-form', alias: 'oppForm' },
+      { scope: 'opportunity-moves', alias: 'oppMoves' },
       { scope: 'record-modal', alias: 'recordModal' },
+      { scope: 'record-fields', alias: 'recordFields' },
+      { scope: 'record-form', alias: 'recordForm' },
     ),
     provideIcons({
       tablerAlertTriangle,
@@ -158,8 +161,8 @@ export class OpportunityModal {
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly language = inject(LanguageState).current;
-  private readonly currentUser = inject(CurrentUser);
-  private readonly scope = inject(ScopeState);
+  private readonly scope = inject(OpportunityLookups).scope;
+  private readonly tenantScope = inject(TenantScopeState);
   private readonly crmModules = inject(CrmModules);
   private readonly draftStore = inject(RecordDraftStore);
   private readonly pipelineScope = inject(PipelineScope);
@@ -168,7 +171,6 @@ export class OpportunityModal {
 
   private readonly unsavedDialog = viewChild<UnsavedDialog>('unsavedDialog');
   private readonly conflictDialogWrap = viewChild<ElementRef<HTMLElement>>('conflictDialogWrap');
-  private readonly conflictDialog = viewChild.required<ConfirmDialog>('conflictDialog');
   private readonly deleteDialogWrap = viewChild<ElementRef<HTMLElement>>('deleteDialogWrap');
   private readonly deleteDialog = viewChild.required<ConfirmDialog>('deleteDialog');
   private readonly reopenDialogWrap = viewChild<ElementRef<HTMLElement>>('reopenDialogWrap');
@@ -193,13 +195,20 @@ export class OpportunityModal {
 
   protected readonly loading = signal(false);
   protected readonly loadFailed = signal(false);
+  protected readonly notFound = signal(false);
+  protected readonly forbidden = signal(false);
+  protected readonly writeReadOnly = signal(false);
+  protected readonly createMismatch = signal(false);
+  protected readonly loadCorrelationId = signal<string | null>(null);
+  protected readonly needsBranch = computed(() => { this.tenantScope.selection(); return !sessionBranch(); });
+  protected readonly conflictVisible = signal(false);
+  private conflictResolve: ((reload: boolean) => void) | null = null;
   protected readonly saving = signal(false);
   protected readonly deleting = signal(false);
   protected readonly updatingState = signal<OpportunityUpdatingState>({});
   protected readonly attemptedSubmit = signal(false);
   protected readonly serverErrors = signal<DraftErrors>({});
   protected readonly guardBusy = signal(false);
-  private readonly relatedRevision = signal(0);
 
   private loadSeq = 0;
   private reopenSeq = 0;
@@ -214,7 +223,7 @@ export class OpportunityModal {
     this.i18n();
     if (this.transloco.getActiveLang() !== lang) return false;
     const dict = this.transloco.getTranslation(lang);
-    return Boolean(dict['oppForm.sections.deal'] && dict['oppModal.typeTitle']);
+    return Boolean(dict['oppForm.sections.deal'] && dict['oppModal.typeTitle'] && dict['oppMoves.close.lostTitle'] && dict['recordFields.color.none']);
   });
 
   protected readonly instantUpdating = computed(() => {
@@ -259,24 +268,28 @@ export class OpportunityModal {
   });
 
   protected readonly canEdit = computed(() => {
-    if (this.mode() === 'create') return true;
+    if (this.writeReadOnly() || this.needsBranch() || this.notFound() || this.forbidden() || !can('crm.opportunities.read')) return false;
+    if (this.mode() === 'create') return !!this.lookups.capabilities(this.draft().branchId)?.create && !this.createMismatch();
     const current = this.row();
     return Boolean(current && canUpdateOpportunity(this.capabilities(), current));
   });
 
   protected readonly canDelete = computed(() => {
+    if (this.writeReadOnly() || this.needsBranch()) return false;
     if (this.mode() !== 'edit') return false;
     const current = this.row();
     return Boolean(current && canDeleteOpportunity(this.capabilities(), current));
   });
 
   protected readonly canMove = computed(() => {
+    if (this.writeReadOnly() || this.needsBranch()) return false;
     if (this.mode() !== 'edit') return false;
     const current = this.row();
     return Boolean(current && canMoveOpportunity(this.capabilities(), current));
   });
 
   protected readonly canTransfer = computed(() => {
+    if (this.writeReadOnly() || this.needsBranch()) return false;
     if (this.mode() !== 'edit') return false;
     const current = this.row();
     return Boolean(current && canTransferOpportunity(this.capabilities(), current));
@@ -363,24 +376,6 @@ export class OpportunityModal {
     return actions;
   });
 
-  protected readonly relatedKinds: readonly RelatedKind[] = ['quotations', 'salesOrders'];
-
-  protected readonly loadRelatedCounts = computed(() => {
-    this.relatedRevision();
-    return (id: string) => getRelatedCounts(id);
-  });
-
-  protected readonly relatedLinks: Partial<Record<RelatedKind, RelatedLinkFn>> = {
-    quotations: ({ recordId }) => ({
-      commands: ['/trade/documents/quotations'],
-      queryParams: { crmOpportunityId: recordId },
-    }),
-    salesOrders: ({ recordId }) => ({
-      commands: ['/trade/documents/sales-orders'],
-      queryParams: { crmOpportunityId: recordId },
-    }),
-  };
-
   constructor() {
     const onConfirmKeydown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
@@ -449,24 +444,14 @@ export class OpportunityModal {
     this.presetCustomer = null;
     this.pendingFocusTitle = true;
 
-    const sessionCompany = this.scope.company();
-    const branches = this.lookups.branches();
-    const branchId =
-      branches.length > 0
-        ? (pickCompanyBranchId(
-            sessionCompany,
-            sessionCompany,
-            this.scope.branch(),
-            this.scope.companies(),
-            branches,
-          ) ?? branches[0].id)
-        : null;
+    const selected = sessionBranch();
+    const branchId = selected?.branchId ?? null;
 
     const pipeline = this.resolvePipeline(opts.pipelineId);
     const initial = emptyDraft({
       branchId,
-      companyId: sessionCompany.id,
-      ownerUserId: this.currentUser.userId(),
+      companyId: selected?.companyId ?? null,
+      ownerUserId: this.tenantScope.me()?.id ?? null,
       pipeline,
       stageId: opts.stageId ?? null,
       customer: null,
@@ -499,7 +484,7 @@ export class OpportunityModal {
     this.openIdChange.emit(null);
 
     const customerProfileId = opts.customerProfileId?.trim();
-    if (customerProfileId) {
+    if (customerProfileId && selected && can('crm.customer_profiles.read')) {
       void getCustomerOption(customerProfileId)
         .then((customer) => {
           if (seq !== this.loadSeq || !this.isOpen() || this.mode() !== 'create') return;
@@ -551,8 +536,9 @@ export class OpportunityModal {
   }
 
   protected onFormDraftChange(next: OpportunityDraft): void {
-    this.serverErrors.set({});
-    this.draft.set(next);
+    const result = this.mode() === 'edit' ? restoreNonClearableFields(this.base(), next) : { draft: next, errors: {} };
+    this.serverErrors.set(result.errors);
+    this.draft.set(result.draft);
   }
 
   protected onFormSeeded(patch: OpportunitySeedPatch): void {
@@ -634,7 +620,7 @@ export class OpportunityModal {
       this.row.update((r) => (r ? { ...r, importance: prevImportance } : r));
       this.base.update((b) => ({ ...b, importance: prevBaseImportance }));
       this.draft.update((d) => ({ ...d, importance: prevDraftImportance }));
-      this.toastWriteError(error, 'opportunities.card.rateFailed');
+      this.toastWriteError(error);
     } finally {
       this.updatingState.update((s) => ({ ...s, rating: false }));
     }
@@ -677,7 +663,7 @@ export class OpportunityModal {
       this.row.update((r) => (r ? { ...r, cardColor: prevColor } : r));
       this.base.update((b) => ({ ...b, cardColor: prevBaseColor }));
       this.draft.update((d) => ({ ...d, cardColor: prevDraftColor }));
-      this.toastWriteError(error, 'opportunities.card.colorFailed');
+      this.toastWriteError(error);
     } finally {
       this.updatingState.update((s) => ({ ...s, color: false }));
     }
@@ -856,7 +842,7 @@ export class OpportunityModal {
       this.deleted.emit(current.id);
       this.closeModal(true);
     } catch (error) {
-      this.toastWriteError(error, 'opportunities.list.deleteFailed');
+      this.toastWriteError(error);
       if (error instanceof ApiError && error.status === 404) {
         this.deleted.emit(current.id);
         this.closeModal(true);
@@ -870,24 +856,6 @@ export class OpportunityModal {
     if (!next && this.isOpen()) {
       this.closeModal(true);
     }
-  }
-
-  protected onRelatedBadgeClick(click: RelatedBadgeClickEvent): void {
-    if (
-      click.event.button !== 0 ||
-      click.event.ctrlKey ||
-      click.event.metaKey ||
-      click.event.shiftKey ||
-      click.event.altKey
-    ) {
-      return;
-    }
-    if (this.dirty()) {
-      click.event.preventDefault();
-      void this.leaveForRelatedBadge(click);
-      return;
-    }
-    this.closeModal(false);
   }
 
   protected onKeydown(event: KeyboardEvent): void {
@@ -910,13 +878,6 @@ export class OpportunityModal {
     } else {
       void this.goNext();
     }
-  }
-
-  private async leaveForRelatedBadge(click: RelatedBadgeClickEvent): Promise<void> {
-    if (this.saving() || this.deleting() || this.anyGuardBusy()) return;
-    if (!(await this.unsavedGuard.confirmLeave())) return;
-    this.closeModal(false);
-    void this.router.navigate(click.target.commands, { queryParams: click.target.queryParams });
   }
 
   private dismissOpenConfirmDialog(event: Event): void {
@@ -1049,9 +1010,13 @@ export class OpportunityModal {
   }
 
   private async loadRecord(id: string): Promise<void> {
+    if (!sessionBranch()) { this.loading.set(false); return; }
+    if (!can('crm.opportunities.read')) { this.forbidden.set(true); this.loading.set(false); return; }
     const seq = ++this.loadSeq;
     this.loading.set(true);
     this.loadFailed.set(false);
+    this.notFound.set(false);
+    this.forbidden.set(false);
     this.attemptedSubmit.set(false);
     this.serverErrors.set({});
     this.updatingState.set({});
@@ -1059,20 +1024,24 @@ export class OpportunityModal {
     try {
       const loaded = await getOpportunity(id);
       if (seq !== this.loadSeq) return;
-      const caps = await getOpportunityCapabilities(loaded.branchId);
+      const caps = await getOpportunityCapabilities(loaded.branchId).catch(() => null);
       if (seq !== this.loadSeq) return;
       this.applyLoadedRow(loaded, caps);
     } catch (error) {
       if (seq !== this.loadSeq) return;
       if (errorCodeOf(error) === 'CRM_OPPORTUNITIES_DISABLED') {
-        this.toastWriteError(error, 'oppModal.loadFailed');
+        this.toastWriteError(error);
       }
       this.loading.set(false);
-      this.loadFailed.set(true);
+      const state = opportunityRecordError(this.transloco, error, 'oppModal');
+      this.notFound.set(state.kind === 'not-found');
+      this.forbidden.set(state.kind === 'forbidden');
+      this.loadFailed.set(state.kind === 'load-failure');
+      this.loadCorrelationId.set(state.correlationId);
     }
   }
 
-  private applyLoadedRow(loaded: OpportunityRow, caps: OpportunityCapabilities): void {
+  private applyLoadedRow(loaded: OpportunityRow, caps: OpportunityCapabilities | null): void {
     const mapped = draftFromRow(loaded, this.scope.companies());
     this.opportunityId.set(loaded.id);
     this.row.set(loaded);
@@ -1082,7 +1051,6 @@ export class OpportunityModal {
     this.draft.set(mapped);
     this.loading.set(false);
     this.loadFailed.set(false);
-    this.relatedRevision.update((v) => v + 1);
   }
 
   private applyMovedRow(updated: OpportunityRow): void {
@@ -1111,7 +1079,11 @@ export class OpportunityModal {
 
     this.saving.set(true);
     try {
-      const created = await createOpportunity(body, this.lastIdempotencyKey);
+      let created = await createOpportunity(body, this.lastIdempotencyKey);
+      if (currentDraft.tagIds.length) {
+        try { created = { ...created, tags: await attachOpportunityTags(created.id, currentDraft.tagIds) }; }
+        catch { this.notify.warning(this.transloco.translate('oppForm.savedWithoutTags')); }
+      }
       this.lastBodyFingerprint = null;
       this.lastIdempotencyKey = null;
       this.notify.success(this.transloco.translate('oppModal.created'));
@@ -1170,6 +1142,10 @@ export class OpportunityModal {
       }
       return true;
     } catch (error) {
+      if (!isRetryableWriteError(error) && !(error instanceof ApiError && error.status === 401)) {
+        this.lastIdempotencyKey = null;
+        this.lastBodyFingerprint = null;
+      }
       this.handleSaveError(error);
       return false;
     } finally {
@@ -1248,7 +1224,6 @@ export class OpportunityModal {
       this.draft.set(finalMapped);
       this.attemptedSubmit.set(false);
       this.serverErrors.set({});
-      this.relatedRevision.update((v) => v + 1);
       this.notify.success(this.transloco.translate('oppModal.saved'));
       this.saved.emit(latest);
       return true;
@@ -1258,31 +1233,44 @@ export class OpportunityModal {
   }
 
   private async handleConflict(id: string): Promise<boolean> {
-    if (this.anyGuardBusy()) return false;
+    if (this.guardBusy()) return false;
     this.guardBusy.set(true);
     let reload = false;
     try {
-      reload = await this.conflictDialog().open();
+      this.conflictVisible.set(true);
+      reload = await new Promise<boolean>((resolve) => { this.conflictResolve = resolve; });
     } finally {
       this.guardBusy.set(false);
     }
-    if (!reload) return false;
-
     try {
       const fresh = await getOpportunity(id);
+      if (this.opportunityId() !== id) return false;
+      if (!reload) {
+        this.updatedAt.set(fresh.updatedAt);
+        this.row.update((row) => row ? { ...row, updatedAt: fresh.updatedAt } : row);
+        return false;
+      }
       const caps = await getOpportunityCapabilities(fresh.branchId);
       if (this.opportunityId() !== id) return false;
       this.applyLoadedRow(fresh, caps);
       return false;
     } catch (error) {
-      this.toastWriteError(error, 'opportunities.errors.generic');
+      this.toastWriteError(error);
       return false;
     }
   }
 
+  protected resolveConflict(reload: boolean): void {
+    this.conflictVisible.set(false);
+    this.conflictResolve?.(reload);
+    this.conflictResolve = null;
+  }
+
   private handleSaveError(error: unknown): void {
+    const code = errorCodeOf(error);
+    if (code === 'GW.IDEM.MISMATCH' || code?.endsWith('_IDEMPOTENCY_MISMATCH')) this.createMismatch.set(true);
     if (errorCodeOf(error) === 'CRM_OPPORTUNITIES_DISABLED') {
-      this.toastWriteError(error, 'opportunities.errors.generic');
+      this.toastWriteError(error);
       return;
     }
 
@@ -1293,21 +1281,24 @@ export class OpportunityModal {
       return;
     }
 
-    this.toastWriteError(error, 'opportunities.errors.generic');
+    this.toastWriteError(error);
   }
 
   private handleMoveFailure(outcome: MoveOutcome): void {
-    if (outcome.kind === 'failed' && outcome.code === 'CRM_OPPORTUNITIES_DISABLED') {
-      void this.crmModules.reload();
+    if (outcome.kind === 'failed') {
+      if (outcome.code === 'CRM.OPPORTUNITY.STALE_MOVE') void this.handleConflict(this.opportunityId()!);
+      if (outcome.code === 'PIPELINE_STAGE_NOT_FOUND' && this.opportunityId()) {
+        this.lookups.reloadPipelines();
+        void this.loadRecord(this.opportunityId()!);
+      }
+      if (['CRM_OPPORTUNITIES_DISABLED', 'CRM_SUBSCRIPTION_READ_ONLY', 'SEAT_OVER_CAPACITY_READ_ONLY'].includes(outcome.code ?? '')) this.writeReadOnly.set(true);
     }
   }
 
-  private toastWriteError(error: unknown, fallbackKey: string): void {
-    const message = opportunityErrorMessage(error, this.transloco, fallbackKey);
-    this.notify.error(message);
-    if (errorCodeOf(error) === 'CRM_OPPORTUNITIES_DISABLED') {
-      void this.crmModules.reload();
-    }
+  private toastWriteError(error: unknown): void {
+    const state = opportunityRecordError(this.transloco, error, 'oppForm');
+    this.notify.error(state.message);
+    if (state.readOnly) this.writeReadOnly.set(true);
   }
 
   private isConcurrentUpdate(error: unknown): boolean {

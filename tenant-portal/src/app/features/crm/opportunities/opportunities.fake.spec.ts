@@ -1,6 +1,15 @@
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
+import { TestBed } from '@angular/core/testing';
+import { AuthSession } from '../../../core/auth/auth-session';
+import { FAKE_TENANT_ME } from '../../../core/auth/auth-session.fake';
+import { bindCrmHttpForTest } from '../shared/crm-http';
+import { CrmHttpStub } from '../shared/testing/crm-http-testing';
 import en from '../../../../../public/i18n/opportunities/en.json';
 import ar from '../../../../../public/i18n/opportunities/ar.json';
+import enForm from '../../../../../public/i18n/opportunity-form/en.json';
+import arForm from '../../../../../public/i18n/opportunity-form/ar.json';
+import enPage from '../../../../../public/i18n/opportunity-page/en.json';
+import arPage from '../../../../../public/i18n/opportunity-page/ar.json';
 import { ACME_CUSTOMER_ID, CUSTOMERS_FAKE_DB, DEFAULT_CUSTOMER_BRANCH_ID } from '../customers/customers.fake';
 import { ApiError } from '../settings/shared/settings-api';
 import {
@@ -450,7 +459,25 @@ describe('transfer rules', () => {
 
 describe('api wrappers and error keys', () => {
   it('listOwners is refused with 403 for a branch without a grant (assignable-owners: scopedAccess.resolve throws first)', async () => {
-    await expectApiError(listOwners('00000000-0000-7000-8000-00000000beef'), 403, 'CRM_SCOPED_PERMISSION_DENIED');
+    const branchId = '00000000-0000-7000-8000-00000000beef';
+    const companyId = '019f0000-0000-7000-8000-000000000010';
+    TestBed.configureTestingModule({ providers: [{ provide: AuthSession, useValue: {
+      status: () => 'signed-in',
+      me: () => ({ ...FAKE_TENANT_ME, accessibleCompanies: [companyId], accessibleBranches: [branchId],
+        accessibleBranchCompanies: [{ branchId, companyId }] }),
+    } }] });
+    const stub = new CrmHttpStub();
+    const read = vi.spyOn(stub, 'read').mockRejectedValue(new ApiError(403, 'CRM_SCOPED_PERMISSION_DENIED'));
+    const dispose = bindCrmHttpForTest(stub);
+    try {
+      await expectApiError(listOwners(branchId), 403, 'CRM_SCOPED_PERMISSION_DENIED');
+      expect(read).toHaveBeenCalledWith('/assignable-owners', {
+        branchId, resource: 'opportunities', action: 'create', cursor: undefined, limit: 100,
+      }, { scope: { companyId, branchId } });
+    } finally {
+      read.mockRestore();
+      dispose();
+    }
   });
 
   it('maps OPPORTUNITY_FILTER_TAGS_CONFLICT and OPPORTUNITY_PIPELINE_MISMATCH with en and ar sentences', () => {
@@ -474,6 +501,16 @@ describe('api wrappers and error keys', () => {
     const enErrors = (en as { errors: Record<string, string> }).errors;
     const arErrors = (ar as { errors: Record<string, string> }).errors;
     for (const code of Object.keys(OPPORTUNITY_ERROR_KEYS)) {
+      if (code === 'OPPORTUNITY_AMOUNT_SCALE_INVALID') {
+        expect(enForm.errors.OPPORTUNITY_AMOUNT_SCALE_INVALID).toBeTruthy();
+        expect(arForm.errors.OPPORTUNITY_AMOUNT_SCALE_INVALID).toBeTruthy();
+        continue;
+      }
+      if (code === 'OPPORTUNITY_HISTORY_INTEGRITY_INVALID') {
+        expect(enPage.stages.integrityFailed).toBeTruthy();
+        expect(arPage.stages.integrityFailed).toBeTruthy();
+        continue;
+      }
       expect(enErrors[code], `en ${code}`).toBeTruthy();
       expect(arErrors[code], `ar ${code}`).toBeTruthy();
     }
@@ -489,7 +526,14 @@ describe('api wrappers and error keys', () => {
 
 describe('backend contract alignment', () => {
   it('reasons: { items } of active reasons of the required kind, in the narrow picker view', async () => {
-    const res = await settle(listReasons({ kind: 'WIN' }));
+    const stub = new CrmHttpStub({ '/opportunities/reasons': { items: [{
+      id: 'win-reason', code: 'VALUE', nameEn: 'Value', nameAr: 'Value',
+      definitionEn: 'Selected for value', definitionAr: 'Selected for value',
+      polarity: 'POSITIVE', reasonKind: 'WIN', sortOrder: 1,
+    }] } });
+    const dispose = bindCrmHttpForTest(stub);
+    const res = await settle(listReasons({ kind: 'WIN' })).finally(dispose);
+    expect(stub.recordedReads()).toEqual([{ path: '/opportunities/reasons', query: { kind: 'WIN' }, scope: undefined }]);
     expect(Array.isArray(res.items)).toBe(true);
     expect(res.items.length).toBeGreaterThan(0);
     for (const item of res.items) {
@@ -507,8 +551,15 @@ describe('backend contract alignment', () => {
     const wire = await settle(fakeGetOpportunityCapabilities(BRANCH));
     expect(wire.branchId).toBe(BRANCH);
     expect(wire.opportunities.bulk.createActivity).not.toBeNull();
-    const caps = await settle(getOpportunityCapabilities(BRANCH));
-    expect(caps).toEqual(wire.opportunities);
+    const companyId = '019f0000-0000-7000-8000-000000000010';
+    const branchId = '019f0000-0000-7000-8000-000000000011';
+    TestBed.configureTestingModule({ providers: [{ provide: AuthSession, useValue: {
+      status: () => 'signed-in', me: () => ({ ...FAKE_TENANT_ME, accessibleCompanies: [companyId],
+        accessibleBranches: [branchId], accessibleBranchCompanies: [{ branchId, companyId }] }),
+    } }] });
+    const dispose = bindCrmHttpForTest(new CrmHttpStub({ '/opportunities/capabilities': { branchId, opportunities: wire.opportunities } }));
+    try { expect(await getOpportunityCapabilities(branchId)).toEqual(wire.opportunities); }
+    finally { dispose(); }
     await expectApiError(fakeGetOpportunityCapabilities(''), 400, 'CRM_VALIDATION_FAILED');
   });
 

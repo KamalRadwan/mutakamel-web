@@ -18,6 +18,7 @@
   (submit)="submit()"
   (closed)="onModalClosed()"
 >
+  <fieldset class="contents" [disabled]="submission.readOnly()">
   <p class="text-12 leading-18 font-medium text-text">
     {{ ('oppBulk.delete.text' | pluralKey: rows().length) | transloco: { n: rows().length } }}
   </p>
@@ -45,4 +46,5 @@
       (input)="onReasonInput($event)"
     ></textarea>
   </ui-field>
+  </fieldset>
 </app-bulk-run-modal>

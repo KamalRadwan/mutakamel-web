@@ -1,3 +1,4 @@
+<ui-field [label]="switcherLabel()" [hint]="switcherTitle()">
 <ui-dropdown
   size="button"
   icon="tablerHierarchy2"
@@ -7,3 +8,4 @@
   [disabled]="disabled() || options().length === 0"
   (valueChange)="onSelect($event)"
 />
+</ui-field>

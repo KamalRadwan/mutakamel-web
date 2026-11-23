@@ -1,10 +1,7 @@
 @if (list.failed()) {
-  <div class="flex flex-col items-center gap-8 p-16 text-center">
-    <p class="text-12 text-danger-text" role="alert">{{ 'opportunities.list.loadFailed' | transloco }}</p>
-    <button type="button" uiButton variant="secondary" (click)="retryLoad()">
-      {{ 'opportunities.list.retry' | transloco }}
-    </button>
-  </div>
+  @if (!filterError()) {
+    <ui-full-state [kind]="forbidden() ? 'forbidden' : 'load-failure'" [title]="failureTitle()" [text]="correlationId()" [actionLabel]="forbidden() ? '' : ((mismatch() ? 'opportunities.page.reload' : 'opportunities.list.retry') | transloco)" (action)="retryLoad()" />
+  }
 } @else if (!list.loading() && !items().length) {
   <p class="p-16 text-center text-12 text-text-muted">{{ 'opportunities.list.noResults' | transloco }}</p>
 } @else {
@@ -371,3 +368,4 @@
   [confirmLabel]="'common.delete' | transloco"
   [cancelLabel]="'common.cancel' | transloco"
 />
+<ui-conflict-dialog [open]="list.conflict() !== null" [recordLabel]="list.conflict()?.row?.title ?? null" (reload)="list.resolveConflict(true)" (keepEditing)="list.resolveConflict(false)" (openChange)="!$event && list.resolveConflict(false)" />

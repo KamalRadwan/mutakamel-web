@@ -6,6 +6,7 @@ import { tablerArrowRight, tablerLock, tablerUser } from '@ng-icons/tabler-icons
 import { LanguageState } from '../../../../../core/i18n/language';
 import { Notify } from '../../../../../core/notify/notify';
 import { Button } from '../../../../../shared/ui/button/button';
+import { FullState } from '../../../../../shared/ui/full-state/full-state';
 import { errorCodeOf } from '../../../settings/shared/settings-api';
 import { listStageHistory } from '../../opportunities.api';
 import { OpportunityStatus, StageHistoryItem, StageSnapshot } from '../../opportunities.model';
@@ -120,7 +121,7 @@ function durationUnitKey(unit: DurationUnit, n: number): string {
 /** Opportunity stage-transition timeline tab, grouped by day with previous-stage durations. */
 @Component({
   selector: 'app-opportunity-stages-tab',
-  imports: [NgIcon, TranslocoPipe, Button],
+  imports: [NgIcon, TranslocoPipe, Button, FullState],
   providers: [provideIcons({ tablerArrowRight, tablerLock, tablerUser })],
   templateUrl: './opportunity-stages-tab.html',
   host: { class: 'block' },
@@ -145,6 +146,7 @@ export class OpportunityStagesTab {
   protected readonly loadingMore = signal(false);
   protected readonly denied = signal(false);
   protected readonly loadFailed = signal(false);
+  protected readonly integrityFailed = signal(false);
 
   private loadSeq = 0;
   private loadedOpportunityId: string | null = null;
@@ -312,6 +314,16 @@ export class OpportunityStagesTab {
       this.countChange.emit(merged.length);
     } catch (error) {
       if (seq !== this.loadSeq) return;
+      if (errorCodeOf(error) === 'OPPORTUNITY_HISTORY_CURSOR_INVALID') {
+        await this.loadFirstPage(id, true);
+        return;
+      }
+      if (errorCodeOf(error) === 'OPPORTUNITY_HISTORY_INTEGRITY_INVALID') {
+        this.integrityFailed.set(true);
+        this.loadFailed.set(true);
+        this.nextCursor.set(null);
+        return;
+      }
       if (isDeniedError(error)) {
         this.denied.set(true);
         this.items.set([]);
@@ -335,6 +347,7 @@ export class OpportunityStagesTab {
     }
     this.denied.set(false);
     this.loadFailed.set(false);
+    this.integrityFailed.set(false);
 
     try {
       const res = await listStageHistory(id, null);
@@ -349,6 +362,7 @@ export class OpportunityStagesTab {
         this.items.set([]);
         this.nextCursor.set(null);
       } else {
+        this.integrityFailed.set(errorCodeOf(error) === 'OPPORTUNITY_HISTORY_INTEGRITY_INVALID');
         this.loadFailed.set(true);
       }
     } finally {

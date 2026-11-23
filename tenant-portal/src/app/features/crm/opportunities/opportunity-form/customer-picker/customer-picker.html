@@ -10,6 +10,7 @@
     class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
     [placeholder]="placeholder()"
     [readonly]="disabled()"
+    [disabled]="disabled()"
     [value]="query()"
     [attr.aria-label]="label() || null"
     [attr.aria-expanded]="dropdownVisible()"

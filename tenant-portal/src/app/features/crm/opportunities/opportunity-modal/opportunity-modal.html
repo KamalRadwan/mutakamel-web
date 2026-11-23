@@ -35,22 +35,6 @@
   (delete)="confirmDelete()"
   (extraAction)="onExtraAction($event)"
 >
-  @if (mode() === 'edit' && !loading() && !loadFailed() && row(); as currentOpp) {
-    @if (currentOpp.id === opportunityId()) {
-      <app-record-related-badges
-        headerRelated
-        layout="modal"
-        recordType="OPPORTUNITY"
-        [recordId]="currentOpp.id"
-        [branchId]="currentOpp.branchId"
-        [partyLabel]="subtitle()"
-        [kinds]="relatedKinds"
-        [loadCounts]="loadRelatedCounts()"
-        [links]="relatedLinks"
-        (badgeClick)="onRelatedBadgeClick($event)"
-      />
-    }
-  }
 
   @if (loading() || !scopesReady()) {
     <div modalMain class="flex flex-col gap-y-10">
@@ -74,16 +58,14 @@
         </div>
       </div>
     </div>
+  } @else if (needsBranch()) {
+    <ui-full-state modalMain kind="forbidden" [title]="'oppForm.lookups.chooseBranch' | transloco" />
+  } @else if (notFound()) {
+    <ui-full-state modalMain kind="not-found" [title]="'oppModal.notAvailable' | transloco" />
+  } @else if (forbidden()) {
+    <ui-full-state modalMain kind="forbidden" [title]="'oppModal.forbidden' | transloco" />
   } @else if (loadFailed()) {
-    <div modalMain class="flex flex-1 flex-col items-center justify-center gap-8 p-16 text-center">
-      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
-        <ng-icon name="tablerCloudOff" size="18" aria-hidden="true" />
-      </span>
-      <p class="text-12 leading-18 text-text-muted">{{ 'oppModal.loadFailed' | transloco }}</p>
-      <button type="button" uiButton variant="primary" (click)="retryLoad()">
-        {{ 'recordModal.retry' | transloco }}
-      </button>
-    </div>
+    <ui-full-state modalMain kind="load-failure" [title]="'oppModal.loadFailed' | transloco" [text]="loadCorrelationId() || ''" [actionLabel]="'recordModal.retry' | transloco" (action)="retryLoad()" />
   } @else {
     <app-opportunity-form
       modalMain
@@ -134,6 +116,7 @@
   }
 </span>
 
+@if (scopesReady()) {
 <ui-unsaved-dialog
   #unsavedDialog
   [title]="'recordModal.unsaved.title' | transloco"
@@ -144,13 +127,11 @@
 />
 
 <div #conflictDialogWrap>
-  <ui-confirm-dialog
-    #conflictDialog
-    tone="warning"
-    [title]="'oppModal.conflict.title' | transloco"
-    [text]="'oppModal.conflict.text' | transloco"
-    [confirmLabel]="'oppModal.conflict.reload' | transloco"
-    [cancelLabel]="'oppModal.conflict.keepEditing' | transloco"
+  <ui-conflict-dialog
+    [open]="conflictVisible()"
+    (reload)="resolveConflict(true)"
+    (keepEditing)="resolveConflict(false)"
+    (openChange)="!$event && resolveConflict(false)"
   />
 </div>
 
@@ -188,3 +169,5 @@
     [cancelLabel]="'oppMoves.common.cancel' | transloco"
   />
 </div>
+
+}

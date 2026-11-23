@@ -1,9 +1,15 @@
 import { Signal, computed, inject, linkedSignal, resource, signal } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
 import { Notify } from '../../../core/notify/notify';
-import { ApiError } from '../settings/shared/settings-api';
+import { ApiError, sharedErrorKeyOf } from '../../../core/api/api-errors';
 import { DEFAULT_LIST_PAGE_SIZE } from '../shared/record/list/page-size';
-import { deleteOpportunity, patchOpportunity, searchOpportunities } from './opportunities.api';
+import {
+  OPPORTUNITY_ERROR_KEYS,
+  deleteOpportunity,
+  getOpportunity,
+  patchOpportunity,
+  searchOpportunities,
+} from './opportunities.api';
 import {
   CardColor,
   OpportunityRow,
@@ -12,8 +18,12 @@ import {
   PipelineStageView,
   WireNode,
 } from './opportunities.model';
-import { isConflictError, opportunityErrorMessage } from './opportunity-card/opportunity-card';
 import { MoveOutcome, OpportunityMoves } from './opportunity-moves/opportunity-moves';
+
+interface RowConflict {
+  row: OpportunityRow;
+  patch: { importance?: number; cardColor?: CardColor | null };
+}
 
 export interface OpportunityListStore {
   readonly query: Signal<OpportunitySearchBody>;
@@ -21,6 +31,10 @@ export interface OpportunityListStore {
   readonly total: Signal<number>;
   readonly loading: Signal<boolean>;
   readonly failed: Signal<boolean>;
+  readonly error: Signal<unknown>;
+  readonly conflict: Signal<RowConflict | null>;
+  readonly readOnly: Signal<boolean>;
+  resolveConflict(reload: boolean): Promise<void>;
   reload(): void;
   move(row: OpportunityRow, stage: PipelineStageView): Promise<MoveOutcome>;
   rate(row: OpportunityRow, importance: number): Promise<void>;
@@ -40,6 +54,12 @@ export function opportunityList(
   const notify = inject(Notify);
   const transloco = inject(TranslocoService);
   const moves = inject(OpportunityMoves, { optional: true });
+  const conflict = linkedSignal<string, RowConflict | null>({
+    source: () => body().branchId,
+    computation: () => null,
+  });
+  const readOnly = linkedSignal({ source: () => body().branchId, computation: () => false });
+  let resolvingConflict = false;
 
   const query = computed<OpportunitySearchBody>(() => {
     const base = body();
@@ -52,34 +72,25 @@ export function opportunityList(
     return { ...base, filterTree };
   });
 
-  let lastPage: Page<OpportunityRow> | undefined;
   const pageResource = resource({
-    params: () => ({ query: query(), page: page(), pageSize: pageSize() }),
+    params: () =>
+      body().branchId ? { query: query(), page: page(), pageSize: pageSize() } : undefined,
     loader: async ({ params }) => {
-      try {
-        const res = await searchOpportunities(params.query, params.page, params.pageSize);
-        if (res.items.length === 0 && params.page > 1) {
-          const target = Math.max(1, Math.min(params.page - 1, res.totalPages || 1));
-          if (target !== params.page) {
-            onPageChange?.(target);
-            const fallback = await searchOpportunities(params.query, target, params.pageSize);
-            lastPage = fallback;
-            return fallback;
-          }
+      const res = await searchOpportunities(params.query, params.page, params.pageSize);
+      if (res.items.length === 0 && params.page > 1) {
+        const target = Math.max(1, Math.min(params.page - 1, res.totalPages || 1));
+        if (target !== params.page) {
+          onPageChange?.(target);
+          return searchOpportunities(params.query, target, params.pageSize);
         }
-        lastPage = res;
-        return res;
-      } catch (error) {
-        if (error instanceof ApiError && error.status === 400) {
-          notify.error(transloco.translate('opportunities.list.invalidSearch'));
-          return lastPage;
-        }
-        throw error;
       }
+      return res;
     },
   });
 
-  const pageData = linkedSignal<Page<OpportunityRow> | undefined>(() => pageResource.value());
+  const pageData = linkedSignal<Page<OpportunityRow> | undefined>(() =>
+    pageResource.hasValue() ? pageResource.value() : undefined,
+  );
 
   async function move(row: OpportunityRow, stage: PipelineStageView): Promise<MoveOutcome> {
     if (!moves || row.stageId === stage.id) {
@@ -92,98 +103,113 @@ export function opportunityList(
     } else if (outcome.kind === 'failed' && outcome.code === 'CRM.OPPORTUNITY.STALE_MOVE') {
       pageResource.reload();
     }
+    if (
+      outcome.kind === 'failed' &&
+      [
+        'CRM_OPPORTUNITIES_DISABLED',
+        'CRM_SUBSCRIPTION_READ_ONLY',
+        'SEAT_OVER_CAPACITY_READ_ONLY',
+      ].includes(outcome.code ?? '')
+    )
+      readOnly.set(true);
     return outcome;
   }
 
-  async function rate(row: OpportunityRow, importance: number): Promise<void> {
-    const prevImportance = row.importance;
+  function replaceRow(id: string, changes: Partial<OpportunityRow>): void {
     pageData.update((current) =>
       current
         ? {
             ...current,
-            items: current.items.map((item) => (item.id === row.id ? { ...item, importance } : item)),
+            items: current.items.map((row) => (row.id === id ? { ...row, ...changes } : row)),
           }
         : current,
     );
+  }
 
-    try {
-      const saved = await patchOpportunity(row.id, {
-        importance,
-        expectedUpdatedAt: row.updatedAt,
-      });
-      pageData.update((current) =>
-        current
-          ? {
-              ...current,
-              items: current.items.map((item) => (item.id === row.id ? saved : item)),
-            }
-          : current,
-      );
-    } catch (error) {
-      pageData.update((current) =>
-        current
-          ? {
-              ...current,
-              items: current.items.map((item) =>
-                item.id === row.id ? { ...item, importance: prevImportance } : item,
-              ),
-            }
-          : current,
-      );
-      if (isConflictError(error)) {
-        notify.error(transloco.translate('opportunities.list.refreshed'));
-        pageResource.reload();
+  function writeError(error: unknown, fallback: string): void {
+    if (error instanceof ApiError) {
+      if (
+        [
+          'CRM_OPPORTUNITIES_DISABLED',
+          'CRM_SUBSCRIPTION_READ_ONLY',
+          'SEAT_OVER_CAPACITY_READ_ONLY',
+        ].includes(error.code)
+      )
+        readOnly.set(true);
+      if (error.status === 401) {
+        notify.error(transloco.translate('apiErrors.notSaved'));
         return;
       }
-      notify.error(opportunityErrorMessage(error, transloco, 'opportunities.card.rateFailed'));
+      if (
+        error.code === 'CRM_SUBSCRIPTION_READ_ONLY' ||
+        error.code === 'SEAT_OVER_CAPACITY_READ_ONLY'
+      ) {
+        notify.error(transloco.translate('apiErrors.subscription'));
+        return;
+      }
+      if (error.status === 403 && error.code !== 'CRM_OPPORTUNITIES_DISABLED') {
+        notify.error(transloco.translate('apiErrors.permission'));
+        return;
+      }
+    }
+    const code = error instanceof ApiError ? error.code : '';
+    const mapped = OPPORTUNITY_ERROR_KEYS[code];
+    const shared = sharedErrorKeyOf(code);
+    notify.error(
+      transloco.translate(
+        mapped?.startsWith('opportunities.') ? mapped : shared ? `apiErrors.${shared}` : fallback,
+      ),
+    );
+  }
+
+  async function updateRow(row: OpportunityRow, patch: RowConflict['patch']): Promise<void> {
+    if (readOnly() || conflict()) return;
+    replaceRow(row.id, patch);
+    try {
+      const saved = await patchOpportunity(row.id, { ...patch, expectedUpdatedAt: row.updatedAt });
+      replaceRow(row.id, saved);
+    } catch (error) {
+      if (error instanceof ApiError && error.code === 'CRM.OPPORTUNITY.CONCURRENT_UPDATE') {
+        conflict.set({ row, patch });
+        return;
+      }
+      replaceRow(row.id, row);
+      writeError(
+        error,
+        patch.importance !== undefined
+          ? 'opportunities.card.rateFailed'
+          : 'opportunities.card.colorFailed',
+      );
     }
   }
 
-  async function recolor(row: OpportunityRow, cardColor: CardColor | null): Promise<void> {
-    const prevColor = row.cardColor;
-    pageData.update((current) =>
-      current
-        ? {
-            ...current,
-            items: current.items.map((item) => (item.id === row.id ? { ...item, cardColor } : item)),
-          }
-        : current,
-    );
-
+  async function resolveConflict(reload: boolean): Promise<void> {
+    const pending = conflict();
+    if (!pending || resolvingConflict) return;
+    resolvingConflict = true;
     try {
-      const saved = await patchOpportunity(row.id, {
-        cardColor,
-        expectedUpdatedAt: row.updatedAt,
-      });
-      pageData.update((current) =>
-        current
-          ? {
-              ...current,
-              items: current.items.map((item) => (item.id === row.id ? saved : item)),
-            }
-          : current,
+      const latest = await getOpportunity(pending.row.id);
+      replaceRow(
+        pending.row.id,
+        reload ? latest : { ...pending.row, ...pending.patch, updatedAt: latest.updatedAt },
       );
     } catch (error) {
-      pageData.update((current) =>
-        current
-          ? {
-              ...current,
-              items: current.items.map((item) =>
-                item.id === row.id ? { ...item, cardColor: prevColor } : item,
-              ),
-            }
-          : current,
-      );
-      if (isConflictError(error)) {
-        notify.error(transloco.translate('opportunities.list.refreshed'));
-        pageResource.reload();
-        return;
-      }
-      notify.error(opportunityErrorMessage(error, transloco, 'opportunities.card.colorFailed'));
+      writeError(error, 'opportunities.list.loadFailed');
+    } finally {
+      conflict.set(null);
+      resolvingConflict = false;
     }
+  }
+
+  function rate(row: OpportunityRow, importance: number): Promise<void> {
+    return updateRow(row, { importance });
+  }
+  function recolor(row: OpportunityRow, cardColor: CardColor | null): Promise<void> {
+    return updateRow(row, { cardColor });
   }
 
   async function remove(row: OpportunityRow): Promise<boolean> {
+    if (readOnly() || conflict()) return false;
     const before = pageData();
     pageData.update((current) =>
       current
@@ -203,7 +229,7 @@ export function opportunityList(
       return true;
     } catch (error) {
       pageData.set(before);
-      notify.error(opportunityErrorMessage(error, transloco, 'opportunities.list.deleteFailed'));
+      writeError(error, 'opportunities.list.deleteFailed');
       return false;
     }
   }
@@ -214,6 +240,10 @@ export function opportunityList(
     total: computed(() => pageData()?.total ?? 0),
     loading: pageResource.isLoading,
     failed: computed(() => !!pageResource.error()),
+    error: pageResource.error,
+    conflict,
+    readOnly,
+    resolveConflict,
     reload: () => pageResource.reload(),
     move,
     rate,

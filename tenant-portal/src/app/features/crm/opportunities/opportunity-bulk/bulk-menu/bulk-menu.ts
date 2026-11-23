@@ -63,7 +63,7 @@ export class OpportunityBulkMenu {
     const caps = this.capabilities();
     const list: RecordBulkAction[] = [];
 
-    if (!caps || caps.bulk.assign !== null) {
+    if (caps?.bulk.assign != null) {
       list.push({
         id: 'assign',
         labelKey: 'oppBulk.menu.assign',
@@ -72,7 +72,7 @@ export class OpportunityBulkMenu {
         allowed: true,
       });
     }
-    if (!caps || caps.bulk.moveStage !== null) {
+    if (caps?.bulk.moveStage != null) {
       list.push({
         id: 'stage',
         labelKey: 'oppBulk.menu.stage',
@@ -81,7 +81,7 @@ export class OpportunityBulkMenu {
         allowed: true,
       });
     }
-    if (!caps || caps.bulk.createActivity !== null) {
+    if (caps?.bulk.createActivity != null) {
       list.push({
         id: 'activity',
         labelKey: 'oppBulk.menu.activity',
@@ -90,7 +90,7 @@ export class OpportunityBulkMenu {
         allowed: true,
       });
     }
-    if (!caps || caps.bulk.delete !== null) {
+    if (caps?.bulk.delete != null) {
       list.push({
         id: 'delete',
         labelKey: 'oppBulk.menu.delete',

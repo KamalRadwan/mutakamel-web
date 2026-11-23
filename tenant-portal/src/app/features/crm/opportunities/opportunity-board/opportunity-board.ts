@@ -3,6 +3,7 @@ import {
   DestroyRef,
   afterNextRender,
   computed,
+  effect,
   inject,
   input,
   linkedSignal,
@@ -16,6 +17,9 @@ import { translationEvents } from '../../../../core/i18n/translation-events';
 import { monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/adapter/element-adapter';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { Button } from '../../../../shared/ui/button/button';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
+import { ConflictDialog } from '../../../../shared/ui/conflict-dialog/conflict-dialog';
+import { correlationIdOf } from '../../../../core/api/api-errors';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
 import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
@@ -48,6 +52,7 @@ import {
 } from '../opportunities.model';
 import { OpportunityMoves } from '../opportunity-moves/opportunity-moves';
 import { isTerminalFlag, stageTone } from '../opportunity-stage-tone';
+import { opportunitySearchErrorKey } from '../opportunity-search/opportunity-search.compile';
 import {
   OpportunityCard,
   OpportunityOpenEvent,
@@ -86,8 +91,8 @@ interface LaneTotalsDisplay {
 
 @Component({
   selector: 'app-opportunity-board',
-  imports: [TranslocoPipe, Button, ConfirmDialog, RecordBoard, OpportunityCard],
-  providers: [provideTranslocoScope('opportunities', { scope: 'record-list', alias: 'recordList' })],
+  imports: [TranslocoPipe, Button, ConfirmDialog, RecordBoard, OpportunityCard, FullState, ConflictDialog],
+  providers: [provideTranslocoScope('opportunities', { scope: 'record-list', alias: 'recordList' }, { scope: 'opportunity-moves', alias: 'oppMoves' })],
   templateUrl: './opportunity-board.html',
   host: { class: 'flex shrink-0 flex-col' },
 })
@@ -117,6 +122,8 @@ export class OpportunityBoard {
   readonly activities = output<OpportunityRow>();
   readonly transfer = output<OpportunityRow>();
   readonly changed = output<void>();
+  readonly searchError = output<unknown>();
+  readonly readOnlyChange = output<boolean>();
 
   protected readonly skeletonLanes = [1, 2, 3, 4];
   protected readonly skeletonCards = [1, 2, 3];
@@ -125,8 +132,16 @@ export class OpportunityBoard {
 
   private readonly refreshTick = signal(0);
   private readonly draggingFromLaneId = signal<string | null>(null);
-  private lastBoardPipelineId: string | null = null;
-  private lastStages: BoardStage[] | undefined;
+  private readonly readOnly = linkedSignal({ source: () => this.body().branchId, computation: () => false });
+  protected readonly laneErrors = linkedSignal({
+    source: () => ({ pipeline: this.pipeline().id, body: this.body() }),
+    computation: () => ({}) as Record<string, unknown>,
+  });
+  protected readonly conflict = linkedSignal<{ row: OpportunityBoardRow; patch: Partial<OpportunityBoardRow> } | null>(() => {
+    this.pipeline().id;
+    this.body().branchId;
+    return null;
+  });
 
   private readonly boardResource = resource({
     params: () => ({
@@ -136,36 +151,24 @@ export class OpportunityBoard {
       tick: this.refreshTick(),
     }),
     loader: async ({ params }) => {
-      try {
         const res = await loadBoard(params.pipelineId, {
           ...params.body,
           limitPerStage: BOARD_LIMIT,
         });
-        this.lastBoardPipelineId = params.pipelineId;
-        this.lastStages = res.stages;
         return { pipelineId: params.pipelineId, stages: res.stages };
-      } catch (error) {
-        if (error instanceof ApiError && error.status === 400) {
-          this.notify.error(this.transloco.translate('opportunities.list.invalidSearch'));
-          if (this.lastBoardPipelineId === params.pipelineId && this.lastStages) {
-            return { pipelineId: params.pipelineId, stages: this.lastStages };
-          }
-        }
-        throw error;
-      }
     },
   });
 
   protected readonly boardStages = linkedSignal<
-    { pipelineId: string; loaded: { pipelineId: string; stages: BoardStage[] } | undefined },
+    { context: string; loaded: { pipelineId: string; stages: BoardStage[] } | undefined },
     BoardStage[]
   >({
-    source: () => ({ pipelineId: this.pipeline().id, loaded: this.boardResource.value() }),
-    computation: ({ pipelineId, loaded }, previous) => {
-      if (loaded && loaded.pipelineId === pipelineId) {
+    source: () => ({ context: JSON.stringify([this.pipeline().id, this.body()]), loaded: this.boardResource.hasValue() ? this.boardResource.value() : undefined }),
+    computation: ({ context, loaded }, previous) => {
+      if (loaded) {
         return loaded.stages;
       }
-      if (previous && this.lastBoardPipelineId === pipelineId) {
+      if (previous && previous.source.context === context) {
         return previous.value;
       }
       return [];
@@ -181,16 +184,34 @@ export class OpportunityBoard {
   protected readonly loadingMore = signal<string | null>(null);
   protected readonly loading = this.boardResource.isLoading;
   protected readonly failed = computed(() => !!this.boardResource.error());
+  protected readonly filterError = computed(() => !!opportunitySearchErrorKey(this.boardResource.error()));
+  protected readonly forbidden = computed(() => {
+    const error = this.boardResource.error();
+    return error instanceof ApiError && error.status === 403;
+  });
+  protected readonly correlationId = computed(() => correlationIdOf(this.boardResource.error()) ?? '');
+  protected readonly mismatch = computed(() => {
+    const code = errorCodeOf(this.boardResource.error()) ?? '';
+    return code === 'GW.IDEM.MISMATCH' || code.endsWith('_IDEMPOTENCY_MISMATCH');
+  });
+  protected readonly failureTitle = computed(() => {
+    this.i18n();
+    const error = this.boardResource.error();
+    return error instanceof ApiError && error.status === 429
+      ? opportunityErrorMessage(error, this.transloco, 'opportunities.list.loadFailed')
+      : this.transloco.translate(this.mismatch() ? 'apiErrors.idempotencyMismatch' : this.forbidden() ? 'opportunities.page.forbidden' : 'opportunities.list.loadFailed');
+  });
   protected readonly totalItems = computed(() =>
     this.boardStages().reduce((sum, lane) => sum + lane.summary.totalCount, 0),
   );
 
   protected retryLoad(): void {
+    if (this.mismatch()) { window.location.reload(); return; }
     this.boardResource.reload();
   }
 
   protected readonly canDragItem = (row: OpportunityBoardRow): boolean =>
-    canMoveOpportunity(this.capabilities(), row);
+    this.canMove(row);
 
   protected readonly laneTotals = computed<Record<string, LaneTotalsDisplay>>(() => {
     this.i18n();
@@ -220,7 +241,7 @@ export class OpportunityBoard {
     this.i18n();
     const lang = this.language();
     const loadingStageId = this.loadingMore();
-    const canCreate = canCreateOpportunity(this.capabilities());
+    const canCreate = !this.readOnly() && canCreateOpportunity(this.capabilities());
     const fromLaneId = this.draggingFromLaneId();
     const fromStage = fromLaneId ? this.boardStages().find((item) => item.stage.id === fromLaneId)?.stage : null;
     const draggingFromTerminal = fromStage ? isTerminalFlag(fromStage.flag) : false;
@@ -270,6 +291,8 @@ export class OpportunityBoard {
   });
 
   constructor() {
+    effect(() => this.searchError.emit(this.boardResource.error()));
+    effect(() => this.readOnlyChange.emit(this.readOnly()));
     afterNextRender(() => {
       const stopMonitor = monitorForElements({
         canMonitor: ({ source }) => isDraggedRecord(source.data),
@@ -376,19 +399,19 @@ export class OpportunityBoard {
   }
 
   protected canUpdate(row: OpportunityBoardRow): boolean {
-    return canUpdateOpportunity(this.capabilities(), row);
+    return !this.readOnly() && !this.conflict() && canUpdateOpportunity(this.capabilities(), row);
   }
 
   protected canDelete(row: OpportunityBoardRow): boolean {
-    return canDeleteOpportunity(this.capabilities(), row);
+    return !this.readOnly() && !this.conflict() && canDeleteOpportunity(this.capabilities(), row);
   }
 
   protected canMove(row: OpportunityBoardRow): boolean {
-    return canMoveOpportunity(this.capabilities(), row);
+    return !this.readOnly() && !this.conflict() && canMoveOpportunity(this.capabilities(), row);
   }
 
   protected canTransfer(row: OpportunityBoardRow): boolean {
-    return canTransferOpportunity(this.capabilities(), row);
+    return !this.readOnly() && !this.conflict() && canTransferOpportunity(this.capabilities(), row);
   }
 
   protected setExpanded(stageId: string, opportunityId: string, expanded: boolean): void {
@@ -440,7 +463,7 @@ export class OpportunityBoard {
 
   protected async loadMore(lane: BoardStage): Promise<void> {
     const cursor = lane.pageInfo.nextCursor;
-    if (!cursor) return;
+    if (!cursor || this.loadingMore()) return;
     const pipelineId = this.pipeline().id;
     const body = this.body();
     this.loadingMore.set(lane.stage.id);
@@ -450,7 +473,8 @@ export class OpportunityBoard {
         limit: BOARD_LIMIT,
         cursor,
       });
-      if (this.pipeline().id !== pipelineId) return;
+      if (this.pipeline().id !== pipelineId || this.body() !== body) return;
+      this.clearLaneError(lane.stage.id);
       this.boardStages.update((lanes) =>
         lanes.map((item) => {
           if (item.stage.id !== lane.stage.id) return item;
@@ -466,25 +490,25 @@ export class OpportunityBoard {
         }),
       );
     } catch (error) {
+      if (this.pipeline().id !== pipelineId || this.body() !== body) return;
       if (
         error instanceof ApiError &&
         error.status === 400 &&
         errorCodeOf(error) === 'OPPORTUNITY_BOARD_CURSOR_INVALID'
       ) {
-        void this.reloadLanes([lane.stage.id]);
+        await this.reloadLanes([lane.stage.id]);
         return;
       }
-      const message =
-        error instanceof ApiError && error.status === 400
-          ? this.transloco.translate('opportunities.list.invalidSearch')
-          : opportunityErrorMessage(error, this.transloco, 'opportunities.list.loadFailed');
-      this.notify.error(message);
+      this.laneErrors.update((errors) => ({ ...errors, [lane.stage.id]: error }));
+      this.searchError.emit(error);
     } finally {
       this.loadingMore.set(null);
     }
   }
 
   protected async moveCard(id: string, fromStageId: string, toStageId: string): Promise<void> {
+    const pipelineId = this.pipeline().id;
+    const body = this.body();
     const board = this.recordBoard();
     const lanes = this.boardStages();
     const fromLane = lanes.find((lane) => lane.stage.id === fromStageId);
@@ -508,6 +532,10 @@ export class OpportunityBoard {
     if (needsDialog) board?.revert(id);
     else board?.applyMove(id, fromStageId, toStageId);
     const outcome = await this.moves.move(row, toLane.stage);
+    if (this.pipeline().id !== pipelineId || this.body() !== body) {
+      board?.revert(id);
+      return;
+    }
 
     if (outcome.kind === 'moved') {
       const movedRow = opportunityRowToBoardRow(outcome.row, item.contactDisplayName);
@@ -537,8 +565,12 @@ export class OpportunityBoard {
     }
 
     board?.revert(id);
-    if (outcome.kind === 'failed' && outcome.code === 'CRM.OPPORTUNITY.STALE_MOVE') {
-      void this.reloadLanes([fromStageId]);
+    if (outcome.kind === 'failed') {
+      this.blockWrites(outcome.code);
+      if (outcome.code === 'CRM.OPPORTUNITY.STALE_MOVE' || outcome.code === 'CRM.OPPORTUNITY.CONCURRENT_UPDATE') {
+        try { await getOpportunity(id); } catch (error) { this.writeError(error); }
+        await this.reloadLanes([fromStageId, toStageId]);
+      }
     }
   }
 
@@ -556,11 +588,10 @@ export class OpportunityBoard {
     } catch (error) {
       this.patchBoardRow(row.id, { importance: prevImportance });
       if (isConflictError(error)) {
-        this.notify.error(this.transloco.translate('opportunities.board.refreshed'));
-        void this.reloadLanes([row.stageId]);
+        this.conflict.set({ row, patch: { importance } });
         return;
       }
-      this.notify.error(opportunityErrorMessage(error, this.transloco, 'opportunities.card.rateFailed'));
+      this.writeError(error, 'opportunities.card.rateFailed');
     }
   }
 
@@ -578,11 +609,10 @@ export class OpportunityBoard {
     } catch (error) {
       this.patchBoardRow(row.id, { cardColor: prevColor });
       if (isConflictError(error)) {
-        this.notify.error(this.transloco.translate('opportunities.board.refreshed'));
-        void this.reloadLanes([row.stageId]);
+        this.conflict.set({ row, patch: { cardColor } });
         return;
       }
-      this.notify.error(opportunityErrorMessage(error, this.transloco, 'opportunities.card.colorFailed'));
+      this.writeError(error, 'opportunities.card.colorFailed');
     }
   }
 
@@ -610,31 +640,70 @@ export class OpportunityBoard {
       void this.reloadLanes([row.stageId]);
     } catch (error) {
       this.boardStages.set(before);
-      this.notify.error(opportunityErrorMessage(error, this.transloco, 'opportunities.list.deleteFailed'));
+      this.writeError(error, 'opportunities.list.deleteFailed');
     }
   }
 
-  private async reloadLanes(stageIds: readonly string[]): Promise<void> {
+  protected async reloadLanes(stageIds: readonly string[]): Promise<void> {
     const pipelineId = this.pipeline().id;
     const body = this.body();
-    const targetIds = new Set(stageIds);
+    await Promise.all(stageIds.map(async (stageId) => {
+      try {
+        // An absent cursor restarts only this lane, preserving every other lane's loaded cards.
+        const fresh = await loadStagePage(pipelineId, stageId, { ...body, limit: BOARD_LIMIT, cursor: '' });
+        if (this.pipeline().id !== pipelineId || this.body() !== body) return;
+        this.boardStages.update((current) => current.map((lane) => lane.stage.id === stageId
+          ? { ...lane, items: fresh.items, summary: fresh.summary, activitySummary: fresh.activitySummary, pageInfo: fresh.pageInfo }
+          : lane));
+        this.clearLaneError(stageId);
+      } catch (error) {
+        if (this.pipeline().id !== pipelineId || this.body() !== body) return;
+        this.laneErrors.update((errors) => ({ ...errors, [stageId]: error }));
+        this.searchError.emit(error);
+      }
+    }));
+  }
+
+  private clearLaneError(stageId: string): void {
+    this.laneErrors.update((errors) => {
+      const { [stageId]: _removed, ...rest } = errors;
+      return rest;
+    });
+  }
+
+  protected laneCorrelation(error: unknown): string { return correlationIdOf(error) ?? ''; }
+  protected laneMessage(error: unknown): string {
+    return error instanceof ApiError && error.status === 429
+      ? opportunityErrorMessage(error, this.transloco, 'opportunities.list.loadFailed')
+      : this.transloco.translate('opportunities.list.loadFailed');
+  }
+
+  private blockWrites(code: string | null): void {
+    if (['CRM_OPPORTUNITIES_DISABLED', 'CRM_SUBSCRIPTION_READ_ONLY', 'SEAT_OVER_CAPACITY_READ_ONLY'].includes(code ?? '')) this.readOnly.set(true);
+  }
+
+  private writeError(error: unknown, fallback = 'opportunities.list.loadFailed'): void {
+    const code = errorCodeOf(error);
+    this.blockWrites(code);
+    const key = error instanceof ApiError && error.status === 401 ? 'apiErrors.notSaved'
+      : code === 'CRM_SUBSCRIPTION_READ_ONLY' || code === 'SEAT_OVER_CAPACITY_READ_ONLY' ? 'apiErrors.subscription'
+      : error instanceof ApiError && error.status === 403 && code !== 'CRM_OPPORTUNITIES_DISABLED' ? 'apiErrors.permission' : null;
+    this.notify.error(key ? this.transloco.translate(key) : opportunityErrorMessage(error, this.transloco, fallback));
+  }
+
+  protected async resolveConflict(reload: boolean): Promise<void> {
+    const pending = this.conflict();
+    if (!pending) return;
     try {
-      const res = await loadBoard(pipelineId, {
-        ...body,
-        limitPerStage: BOARD_LIMIT,
-      });
-      if (this.pipeline().id !== pipelineId || this.body() !== body) return;
-      const freshById = new Map(res.stages.map((lane) => [lane.stage.id, lane]));
-      this.boardStages.update((current) =>
-        current.flatMap((lane) => {
-          if (!targetIds.has(lane.stage.id)) return [lane];
-          const fresh = freshById.get(lane.stage.id);
-          return fresh ? [fresh] : [];
-        }),
-      );
-    } catch {
-      // Background lane sum refresh failed silently; existing lane items remain usable.
-    }
+      const latest = await getOpportunity(pending.row.id);
+      if (reload) {
+        this.patchItem(latest);
+        await this.reloadLanes([...new Set([pending.row.stageId, latest.stageId])]);
+      } else {
+        this.replaceBoardRow(pending.row.id, { ...pending.row, ...pending.patch, updatedAt: latest.updatedAt });
+      }
+    } catch (error) { this.writeError(error); }
+    finally { this.conflict.set(null); }
   }
 
   private patchBoardRow(id: string, patch: Partial<OpportunityBoardRow>): void {

@@ -5,13 +5,14 @@ import { provideIcons } from '@ng-icons/core';
 import { tablerHierarchy2 } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Dropdown, type DropdownOption } from '../../../../shared/ui/dropdown/dropdown';
+import { Field } from '../../../../shared/ui/field/field';
 import { type PipelineView, nameIn } from '../opportunities.model';
 
 export const ALL_PIPELINES_VALUE = '__all__';
 
 @Component({
   selector: 'app-pipeline-switcher',
-  imports: [Dropdown],
+  imports: [Dropdown, Field],
   providers: [provideIcons({ tablerHierarchy2 })],
   templateUrl: './pipeline-switcher.html',
   host: {
@@ -28,6 +29,7 @@ export class PipelineSwitcher {
   readonly value = input<string | null>(null);
   readonly allowAll = input(false);
   readonly disabled = input(false);
+  readonly unavailable = input(false);
   readonly valueChange = output<string | null>();
 
   protected readonly switcherLabel = computed(() => {
@@ -37,7 +39,7 @@ export class PipelineSwitcher {
 
   protected readonly switcherTitle = computed(() => {
     this.i18n();
-    return this.transloco.translate('opportunities.page.pipelineTitle');
+    return this.transloco.translate(this.unavailable() ? 'opportunities.search.listRestricted' : 'opportunities.page.pipelineTitle');
   });
 
   protected readonly options = computed<DropdownOption<string>[]>(() => {

@@ -13,6 +13,10 @@ import {
   viewChild,
 } from '@angular/core';
 import { translationEvents } from '../../../../core/i18n/translation-events';
+import { ApiError, correlationIdOf } from '../../../../core/api/api-errors';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
+import { ConflictDialog } from '../../../../shared/ui/conflict-dialog/conflict-dialog';
+import { opportunitySearchErrorKey } from '../opportunity-search/opportunity-search.compile';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   tablerArrowDown,
@@ -28,7 +32,6 @@ import {
 } from '@ng-icons/tabler-icons';
 import { tablerStarFill } from '@ng-icons/tabler-icons/fill';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
-import { Button } from '../../../../shared/ui/button/button';
 import { LanguageState } from '../../../../core/i18n/language';
 import { ActionSelection, ActionsMenu } from '../../../../shared/ui/actions-menu/actions-menu';
 import { Checkbox } from '../../../../shared/ui/checkbox/checkbox';
@@ -120,7 +123,7 @@ const TABLE_GRID_COLS =
 
 @Component({
   selector: 'app-opportunity-table',
-  imports: [NgIcon, TranslocoPipe, Button, ActionsMenu, Checkbox, ConfirmDialog, Pagination, PhoneActions],
+  imports: [NgIcon, TranslocoPipe, ActionsMenu, Checkbox, ConfirmDialog, Pagination, PhoneActions, FullState, ConflictDialog],
   providers: [
     provideTranslocoScope('opportunities', { scope: 'record-list', alias: 'recordList' }),
     provideIcons({
@@ -162,6 +165,8 @@ export class OpportunityTable {
   readonly activities = output<OpportunityRow>();
   readonly transfer = output<OpportunityRow>();
   readonly countsChanged = output<void>();
+  readonly searchError = output<unknown>();
+  readonly readOnlyChange = output<boolean>();
 
   protected readonly skeletonRows = [1, 2, 3, 4, 5, 6];
   protected readonly columns = OPPORTUNITY_TABLE_COLUMNS;
@@ -272,6 +277,8 @@ export class OpportunityTable {
   });
 
   constructor() {
+    effect(() => this.searchError.emit(this.list.error()));
+    effect(() => this.readOnlyChange.emit(this.list.readOnly()));
     let lastPage = this.page();
     effect(() => {
       const current = this.page();
@@ -350,19 +357,19 @@ export class OpportunityTable {
   }
 
   protected canUpdate(row: OpportunityRow): boolean {
-    return canUpdateOpportunity(this.capabilities(), row);
+    return !this.list.readOnly() && !this.list.conflict() && canUpdateOpportunity(this.capabilities(), row);
   }
 
   protected canDelete(row: OpportunityRow): boolean {
-    return canDeleteOpportunity(this.capabilities(), row);
+    return !this.list.readOnly() && !this.list.conflict() && canDeleteOpportunity(this.capabilities(), row);
   }
 
   protected canMove(row: OpportunityRow): boolean {
-    return canMoveOpportunity(this.capabilities(), row);
+    return !this.list.readOnly() && !this.list.conflict() && canMoveOpportunity(this.capabilities(), row);
   }
 
   protected canTransfer(row: OpportunityRow): boolean {
-    return canTransferOpportunity(this.capabilities(), row);
+    return !this.list.readOnly() && !this.list.conflict() && canTransferOpportunity(this.capabilities(), row);
   }
 
   protected sortField(): OpportunitySortKey | null {
@@ -435,8 +442,29 @@ export class OpportunityTable {
   }
 
   protected retryLoad(): void {
-    this.list.reload();
+    if (this.mismatch()) window.location.reload();
+    else this.list.reload();
   }
+
+  protected readonly filterError = computed(() => opportunitySearchErrorKey(this.list.error()) !== null);
+  protected readonly forbidden = computed(() => this.list.error() instanceof ApiError && (this.list.error() as ApiError).status === 403);
+  protected readonly correlationId = computed(() => correlationIdOf(this.list.error()) ?? '');
+  protected readonly mismatch = computed(() => {
+    const error = this.list.error();
+    return error instanceof ApiError && (error.code === 'GW.IDEM.MISMATCH' || error.code.endsWith('_IDEMPOTENCY_MISMATCH'));
+  });
+  protected readonly failureTitle = computed(() => {
+    this.i18n();
+    if (this.mismatch()) return this.transloco.translate('apiErrors.idempotencyMismatch');
+    const error = this.list.error();
+    if (error instanceof ApiError && error.status === 429) {
+      const seconds = error.details?.['retryAfterSeconds'];
+      return Array.isArray(seconds) && seconds[0]
+        ? this.transloco.translate('apiErrors.rateLimitedIn', { seconds: seconds[0] })
+        : this.transloco.translate('apiErrors.rateLimited');
+    }
+    return this.transloco.translate(this.forbidden() ? 'opportunities.page.forbidden' : 'opportunities.list.loadFailed');
+  });
 
   protected amountText(row: OpportunityRow): string | null {
     if (row.amount === null) return null;
@@ -486,7 +514,7 @@ export class OpportunityTable {
     this.i18n();
     return opportunityActions(
       row,
-      this.stages(),
+      this.stages().filter((stage) => stage.pipelineId === row.pipelineId),
       this.language(),
       {
         canUpdate: this.canUpdate(row),
@@ -506,7 +534,7 @@ export class OpportunityTable {
         break;
       case 'move': {
         if (!selection.value || !this.canMove(row)) break;
-        const target = this.stages().find((item) => item.id === selection.value);
+        const target = this.stages().find((item) => item.id === selection.value && item.pipelineId === row.pipelineId);
         if (target) void this.list.move(row, target);
         break;
       }
@@ -536,6 +564,7 @@ export class OpportunityTable {
     this.pageSizePref.set(size);
     if (size !== this.pageSize()) {
       this.pageSize.set(size);
+      this.page.set(1);
     }
   }
 

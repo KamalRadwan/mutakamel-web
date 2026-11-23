@@ -17,6 +17,7 @@
   (cancel)="requestClose()"
   (closed)="onModalClosed()"
 >
+  <fieldset class="contents" [disabled]="submission.readOnly()">
   <div class="grid grid-cols-3 gap-x-10 gap-y-8">
     <!-- Section 1: Activity -->
     <div class="col-span-3">
@@ -340,7 +341,7 @@
         size="bare"
         [label]="'oppBulk.activity.assignee' | transloco"
         [for]="assigneeMode() === 'other' ? uid + '-assignee-person' : ''"
-        [hint]="'oppBulk.activity.hints.assignee' | transloco"
+        [hint]="(assigneeMode() === 'other' && ownersDenied() ? 'opportunities.search.listRestricted' : 'oppBulk.activity.hints.assignee') | transloco"
       >
         <div class="flex flex-wrap items-center gap-8">
           <ui-segmented
@@ -357,7 +358,7 @@
               [options]="assigneeDropdownOptions()"
               [value]="chosenAssigneeId()"
               [label]="'oppBulk.activity.assigneeOther' | transloco"
-              [disabled]="assigneeDropdownOptions().length === 0"
+              [disabled]="ownersLoading() || ownersDenied() || assigneeDropdownOptions().length === 0"
               (valueChange)="onChosenAssigneeChange($event)"
             />
           }
@@ -435,6 +436,7 @@
       }
     </div>
   </div>
+  </fieldset>
 </app-bulk-run-modal>
 
 <ui-confirm-dialog

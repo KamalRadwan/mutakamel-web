@@ -1,4 +1,22 @@
+import { ApiError, fieldErrorsOf, writeErrorMessage } from '../../../../core/api/api-errors';
+import type { TranslocoService } from '@jsverse/transloco';
+import { crmSettingsError } from '../../settings/shared/settings-api';
+import { OPPORTUNITY_ERROR_KEYS } from '../opportunities.api';
 import type { DraftErrors } from './opportunity-draft';
+
+/** Shared error mapping probes optional keys; only translate keys that actually exist. */
+export function opportunityRecordError(transloco: TranslocoService, error: unknown, scope: string) {
+  const dictionary = transloco.getTranslation(transloco.getActiveLang());
+  const translate = (key: string, params?: Record<string, unknown>): string => {
+    if (typeof dictionary[key] === 'string') return transloco.translate(key, params);
+    const prefix = `${scope}.errors.`;
+    const mapped = key.startsWith(prefix) ? OPPORTUNITY_ERROR_KEYS[key.slice(prefix.length)] : undefined;
+    return mapped && typeof dictionary[mapped] === 'string' ? transloco.translate(mapped, params) : key;
+  };
+  const state = crmSettingsError(translate, error, scope);
+  return error instanceof ApiError && error.status === 401
+    ? { ...state, message: writeErrorMessage(error, scope, translate) } : state;
+}
 
 /**
  * Maps a backend (crm-app opportunities) error to the form field it belongs to, so hosts
@@ -19,6 +37,12 @@ const FIELD_OF_CODE: Record<string, string> = {
   CUSTOMER_PROFILE_BLACKLISTED: 'customerProfileId',
   CUSTOMER_PROFILE_NOT_FOUND: 'customerProfileId',
   PARTY_NOT_FOUND: 'contactPartyId',
+  LEAD_NOT_FOUND: 'leadId',
+  OPPORTUNITY_LEAD_CUSTOMER_MISMATCH: 'leadId',
+  OPPORTUNITY_PIPELINE_MISMATCH: 'stageId',
+  CRM_BRANCH_MISMATCH: 'branchId',
+  OPPORTUNITY_AMOUNT_SCALE_INVALID: 'amount',
+  PIPELINE_NOT_FOUND: 'pipelineId',
 };
 
 /** Custom-field codes (custom-field-write.helper.ts) → message for the custom field. */
@@ -71,7 +95,7 @@ export function mapOpportunityApiError(error: unknown): DraftErrors | null {
     return { [key ? `customFields.${key}` : 'customFields']: cfMessage };
   }
 
-  return fieldsFromDetails(details);
+  return fieldsFromDetails(error instanceof ApiError ? fieldErrorsOf(error) : details);
 }
 
 /** `details.path` / `details.field` ('customFields.<key>' or '<key>'), else the backend message "Custom field '<key>' …". */

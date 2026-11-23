@@ -42,10 +42,14 @@ import {
   tablerUserPlus,
 } from '@ng-icons/tabler-icons';
 import { filter } from 'rxjs';
-import { CurrentUser } from '../../../../core/auth/current-user';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
-import { ScopeState } from '../../../../core/scope/scope';
+import { TenantScopeState } from '../../../../core/scope/tenant-scope';
+import { isRetryableWriteError } from '../../../../core/api/api-errors';
+import { can } from '../../../../shared/widgets/dashboard/analytics-permissions';
+import { ConflictDialog } from '../../../../shared/ui/conflict-dialog/conflict-dialog';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
+import { sessionBranch } from '../../shared/lookups/session-branch';
 import { ActionItem, ActionSelection, ActionSwatch } from '../../../../shared/ui/actions-menu/actions-menu';
 import { Button } from '../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
@@ -64,21 +68,20 @@ import { HistoryCategoryOption } from '../../../../shared/widgets/record-history
 import { CrmModules } from '../../shared/crm-modules/crm-modules';
 import { RecordActivitiesTab } from '../../shared/record/activities-tab/record-activities-tab';
 import { RecordDraftStore } from '../../shared/record/nav/record-draft-store';
+import { RecordRelatedBadges } from '../../shared/record/related/record-related-badges';
 import { RecordNavContext, navPosition, nextNavTarget } from '../../shared/record/nav/record-nav';
 import { CanLeaveRecord } from '../../shared/record/nav/record-page.guard';
 import { RecordHeaderOwner, RecordPageHeader } from '../../shared/record/page/record-page-header/record-page-header';
 import { RecordTab, RecordTabs } from '../../shared/record/page/record-tabs/record-tabs';
 import { createVisitedTabs, syncTabWithQuery } from '../../shared/record/page/record-tabs/visited-tabs';
-import { RecordRelatedBadges } from '../../shared/record/related/record-related-badges';
-import { RelatedCounts, RelatedKind, RelatedLinkFn } from '../../shared/record/related/related-records.model';
 import { ApiError, errorCodeOf, newIdempotencyKey } from '../../settings/shared/settings-api';
 import {
   createOpportunity,
+  attachOpportunityTags,
   deleteOpportunity,
   getCustomerOption,
   getOpportunity,
   getOpportunityCapabilities,
-  getRelatedCounts,
   listOwners,
   listStageHistory,
   patchOpportunity,
@@ -87,7 +90,6 @@ import {
   CARD_COLORS,
   CardColor,
   OpportunityCapabilities,
-  OpportunityRelatedCounts,
   OpportunityRow,
   OwnerOption,
   PipelineStageView,
@@ -117,9 +119,10 @@ import {
   toCreateBody,
   toPatchBody,
   validateDraft,
+  restoreNonClearableFields,
 } from '../opportunity-form/opportunity-draft';
 import { OpportunityForm, OpportunitySeedPatch, OpportunityUpdatingState } from '../opportunity-form/opportunity-form';
-import { mapOpportunityApiError } from '../opportunity-form/opportunity-form-errors';
+import { mapOpportunityApiError, opportunityRecordError } from '../opportunity-form/opportunity-form-errors';
 import { OpportunityLookups } from '../opportunity-form/opportunity-lookups';
 import { diffOpportunityTags, saveTags } from '../opportunity-form/opportunity-tags-diff';
 import { CloseDialog } from '../opportunity-moves/close-dialog/close-dialog';
@@ -128,6 +131,7 @@ import { PipelineMoveDialog } from '../opportunity-moves/pipeline-move-dialog/pi
 import { PipelineScope } from '../pipeline-scope';
 import { OpportunityQuotationsTab } from './opportunity-quotations-tab/opportunity-quotations-tab';
 import { OpportunityStagesTab } from './opportunity-stages-tab/opportunity-stages-tab';
+import { getTradeCounts } from './trade-counts.api';
 
 export type OpportunityPageTab =
   | 'overview'
@@ -150,17 +154,6 @@ const ALL_TABS: readonly OpportunityPageTab[] = [
 
 const OPPORTUNITY_RECORD_TYPE = 'opportunity';
 const OPPORTUNITY_HISTORY_ENTITY_TYPES: readonly string[] = ['OpportunityEntity', 'Opportunity'];
-const RELATED_KINDS: readonly RelatedKind[] = ['quotations', 'salesOrders'];
-const RELATED_LINKS: Partial<Record<RelatedKind, RelatedLinkFn>> = {
-  quotations: ({ recordId }) => ({
-    commands: ['/trade/documents/quotations'],
-    queryParams: { crmOpportunityId: recordId },
-  }),
-  salesOrders: ({ recordId }) => ({
-    commands: ['/trade/documents/sales-orders'],
-    queryParams: { crmOpportunityId: recordId },
-  }),
-};
 const COLOR_KEYS = Object.keys(CARD_COLORS) as CardColor[];
 
 const BLANK_DRAFT: OpportunityDraft = emptyDraft({
@@ -185,26 +178,6 @@ function cleanBackParams(params: Params | undefined): Params {
   return rest;
 }
 
-function rebaseDraft(
-  oldBase: OpportunityDraft,
-  freshBase: OpportunityDraft,
-  currentDraft: OpportunityDraft,
-): OpportunityDraft {
-  const next: Record<string, unknown> = { ...freshBase };
-  for (const key of Object.keys(freshBase) as (keyof OpportunityDraft)[]) {
-    const curVal = currentDraft[key];
-    const oldVal = oldBase[key];
-    const unchanged =
-      typeof curVal === 'object' && curVal !== null
-        ? JSON.stringify(curVal) === JSON.stringify(oldVal)
-        : curVal === oldVal;
-    if (!unchanged) {
-      next[key] = curVal;
-    }
-  }
-  return next as unknown as OpportunityDraft;
-}
-
 /** Full-page workspace for creating, viewing, and editing a CRM opportunity. */
 @Component({
   selector: 'app-opportunity-page',
@@ -214,6 +187,8 @@ function rebaseDraft(
     TranslocoPipe,
     Button,
     ConfirmDialog,
+    ConflictDialog,
+    FullState,
     UnsavedDialog,
     RecordPageHeader,
     RecordRelatedBadges,
@@ -235,6 +210,7 @@ function rebaseDraft(
       'opportunities',
       { scope: 'opportunity-page', alias: 'oppPage' },
       { scope: 'opportunity-form', alias: 'oppForm' },
+      { scope: 'opportunity-moves', alias: 'oppMoves' },
       { scope: 'record-page', alias: 'recordPage' },
       { scope: 'record-fields', alias: 'recordFields' },
       { scope: 'record-form', alias: 'recordForm' },
@@ -282,8 +258,8 @@ export class OpportunityPage implements CanLeaveRecord {
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   protected readonly language = inject(LanguageState).current;
-  private readonly scope = inject(ScopeState);
-  private readonly currentUser = inject(CurrentUser);
+  private readonly scope = inject(OpportunityLookups).scope;
+  private readonly tenantScope = inject(TenantScopeState);
   private readonly crmModules = inject(CrmModules);
   private readonly pipelineScope = inject(PipelineScope);
   private readonly draftStore = inject(RecordDraftStore);
@@ -292,7 +268,6 @@ export class OpportunityPage implements CanLeaveRecord {
 
   private readonly opportunityForm = viewChild(OpportunityForm);
   private readonly unsavedDialog = viewChild(UnsavedDialog);
-  private readonly conflictDialog = viewChild<ConfirmDialog>('conflictDialog');
   private readonly deleteDialog = viewChild<ConfirmDialog>('deleteDialog');
   private readonly reopenDialog = viewChild<ConfirmDialog>('reopenDialog');
 
@@ -310,6 +285,12 @@ export class OpportunityPage implements CanLeaveRecord {
   protected readonly loadFailed = signal(false);
   protected readonly scopeDenied = signal(false);
   protected readonly notFound = signal(false);
+  protected readonly writeReadOnly = signal(false);
+  protected readonly createMismatch = signal(false);
+  protected readonly loadCorrelationId = signal<string | null>(null);
+  protected readonly needsBranch = computed(() => { this.tenantScope.selection(); return !sessionBranch(); });
+  protected readonly conflictVisible = signal(false);
+  private conflictResolve: ((reload: boolean) => void) | null = null;
   protected readonly saving = signal(false);
   protected readonly deleting = signal(false);
   protected readonly updatingState = signal<OpportunityUpdatingState>({});
@@ -323,17 +304,18 @@ export class OpportunityPage implements CanLeaveRecord {
   protected readonly callsMissed = signal(0);
   protected readonly callsReload = signal(0);
   protected readonly stagesCount = signal<number | null>(null);
+  protected readonly loadTradeCounts = getTradeCounts;
+  protected readonly tradeCountsRecord = computed(() => {
+    const row = this.detail();
+    return this.mode() === 'edit' && row?.id === this.opportunityId() && row?.branchId === sessionBranch()?.branchId
+      ? row : null;
+  });
   protected readonly newActivityRequest = signal(0);
   protected readonly historyRefresh = signal(0);
   protected readonly stagesRefresh = signal(0);
 
-  private readonly relatedCounts = signal<OpportunityRelatedCounts | null>(null);
-  private readonly relatedCountsLoaded = signal(false);
-  private readonly relatedCountsVersion = signal(0);
   private readonly branchOwners = signal<readonly OwnerOption[]>([]);
 
-  protected readonly relatedKinds = RELATED_KINDS;
-  protected readonly relatedLinks = RELATED_LINKS;
   protected readonly opportunityHistoryEntityTypes = OPPORTUNITY_HISTORY_ENTITY_TYPES;
   protected readonly historyCategories: readonly HistoryCategoryOption[] = [
     { id: 'record', labelKey: 'oppPage.history.filter.details' },
@@ -341,13 +323,9 @@ export class OpportunityPage implements CanLeaveRecord {
     { id: 'activity', labelKey: 'recordHistory.filter.activity' },
   ];
 
-  protected readonly quotationsCount = computed<number | null>(() => this.relatedCounts()?.quotations ?? null);
 
   private readonly allowedTabs = computed<readonly OpportunityPageTab[]>(() => {
     if (this.mode() === 'create') return ['overview'];
-    if (this.relatedCountsLoaded() && this.quotationsCount() === null) {
-      return ALL_TABS.filter((tab) => tab !== 'quotations');
-    }
     return ALL_TABS;
   });
 
@@ -360,12 +338,10 @@ export class OpportunityPage implements CanLeaveRecord {
   private bypassGuard = false;
   private guardBusy = false;
   private conflictOpen = false;
-  private moduleRedirecting = false;
   private loadSeq = 0;
   private capSeq = 0;
   private ownersSeq = 0;
   private loadedOwnersKey: string | null = null;
-  private countsSeq = 0;
   private createIdempotencyKey: string | null = null;
   private lastCreateFingerprint: string | null = null;
   private lastNavStep: { dir: -1 | 1; fromId: string } | null = null;
@@ -386,6 +362,7 @@ export class OpportunityPage implements CanLeaveRecord {
       dict['opportunities.record'] &&
         dict['oppPage.back'] &&
         dict['oppForm.sections.classification'] &&
+        dict['oppMoves.close.lostTitle'] &&
         dict['recordPage.save'] &&
         dict['recordFields.scope.branch'],
     );
@@ -419,9 +396,10 @@ export class OpportunityPage implements CanLeaveRecord {
   );
 
   protected readonly canEdit = computed(() => {
+    if (this.writeReadOnly() || this.needsBranch() || !can('crm.opportunities.read')) return false;
     if (this.mode() === 'create') {
       const caps = this.capabilities();
-      return caps ? canCreateOpportunity(caps) : true;
+      return !!caps && canCreateOpportunity(caps) && !this.createMismatch();
     }
     const current = this.detail();
     const caps = this.capabilities();
@@ -430,6 +408,7 @@ export class OpportunityPage implements CanLeaveRecord {
   });
 
   protected readonly canDelete = computed(() => {
+    if (this.writeReadOnly() || this.needsBranch()) return false;
     if (this.mode() !== 'edit') return false;
     const current = this.detail();
     const caps = this.capabilities();
@@ -438,6 +417,7 @@ export class OpportunityPage implements CanLeaveRecord {
   });
 
   private readonly canMove = computed(() => {
+    if (this.writeReadOnly() || this.needsBranch()) return false;
     const current = this.detail();
     const caps = this.capabilities();
     if (!current || !caps) return false;
@@ -445,6 +425,7 @@ export class OpportunityPage implements CanLeaveRecord {
   });
 
   private readonly canTransfer = computed(() => {
+    if (this.writeReadOnly() || this.needsBranch()) return false;
     const current = this.detail();
     const caps = this.capabilities();
     if (!current || !caps) return false;
@@ -460,7 +441,7 @@ export class OpportunityPage implements CanLeaveRecord {
   );
 
   protected readonly canCreateQuotation = computed(
-    () => this.mode() === 'edit' && this.relatedCountsLoaded() && this.quotationsCount() !== null,
+    () => this.mode() === 'edit' && can('trade.quotation.create'),
   );
 
   protected readonly errors = computed<DraftErrors>(() => {
@@ -497,7 +478,7 @@ export class OpportunityPage implements CanLeaveRecord {
     if (this.mode() === 'edit') {
       const current = this.detail();
       if (current) {
-        parts.push(current.customerDisplayName?.trim() || '—');
+        parts.push(current.customerDisplayName?.trim() || 'â€”');
         parts.push(`\u2066${opportunityRef(current.id)}\u2069`);
         const branchName = this.branchNameIn(current.branchId, lang);
         if (branchName) parts.push(branchName);
@@ -506,7 +487,7 @@ export class OpportunityPage implements CanLeaveRecord {
           parts.push(this.transloco.translate('recordPage.createdOn', { date: created }));
         }
       }
-      return parts.join(' · ');
+      return parts.join(' Â· ');
     }
 
     const d = this.draft();
@@ -515,7 +496,7 @@ export class OpportunityPage implements CanLeaveRecord {
       const branchName = this.branchNameIn(d.branchId, lang);
       if (branchName) parts.push(branchName);
     }
-    return parts.join(' · ');
+    return parts.join(' Â· ');
   });
 
   protected readonly edgeClass = computed(() => {
@@ -680,26 +661,6 @@ export class OpportunityPage implements CanLeaveRecord {
     };
   });
 
-  protected readonly loadRelatedCountsFn = computed(() => {
-    const _version = this.relatedCountsVersion();
-    return async (recordId: string): Promise<Partial<RelatedCounts> | null> => {
-      try {
-        const res = await getRelatedCounts(recordId);
-        if (this.opportunityId() === recordId) {
-          this.relatedCounts.set(res);
-          this.relatedCountsLoaded.set(true);
-        }
-        return res;
-      } catch {
-        if (this.opportunityId() === recordId) {
-          this.relatedCounts.set({ quotations: null, salesOrders: null });
-          this.relatedCountsLoaded.set(true);
-        }
-        return null;
-      }
-    };
-  });
-
   protected readonly historyPartyIds = computed<readonly string[]>(() => {
     const current = this.detail();
     if (!current || current.id !== this.opportunityId()) return [];
@@ -766,7 +727,7 @@ export class OpportunityPage implements CanLeaveRecord {
       if (field === 'ownerUserId') {
         if (value === null || value === undefined || value === '') return none;
         const ownerId = String(value);
-        return ownerById.get(ownerId) ?? `${ownerId.slice(0, 8)}…`;
+        return ownerById.get(ownerId) ?? `${ownerId.slice(0, 8)}â€¦`;
       }
       if (field === 'cardColor') {
         if (value === null || value === undefined || value === '' || value === 'none') {
@@ -840,15 +801,7 @@ export class OpportunityPage implements CanLeaveRecord {
       },
     ];
 
-    const qCount = this.quotationsCount();
-    if (!this.relatedCountsLoaded() || qCount !== null) {
-      list.push({
-        id: 'quotations',
-        icon: 'tablerFileInvoice',
-        label: this.transloco.translate('oppPage.tabs.quotations'),
-        count: qCount,
-      });
-    }
+    list.push({ id: 'quotations', icon: 'tablerFileInvoice', label: this.transloco.translate('oppPage.tabs.quotations') });
 
     return list;
   });
@@ -858,7 +811,7 @@ export class OpportunityPage implements CanLeaveRecord {
 
     effect(() => {
       if (this.crmModules.loaded() && !this.crmModules.opportunitiesEnabled()) {
-        untracked(() => this.redirectModuleOff());
+        untracked(() => this.writeReadOnly.set(true));
       }
     });
 
@@ -1008,8 +961,6 @@ export class OpportunityPage implements CanLeaveRecord {
       this.newActivityRequest.set(0);
       this.historyRefresh.set(0);
       this.stagesRefresh.set(0);
-      this.relatedCounts.set(null);
-      this.relatedCountsLoaded.set(false);
 
       if (nextId) {
         const matchedCarried = carried && (carried.recordId === nextId || carried.recordId === null) ? carried : null;
@@ -1029,7 +980,6 @@ export class OpportunityPage implements CanLeaveRecord {
           this.base.set(mapped);
           this.draft.set(structuredClone(mapped));
           this.updatedAt.set(created.updatedAt);
-          this.relatedCountsVersion.update((v) => v + 1);
           void this.refreshCapabilities(created.branchId);
           void this.loadInitialTabCounts(created, seq);
         } else {
@@ -1068,8 +1018,9 @@ export class OpportunityPage implements CanLeaveRecord {
   }
 
   protected onFormDraftChange(next: OpportunityDraft): void {
-    this.serverErrors.set({});
-    this.draft.set(next);
+    const result = this.mode() === 'edit' ? restoreNonClearableFields(this.base(), next) : { draft: next, errors: {} };
+    this.serverErrors.set(result.errors);
+    this.draft.set(result.draft);
   }
 
   protected onFormSeeded(patch: OpportunitySeedPatch): void {
@@ -1190,7 +1141,7 @@ export class OpportunityPage implements CanLeaveRecord {
       this.detail.update((r) => (r ? { ...r, importance: prevImportance } : r));
       this.base.update((b) => ({ ...b, importance: prevBaseImportance }));
       this.draft.update((d) => ({ ...d, importance: prevDraftImportance }));
-      this.toastWriteError(error, 'opportunities.card.rateFailed');
+      this.toastWriteError(error);
     } finally {
       this.updatingState.update((s) => ({ ...s, rating: false }));
     }
@@ -1233,7 +1184,7 @@ export class OpportunityPage implements CanLeaveRecord {
       this.detail.update((r) => (r ? { ...r, cardColor: prevColor } : r));
       this.base.update((b) => ({ ...b, cardColor: prevBaseColor }));
       this.draft.update((d) => ({ ...d, cardColor: prevDraftColor }));
-      this.toastWriteError(error, 'opportunities.card.colorFailed');
+      this.toastWriteError(error);
     } finally {
       this.updatingState.update((s) => ({ ...s, color: false }));
     }
@@ -1410,9 +1361,13 @@ export class OpportunityPage implements CanLeaveRecord {
       return;
     }
 
-    if (outcome.kind === 'failed' && outcome.code === 'CRM_OPPORTUNITIES_DISABLED') {
-      void this.crmModules.reload();
-      this.redirectModuleOff();
+    if (outcome.kind === 'failed') {
+      if (outcome.code === 'CRM.OPPORTUNITY.STALE_MOVE') void this.handleConflict(this.opportunityId()!);
+      if (outcome.code === 'PIPELINE_STAGE_NOT_FOUND' && this.opportunityId()) {
+        this.lookups.reloadPipelines();
+        void this.loadRecord(this.opportunityId()!, null);
+      }
+      if (['CRM_OPPORTUNITIES_DISABLED', 'CRM_SUBSCRIPTION_READ_ONLY', 'SEAT_OVER_CAPACITY_READ_ONLY'].includes(outcome.code ?? '')) this.writeReadOnly.set(true);
     }
   }
 
@@ -1442,7 +1397,7 @@ export class OpportunityPage implements CanLeaveRecord {
         await this.router.navigate(['/crm/opportunities'], { queryParams: this.backQueryParams });
         return;
       }
-      this.toastWriteError(error, 'opportunities.errors.generic');
+      this.toastWriteError(error);
     } finally {
       this.deleting.set(false);
     }
@@ -1454,15 +1409,17 @@ export class OpportunityPage implements CanLeaveRecord {
     customerParam: string | null,
   ): Promise<void> {
     const seq = ++this.loadSeq;
+    const branch = sessionBranch();
+    if (!branch || !can('crm.opportunities.read')) { this.loading.set(false); return; }
 
     const initialDraft = emptyDraft({
-      branchId: this.scope.branch().id ?? null,
-      companyId: this.scope.company().id ?? null,
-      ownerUserId: this.currentUser.userId(),
+      branchId: branch.branchId,
+      companyId: branch.companyId,
+      ownerUserId: this.tenantScope.me()?.id ?? null,
       pipeline: this.pipelineScope.current(),
       stageId: stageParam,
       customer: null,
-      defaultCurrency: this.scope.company().currencyCode ?? null,
+      defaultCurrency: this.lookups.defaultCurrency(),
     });
 
     this.loading.set(false);
@@ -1501,7 +1458,7 @@ export class OpportunityPage implements CanLeaveRecord {
       }
     }
 
-    if (customerParam) {
+    if (customerParam && can('crm.customer_profiles.read')) {
       try {
         const customer = await getCustomerOption(customerParam);
         if (seq !== this.loadSeq || this.mode() !== 'create') return;
@@ -1523,7 +1480,7 @@ export class OpportunityPage implements CanLeaveRecord {
       } catch (error) {
         if (seq !== this.loadSeq || this.mode() !== 'create') return;
         if (errorCodeOf(error) === 'CRM_OPPORTUNITIES_DISABLED') {
-          this.toastWriteError(error, 'opportunities.errors.generic');
+          this.toastWriteError(error);
           return;
         }
         this.serverErrors.set({ customerProfileId: 'oppPage.errors.customerCannotCreate' });
@@ -1535,6 +1492,8 @@ export class OpportunityPage implements CanLeaveRecord {
     id: string,
     carried: { draft: OpportunityDraft; baseUpdatedAt: string | null } | null,
   ): Promise<void> {
+    if (!sessionBranch()) { this.loading.set(false); return; }
+    if (!can('crm.opportunities.read')) { this.scopeDenied.set(true); this.loading.set(false); return; }
     const seq = ++this.loadSeq;
     this.loading.set(true);
     this.loadFailed.set(false);
@@ -1562,13 +1521,12 @@ export class OpportunityPage implements CanLeaveRecord {
       this.base.set(mapped);
       this.draft.set(carried ? structuredClone(carried.draft) : structuredClone(mapped));
       this.updatedAt.set(carried?.baseUpdatedAt ?? fresh.updatedAt);
-      this.relatedCountsVersion.update((v) => v + 1);
       void this.loadInitialTabCounts(fresh, seq);
     } catch (error) {
       if (seq !== this.loadSeq) return;
       if (errorCodeOf(error) === 'CRM_OPPORTUNITIES_DISABLED') {
         void this.crmModules.reload();
-        this.redirectModuleOff();
+        this.enterReadOnlyMode();
         return;
       }
 
@@ -1586,6 +1544,7 @@ export class OpportunityPage implements CanLeaveRecord {
       }
 
       this.loadFailed.set(true);
+      this.loadCorrelationId.set(opportunityRecordError(this.transloco, error, 'oppPage').correlationId);
     } finally {
       if (seq === this.loadSeq) {
         this.loading.set(false);
@@ -1693,7 +1652,12 @@ export class OpportunityPage implements CanLeaveRecord {
 
     this.saving.set(true);
     try {
-      const created = await createOpportunity(body, this.createIdempotencyKey);
+      let created = await createOpportunity(body, this.createIdempotencyKey);
+      const tagIds = [...this.draft().tagIds];
+      if (tagIds.length) {
+        try { created = { ...created, tags: await attachOpportunityTags(created.id, tagIds) }; }
+        catch { this.notify.warning(this.transloco.translate('oppForm.savedWithoutTags')); }
+      }
       this.createIdempotencyKey = null;
       this.lastCreateFingerprint = null;
       const mapped = draftFromRow(created, this.scope.companies());
@@ -1716,6 +1680,10 @@ export class OpportunityPage implements CanLeaveRecord {
       });
       return true;
     } catch (error) {
+      if (!isRetryableWriteError(error) && !(error instanceof ApiError && error.status === 401)) {
+        this.createIdempotencyKey = null;
+        this.lastCreateFingerprint = null;
+      }
       this.handleSaveError(error);
       return false;
     } finally {
@@ -1779,7 +1747,6 @@ export class OpportunityPage implements CanLeaveRecord {
           }
           if (patchBody !== null) {
             this.historyRefresh.update((v) => v + 1);
-            this.relatedCountsVersion.update((v) => v + 1);
           }
           this.handleSaveError(error);
           return false;
@@ -1795,7 +1762,6 @@ export class OpportunityPage implements CanLeaveRecord {
       this.submitted.set(false);
       this.serverErrors.set({});
       this.historyRefresh.update((v) => v + 1);
-      this.relatedCountsVersion.update((v) => v + 1);
       this.notify.success(this.transloco.translate('recordPage.saved'));
       return true;
     } finally {
@@ -1804,13 +1770,13 @@ export class OpportunityPage implements CanLeaveRecord {
   }
 
   private async handleConflict(id: string): Promise<boolean> {
-    const dialog = this.conflictDialog();
-    if (!dialog || this.conflictOpen) return false;
+    if (this.conflictOpen) return false;
 
     this.conflictOpen = true;
     let reload = false;
     try {
-      reload = await dialog.open();
+      this.conflictVisible.set(true);
+      reload = await new Promise<boolean>((resolve) => { this.conflictResolve = resolve; });
     } finally {
       this.conflictOpen = false;
     }
@@ -1836,26 +1802,29 @@ export class OpportunityPage implements CanLeaveRecord {
         this.submitted.set(false);
         this.serverErrors.set({});
         this.historyRefresh.update((v) => v + 1);
-        this.relatedCountsVersion.update((v) => v + 1);
         return false;
       }
 
-      const rebased = rebaseDraft(this.base(), freshMapped, this.draft());
-      this.detail.set(fresh);
-      this.base.set(freshMapped);
-      this.draft.set(rebased);
       this.updatedAt.set(fresh.updatedAt);
-      this.historyRefresh.update((v) => v + 1);
+      this.detail.update((row) => row ? { ...row, updatedAt: fresh.updatedAt } : row);
       return false;
     } catch (error) {
-      this.toastWriteError(error, 'opportunities.errors.generic');
+      this.toastWriteError(error);
       return false;
     }
   }
 
+  protected resolveConflict(reload: boolean): void {
+    this.conflictVisible.set(false);
+    this.conflictResolve?.(reload);
+    this.conflictResolve = null;
+  }
+
   private handleSaveError(error: unknown): void {
+    const code = errorCodeOf(error);
+    if (code === 'GW.IDEM.MISMATCH' || code?.endsWith('_IDEMPOTENCY_MISMATCH')) this.createMismatch.set(true);
     if (errorCodeOf(error) === 'CRM_OPPORTUNITIES_DISABLED') {
-      this.toastWriteError(error, 'opportunities.errors.generic');
+      this.toastWriteError(error);
       return;
     }
 
@@ -1867,23 +1836,17 @@ export class OpportunityPage implements CanLeaveRecord {
       return;
     }
 
-    this.toastWriteError(error, 'opportunities.errors.generic');
+    this.toastWriteError(error);
   }
 
-  private toastWriteError(error: unknown, fallbackKey: string): void {
-    const message = opportunityErrorMessage(error, this.transloco, fallbackKey);
-    this.notify.error(message);
-    if (errorCodeOf(error) === 'CRM_OPPORTUNITIES_DISABLED') {
-      void this.crmModules.reload();
-      this.redirectModuleOff();
-    }
+  private toastWriteError(error: unknown): void {
+    const state = opportunityRecordError(this.transloco, error, 'oppForm');
+    this.notify.error(state.message);
+    if (state.readOnly) this.writeReadOnly.set(true);
   }
 
-  private redirectModuleOff(): void {
-    if (this.moduleRedirecting) return;
-    this.moduleRedirecting = true;
-    this.bypassGuard = true;
-    void this.router.navigate(['/crm/off/opportunities'], { replaceUrl: true });
+  private enterReadOnlyMode(): void {
+    this.writeReadOnly.set(true);
   }
 
   private isConcurrentUpdate(error: unknown): boolean {

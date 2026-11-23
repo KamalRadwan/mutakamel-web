@@ -17,18 +17,20 @@ import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerCheck, tablerChevronDown, tablerSearch, tablerUserShare } from '@ng-icons/tabler-icons';
 import { PluralKeyPipe } from '../../../../../core/i18n/plural';
 import { Notify } from '../../../../../core/notify/notify';
-import { ScopeState } from '../../../../../core/scope/scope';
+import { TenantScopeState } from '../../../../../core/scope/tenant-scope';
 import { BulkJobsTracker } from '../../../../../shared/bulk-jobs/bulk-jobs-tracker';
 import { BulkJobSelection } from '../../../../../shared/bulk-jobs/bulk-jobs.model';
 import { Field } from '../../../../../shared/ui/field/field';
 import { rectInPage, viewport } from '../../../../../shared/ui/overlay/zoom';
 import { BulkRunModal } from '../../../shared/record/bulk/bulk-run-modal/bulk-run-modal';
 import { ApiError, errorCodeOf } from '../../../settings/shared/settings-api';
-import { listAssignableOwners } from '../../opportunities.api';
+import { listBulkOpportunityOwners } from '../opportunity-bulk.api';
 import { type OwnerOption, type SelectedOpportunity, initials } from '../../opportunities.model';
 import {
   buildAssignBulkJob,
-  submitOpportunityBulkJob,
+  OpportunityBulkSubmission,
+  opportunityBulkErrorMessage,
+  opportunityBulkFieldError,
   translateOpportunityBulkError,
 } from '../bulk-runner';
 import {
@@ -47,7 +49,7 @@ interface MenuPlace {
 @Component({
   selector: 'app-opp-bulk-assign-modal',
   imports: [NgIcon, TranslocoPipe, PluralKeyPipe, BulkRunModal, Field],
-  providers: [
+  viewProviders: [
     provideTranslocoScope('opportunities', { scope: 'opportunity-bulk', alias: 'oppBulk' }),
     provideIcons({ tablerUserShare, tablerChevronDown, tablerCheck, tablerSearch }),
   ],
@@ -63,12 +65,14 @@ export class OppBulkAssignModal {
 
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
-  private readonly scopeState = inject(ScopeState);
+  private readonly scopeState = inject(TenantScopeState);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly selection = inject(OpportunitySelection, { optional: true });
   private readonly tracker = inject(BulkJobsTracker);
+  protected readonly submission = new OpportunityBulkSubmission();
+  private readonly openedBranchId = signal('');
 
   private readonly modal = viewChild.required(BulkRunModal);
   private readonly ownerTrigger = viewChild<ElementRef<HTMLButtonElement>>('ownerTrigger');
@@ -84,6 +88,7 @@ export class OppBulkAssignModal {
   protected readonly owners = signal<OwnerOption[]>([]);
   protected readonly ownersLoading = signal(false);
   protected readonly ownersLoaded = signal(false);
+  protected readonly ownersDenied = signal(false);
   protected readonly selectedOwnerId = signal('');
   protected readonly ownerSearch = signal('');
   protected readonly ownerMenuOpen = signal(false);
@@ -96,7 +101,11 @@ export class OppBulkAssignModal {
   private openSeq = 0;
   private menuSeq = 0;
 
-  private readonly effectiveBranchId = computed(() => this.branchId().trim() || this.scopeState.branch().id);
+  private readonly effectiveBranchId = computed(() => {
+    const selected = this.scopeState.selection()?.branchId ?? '';
+    return selected === this.openedBranchId() && (!this.branchId().trim() || this.branchId().trim() === selected)
+      && this.scopeState.branchCompanies().has(selected) ? selected : '';
+  });
 
   protected readonly displayCount = computed(() =>
     this.resolving() && this.rows().length === 0 ? (this.selection?.count() ?? 0) : this.rows().length,
@@ -119,6 +128,7 @@ export class OppBulkAssignModal {
     const serverErr = this.serverOwnerError();
     if (serverErr) return serverErr;
     if (this.ownersLoaded() && this.owners().length === 0) {
+      if (this.ownersDenied()) return null;
       return this.transloco.translate('oppBulk.assign.noOwners');
     }
     return null;
@@ -138,6 +148,8 @@ export class OppBulkAssignModal {
 
   protected readonly canSubmit = computed(
     () =>
+      !this.submission.readOnly() &&
+      !!this.effectiveBranchId() &&
       !this.submitting() &&
       !this.resolving() &&
       !this.ownersLoading() &&
@@ -281,7 +293,7 @@ export class OppBulkAssignModal {
     this.submitting.set(true);
     this.serverOwnerError.set(null);
     try {
-      const res = await submitOpportunityBulkJob(this.tracker, body);
+      const res = await this.submission.submit(this.tracker, body);
       this.close();
       this.submitted.emit(res.jobId);
     } catch (error) {
@@ -292,6 +304,12 @@ export class OppBulkAssignModal {
   }
 
   private async initOpen(rows?: readonly OpportunitySelectionRow[]): Promise<void> {
+    this.openedBranchId.set(this.scopeState.selection()?.branchId ?? '');
+    this.submission.reset();
+    if (!this.effectiveBranchId()) {
+      this.notify.error(this.transloco.translate('opportunities.page.chooseBranch'));
+      return;
+    }
     const seq = ++this.openSeq;
     const mapped = rows ? rows.map(toSelectedOpportunity) : [];
     this.ownerSearch.set('');
@@ -299,6 +317,8 @@ export class OppBulkAssignModal {
     this.submitting.set(false);
     this.closeOwnerMenu();
     this.ownersLoaded.set(false);
+    this.ownersDenied.set(false);
+    this.owners.set([]);
     this.selectedOwnerId.set('');
     this.rows.set(mapped);
     this.modal().open();
@@ -309,15 +329,17 @@ export class OppBulkAssignModal {
   private async loadOwners(seq: number): Promise<void> {
     this.ownersLoading.set(true);
     try {
-      const list = await listAssignableOwners(this.effectiveBranchId());
+      const list = await listBulkOpportunityOwners(this.effectiveBranchId());
       if (seq !== this.openSeq) return;
       this.owners.set(list);
       this.ownersLoaded.set(true);
       this.selectedOwnerId.set(list[0]?.id ?? '');
-    } catch {
+    } catch (error) {
       if (seq !== this.openSeq) return;
       this.owners.set([]);
       this.ownersLoaded.set(true);
+      this.ownersDenied.set(error instanceof ApiError && error.status === 403);
+      if (!this.ownersDenied()) this.notify.error(opportunityBulkErrorMessage(this.transloco, error));
     } finally {
       if (seq === this.openSeq) {
         this.ownersLoading.set(false);
@@ -355,11 +377,13 @@ export class OppBulkAssignModal {
   private handleSubmitError(error: unknown): void {
     const code = errorCodeOf(error);
     if (code === 'BULK_JOB_ACTIVE') return;
-    if (code === 'CRM_SCOPED_PERMISSION_DENIED' || code === 'OPPORTUNITY_OWNER_INELIGIBLE') {
+    const fieldError = opportunityBulkFieldError(this.transloco, error, 'ownerUserId');
+    if (fieldError) { this.serverOwnerError.set(fieldError); return; }
+    if (code === 'OPPORTUNITY_OWNER_INELIGIBLE') {
       this.serverOwnerError.set(this.translateCode(code));
       return;
     }
-    this.notify.error(this.translateCode(code));
+    this.notify.error(opportunityBulkErrorMessage(this.transloco, error));
   }
 
   private translateCode(code: string | null): string {

@@ -87,7 +87,7 @@
 
       <ui-field
         size="multiline"
-        [label]="'oppMoves.close.note' | transloco"
+        [label]="(terminalKind() === 'LOST' ? 'oppMoves.close.lossReason' : 'oppMoves.close.note') | transloco"
         [for]="noteId"
         [hint]="noteHintKey() | transloco"
         [required]="noteRequired()"

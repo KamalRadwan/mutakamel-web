@@ -108,7 +108,7 @@ export class CustomerSection {
   );
 
   protected readonly contactDisabled = computed(
-    () => this.readonly() || !this.draft().customerProfileId || this.contactsPending(),
+    () => this.readonly() || !this.draft().customerProfileId || this.contactsPending() || this.lookups.contactsDenied(),
   );
 
   protected readonly contactOptions = computed<DropdownOption<string>[]>(() => {

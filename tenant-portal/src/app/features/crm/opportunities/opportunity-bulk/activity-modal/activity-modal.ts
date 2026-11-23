@@ -25,11 +25,11 @@ import {
   tablerSquareCheck,
   tablerUsers,
 } from '@ng-icons/tabler-icons';
-import { CurrentUser } from '../../../../../core/auth/current-user';
 import { LanguageState } from '../../../../../core/i18n/language';
+import { userFromMe } from '../../../../../core/auth/auth-me';
 import { PluralKeyPipe } from '../../../../../core/i18n/plural';
 import { Notify } from '../../../../../core/notify/notify';
-import { ScopeState } from '../../../../../core/scope/scope';
+import { TenantScopeState } from '../../../../../core/scope/tenant-scope';
 import { BulkJobsTracker } from '../../../../../shared/bulk-jobs/bulk-jobs-tracker';
 import { BulkJobSelection } from '../../../../../shared/bulk-jobs/bulk-jobs.model';
 import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
@@ -56,13 +56,15 @@ import {
   toLocalDateTime,
 } from '../../../../../shared/widgets/activities/activity-form/activity-form.model';
 import { BulkRunModal } from '../../../shared/record/bulk/bulk-run-modal/bulk-run-modal';
-import { errorCodeOf } from '../../../settings/shared/settings-api';
-import { listAssignableOwners } from '../../opportunities.api';
+import { ApiError, errorCodeOf } from '../../../settings/shared/settings-api';
+import { listBulkOpportunityOwners } from '../opportunity-bulk.api';
 import type { SelectedOpportunity } from '../../opportunities.model';
 import {
   type CreateActivityOpportunityCommonParams,
   buildCreateActivityBulkJob,
-  submitOpportunityBulkJob,
+  OpportunityBulkSubmission,
+  opportunityBulkErrorMessage,
+  opportunityBulkFieldError,
   toWireActivitySchedule,
   translateOpportunityBulkError,
 } from '../bulk-runner';
@@ -151,7 +153,7 @@ function parseCustomGapMinutes(raw: string): number | null {
     Segmented,
     Switch,
   ],
-  providers: [
+  viewProviders: [
     provideTranslocoScope('opportunities', { scope: 'opportunity-bulk', alias: 'oppBulk' }),
     provideIcons({
       tablerCalendarPlus,
@@ -177,11 +179,16 @@ export class OppBulkActivityModal {
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly language = inject(LanguageState).current;
-  private readonly currentUser = inject(CurrentUser);
-  private readonly scopeState = inject(ScopeState);
+  private readonly scopeState = inject(TenantScopeState);
+  private readonly currentUser = computed(() => {
+    const me = this.scopeState.me();
+    return me ? userFromMe(me) : null;
+  });
   private readonly notify = inject(Notify);
   private readonly selection = inject(OpportunitySelection, { optional: true });
   private readonly tracker = inject(BulkJobsTracker);
+  protected readonly submission = new OpportunityBulkSubmission();
+  private readonly openedBranchId = signal('');
 
   private readonly modal = viewChild.required<BulkRunModal>('formModal');
   private readonly discardDialog = viewChild.required<ConfirmDialog>('discardDialog');
@@ -196,6 +203,8 @@ export class OppBulkActivityModal {
 
   protected readonly rows = signal<SelectedOpportunity[]>([]);
   protected readonly owners = signal<AssignableOwner[]>([]);
+  protected readonly ownersDenied = signal(false);
+  protected readonly ownersLoading = signal(false);
   protected readonly resolving = signal(false);
   protected readonly submitting = signal(false);
   protected readonly nowMs = signal(Date.now());
@@ -221,6 +230,7 @@ export class OppBulkActivityModal {
   protected readonly chosenAssigneeTouched = signal(false);
   protected readonly spacePerAssignee = signal(true);
 
+  private readonly serverFieldErrors = signal<Record<string, string>>({});
   private readonly serverStartError = signal<string | null>(null);
   private readonly touched = signal<Partial<Record<'subject' | 'location' | 'meetingUrl' | 'description' | 'gap', boolean>>>({});
   private readonly revealAllErrors = signal(false);
@@ -230,7 +240,11 @@ export class OppBulkActivityModal {
   private clockTimer: ReturnType<typeof setInterval> | null = null;
   private openSeq = 0;
 
-  private readonly effectiveBranchId = computed(() => this.branchId().trim() || this.scopeState.branch().id);
+  private readonly effectiveBranchId = computed(() => {
+    const selected = this.scopeState.selection()?.branchId ?? '';
+    return selected === this.openedBranchId() && (!this.branchId().trim() || this.branchId().trim() === selected)
+      && this.scopeState.branchCompanies().has(selected) ? selected : '';
+  });
 
   protected readonly displayCount = computed(() =>
     this.resolving() && this.rows().length === 0 ? (this.selection?.count() ?? 0) : this.rows().length,
@@ -337,6 +351,7 @@ export class OppBulkActivityModal {
 
   protected readonly subjectError = computed<string | null>(() => {
     this.i18n();
+    if (this.serverFieldErrors()['subject']) return this.serverFieldErrors()['subject'];
     if (!this.revealAllErrors() && !this.touched().subject) return null;
     const trimmed = this.subject().trim();
     if (!trimmed) return this.transloco.translate('oppBulk.activity.validation.required');
@@ -348,6 +363,7 @@ export class OppBulkActivityModal {
 
   protected readonly locationError = computed<string | null>(() => {
     this.i18n();
+    if (this.serverFieldErrors()['location']) return this.serverFieldErrors()['location'];
     if (!this.typeFields().location) return null;
     if (!this.revealAllErrors() && !this.touched().location) return null;
     if (codePointLength(this.location().trim()) > LIMITS.location) {
@@ -358,6 +374,7 @@ export class OppBulkActivityModal {
 
   protected readonly meetingUrlError = computed<string | null>(() => {
     this.i18n();
+    if (this.serverFieldErrors()['meetingUrl']) return this.serverFieldErrors()['meetingUrl'];
     if (!this.typeFields().meetingUrl) return null;
     if (!this.revealAllErrors() && !this.touched().meetingUrl) return null;
     const trimmed = this.meetingUrl().trim();
@@ -373,6 +390,7 @@ export class OppBulkActivityModal {
 
   protected readonly descriptionError = computed<string | null>(() => {
     this.i18n();
+    if (this.serverFieldErrors()['description']) return this.serverFieldErrors()['description'];
     if (!this.revealAllErrors() && !this.touched().description) return null;
     if (codePointLength(this.description().trim()) > LIMITS.description) {
       return this.transloco.translate('oppBulk.activity.validation.maxLength', { max: LIMITS.description });
@@ -400,7 +418,7 @@ export class OppBulkActivityModal {
 
   protected readonly ownerNameMap = computed(() => {
     const map = new Map<string, string>();
-    map.set(this.currentUser.userId(), this.currentUser.user().displayName);
+    map.set(this.currentUser()?.id ?? '', this.currentUser()?.displayName ?? '');
     for (const owner of this.owners()) {
       map.set(owner.id, owner.displayName);
     }
@@ -422,8 +440,8 @@ export class OppBulkActivityModal {
       assigneeMode: this.assigneeMode(),
       chosenAssigneeId: this.chosenAssigneeId(),
       spacePerAssignee: this.spacePerAssignee(),
-      currentUserId: this.currentUser.userId(),
-      currentUserName: this.currentUser.user().displayName,
+      currentUserId: this.currentUser()?.id ?? '',
+      currentUserName: this.currentUser()?.displayName ?? '',
       ownerNames: this.ownerNameMap(),
     });
   });
@@ -469,10 +487,10 @@ export class OppBulkActivityModal {
   });
 
   protected readonly submitBlocked = computed(() => {
-    if (this.submitting() || this.resolving() || this.rows().length === 0) return true;
+    if (this.submission.readOnly() || !this.effectiveBranchId() || this.submitting() || this.resolving() || this.rows().length === 0) return true;
     if (this.isStartInPast()) return true;
     if (this.gapPreset() === 'custom' && this.parsedGapMinutes() === null) return true;
-    if (this.assigneeMode() === 'other' && !this.chosenAssigneeId()) return true;
+    if (this.assigneeMode() === 'other' && (this.ownersLoading() || !this.owners().some((owner) => owner.id === this.chosenAssigneeId()))) return true;
     return false;
   });
 
@@ -496,7 +514,13 @@ export class OppBulkActivityModal {
 
   open(rows?: readonly OpportunitySelectionRow[]): void {
     const seq = ++this.openSeq;
+    this.openedBranchId.set(this.scopeState.selection()?.branchId ?? '');
+    this.submission.reset();
     this.resetForm();
+    if (!this.effectiveBranchId()) {
+      this.notify.error(this.transloco.translate('opportunities.page.chooseBranch'));
+      return;
+    }
     this.allowClose = false;
     this.confirmingDiscard = false;
     this.startClock();
@@ -529,18 +553,24 @@ export class OppBulkActivityModal {
     }
 
     const branch = this.effectiveBranchId();
-    void listAssignableOwners(branch)
+    this.owners.set([]);
+    this.ownersDenied.set(false);
+    this.ownersLoading.set(true);
+    void listBulkOpportunityOwners(branch)
       .then((list) => {
         if (seq !== this.openSeq) return;
         this.owners.set(list);
         if (!this.chosenAssigneeTouched()) {
-          this.chosenAssigneeId.set(list[0]?.id ?? this.currentUser.userId());
+          this.chosenAssigneeId.set(list[0]?.id ?? '');
         }
       })
-      .catch(() => {
+      .catch((error) => {
         if (seq !== this.openSeq) return;
         this.owners.set([]);
-      });
+        this.ownersDenied.set(error instanceof ApiError && error.status === 403);
+        if (!this.ownersDenied()) this.notify.error(opportunityBulkErrorMessage(this.transloco, error));
+      })
+      .finally(() => { if (seq === this.openSeq) this.ownersLoading.set(false); });
 
     this.modal().open();
   }
@@ -584,6 +614,11 @@ export class OppBulkActivityModal {
 
   protected onTextInput(field: 'subject' | 'location' | 'meetingUrl' | 'description', event: Event): void {
     const value = (event.target as HTMLInputElement | HTMLTextAreaElement).value;
+    this.serverFieldErrors.update((current) => {
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
     switch (field) {
       case 'subject':
         this.subject.set(value);
@@ -609,6 +644,7 @@ export class OppBulkActivityModal {
     this.nowMs.set(Date.now());
     this.startDate.set(value);
     this.serverStartError.set(null);
+    this.serverFieldErrors.set({});
   }
 
   protected onStartTimeChange(value: string | null): void {
@@ -616,6 +652,7 @@ export class OppBulkActivityModal {
     this.nowMs.set(Date.now());
     this.startTime.set(value);
     this.serverStartError.set(null);
+    this.serverFieldErrors.set({});
   }
 
   protected onGapPresetChange(value: string | null): void {
@@ -702,6 +739,7 @@ export class OppBulkActivityModal {
     this.nowMs.set(Date.now());
     this.revealAllErrors.set(true);
     this.serverStartError.set(null);
+    this.serverFieldErrors.set({});
     if (!this.isFormValid()) {
       this.focusFirstInvalidField();
       return;
@@ -733,7 +771,7 @@ export class OppBulkActivityModal {
 
     this.submitting.set(true);
     try {
-      const res = await submitOpportunityBulkJob(this.tracker, body);
+      const res = await this.submission.submit(this.tracker, body);
 
       const serverFirst = typeof res.summary?.['firstDueAt'] === 'string' ? res.summary['firstDueAt'] : null;
       const serverLast = typeof res.summary?.['lastDueAt'] === 'string' ? res.summary['lastDueAt'] : null;
@@ -756,13 +794,22 @@ export class OppBulkActivityModal {
   private handleSubmitError(error: unknown): void {
     const code = errorCodeOf(error);
     if (code === 'BULK_JOB_ACTIVE') return;
+    const errors: Record<string, string> = {};
+    for (const field of ['subject', 'location', 'meetingUrl', 'description']) {
+      const message = opportunityBulkFieldError(this.transloco, error, `activity.${field}`);
+      if (message) errors[field] = message;
+    }
+    this.serverFieldErrors.set(errors);
+    const startError = opportunityBulkFieldError(this.transloco, error, 'schedule.startAt');
+    if (startError) this.serverStartError.set(startError);
+    if (startError || Object.keys(errors).length) { this.focusFirstInvalidField(); return; }
     if (code === 'OPPORTUNITY_BULK_START_IN_PAST' || code === 'LEAD_BULK_START_IN_PAST') {
       const msg = this.translateCode(code);
       this.serverStartError.set(msg);
       this.host.nativeElement.querySelector<HTMLElement>(`#${this.uid}-start-date`)?.focus();
       return;
     }
-    this.notify.error(this.translateCode(code));
+    this.notify.error(opportunityBulkErrorMessage(this.transloco, error));
   }
 
   private translateCode(code: string | null): string {
@@ -855,11 +902,12 @@ export class OppBulkActivityModal {
     this.lastValidGap.set(Number(DEFAULT_GAP));
     this.order.set('table');
     this.assigneeMode.set('owner');
-    this.chosenAssigneeId.set(this.owners()[0]?.id ?? this.currentUser.userId());
+    this.chosenAssigneeId.set(this.owners()[0]?.id ?? '');
     this.chosenAssigneeTouched.set(false);
     this.spacePerAssignee.set(true);
     this.submitting.set(false);
     this.serverStartError.set(null);
+    this.serverFieldErrors.set({});
     this.touched.set({});
     this.revealAllErrors.set(false);
 

@@ -1,3 +1,8 @@
+@if (lookups.customFieldsDenied()) {
+  <ui-field [label]="'oppForm.sections.custom' | transloco" [for]="uid + '-custom-denied'" [hint]="'oppForm.lookups.denied' | transloco">
+    <input [id]="uid + '-custom-denied'" disabled class="w-full bg-transparent text-12 text-text outline-none" />
+  </ui-field>
+}
 @if (layout() === 'modal') {
   <div class="flex h-full min-h-0 flex-1 overflow-hidden">
     <div class="flex h-full min-h-0 min-w-0 flex-1 flex-col gap-y-10 overflow-y-auto px-16 py-10">

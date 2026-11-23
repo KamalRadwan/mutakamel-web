@@ -14,12 +14,14 @@
   (cancel)="closeStageMenu()"
   (closed)="onModalClosed()"
 >
+  <fieldset class="contents" [disabled]="submission.readOnly()">
   <ui-field
     size="bare"
     [label]="'oppBulk.stage.stage' | transloco"
     [for]="uid + '-stage'"
-    [hint]="'oppBulk.stage.stageHint' | transloco"
+    [hint]="(stagesDenied() ? 'opportunities.search.listRestricted' : 'oppBulk.stage.stageHint') | transloco"
     [required]="true"
+    [error]="serverStageError()"
   >
     <div class="relative inline-flex w-full">
       <button
@@ -120,7 +122,7 @@
         size="bare"
         [label]="reasonFieldLabelKey() | transloco"
         [for]="reasonsLoading() ? '' : uid + '-reason'"
-        [hint]="'oppBulk.stage.reasonHint' | transloco"
+        [hint]="(reasonsDenied() ? 'opportunities.search.listRestricted' : 'oppBulk.stage.reasonHint') | transloco"
         [required]="reasonRequired()"
         [error]="reasonError()"
       >
@@ -138,7 +140,7 @@
               [describedBy]="reasonDescribedBy()"
               [options]="reasonOptions()"
               [value]="selectedReasonId()"
-              [disabled]="submitting()"
+              [disabled]="submitting() || reasonsUnavailable()"
               (valueChange)="onReasonChange($event)"
             />
           </div>
@@ -176,4 +178,5 @@
   <p class="text-12 leading-18 text-text-muted">
     {{ 'oppBulk.stage.preview' | transloco: previewParams() }}
   </p>
+  </fieldset>
 </app-bulk-run-modal>

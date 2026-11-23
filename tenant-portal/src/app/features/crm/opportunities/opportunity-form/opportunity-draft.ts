@@ -298,10 +298,6 @@ export function toCreateBody(d: OpportunityDraft): CreateOpportunityBody {
     body.probabilityPercent = probability;
   }
 
-  if (d.tagIds.length > 0) {
-    body.tagIds = [...d.tagIds];
-  }
-
   const customFields = cleanCustomFields(d.customFields);
   if (customFields) {
     body.customFields = customFields;
@@ -336,7 +332,7 @@ export function toPatchBody(
 
   const baseDescription = trimOrNull(base.description);
   const nextDescription = trimOrNull(d.description);
-  if (baseDescription !== nextDescription) {
+  if (baseDescription !== nextDescription && nextDescription !== null) {
     body.description = nextDescription;
     changed = true;
   }
@@ -368,22 +364,22 @@ export function toPatchBody(
 
   const baseContactId = trimOrNull(base.contactPartyId);
   const nextContactId = trimOrNull(d.contactPartyId);
-  if (baseContactId !== nextContactId) {
+  if (baseContactId !== nextContactId && nextContactId !== null) {
     body.contactPartyId = nextContactId;
     changed = true;
   }
 
   const baseCloseDate = trimOrNull(base.expectedCloseDate);
   const nextCloseDate = trimOrNull(d.expectedCloseDate);
-  if (baseCloseDate !== nextCloseDate) {
+  if (baseCloseDate !== nextCloseDate && nextCloseDate !== null) {
     body.expectedCloseDate = nextCloseDate;
     changed = true;
   }
 
   const baseProb = trimOrNull(base.probabilityPercent);
   const nextProb = trimOrNull(d.probabilityPercent);
-  if (baseProb !== nextProb) {
-    body.probabilityPercent = nextProb === null ? null : parseProbability(nextProb);
+  if (baseProb !== nextProb && nextProb !== null) {
+    body.probabilityPercent = parseProbability(nextProb);
     changed = true;
   }
 
@@ -403,6 +399,19 @@ export function toPatchBody(
   }
 
   return changed ? body : null;
+}
+
+/** Wave A cannot clear these values; restore the saved value and explain at its field. */
+export function restoreNonClearableFields(base: OpportunityDraft, next: OpportunityDraft): { draft: OpportunityDraft; errors: DraftErrors } {
+  const draft = { ...next };
+  const errors: DraftErrors = {};
+  for (const key of ['description', 'contactPartyId', 'expectedCloseDate', 'probabilityPercent', 'ownerUserId'] as const) {
+    if (base[key] && !next[key]?.trim()) {
+      draft[key] = base[key];
+      errors[key] = 'oppForm.errors.cannotClear';
+    }
+  }
+  return { draft, errors };
 }
 
 export function isDirty(base: OpportunityDraft, d: OpportunityDraft): boolean {

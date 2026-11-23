@@ -113,10 +113,8 @@ export function opportunityRowToBoardRow(
 
 function hasScopedCapability(cap: Scope | null | undefined, ownerUserId: string | null): boolean {
   if (!cap) return false;
-  if (cap.ownerUserIds) {
-    return !!ownerUserId && cap.ownerUserIds.includes(ownerUserId);
-  }
-  return true;
+  if (cap.scope === 'all') return true;
+  return !!ownerUserId && !!cap.ownerUserIds?.includes(ownerUserId);
 }
 
 export function canCreateOpportunity(capabilities: OpportunityCapabilities | null | undefined): boolean {
@@ -256,12 +254,17 @@ export function opportunityErrorMessage(
   transloco: TranslocoService,
   fallbackKey: string,
 ): string {
+  if (error instanceof ApiError && error.status === 429) {
+    const delay = error.details?.['retryAfterSeconds'];
+    const seconds = Array.isArray(delay) ? delay[0] : delay;
+    return seconds ? transloco.translate('apiErrors.rateLimitedIn', { seconds }) : transloco.translate('apiErrors.rateLimited');
+  }
   const code = errorCodeOf(error);
   if (code) {
-    const mappedKey = OPPORTUNITY_ERROR_KEYS[code] ?? `opportunities.errors.${code}`;
+    const mappedKey = OPPORTUNITY_ERROR_KEYS[code];
     for (const key of [mappedKey, opportunitySharedErrorKey(code)]) {
       if (!key) continue;
-      const translated = transloco.translate(key);
+      const translated = transloco.translate(key, error instanceof ApiError ? error.details : undefined);
       if (translated && translated !== key) {
         return translated;
       }

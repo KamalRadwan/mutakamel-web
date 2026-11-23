@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getBulkJob, listBulkJobItems, submitBulkJob } from '../../../../shared/bulk-jobs/bulk-jobs.api';
+import { resetBulkJobsFake } from '../../../../shared/bulk-jobs/bulk-jobs.fake';
+import { fakeGetBulkJob as getBulkJob, fakeListBulkJobItems as listBulkJobItems, fakeSubmitBulkJob as submitBulkJob } from '../../../../shared/bulk-jobs/bulk-jobs.fake';
 import type { BulkJobSubmit } from '../../../../shared/bulk-jobs/bulk-jobs.model';
-import { selectOpportunities, toOpportunitySelectionRequest } from '../opportunities.api';
+import { toOpportunitySelectionRequest } from '../opportunities.api';
 import {
   RENEWALS_PIPELINE_ID,
   SALES_PIPELINE_ID,
@@ -44,6 +45,7 @@ async function salesOpenStageId(): Promise<string> {
 }
 
 beforeEach(() => {
+  resetBulkJobsFake();
   vi.useFakeTimers();
   FAKE_CRM_OPPORTUNITIES_BULK.opportunitiesDisabled = false;
 });
@@ -194,7 +196,7 @@ describe('selectOpportunities: POST /opportunities/selection shape', () => {
   });
 
   it('returns items, total and truncated from the fake in fake mode', async () => {
-    const res = await settle(selectOpportunities({ branchId: BRANCH }, 1));
+    const res = await settle(fakeSelectOpportunities({ branchId: BRANCH }, 1));
     expect(res.items).toHaveLength(1);
     expect(Object.keys(res.items[0]).sort()).toEqual(['id', 'ownerUserId', 'stageId', 'status', 'title', 'updatedAt']);
     expect(res.total).toBeGreaterThan(1);

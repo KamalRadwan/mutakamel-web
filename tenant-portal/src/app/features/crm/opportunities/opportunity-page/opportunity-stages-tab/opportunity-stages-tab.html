@@ -25,12 +25,7 @@
       </p>
     </div>
   } @else if (loadFailed()) {
-    <div class="flex flex-col items-center justify-center gap-8 py-16 text-center">
-      <p class="text-12 leading-18 text-text-muted">{{ 'oppPage.stages.loadFailed' | transloco }}</p>
-      <button type="button" uiButton variant="secondary" size="small" (click)="retry()">
-        {{ 'oppPage.stages.retry' | transloco }}
-      </button>
-    </div>
+    <ui-full-state kind="load-failure" [title]="(integrityFailed() ? 'oppPage.stages.integrityFailed' : 'oppPage.stages.loadFailed') | transloco" [actionLabel]="'oppPage.stages.retry' | transloco" (action)="retry()" />
   } @else if (dayGroups().length === 0) {
     <p class="py-16 text-center text-12 leading-18 text-text-muted">{{ 'oppPage.stages.empty' | transloco }}</p>
   } @else {

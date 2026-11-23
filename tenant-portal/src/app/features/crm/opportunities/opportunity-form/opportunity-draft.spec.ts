@@ -31,19 +31,13 @@ describe('toPatchBody', () => {
     expect(toPatchBody(base(), base({ title: '  Deal ', description: 'Some text  ' }), AT)).toBeNull();
   });
 
-  it('sends nulls for cleared fields', () => {
+  it('does not send clears unsupported by Wave A', () => {
     const body = toPatchBody(
       base(),
       base({ description: '  ', contactPartyId: null, expectedCloseDate: null, probabilityPercent: '' }),
       AT,
     );
-    expect(body).toEqual({
-      expectedUpdatedAt: AT,
-      description: null,
-      contactPartyId: null,
-      expectedCloseDate: null,
-      probabilityPercent: null,
-    });
+    expect(body).toBeNull();
   });
 
   it('sends a cleared custom field as null and only changed custom keys', () => {

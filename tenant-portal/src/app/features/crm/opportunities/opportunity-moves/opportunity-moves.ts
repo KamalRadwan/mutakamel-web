@@ -2,6 +2,7 @@ import { DestroyRef, Injectable, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { TranslocoService } from '@jsverse/transloco';
 import { LanguageState } from '../../../../core/i18n/language';
+import { ApiError, isRetryableWriteError } from '../../../../core/api/api-errors';
 import { Notify } from '../../../../core/notify/notify';
 import { errorCodeOf, newIdempotencyKey } from '../../settings/shared/settings-api';
 import {
@@ -20,6 +21,7 @@ import {
   nameIn,
   stageLabel,
 } from '../opportunities.model';
+import { opportunityRecordError } from '../opportunity-form/opportunity-form-errors';
 import { isTerminalFlag } from '../opportunity-stage-tone';
 
 export type MoveOutcome =
@@ -132,10 +134,7 @@ export class OpportunityMoves {
   private pendingTransferReopen: { seq: number; result: TransferDialogResult } | null = null;
 
   constructor() {
-    this.transloco
-      .selectTranslate('toasts.moved', undefined, { scope: 'opportunity-moves', alias: 'oppMoves' })
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe();
+    // Host pipes register the oppMoves alias before loading this scope.
     // Error texts come from OPPORTUNITY_ERROR_KEYS (`opportunities.errors.*`): load that scope here too.
     this.transloco
       .selectTranslate('errors.CRM_REASON_REQUIRED', undefined, { scope: 'opportunities', alias: 'opportunities' })
@@ -298,14 +297,16 @@ export class OpportunityMoves {
   }
 
   private async submitClose(pending: PendingClose, result: CloseDialogResult): Promise<void> {
+    if (pending.kind === 'LOST' && !result.lostReason?.trim()) {
+      this.closeError.set({ field: 'note', message: this.translate('oppMoves.close.noteRequired') });
+      return;
+    }
     this.closeSubmitting.set(true);
     this.closeError.set(null);
 
     const body: MoveStageBody = {
       stageId: pending.target.id,
-      ...(pending.row.updatedAt ? { expectedUpdatedAt: pending.row.updatedAt } : {}),
-      ...(result.winReasonId ? { winReasonId: result.winReasonId } : {}),
-      ...(result.lostReasonId ? { lostReasonId: result.lostReasonId } : {}),
+      expectedUpdatedAt: pending.row.updatedAt,
       ...(result.lostReason ? { lostReason: result.lostReason } : {}),
       ...(result.reason ? { reason: result.reason } : {}),
     };
@@ -332,10 +333,14 @@ export class OpportunityMoves {
         });
         return;
       }
+      if (isRetryableWriteError(error) || (error instanceof ApiError && error.status === 401)) {
+        this.notify.error(opportunityRecordError(this.transloco, error, 'oppMoves').message);
+        return;
+      }
       this.pendingClose = null;
       this.closeError.set(null);
       this.closeRequest.set(null);
-      this.notify.error(this.errorText(code, pending.kind));
+      if (code !== 'CRM.OPPORTUNITY.STALE_MOVE') this.notify.error(opportunityRecordError(this.transloco, error, 'oppMoves').message);
       pending.resolve({ kind: 'failed', code });
     }
   }
@@ -352,9 +357,7 @@ export class OpportunityMoves {
     const body: TransferPipelineBody = {
       pipelineId: result.pipelineId,
       stageId: result.stageId,
-      ...(pending.row.updatedAt ? { expectedUpdatedAt: pending.row.updatedAt } : {}),
-      ...(result.winReasonId ? { winReasonId: result.winReasonId } : {}),
-      ...(result.lostReasonId ? { lostReasonId: result.lostReasonId } : {}),
+      expectedUpdatedAt: pending.row.updatedAt,
       ...(result.lostReason ? { lostReason: result.lostReason } : {}),
       ...(result.reason ? { reason: result.reason } : {}),
     };
@@ -377,12 +380,21 @@ export class OpportunityMoves {
     } catch (error) {
       if (this.pendingTransfer?.seq !== pending.seq) return;
       this.transferSubmitting.set(false);
+      if (!isRetryableWriteError(error) && !(error instanceof ApiError && error.status === 401)) pending.idempotency = undefined;
       const code = errorCodeOf(error);
       if (code === 'OPPORTUNITY_OWNER_INELIGIBLE') {
         this.transferError.set({
           field: 'pipeline',
           message: this.translate('oppMoves.transfer.ownerIneligible'),
         });
+        return;
+      }
+      if (code === 'OPPORTUNITY_PIPELINE_UNCHANGED') {
+        this.transferError.set({ field: 'pipeline', message: this.translate('oppMoves.transfer.unchanged') });
+        return;
+      }
+      if (isRetryableWriteError(error) || (error instanceof ApiError && error.status === 401)) {
+        this.notify.error(opportunityRecordError(this.transloco, error, 'oppMoves').message);
         return;
       }
       if (code === 'CRM_REASON_REQUIRED' || code === 'OPPORTUNITY_LOST_REASON_REQUIRED') {
@@ -395,7 +407,7 @@ export class OpportunityMoves {
       this.pendingTransfer = null;
       this.transferError.set(null);
       this.transferRequest.set(null);
-      this.notify.error(this.errorText(code, targetKind));
+      if (code !== 'CRM.OPPORTUNITY.STALE_MOVE') this.notify.error(opportunityRecordError(this.transloco, error, 'oppMoves').message);
       pending.resolve({ kind: 'failed', code });
     }
   }
@@ -407,7 +419,7 @@ export class OpportunityMoves {
   ): Promise<MoveOutcome> {
     const body: MoveStageBody = {
       stageId: target.id,
-      ...(row.updatedAt ? { expectedUpdatedAt: row.updatedAt } : {}),
+      expectedUpdatedAt: row.updatedAt,
     };
     try {
       const saved = await moveOpportunityStage(row.id, body);
@@ -416,7 +428,7 @@ export class OpportunityMoves {
       return { kind: 'moved', row: saved };
     } catch (error) {
       const code = errorCodeOf(error);
-      this.notify.error(this.errorText(code));
+      if (code !== 'CRM.OPPORTUNITY.STALE_MOVE') this.notify.error(opportunityRecordError(this.transloco, error, 'oppMoves').message);
       return { kind: 'failed', code };
     }
   }

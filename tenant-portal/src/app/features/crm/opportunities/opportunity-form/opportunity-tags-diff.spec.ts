@@ -1,36 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ApiError } from '../../settings/shared/settings-api';
-import { listTags } from '../../settings/tags/tags.api';
-import { ACME_OPPORTUNITY_ID, fakeGetOpportunity } from '../opportunities.fake';
-import { emptyDraft, toPatchBody } from './opportunity-draft';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { bindCrmHttpForTest } from '../../shared/crm-http';
+import { CrmHttpStub } from '../../shared/testing/crm-http-testing';
 import { diffOpportunityTags, saveTags } from './opportunity-tags-diff';
-
-/**
- * `vi.mock` is not supported for relative imports in the Angular unit-test builder, so
- * saveTags is checked against the fake backend that `opportunities.api` delegates to.
- */
-async function settle<T>(promise: Promise<T>): Promise<T> {
-  const guarded = promise.then(
-    (value) => ({ ok: true as const, value }),
-    (error: unknown) => ({ ok: false as const, error }),
-  );
-  await vi.runAllTimersAsync();
-  const result = await guarded;
-  if (!result.ok) throw result.error;
-  return result.value;
-}
-
-async function tagIdsOf(id: string): Promise<string[]> {
-  return (await settle(fakeGetOpportunity(id))).tags.map((tag) => tag.id);
-}
-
-async function catalogIds(): Promise<string[]> {
-  try {
-    return (await settle(listTags())).map((tag) => tag.id);
-  } catch {
-    return ['tag-001', 'tag-002', 'tag-003', 'tag-004', 'tag-005'];
-  }
-}
+import { ApiError } from '../../../../core/api/api-errors';
 
 describe('diffOpportunityTags', () => {
   it('returns attach and detach sets', () => {
@@ -51,75 +23,31 @@ describe('diffOpportunityTags', () => {
   });
 });
 
-describe('saveTags (against the fake backend)', () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
+describe('saveTags (live transport)', () => {
+  let stub: CrmHttpStub;
+  let dispose: () => void;
+  beforeEach(() => { stub = new CrmHttpStub(); dispose = bindCrmHttpForTest(stub); });
+  afterEach(() => dispose());
+  it('attaches additions before detaching removals with keyed writes', async () => {
+    expect(await saveTags('record', ['a', 'b'], ['b', 'c'])).toEqual({ attach: ['c'], detach: ['a'] });
+    expect(stub.recordedWrites().map(({ method, path, body }) => ({ method, path, body }))).toEqual([
+      { method: 'POST', path: '/opportunities/record/tags', body: { tagIds: ['c'] } },
+      { method: 'DELETE', path: '/opportunities/record/tags/a', body: {} },
+    ]);
+    expect(stub.recordedWrites().every((write) => !!write.options.key && !write.options.scope)).toBe(true);
   });
-
-  afterEach(() => {
-    vi.useRealTimers();
+  it('does not write for reordered tags', async () => {
+    await saveTags('record', ['a', 'b'], ['b', 'a']);
+    expect(stub.recordedWrites()).toEqual([]);
   });
-
-  it('attaches added ids and detaches removed ids so the opportunity ends with the target set', async () => {
-    const before = await tagIdsOf(ACME_OPPORTUNITY_ID);
-    expect(before.length).toBeGreaterThan(0);
-    const extra = (await catalogIds()).filter((id) => !before.includes(id)).slice(0, 2);
-    expect(extra.length).toBeGreaterThan(0);
-    const after = [...before.slice(1), ...extra];
-
-    const diff = await settle(saveTags(ACME_OPPORTUNITY_ID, before, after));
-
-    expect(diff).toEqual({ attach: extra, detach: [before[0]] });
-    expect(new Set(await tagIdsOf(ACME_OPPORTUNITY_ID))).toEqual(new Set(after));
+  it('detaches all tags when the target is empty', async () => {
+    await saveTags('record', ['a', 'b'], []);
+    expect(stub.recordedWrites().map((write) => write.path)).toEqual(['/opportunities/record/tags/a', '/opportunities/record/tags/b']);
   });
-
-  it('returns an empty diff and changes nothing when the set is only reordered', async () => {
-    const before = await tagIdsOf(ACME_OPPORTUNITY_ID);
-    const stamp = (await settle(fakeGetOpportunity(ACME_OPPORTUNITY_ID))).updatedAt;
-
-    const diff = await settle(saveTags(ACME_OPPORTUNITY_ID, before, [...before].reverse()));
-
-    expect(diff).toEqual({ attach: [], detach: [] });
-    expect((await settle(fakeGetOpportunity(ACME_OPPORTUNITY_ID))).updatedAt).toBe(stamp);
-  });
-
-  it('detaches every tag when the target is empty', async () => {
-    const before = await tagIdsOf(ACME_OPPORTUNITY_ID);
-    const diff = await settle(saveTags(ACME_OPPORTUNITY_ID, before, []));
-    expect(diff).toEqual({ attach: [], detach: before });
-    expect(await tagIdsOf(ACME_OPPORTUNITY_ID)).toEqual([]);
-  });
-
-  it('still saves tags when the PATCH body is null (tags-only edit)', async () => {
-    const before = await tagIdsOf(ACME_OPPORTUNITY_ID);
-    const extra = (await catalogIds()).find((id) => !before.includes(id));
-    expect(extra).toBeDefined();
-    const baseDraft = {
-      ...emptyDraft({ branchId: 'br', companyId: null, ownerUserId: 'u1', pipeline: null, defaultCurrency: 'SAR' }),
-      title: 'Deal',
-      tagIds: before,
-    };
-    const nextDraft = { ...baseDraft, tagIds: [...before, extra as string] };
-    expect(toPatchBody(baseDraft, nextDraft, '2026-11-21T00:00:00Z')).toBeNull();
-
-    const diff = await settle(saveTags(ACME_OPPORTUNITY_ID, baseDraft.tagIds, nextDraft.tagIds));
-
-    expect(diff).toEqual({ attach: [extra], detach: [] });
-    expect(await tagIdsOf(ACME_OPPORTUNITY_ID)).toContain(extra);
-  });
-
-  it('attaches first: an attach failure rejects and no detach runs', async () => {
-    const before = await tagIdsOf(ACME_OPPORTUNITY_ID);
-    expect(before.length).toBeGreaterThan(0);
-
-    let caught: unknown;
-    try {
-      await settle(saveTags(ACME_OPPORTUNITY_ID, before, ['no-such-tag']));
-    } catch (error) {
-      caught = error;
-    }
-
-    expect(caught).toBeInstanceOf(ApiError);
-    expect(new Set(await tagIdsOf(ACME_OPPORTUNITY_ID))).toEqual(new Set(before));
+  it('does not detach after an attach fails', async () => {
+    const fail = bindCrmHttpForTest({ ...stub, read: stub.read.bind(stub), readBlob: stub.readBlob.bind(stub), writeMultipart: stub.writeMultipart.bind(stub), write: async () => { throw new ApiError(422, 'CRM_TAG_UNKNOWN'); } });
+    try { await expect(saveTags('record', ['a'], ['bad'])).rejects.toMatchObject({ code: 'CRM_TAG_UNKNOWN' }); }
+    finally { fail(); }
+    expect(stub.recordedWrites()).toEqual([]);
   });
 });

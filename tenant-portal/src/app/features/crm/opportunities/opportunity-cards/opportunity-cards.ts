@@ -12,16 +12,19 @@ import {
   untracked,
   viewChild,
 } from '@angular/core';
-import { TranslocoPipe } from '@jsverse/transloco';
+import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
+import { translationEvents } from '../../../../core/i18n/translation-events';
+import { ApiError, correlationIdOf } from '../../../../core/api/api-errors';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
+import { ConflictDialog } from '../../../../shared/ui/conflict-dialog/conflict-dialog';
 import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { Pagination } from '../../../../shared/ui/pagination/pagination';
 import {
   DEFAULT_LIST_PAGE_SIZE,
-  DEFAULT_LIST_PAGE_SIZES,
   createListPageSize,
 } from '../../shared/record/list/page-size';
 import { RecordNavContext } from '../../shared/record/nav/record-nav';
-import { listPageSizes, searchOpportunities } from '../opportunities.api';
+import { listPageSizes, loadOpportunityCards } from '../opportunities.api';
 import {
   OpportunityCapabilities,
   OpportunityRow,
@@ -35,20 +38,26 @@ import {
   canMoveOpportunity,
   canTransferOpportunity,
   canUpdateOpportunity,
+  opportunityErrorMessage,
 } from '../opportunity-card/opportunity-card';
-import { opportunityList } from '../opportunity-list';
+import { opportunityCardsList } from './opportunity-cards-list';
+import { opportunitySearchErrorKey } from '../opportunity-search/opportunity-search.compile';
 
 @Component({
   selector: 'app-opportunity-cards',
-  imports: [TranslocoPipe, ConfirmDialog, Pagination, OpportunityCard],
+  imports: [TranslocoPipe, ConfirmDialog, Pagination, OpportunityCard, FullState, ConflictDialog],
+  providers: [provideTranslocoScope('opportunities', { scope: 'record-list', alias: 'recordList' }, { scope: 'opportunity-moves', alias: 'oppMoves' })],
   templateUrl: './opportunity-cards.html',
   host: { class: 'flex flex-1 shrink-0 flex-col gap-8' },
 })
 export class OpportunityCards {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly transloco = inject(TranslocoService);
+  private readonly i18n = translationEvents(this.transloco);
   private readonly confirmDialog = viewChild.required(ConfirmDialog);
 
   readonly body = input.required<OpportunitySearchBody>();
+  readonly pipelineId = input('');
   readonly stages = input.required<PipelineStageView[]>();
   readonly stage = input('all');
   readonly page = model(1);
@@ -60,13 +69,19 @@ export class OpportunityCards {
   readonly activities = output<OpportunityRow>();
   readonly transfer = output<OpportunityRow>();
   readonly countsChanged = output<void>();
+  readonly searchError = output<unknown>();
+  readonly readOnlyChange = output<boolean>();
 
   protected readonly skeletonCards = [1, 2, 3, 4, 5, 6];
   protected readonly pageSizePref = createListPageSize({
     storageKey: 'opportunities.cards.pageSize',
-    sizes: DEFAULT_LIST_PAGE_SIZES,
-    defaultSize: DEFAULT_LIST_PAGE_SIZE,
-    load: listPageSizes,
+    sizes: [50, 100],
+    defaultSize: 50,
+    load: async () => {
+      const preference = await listPageSizes();
+      const pageSizes = preference.pageSizes.filter((size) => size === 50 || size === 100);
+      return { pageSizes: pageSizes.length ? pageSizes : [50, 100], defaultPageSize: preference.defaultPageSize === 100 ? 100 : 50 };
+    },
   });
   private syncedInitialPageSize = false;
 
@@ -77,7 +92,8 @@ export class OpportunityCards {
     return { ...this.body() };
   });
 
-  protected readonly list = opportunityList(
+  protected readonly list = opportunityCardsList(
+    this.pipelineId,
     this.listBody,
     this.stage,
     this.page,
@@ -85,6 +101,27 @@ export class OpportunityCards {
     (nextPage) => this.page.set(nextPage),
     () => this.countsChanged.emit(),
   );
+  protected readonly filterError = computed(() => !!opportunitySearchErrorKey(this.list.error()));
+  protected readonly forbidden = computed(() => {
+    const error = this.list.error();
+    return error instanceof ApiError && error.status === 403;
+  });
+  protected readonly correlationId = computed(() => correlationIdOf(this.list.error()) ?? '');
+  protected readonly mismatch = computed(() => {
+    const error = this.list.error();
+    return error instanceof ApiError && (error.code === 'GW.IDEM.MISMATCH' || error.code.endsWith('_IDEMPOTENCY_MISMATCH'));
+  });
+  protected readonly failureTitle = computed(() => {
+    this.i18n();
+    const error = this.list.error();
+    return error instanceof ApiError && error.status === 429
+      ? opportunityErrorMessage(error, this.transloco, 'opportunities.list.loadFailed')
+      : this.transloco.translate(this.mismatch() ? 'apiErrors.idempotencyMismatch' : this.forbidden() ? 'opportunities.page.forbidden' : 'opportunities.list.loadFailed');
+  });
+  protected retryLoad(): void {
+    if (this.mismatch()) { window.location.reload(); return; }
+    this.list.reload();
+  }
 
   private readonly patches = linkedSignal({
     source: () => ({
@@ -135,6 +172,8 @@ export class OpportunityCards {
   });
 
   constructor() {
+    effect(() => this.searchError.emit(this.list.error()));
+    effect(() => this.readOnlyChange.emit(this.list.readOnly()));
     let lastPage = this.page();
     effect(() => {
       const current = this.page();
@@ -184,18 +223,16 @@ export class OpportunityCards {
     const totalMatching = this.totalCount();
     const remainingTotal = Math.max(ids.length, totalMatching - (currentPage - 1) * limit);
     const query = this.list.query();
-    let nextPage = currentPage + 1;
-    let hasMore = ids.length < remainingTotal;
+    let cursor = this.list.nextCursor();
 
     return {
       ids,
       total: remainingTotal,
-      loadMore: hasMore
+      loadMore: cursor
         ? async () => {
-            if (!hasMore) return [];
-            const res = await searchOpportunities(query, nextPage, limit);
-            hasMore = res.hasNext;
-            nextPage += 1;
+            if (!cursor) return [];
+            const res = await loadOpportunityCards(this.pipelineId(), { ...query, cursor, limit: limit === 100 ? 100 : 50 });
+            cursor = res.pageInfo.nextCursor;
             return res.items.map((item) => item.id);
           }
         : null,
@@ -203,19 +240,19 @@ export class OpportunityCards {
   }
 
   protected canUpdate(row: OpportunityRow): boolean {
-    return canUpdateOpportunity(this.capabilities(), row);
+    return !this.list.readOnly() && !this.list.conflict() && canUpdateOpportunity(this.capabilities(), row);
   }
 
   protected canDelete(row: OpportunityRow): boolean {
-    return canDeleteOpportunity(this.capabilities(), row);
+    return !this.list.readOnly() && !this.list.conflict() && canDeleteOpportunity(this.capabilities(), row);
   }
 
   protected canMove(row: OpportunityRow): boolean {
-    return canMoveOpportunity(this.capabilities(), row);
+    return !this.list.readOnly() && !this.list.conflict() && canMoveOpportunity(this.capabilities(), row);
   }
 
   protected canTransfer(row: OpportunityRow): boolean {
-    return canTransferOpportunity(this.capabilities(), row);
+    return !this.list.readOnly() && !this.list.conflict() && canTransferOpportunity(this.capabilities(), row);
   }
 
   protected onMoveTo(row: OpportunityRow, stageId: string): void {

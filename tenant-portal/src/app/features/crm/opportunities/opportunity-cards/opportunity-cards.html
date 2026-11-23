@@ -1,9 +1,12 @@
 @if (list.failed()) {
-  <p class="p-16 text-center text-12 text-danger-text" role="alert">{{ 'opportunities.list.loadFailed' | transloco }}</p>
+  @if (!filterError()) {
+    <ui-full-state [kind]="forbidden() ? 'forbidden' : 'load-failure'"
+      [title]="failureTitle()"
+      [text]="correlationId()" [actionLabel]="forbidden() ? '' : ((mismatch() ? 'opportunities.page.reload' : 'opportunities.list.retry') | transloco)" (action)="retryLoad()" />
+  }
 } @else if (list.loading()) {
   <div
-    class="grid gap-12"
-    [style.grid-template-columns]="'repeat(auto-fill, minmax(var(--kanban-col-min), 1fr))'"
+    class="grid grid-cols-kanban-cards gap-12"
     aria-busy="true"
   >
     @for (item of skeletonCards; track item) {
@@ -31,8 +34,7 @@
   <p class="p-16 text-center text-12 text-text-muted">{{ 'opportunities.list.noResults' | transloco }}</p>
 } @else {
   <div
-    class="grid auto-rows-fr gap-12"
-    [style.grid-template-columns]="'repeat(auto-fill, minmax(var(--kanban-col-min), 1fr))'"
+    class="grid grid-cols-kanban-cards auto-rows-fr gap-12"
   >
     @for (row of items(); track row.id) {
       <app-opportunity-card
@@ -76,3 +78,5 @@
   [confirmLabel]="'common.delete' | transloco"
   [cancelLabel]="'common.cancel' | transloco"
 />
+<ui-conflict-dialog [open]="!!list.conflict()" [recordLabel]="list.conflict()?.row?.title ?? null"
+  (reload)="list.resolveConflict(true)" (keepEditing)="list.resolveConflict(false)" />

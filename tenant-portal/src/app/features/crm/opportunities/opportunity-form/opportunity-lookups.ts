@@ -1,4 +1,9 @@
-import { Injectable, computed, resource, signal } from '@angular/core';
+import { Injectable, computed, inject, resource, signal } from '@angular/core';
+import { hasTenantWidePermission } from '../../../../core/auth/tenant-wide-permission';
+import { TenantScopeState } from '../../../../core/scope/tenant-scope';
+import { can } from '../../../../shared/widgets/dashboard/analytics-permissions';
+import { sessionBranch } from '../../shared/lookups/session-branch';
+import type { ScopeCompany, ScopeBranch } from '../../../../core/scope/scope';
 import { ApiError } from '../../settings/shared/settings-api';
 import { listTags } from '../../settings/tags/tags.api';
 import {
@@ -39,6 +44,13 @@ function ownersAction(mode: 'create' | 'edit' | 'view'): 'create' | 'update' {
 
 @Injectable()
 export class OpportunityLookups {
+  private readonly tenantScope = inject(TenantScopeState);
+  readonly customerDenied = signal(!can('crm.customer_profiles.read'));
+  readonly currencyAllowed = computed(() => hasTenantWidePermission(this.tenantScope.me(), 'currencies.currency.read'));
+  readonly selectedBranch = computed(() => {
+    this.tenantScope.selection();
+    return sessionBranch();
+  });
   private readonly activeBranchId = signal<string | null>(null);
   private readonly mode = signal<'create' | 'edit' | 'view'>('create');
   private readonly customerProfileId = signal<string | null>(null);
@@ -55,27 +67,32 @@ export class OpportunityLookups {
   private readonly capabilitiesRequested = new Set<string>();
 
   private readonly pipelinesResource = resource({
+    params: () => this.selectedBranch() ?? undefined,
     loader: () => listPipelines(),
   });
 
   private readonly currenciesResource = resource({
+    params: () => this.selectedBranch() ?? undefined,
     loader: () => listCurrencies(),
   });
 
   private readonly branchesResource = resource({
+    params: () => this.selectedBranch() ?? undefined,
     loader: () => listBranches(),
   });
 
   private readonly customFieldsResource = resource({
+    params: () => this.selectedBranch() ?? undefined,
     loader: () => listOpportunityCustomFields(),
   });
 
   private readonly tagsResource = resource({
+    params: () => this.selectedBranch() ?? undefined,
     loader: () => loadNullableList(listTags),
   });
 
   private readonly contactsResource = resource({
-    params: () => ({ customerProfileId: this.customerProfileId() }),
+    params: () => this.selectedBranch() ? { customerProfileId: this.customerProfileId() } : undefined,
     loader: ({ params }) =>
       params.customerProfileId ? listCustomerContacts(params.customerProfileId) : Promise.resolve([]),
   });
@@ -102,6 +119,22 @@ export class OpportunityLookups {
     this.branchesResource.hasValue() ? this.branchesResource.value() : [],
   );
 
+  // /me owns the IDs; catalogue names are optional and never widen the selected scope.
+  readonly scope = {
+    companies: computed<readonly ScopeCompany[]>(() => this.tenantScope.selectorCompanyIds().map((id) => {
+      const branches = this.tenantScope.branchesFor(id).map((branchId) => {
+        const name = this.branches().find((branch) => branch.id === branchId)?.name ?? branchId;
+        return { id: branchId, nameEn: name, nameAr: name };
+      });
+      const name = this.branches().find((branch) => this.tenantScope.branchCompanies().get(branch.id) === id)?.companyName || id;
+      return { id, nameEn: name, nameAr: name, branches };
+    })),
+    company: (): ScopeCompany => this.scope.companies().find((company) => company.id === this.tenantScope.selection()?.companyId)
+      ?? { id: '', nameEn: '', nameAr: '', branches: [] },
+    branch: (): ScopeBranch => this.scope.company().branches.find((branch) => branch.id === this.tenantScope.selection()?.branchId)
+      ?? { id: '', nameEn: '', nameAr: '' },
+  };
+
   readonly customFields = computed<CustomFieldDef[]>(() =>
     this.customFieldsResource.hasValue() ? this.customFieldsResource.value() : [],
   );
@@ -122,23 +155,34 @@ export class OpportunityLookups {
   readonly contactsLoading = computed<boolean>(() => this.contactsResource.isLoading());
 
   // Load failures. Each one is shown under the affected field with a Retry action.
-  readonly pipelinesFailed = computed(() => this.pipelinesResource.status() === 'error');
+  readonly pipelinesDenied = computed(() => this.isDenied(this.pipelinesResource.error()));
+  readonly customFieldsDenied = computed(() => this.isDenied(this.customFieldsResource.error()));
+  readonly contactsDenied = computed(() => this.isDenied(this.contactsResource.error()));
+  readonly pipelinesFailed = computed(() => this.pipelinesResource.status() === 'error' && !this.pipelinesDenied());
   readonly currenciesFailed = computed(() => this.currenciesResource.status() === 'error');
   readonly branchesFailed = computed(() => this.branchesResource.status() === 'error');
-  readonly customFieldsFailed = computed(() => this.customFieldsResource.status() === 'error');
+  readonly customFieldsFailed = computed(() => this.customFieldsResource.status() === 'error' && !this.customFieldsDenied());
   readonly customFieldsLoading = computed(() => this.customFieldsResource.isLoading());
   readonly tagsFailed = computed(() => this.tagsResource.status() === 'error');
-  readonly contactsFailed = computed(() => this.contactsResource.status() === 'error');
+  readonly contactsFailed = computed(() => this.contactsResource.status() === 'error' && !this.contactsDenied());
 
   /**
    * Non-null when the form must not be saved: without the custom-field definitions the
    * required checks cannot run, so hosts must block save and show this message key.
    */
   readonly saveBlockedReason = computed<string | null>(() => {
+    if (!this.selectedBranch()) return 'oppForm.lookups.chooseBranch';
+    if (this.mode() === 'create' && this.customerDenied()) return 'oppForm.lookups.denied';
+    if (this.mode() === 'create' && this.pipelinesDenied()) return 'oppForm.lookups.denied';
+    if (this.customFieldsDenied()) return 'oppForm.lookups.denied';
     if (this.customFieldsFailed()) return 'oppForm.lookups.customFieldsBlocked';
     if (this.customFieldsLoading()) return 'oppForm.lookups.customFieldsLoading';
     return null;
   });
+
+  private isDenied(error: unknown): boolean {
+    return error instanceof ApiError && error.status === 403;
+  }
 
   reloadPipelines(): void {
     this.pipelinesResource.reload();

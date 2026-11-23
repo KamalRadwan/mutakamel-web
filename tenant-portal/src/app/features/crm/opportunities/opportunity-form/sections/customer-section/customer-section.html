@@ -9,7 +9,7 @@
       size="bare"
       [label]="'oppForm.customer.label' | transloco"
       [for]="uid + '-customer'"
-      [hint]="'oppForm.customer.hint' | transloco"
+      [hint]="(lookups.customerDenied() ? 'oppForm.lookups.denied' : 'oppForm.customer.hint') | transloco"
       [required]="mode() === 'create'"
       [error]="customerErr"
     >
@@ -24,6 +24,7 @@
           [placeholder]="'oppForm.customer.searchPlaceholder' | transloco"
           [displayText]="draft().customerLabel"
           [invalid]="!!customerErr"
+          [disabled]="lookups.customerDenied()"
         />
       } @else {
         <div class="flex items-center gap-6">
@@ -60,7 +61,7 @@
         size="bare"
         [label]="'oppForm.customer.contact' | transloco"
         [for]="uid + '-contact'"
-        [hint]="'oppForm.customer.contactHint' | transloco"
+        [hint]="(lookups.contactsDenied() ? 'oppForm.lookups.denied' : 'oppForm.customer.contactHint') | transloco"
         [error]="contactErr"
       >
         @if (readonly()) {

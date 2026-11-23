@@ -15,7 +15,7 @@ import { errorCodeOf } from '../../../settings/shared/settings-api';
 @Component({
   selector: 'app-opportunity-selection-bar',
   imports: [TranslocoPipe, PluralKeyPipe, Button],
-  providers: [provideTranslocoScope('opportunities', { scope: 'opportunity-bulk', alias: 'oppBulk' })],
+  viewProviders: [provideTranslocoScope('opportunities', { scope: 'opportunity-bulk', alias: 'oppBulk' })],
   templateUrl: './selection-bar.html',
   host: { class: 'block shrink-0' },
 })

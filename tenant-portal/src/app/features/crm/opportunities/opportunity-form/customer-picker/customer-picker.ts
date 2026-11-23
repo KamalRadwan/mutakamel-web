@@ -29,6 +29,8 @@ import {
   initialSuggestionPlace,
 } from '../../../../../shared/ui/suggest-input/suggestions';
 import { searchCustomerOptions } from '../../opportunities.api';
+import { ApiError } from '../../../../../core/api/api-errors';
+import { OpportunityLookups } from '../opportunity-lookups';
 import type { CustomerOption } from '../../opportunities.model';
 
 const SEARCH_DEBOUNCE_MS = 250;
@@ -59,6 +61,7 @@ const MAX_RESULTS = 20;
   },
 })
 export class CustomerPicker {
+  private readonly lookups = inject(OpportunityLookups);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly destroyRef = inject(DestroyRef);
   private readonly injector = inject(Injector);
@@ -391,8 +394,9 @@ export class CustomerPicker {
           this.activeIndex.set(firstValid);
           this.schedulePlace();
         })
-        .catch(() => {
+        .catch((error: unknown) => {
           if (seq !== this.searchSeq) return;
+          if (error instanceof ApiError && error.status === 403) this.lookups.customerDenied.set(true);
           this.results.set([]);
           this.loadError.set(true);
           this.activeIndex.set(-1);

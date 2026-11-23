@@ -25,7 +25,7 @@ import {
 } from '@ng-icons/tabler-icons';
 import { listCountries } from '../../../../core/geo/geo.api';
 import { GeoCountry } from '../../../../core/geo/geo.model';
-import { ScopeState } from '../../../../core/scope/scope';
+import { Field } from '../../../../shared/ui/field/field';
 import { RecordLayout } from '../../../../shared/ui/record-layout/record-layout';
 import { SectionBar } from '../../../../shared/ui/section-bar/section-bar';
 import { RecordCustomFields } from '../../shared/record/custom-fields/record-custom-fields';
@@ -41,7 +41,6 @@ import { OpportunityLookups } from './opportunity-lookups';
 import {
   ClassificationSection,
   OpportunityUpdatingState,
-  pickCompanyBranchId,
 } from './sections/classification-section/classification-section';
 import { ClosingSection } from './sections/closing-section/closing-section';
 import { CustomerSection } from './sections/customer-section/customer-section';
@@ -94,6 +93,7 @@ const PAGE_SECTION_ORDER: readonly OpportunityFormSection[] = [
   selector: 'app-opportunity-form',
   imports: [
     TranslocoPipe,
+    Field,
     SectionBar,
     RecordCustomFields,
     ClassificationSection,
@@ -132,7 +132,7 @@ export class OpportunityForm {
 
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
-  private readonly scope = inject(ScopeState);
+  private readonly scope = inject(OpportunityLookups).scope;
   readonly lookups = inject(OpportunityLookups);
   private readonly dealSection = viewChild(DealSection);
 
@@ -197,20 +197,10 @@ export class OpportunityForm {
       if (m !== 'create') return;
 
       const d = this.draft();
-      const branches = this.lookups.branches();
       const defaultPipeline = this.lookups.defaultPipeline();
       const defaultCurrency = this.lookups.defaultCurrency();
 
-      const nextBranchId =
-        !d.branchId && branches.length > 0
-          ? (pickCompanyBranchId(
-              this.scope.company(),
-              this.scope.company(),
-              this.scope.branch(),
-              this.scope.companies(),
-              branches,
-            ) ?? branches[0].id)
-          : d.branchId;
+      const nextBranchId = this.lookups.selectedBranch()?.branchId ?? null;
 
       const nextPipelineId = !d.pipelineId && defaultPipeline ? defaultPipeline.id : d.pipelineId;
       const activePipeline = nextPipelineId ? this.lookups.pipeline(nextPipelineId) ?? defaultPipeline : defaultPipeline;

@@ -1,26 +1,17 @@
-import { Injectable } from '@angular/core';
 import { type ComponentFixture, TestBed } from '@angular/core/testing';
-import { TranslocoLoader, provideTransloco } from '@jsverse/transloco';
-import { of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { SALES_PIPELINE_ID, fakeListPipelines } from '../opportunities.fake';
+import { SALES_PIPELINE_ID, fakeListPipelines, fakeLoadBoard } from '../opportunities.fake';
+import { configureListTest } from '../opportunities-page/opportunities-list-test-support';
 import { OpportunityBoardRow, OpportunityCapabilities, OpportunityRow, PipelineView } from '../opportunities.model';
 import { boardRowToOpportunityRow } from '../opportunity-card/opportunity-card';
 import { MoveOutcome, OpportunityMoves } from '../opportunity-moves/opportunity-moves';
 import { OpportunityBoard } from './opportunity-board';
 
 /*
- * The board runs on the real opportunities fake. A drop is simulated through the record board's own drop
+ * The transport stub serves the existing fixtures. A drop is simulated through the record board's own drop
  * handler, and OpportunityMoves is stubbed so the spec controls when the Won/Lost close dialog confirms or
  * cancels.
  */
-
-@Injectable()
-class EmptyLoader implements TranslocoLoader {
-  getTranslation() {
-    return of({});
-  }
-}
 
 // Protected members are reached through this view on purpose: the spec drives the board state directly.
 type Internals = Record<string, any>;
@@ -31,11 +22,12 @@ const NEXT = 'ps-sales-2';
 const WON = 'ps-sales-6';
 const LOST = 'ps-sales-7';
 
-const CAPABILITIES = { move: {} } as unknown as OpportunityCapabilities;
+const CAPABILITIES = { move: { scope: 'all', ownerUserIds: null } } as unknown as OpportunityCapabilities;
 
 let fixture: ComponentFixture<OpportunityBoard>;
 let c: Internals;
-let moveSpy: ReturnType<typeof vi.fn>;
+let moveSpy: ReturnType<typeof vi.fn<OpportunityMoves['move']>>;
+let context: ReturnType<typeof configureListTest>;
 
 async function flush(): Promise<void> {
   fixture.detectChanges();
@@ -81,21 +73,15 @@ async function settled(): Promise<void> {
 }
 
 beforeEach(async () => {
-  vi.useFakeTimers();
+  moveSpy = vi.fn<OpportunityMoves['move']>();
+  context = configureListTest('en', 'light', { move: moveSpy });
   const loading = fakeListPipelines();
   await vi.advanceTimersByTimeAsync(2000);
   const pipeline = (await loading).find((item) => item.id === SALES_PIPELINE_ID) as PipelineView;
+  const loadingBoard = fakeLoadBoard(pipeline.id, { branchId: 'b1', limitPerStage: 50 });
+  await vi.advanceTimersByTimeAsync(2000);
+  context.transport.boardResponse = await loadingBoard;
 
-  moveSpy = vi.fn();
-  TestBed.configureTestingModule({
-    providers: [
-      provideTransloco({
-        config: { availableLangs: ['ar', 'en'], defaultLang: 'en', missingHandler: { logMissingKey: false } },
-        loader: EmptyLoader,
-      }),
-      { provide: OpportunityMoves, useValue: { move: moveSpy } },
-    ],
-  });
   fixture = TestBed.createComponent(OpportunityBoard);
   fixture.componentRef.setInput('pipeline', pipeline);
   fixture.componentRef.setInput('body', { branchId: 'b1' });
@@ -104,10 +90,9 @@ beforeEach(async () => {
   await flush();
 });
 
-afterEach(() => {
+afterEach(async () => {
   fixture.destroy();
-  TestBed.resetTestingModule();
-  vi.useRealTimers();
+  await context.dispose();
 });
 
 describe('opportunity board: drop on Won / Lost', () => {
@@ -138,6 +123,11 @@ describe('opportunity board: drop on Won / Lost', () => {
     const { row, settle } = dropOn(LOST);
     expect(shownLaneOf(row.id)).toBe(FROM);
 
+    context.transport.boardResponse.stages = context.transport.boardResponse.stages.map((lane) => ({
+      ...lane,
+      items: lane.stage.id === LOST ? [{ ...row, stageId: LOST, stageFlag: 'LOST', status: 'LOST' }]
+        : lane.items.filter((item) => item.id !== row.id),
+    }));
     settle(savedIn(row, LOST, 'LOST'));
     await settled();
 

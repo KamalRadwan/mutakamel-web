@@ -23,7 +23,7 @@ import {
 import { LanguageState } from '../../../../../core/i18n/language';
 import { PluralKeyPipe } from '../../../../../core/i18n/plural';
 import { Notify } from '../../../../../core/notify/notify';
-import { ScopeState } from '../../../../../core/scope/scope';
+import { TenantScopeState } from '../../../../../core/scope/tenant-scope';
 import { BulkJobsTracker } from '../../../../../shared/bulk-jobs/bulk-jobs-tracker';
 import { BulkJobSelection } from '../../../../../shared/bulk-jobs/bulk-jobs.model';
 import { Dropdown, type DropdownOption } from '../../../../../shared/ui/dropdown/dropdown';
@@ -46,7 +46,9 @@ import { PipelineScope } from '../../pipeline-scope';
 import {
   buildMoveStageBulkJob,
   moveStageParamsFor,
-  submitOpportunityBulkJob,
+  OpportunityBulkSubmission,
+  opportunityBulkErrorMessage,
+  opportunityBulkFieldError,
   translateOpportunityBulkError,
 } from '../bulk-runner';
 import {
@@ -80,7 +82,7 @@ function dotClassForFlag(flag: OpportunityStageFlag): string {
 @Component({
   selector: 'app-opp-bulk-stage-modal',
   imports: [NgIcon, TranslocoPipe, PluralKeyPipe, BulkRunModal, Dropdown, Field],
-  providers: [
+  viewProviders: [
     provideTranslocoScope('opportunities', { scope: 'opportunity-bulk', alias: 'oppBulk' }),
     provideIcons({ tablerArrowsExchange, tablerChevronDown, tablerCheck, tablerAlertTriangle }),
   ],
@@ -96,7 +98,7 @@ export class OppBulkStageModal {
 
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
-  private readonly scopeState = inject(ScopeState);
+  private readonly scopeState = inject(TenantScopeState);
   private readonly pipelineScope = inject(PipelineScope, { optional: true });
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
@@ -104,6 +106,8 @@ export class OppBulkStageModal {
   protected readonly language = inject(LanguageState).current;
   private readonly selection = inject(OpportunitySelection, { optional: true });
   private readonly tracker = inject(BulkJobsTracker);
+  protected readonly submission = new OpportunityBulkSubmission();
+  private readonly openedBranchId = signal('');
 
   private readonly modal = viewChild.required(BulkRunModal);
   private readonly stageTrigger = viewChild<ElementRef<HTMLButtonElement>>('stageTrigger');
@@ -123,6 +127,13 @@ export class OppBulkStageModal {
   protected readonly lossReasons = signal<OpportunityReason[]>([]);
   protected readonly winReasons = signal<OpportunityReason[]>([]);
   protected readonly reasonsLoading = signal(false);
+  protected readonly stagesDenied = signal(false);
+  protected readonly lossReasonsDenied = signal(false);
+  protected readonly winReasonsDenied = signal(false);
+  protected readonly reasonsDenied = computed(() => this.isLost() ? this.lossReasonsDenied() : this.winReasonsDenied());
+  private readonly lossReasonsUnavailable = signal(false);
+  private readonly winReasonsUnavailable = signal(false);
+  protected readonly reasonsUnavailable = computed(() => this.isLost() ? this.lossReasonsUnavailable() : this.winReasonsUnavailable());
   protected readonly lossReasonsHidden = signal(false);
   protected readonly winReasonsHidden = signal(false);
   protected readonly serverRequiredWinReason = signal(false);
@@ -130,6 +141,7 @@ export class OppBulkStageModal {
   protected readonly selectedReasonId = signal('');
   protected readonly note = signal('');
   protected readonly lostTouched = signal(false);
+  protected readonly serverStageError = signal<string | null>(null);
   protected readonly serverReasonError = signal<string | null>(null);
   protected readonly serverNoteError = signal<string | null>(null);
   protected readonly stageMenuOpen = signal(false);
@@ -139,7 +151,11 @@ export class OppBulkStageModal {
   private openSeq = 0;
   private menuSeq = 0;
 
-  private readonly effectiveBranchId = computed(() => this.branchId().trim() || this.scopeState.branch().id);
+  private readonly effectiveBranchId = computed(() => {
+    const selected = this.scopeState.selection()?.branchId ?? '';
+    return selected === this.openedBranchId() && (!this.branchId().trim() || this.branchId().trim() === selected)
+      && this.scopeState.branchCompanies().has(selected) ? selected : '';
+  });
 
   protected readonly displayCount = computed(() =>
     this.resolving() && this.rows().length === 0 ? (this.selection?.count() ?? 0) : this.rows().length,
@@ -265,23 +281,27 @@ export class OppBulkStageModal {
 
   protected readonly canSubmit = computed(() => {
     if (
+      this.submission.readOnly() ||
+      !this.effectiveBranchId() ||
       this.submitting() ||
       this.resolving() ||
       !this.selectedStage() ||
       !this.effectivePipelineId() ||
+      this.stagesDenied() ||
       this.rows().length === 0 ||
       this.noteLength() > MAX_NOTE_LENGTH
     ) {
       return false;
     }
     if (this.isLost()) {
+      if (this.lossReasonsUnavailable()) return false;
       if (this.reasonsLoading()) return false;
       const reasonId = this.reasonsHidden() ? '' : this.selectedReasonId().trim();
       const trimmedNote = this.note().trim();
       return Boolean(reasonId || trimmedNote);
     }
-    if (this.isWon() && this.serverRequiredWinReason() && !this.reasonsHidden()) {
-      return Boolean(this.selectedReasonId().trim());
+    if (this.isWon() && this.serverRequiredWinReason()) {
+      return !this.winReasonsUnavailable() && Boolean(this.selectedReasonId().trim());
     }
     return true;
   });
@@ -340,6 +360,7 @@ export class OppBulkStageModal {
   protected selectStage(stageId: string): void {
     if (this.selectedStageId() !== stageId) {
       this.selectedStageId.set(stageId);
+      this.serverStageError.set(null);
       this.selectedReasonId.set('');
       this.lostTouched.set(false);
       this.serverRequiredWinReason.set(false);
@@ -449,7 +470,7 @@ export class OppBulkStageModal {
     this.serverReasonError.set(null);
     this.serverNoteError.set(null);
     try {
-      const res = await submitOpportunityBulkJob(this.tracker, body);
+      const res = await this.submission.submit(this.tracker, body);
       this.close();
       this.submitted.emit(res.jobId);
     } catch (error) {
@@ -460,6 +481,12 @@ export class OppBulkStageModal {
   }
 
   private async initOpen(rows?: readonly OpportunitySelectionRow[]): Promise<void> {
+    this.openedBranchId.set(this.scopeState.selection()?.branchId ?? '');
+    this.submission.reset();
+    if (!this.effectiveBranchId()) {
+      this.notify.error(this.transloco.translate('opportunities.page.chooseBranch'));
+      return;
+    }
     const seq = ++this.openSeq;
     const mapped = rows ? rows.map(toSelectedOpportunity) : [];
     this.closeStageMenu();
@@ -469,7 +496,15 @@ export class OppBulkStageModal {
     this.serverReasonError.set(null);
     this.serverNoteError.set(null);
     this.selectedReasonId.set('');
+    this.serverStageError.set(null);
     this.note.set('');
+    this.stagesDenied.set(false);
+    this.fallbackPipelineId.set('');
+    this.fallbackStages.set([]);
+    this.lossReasonsDenied.set(false);
+    this.winReasonsDenied.set(false);
+    this.lossReasonsUnavailable.set(false);
+    this.winReasonsUnavailable.set(false);
     this.rows.set(mapped);
     this.selectedStageId.set(this.selectableStages()[0]?.id ?? '');
     this.modal().open();
@@ -500,18 +535,17 @@ export class OppBulkStageModal {
       const pipelines = await listPipelines();
       if (seq !== this.openSeq) return;
       const requested = this.pipelineId().trim();
-      const target =
-        (requested ? pipelines.find((p) => p.id === requested) : undefined) ??
-        pipelines.find((p) => p.isDefault) ??
-        pipelines[0] ??
-        null;
+      const target = requested ? pipelines.find((p) => p.id === requested) ?? null
+        : pipelines.find((p) => p.isDefault) ?? pipelines[0] ?? null;
       this.fallbackPipelineId.set(target?.id ?? '');
       this.fallbackStages.set(target?.stages ?? []);
       if (!this.selectedStageId()) {
         this.selectedStageId.set(this.selectableStages()[0]?.id ?? '');
       }
-    } catch {
-      // Keep empty stages if fallback load fails.
+    } catch (error) {
+      if (seq !== this.openSeq) return;
+      this.stagesDenied.set(error instanceof ApiError && error.status === 403);
+      if (!this.stagesDenied()) this.notify.error(opportunityBulkErrorMessage(this.transloco, error));
     }
   }
 
@@ -527,7 +561,12 @@ export class OppBulkStageModal {
         this.lossReasonsHidden.set(activeLoss.length === 0);
       } else {
         this.lossReasons.set([]);
-        this.lossReasonsHidden.set(true);
+        this.lossReasonsHidden.set(false);
+        this.lossReasonsUnavailable.set(true);
+        this.lossReasonsDenied.set(lossRes.reason instanceof ApiError && lossRes.reason.status === 403);
+        if (!(lossRes.reason instanceof ApiError && lossRes.reason.status === 403)) {
+          this.notify.error(opportunityBulkErrorMessage(this.transloco, lossRes.reason));
+        }
       }
 
       if (winRes.status === 'fulfilled') {
@@ -536,7 +575,12 @@ export class OppBulkStageModal {
         this.winReasonsHidden.set(activeWin.length === 0);
       } else {
         this.winReasons.set([]);
-        this.winReasonsHidden.set(true);
+        this.winReasonsHidden.set(false);
+        this.winReasonsUnavailable.set(true);
+        this.winReasonsDenied.set(winRes.reason instanceof ApiError && winRes.reason.status === 403);
+        if (!(winRes.reason instanceof ApiError && winRes.reason.status === 403)) {
+          this.notify.error(opportunityBulkErrorMessage(this.transloco, winRes.reason));
+        }
       }
     } finally {
       if (seq === this.openSeq) {
@@ -575,6 +619,15 @@ export class OppBulkStageModal {
   private handleSubmitError(error: unknown): void {
     const code = errorCodeOf(error);
     if (code === 'BULK_JOB_ACTIVE') return;
+    const stageError = opportunityBulkFieldError(this.transloco, error, 'stageId', 'pipelineId');
+    const reasonError = opportunityBulkFieldError(this.transloco, error, 'lostReasonId', 'winReasonId');
+    const noteError = opportunityBulkFieldError(this.transloco, error, 'reason', 'lostReason');
+    if (stageError || reasonError || noteError) {
+      this.serverStageError.set(stageError);
+      this.serverReasonError.set(reasonError);
+      this.serverNoteError.set(noteError);
+      return;
+    }
     if (code === 'OPPORTUNITY_LOST_REASON_REQUIRED' || code === 'CRM_REASON_REQUIRED') {
       if (this.isWon()) {
         this.serverRequiredWinReason.set(true);
@@ -582,7 +635,7 @@ export class OppBulkStageModal {
       this.serverReasonError.set(this.translateCode(code));
       return;
     }
-    this.notify.error(this.translateCode(code));
+    this.notify.error(opportunityBulkErrorMessage(this.transloco, error));
   }
 
   private translateCode(code: string | null): string {
