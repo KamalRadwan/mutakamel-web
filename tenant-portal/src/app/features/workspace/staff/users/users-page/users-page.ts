@@ -7,6 +7,13 @@ import { tablerCloudOff, tablerCrown } from '@ng-icons/tabler-icons';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { LanguageState } from '../../../../../core/i18n/language';
 import { TenantScopeState } from '../../../../../core/scope/tenant-scope';
+import { ApiError, errorCodeOf, staffErrorMessage, newIdempotencyKey } from '../../shared/staff.api';
+import { Notify } from '../../../../../core/notify/notify';
+import type { ActionItem } from '../../../../../shared/ui/actions-menu/actions-menu';
+import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
+import { SeatCascadeConfirm } from '../../../seats/cascade-confirm/cascade-confirm';
+import { isCascadeRequired, seatErrorMessage } from '../../../seats/seat-errors';
+import { UserModal } from '../user-modal/user-modal';
 import { Button } from '../../../../../shared/ui/button/button';
 import { SeatChips } from '../../../seats/seat-chips/seat-chips';
 import { ModuleUsage, moduleNameIn } from '../../../seats/seats.model';
@@ -26,7 +33,7 @@ const SKELETON_ROWS = [1, 2, 3, 4, 5] as const;
 
 @Component({
   selector: 'app-users-page',
-  imports: [NgIcon, TranslocoPipe, Button, InviteModal, SeatChips, StaffList, StatusBadge],
+  imports: [NgIcon, TranslocoPipe, Button, InviteModal, UserModal, ConfirmDialog, SeatChips, StaffList, StatusBadge],
   providers: [
     provideTranslocoScope(
       'settings',
@@ -37,7 +44,7 @@ const SKELETON_ROWS = [1, 2, 3, 4, 5] as const;
     provideIcons({ tablerCrown, tablerCloudOff }),
   ],
   templateUrl: './users-page.html',
-  host: { class: 'flex min-h-0 flex-1 flex-col' },
+  host: { class: 'flex flex-1 shrink-0 flex-col' },
 })
 export class UsersPage {
   private readonly route = inject(ActivatedRoute);
@@ -50,9 +57,17 @@ export class UsersPage {
   private readonly scope = inject(TenantScopeState);
   private readonly organization = inject(OrganizationReadApi);
   private readonly usersApi = inject(StaffUsersApi);
+  private readonly notify = inject(Notify);
+  private readonly cascadeConfirm = inject(SeatCascadeConfirm);
   private readonly queryParams = toSignal(this.route.queryParamMap);
 
   private readonly inviteModal = viewChild.required(InviteModal);
+  private readonly userModal = viewChild.required(UserModal);
+  private readonly statusConfirm = viewChild.required(ConfirmDialog);
+  protected readonly actionBusy = signal(false);
+  protected readonly confirmation = signal({ action: 'suspend', name: '', tone: 'danger' as 'danger' | 'warning' });
+  private heldAction: { action: string; userId: string; key: string } | null = null;
+  private handledOpenId: string | null = null;
   protected readonly skeletonRows = SKELETON_ROWS;
   protected readonly tableColumns = 'grid-cols-staff-user-row';
 
@@ -387,6 +402,15 @@ export class UsersPage {
       const params = this.queryParams();
       if (!params) return;
 
+      const openId = params.get('open');
+      if (openId && this.session.me()) {
+        if (this.handledOpenId !== openId) {
+          this.handledOpenId = openId;
+          void untracked(() => this.openUserById(openId));
+        }
+        return;
+      }
+      this.handledOpenId = null;
       const companyId = params.get('companyId');
       const branchId = params.get('branchId');
       const departmentId = params.get('departmentId');
@@ -495,6 +519,110 @@ export class UsersPage {
       departmentId: resolved.departmentId,
       teamId: f['teamId'] ?? null,
     });
+  }
+
+  protected openUser(user: TenantUser): void {
+    this.userModal().open(user, 'profile');
+  }
+
+  private async openUserById(id: string): Promise<void> {
+    const revision = this.session.scopeRevision();
+    try {
+      const user = await this.usersApi.getUser(id);
+      if (revision === this.session.scopeRevision()) this.openUser(user);
+    } catch (error) {
+      if (revision !== this.session.scopeRevision() || (error instanceof ApiError && error.status === 0)) return;
+      const unavailable = error instanceof ApiError && (error.status === 404 || error.status === 403);
+      this.notify.error(unavailable
+        ? staffErrorMessage(new ApiError(404, 'USER_UNAVAILABLE'), 'users', this.transloco)
+        : staffErrorMessage(error, 'users', this.transloco));
+    } finally {
+      this.clearQueryParams(['open', 'new']);
+    }
+  }
+
+  protected replaceUser(user: TenantUser): void {
+    this.loadedRows.update((rows) => rows.map((row) => row.id === user.id ? user : row));
+  }
+
+  protected readonly actionsFor = (user: TenantUser): ActionItem[] => {
+    this.i18n();
+    if (user.isTenantOwner || this.isSelf(user)) return [];
+    const actions: ActionItem[] = [];
+    const add = (id: string, icon: string, tile: string, danger = false) => actions.push({
+      id, title: this.transloco.translate(`users.actions.${id}`), icon, tile, danger, disabled: this.actionBusy(),
+    });
+    if (user.status === 'INVITED' && this.session.can('users.user.invite', user)) add('resend', 'tablerSend', 'bg-icon-blue');
+    if (this.session.can('users.user.deactivate', user)) {
+      if (user.status === 'ACTIVE' || user.status === 'INVITED') add('suspend', 'tablerLock', 'bg-icon-orange');
+      if (user.status === 'SUSPENDED') add('activate', 'tablerCheck', 'bg-icon-green');
+      if (user.status === 'ACTIVE') add('revokeSessions', 'tablerLock', 'bg-icon-orange');
+    }
+    if (this.session.can('users.user.delete', user)) add('delete', 'tablerTrash', 'bg-icon-red', true);
+    return actions;
+  };
+
+  protected async onStatusAction({ user, actionId }: { user: TenantUser; actionId: string }): Promise<void> {
+    if (this.actionBusy() || !this.actionsFor(user).some((action) => action.id === actionId)) return;
+    this.actionBusy.set(true);
+    try {
+      if (actionId !== 'resend') {
+        this.confirmation.set({ action: actionId, name: userFullName(user), tone: actionId === 'activate' ? 'warning' : 'danger' });
+        if (!await this.statusConfirm().open()) return;
+      }
+      if (this.heldAction?.action !== actionId || this.heldAction.userId !== user.id) {
+        this.heldAction = { action: actionId, userId: user.id, key: newIdempotencyKey() };
+      }
+      let updated: TenantUser | void;
+      try {
+        updated = await this.runAction(user.id, actionId, this.heldAction.key);
+      } catch (error) {
+        const cascade = isCascadeRequired(error);
+        if (!cascade || !['suspend', 'activate', 'delete'].includes(actionId)) throw error;
+        if (!await this.cascadeConfirm.confirm(cascade.addons)) return;
+        updated = await this.runAction(user.id, actionId, newIdempotencyKey(), true);
+      }
+      this.heldAction = null;
+      const toast = actionId === 'activate' ? (updated?.status === 'INVITED' ? 'activatedInvited' : 'activated')
+        : ({ suspend: 'suspended', revokeSessions: 'signedOut', resend: 'resent', delete: 'deleted' } as Record<string, string>)[actionId];
+      this.notify.success(this.transloco.translate(`users.toast.${toast}`));
+      if (actionId === 'delete') {
+        this.userModal().closeImmediate();
+        this.reload();
+      } else if (updated) {
+        this.userModal().syncUser(updated);
+        this.replaceUser(updated);
+      }
+    } catch (error) {
+      const code = errorCodeOf(error);
+      const message = seatErrorMessage(this.transloco, error) ?? staffErrorMessage(error, 'users', this.transloco, 'write');
+      if (code === 'GW.IDEM.IN_FLIGHT') this.notify.info(message);
+      else if (code === 'GW.IDEM.MISMATCH') this.notify.warning(message);
+      else if (!(error instanceof ApiError && error.status === 0)) this.notify.error(
+        actionId === 'resend' && error instanceof ApiError && error.status === 429
+          ? this.transloco.translate('users.toast.tooMany') : message);
+      if (code === 'INVALID_STATUS_TRANSITION' || code === 'GW.IDEM.MISMATCH') {
+        await this.userModal().reloadUser();
+        this.reload();
+      }
+      if (code === 'TENANT_USER_NOT_FOUND' || (error instanceof ApiError && error.status === 404)) {
+        this.userModal().closeImmediate();
+        this.reload();
+      }
+    } finally {
+      this.actionBusy.set(false);
+    }
+  }
+
+  private async runAction(id: string, action: string, key: string, confirmAddonCascade = false): Promise<TenantUser | void> {
+    const opts = { confirmAddonCascade };
+    switch (action) {
+      case 'suspend': return this.usersApi.suspendUser(id, key, opts);
+      case 'activate': return this.usersApi.activateUser(id, key, opts);
+      case 'revokeSessions': return this.usersApi.revokeSessions(id, key);
+      case 'delete': return this.usersApi.deleteUser(id, key, opts);
+      case 'resend': await this.usersApi.resendInvite(id, key); return;
+    }
   }
 
   protected onUserInvited(): void {
@@ -639,8 +767,9 @@ export class UsersPage {
       if (seq !== this.loadSeq || revision !== this.session.scopeRevision()) return;
       this.loadedRows.set(result.data);
       this.loadedTotal.set({ revision, count: result.meta.total });
-    } catch {
-      if (seq !== this.loadSeq) return;
+    } catch (error) {
+      if (seq !== this.loadSeq || revision !== this.session.scopeRevision()) return;
+      if (error instanceof ApiError && error.status === 0) return;
       this.loadFailed.set(true);
       this.loadedRows.set([]);
       this.loadedTotal.set(null);

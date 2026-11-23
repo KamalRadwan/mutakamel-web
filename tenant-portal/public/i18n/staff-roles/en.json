@@ -85,7 +85,6 @@
     "count": "{{n}} of 200",
     "saved": "Saved. Users with this role get the change on their next action.",
     "listChanged": "The permission list changed. Reload.",
-    "grantDenied": "You can only give permissions you hold workspace-wide.",
     "reload": "Reload",
     "loadFailed": "Could not load permissions.",
     "branchOwnerOnly": "Permissions are set per branch; only the workspace owner can view them."
@@ -98,7 +97,8 @@
     "title": "Delete {{name}}?",
     "text": "This can't be undone.",
     "inUse": "Remove this role from its {{n}} users first.",
-    "viewUsers": "View users"
+    "viewUsers": "View users",
+    "inUseNoCount": "Remove this role from its users first."
   },
   "toast": {
     "created": "Role created.",
@@ -129,8 +129,9 @@
     "TENANT_ROLE_PERMISSION_LIMIT_EXCEEDED": "A role can have at most 200 permissions.",
     "PERMISSION_UNKNOWN": "The permission list changed. Reload.",
     "ROLE_BRANCH_MODE_REQUIRED": "This role uses per-branch permissions.",
-    "ROLE_PERMISSION_GRANT_DENIED": "You can only give permissions you hold workspace-wide.",
+    "ROLE_PERMISSION_GRANT_DENIED": "You can only grant permissions you hold workspace-wide.",
     "ROLE_IN_USE": "Remove this role from its users first.",
-    "generic": "Something went wrong. Try again."
+    "generic": "Something went wrong. Try again.",
+    "ROLE_PERMISSION_AUTHORITY_EXCEEDED": "You can only grant permissions you hold workspace-wide."
   }
 }

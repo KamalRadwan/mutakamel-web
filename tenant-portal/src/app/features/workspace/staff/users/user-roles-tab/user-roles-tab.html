@@ -12,7 +12,7 @@
       <p class="text-12 leading-18 text-text-muted">{{ 'access.roles.branchDesc' | transloco }}</p>
     </div>
 
-    @if (!effectiveReadonly() && canViewBranchRoles()) {
+    @if (!effectiveReadonly() && canViewBranchRoles() && !loadingBranch() && !branchLoadFailed()) {
       <button type="button" uiButton variant="secondary" size="small" (click)="openAddBranchModal()">
         <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
         <span>{{ 'access.roles.add' | transloco }}</span>
@@ -157,7 +157,7 @@
         <p class="text-12 leading-18 text-text-muted">{{ 'access.roles.scopeDesc' | transloco }}</p>
       </div>
 
-      @if (!effectiveReadonly() && user().status === 'ACTIVE') {
+      @if (!effectiveReadonly() && !loadingScope() && !scopeLoadFailed()) {
         <button type="button" uiButton variant="secondary" size="small" (click)="openAddScopeModal()">
           <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
           <span>{{ 'access.roles.addScope' | transloco }}</span>
@@ -165,8 +165,8 @@
       }
     </div>
 
-    @if (user().status !== 'ACTIVE') {
-      <p class="text-12 leading-18 text-text-muted">{{ 'access.roles.needsActive' | transloco }}</p>
+    @if (isRolesLocked()) {
+      <p class="text-12 leading-18 text-text-muted">{{ 'access.roles.suspendedReadonly' | transloco }}</p>
     }
 
     @if (scopeLoadFailed()) {
@@ -316,6 +316,7 @@
         dir="auto"
         class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
         [placeholder]="'access.roles.search' | transloco"
+        maxlength="200"
         [value]="choiceSearch()"
         (input)="onChoiceSearchInput($event)"
       />
@@ -326,6 +327,7 @@
       [for]="uid + '-choices'"
       [label]="'access.roles.choicesLabel' | transloco"
       [hint]="'access.roles.choicesHint' | transloco"
+      [error]="fieldError('assignments')"
       [required]="true"
     >
       <div
@@ -339,6 +341,16 @@
           @for (row of skeletonRows; track row) {
             <span class="h-skeleton-line w-full rounded-4 bg-neutral-soft motion-safe:animate-pulse"></span>
           }
+        } @else if (choicesLoadFailed()) {
+          <div class="flex flex-col items-center gap-8 p-16 text-center" role="alert">
+            <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon" aria-hidden="true">
+              <ng-icon name="tablerCloudOff" size="20" />
+            </span>
+            <p class="text-12 text-danger-text">{{ 'access.common.loadFailed' | transloco }}</p>
+            <button type="button" uiButton variant="secondary" size="small" (click)="retryChoices()">
+              {{ 'access.common.retry' | transloco }}
+            </button>
+          </div>
         } @else {
           @for (choice of choices(); track choiceId(choice)) {
             <div class="flex items-center justify-between gap-8 rounded-6 px-4 py-2 hover:bg-row-hover">
@@ -453,6 +465,7 @@
       [for]="uid + '-scope-target'"
       [label]="'access.roles.scopeField' | transloco"
       [hint]="'access.roles.scopeFieldHint' | transloco"
+      [error]="fieldError('scopeTarget')"
       [required]="true"
     >
       <div>
@@ -473,6 +486,7 @@
         [for]="uid + '-scope-company'"
         [label]="'access.roles.companyField' | transloco"
         [hint]="'access.roles.companyFieldHint' | transloco"
+      [error]="fieldError('companyId')"
         [required]="true"
       >
         <ui-dropdown
@@ -494,6 +508,7 @@
         [for]="uid + '-scope-branch'"
         [label]="'access.roles.branchField' | transloco"
         [hint]="'access.roles.branchFieldHint' | transloco"
+      [error]="fieldError('branchId')"
         [required]="true"
       >
         <ui-dropdown
@@ -514,6 +529,7 @@
       [for]="uid + '-scope-role'"
       [label]="'access.roles.roleField' | transloco"
       [hint]="'access.roles.roleFieldHint' | transloco"
+      [error]="fieldError('roleId') || fieldError('assignments')"
       [required]="true"
     >
       <ui-dropdown

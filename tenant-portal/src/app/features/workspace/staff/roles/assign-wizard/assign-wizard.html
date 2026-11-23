@@ -30,7 +30,13 @@
             >
               <span
                 class="inline-flex size-badge shrink-0 items-center justify-center rounded-full text-11 font-medium"
-                [class]="invalid ? 'bg-danger text-on-danger' : done ? 'bg-success text-on-success' : 'bg-brand text-on-brand'"
+                [class]="
+                  invalid
+                    ? 'bg-danger text-on-danger'
+                    : done
+                      ? 'bg-success text-on-success'
+                      : 'bg-brand text-on-brand'
+                "
               >
                 @if (invalid) {
                   <ng-icon name="tablerX" size="12" aria-hidden="true" />
@@ -120,7 +126,9 @@
       </div>
     } @else if (loadFailed()) {
       <div class="flex flex-1 flex-col items-center justify-center gap-8 p-16 text-center">
-        <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+        <span
+          class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon"
+        >
           <ng-icon name="tablerCloudOff" size="18" aria-hidden="true" />
         </span>
         <p class="text-12 leading-18 text-text-muted">{{ 'perm.loadFailed' | transloco }}</p>
@@ -140,7 +148,7 @@
               [autoSelectedCompanyIds]="autoSelectedCompanyIds()"
               [invalidBranchIds]="invalidBranchIds()"
               [showRequiredError]="step1Attempted()"
-              [readonly]="readonly()"
+              [readonly]="readonly() || saving() || guardBusy()"
               [maxBranches]="limits().branches"
               (addCompany)="onAddCompany($event)"
               (removeCompany)="onRemoveCompany($event)"
@@ -160,7 +168,7 @@
               [currentSelectedIds]="currentBranchSelectedIds()"
               [otherBranches]="otherCopyBranches()"
               [maxPerBranch]="limits().permissionsPerBranch"
-              [readonly]="readonly()"
+              [readonly]="readonly() || saving() || guardBusy()"
               (currentBranchChange)="currentBranchId.set($event)"
               (selectedChange)="onCurrentBranchPermissionsChange($event)"
               (copyFromBranch)="onCopyFromBranch($event)"
@@ -174,7 +182,7 @@
             <app-assign-step-review
               [items]="reviewItems()"
               [holderCount]="holderCount()"
-              [readonly]="readonly()"
+              [readonly]="readonly() || saving() || guardBusy()"
               (editBranch)="onReviewEditBranch($event)"
             >
               @if (!readonly()) {
@@ -252,9 +260,13 @@
     </button>
 
     @if (step() === 'review' && !readonly() && seatBlocked()) {
-      <span class="text-12 leading-18 text-warning-text">{{ 'perm.s3.seatsShort' | transloco }}</span>
+      <span class="text-12 leading-18 text-warning-text">{{
+        'perm.s3.seatsShort' | transloco
+      }}</span>
     } @else if (!readonly() && dirty()) {
-      <span class="text-12 leading-18 text-text-muted">{{ 'perm.footer.unsaved' | transloco }}</span>
+      <span class="text-12 leading-18 text-text-muted">{{
+        'perm.footer.unsaved' | transloco
+      }}</span>
     }
   </div>
 </ui-modal>
@@ -281,13 +293,33 @@
   <p class="text-12 leading-18 text-text-muted">{{ 'perm.conflict.text' | transloco }}</p>
 
   <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
-    <button type="button" uiButton variant="primary" (click)="reloadFromConflict()">
+    <button
+      type="button"
+      uiButton
+      variant="primary"
+      [disabled]="saving()"
+      (click)="reloadFromConflict()"
+    >
       {{ 'perm.conflict.reload' | transloco }}
+    </button>
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [loading]="saving()"
+      [disabled]="saving()"
+      (click)="keepChangesFromConflict()"
+    >
+      {{ 'perm.conflict.keep' | transloco }}
     </button>
   </div>
 </ui-modal>
 
-<div #confirmDialogWrap (keydown.escape)="onConfirmDialogEscape($event)" (cancel)="onConfirmDialogEscape($event)">
+<div
+  #confirmDialogWrap
+  (keydown.escape)="onConfirmDialogEscape($event)"
+  (cancel)="onConfirmDialogEscape($event)"
+>
   <ui-confirm-dialog
     #confirmDialog
     [tone]="confirmPrompt().tone"

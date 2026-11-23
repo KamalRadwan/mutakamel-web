@@ -47,6 +47,7 @@
     "addBranch": "إضافة فرع",
     "viewBranches": "عرض الفروع",
     "viewUsers": "عرض المستخدمين",
+    "viewTaxes": "عرض الضرائب",
     "activation": "تفعيل التطبيقات",
     "activate": "تفعيل",
     "deactivate": "تعطيل",
@@ -73,6 +74,9 @@
     "created": "تم إنشاء الشركة.",
     "saved": "تم حفظ التغييرات.",
     "deleted": "تم حذف الشركة."
+  },
+  "errors": {
+    "currencyNotEnabledActivate": "فعِّل عملة الشركة أولًا من الإعدادات › العملات."
   },
   "save": "حفظ",
   "undo": "تراجع عن التغييرات",

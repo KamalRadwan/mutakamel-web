@@ -20,10 +20,11 @@ import { Button } from '../../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
-import { errorCodeOf, errorMessage, fieldErrorsOf } from '../../../../../core/api/api-errors';
+import { ApiError, errorCodeOf, fieldErrorsOf } from '../../../../../core/api/api-errors';
 import { newIdempotencyKey } from '../../../../../core/api/idempotency';
 import { seatErrorMessage } from '../../../seats/seat-errors';
 import { OrgCascade } from '../../shared/org-cascade/org-cascade';
+import { staffErrorMessage } from '../../shared/staff.api';
 import { StaffSession } from '../../shared/staff-session';
 import {
   Branch,
@@ -370,7 +371,10 @@ export class InviteModal {
       } catch (error) {
         const code = errorCodeOf(error);
         const fields = fieldErrorsOf(error);
-        const message = errorMessage(error, 'staff', this.transloco);
+        const message = staffErrorMessage(error, 'users', this.transloco, 'write');
+        if (error instanceof ApiError && error.status === 0) return undefined;
+        if (code === 'GW.IDEM.IN_FLIGHT') { this.notify.info(message); return undefined; }
+        if (code === 'GW.IDEM.MISMATCH') { this.notify.warning(message); return undefined; }
         if (code === 'TENANT_EMAIL_TAKEN' || code === 'INVITE_EMAIL_UNDELIVERABLE' || fields['email']) {
           this.emailServerError.set({ message, value: email });
           return undefined;

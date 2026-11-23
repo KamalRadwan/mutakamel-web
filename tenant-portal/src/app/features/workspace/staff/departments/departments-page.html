@@ -105,7 +105,7 @@
               role="row"
               class="mt-6 grid h-table-row cursor-pointer rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card transition-colors duration-fast hover:bg-row-hover"
               [class]="tableColumns"
-              (click)="openDetails(department)"
+              (click)="openEdit(department)"
             >
               <span role="cell" class="flex min-w-0 items-center px-10">
                 <span
@@ -123,7 +123,7 @@
                 <button
                   type="button"
                   class="min-w-0 cursor-pointer truncate rounded-4 text-start font-medium outline-none hover:text-accent focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
-                  (click)="$event.stopPropagation(); openDetails(department)"
+                  (click)="$event.stopPropagation(); openEdit(department)"
                 >
                   {{ department.name }}
                 </button>
@@ -176,9 +176,36 @@
 </app-staff-list>
 
 <app-department-modal
+  [canManage]="modalCanManage()"
   [companies]="companies()"
   [branches]="branches()"
   [createBranches]="createBranches()"
   (saved)="onModalSaved()"
   (staleScopeDetected)="reload()"
+  (deleteRequested)="requestDelete($event)"
+  (deactivateBlocked)="onDeactivateBlocked($event)"
+/>
+
+<ui-confirm-dialog
+  #statusDialog
+  tone="warning"
+  [title]="(pendingStatusChange()?.nextStatus === 'ACTIVE' ? 'departments.confirm.activateTitle' : 'departments.confirm.deactivateTitle') | transloco: { name: pendingStatusChange()?.department?.name ?? '' }"
+  [text]="(pendingStatusChange()?.nextStatus === 'ACTIVE' ? 'departments.confirm.activateText' : 'departments.confirm.deactivateText') | transloco"
+  [confirmLabel]="(pendingStatusChange()?.nextStatus === 'ACTIVE' ? 'departments.actions.activate' : 'departments.actions.deactivate') | transloco"
+  [cancelLabel]="'departments.cancel' | transloco"
+/>
+<ui-confirm-dialog
+  #deleteConfirm
+  tone="danger"
+  [title]="'departments.confirm.deleteTitle' | transloco: { name: pendingDeleteDepartment()?.name ?? '' }"
+  [text]="'departments.confirm.deleteText' | transloco"
+  [confirmLabel]="'departments.delete' | transloco"
+  [cancelLabel]="'departments.cancel' | transloco"
+/>
+<app-blockers-dialog />
+<ui-conflict-dialog
+  [(open)]="conflictOpen"
+  [recordLabel]="conflictDepartment()?.name ?? ''"
+  (reload)="resolveActionConflict(false)"
+  (keepEditing)="resolveActionConflict(true)"
 />

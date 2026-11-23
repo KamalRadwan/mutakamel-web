@@ -175,7 +175,6 @@
 </app-staff-list>
 
 <app-branch-modal
-  [canManage]="false"
   [canCreate]="canAddBranch()"
   [companies]="companies()"
   [branches]="allBranches()"
@@ -188,6 +187,7 @@
 />
 
 <app-hq-transfer-modal
+  (unavailable)="reload()"
   (transferred)="onHqTransferred()"
   (addBranchRequested)="onTransferAddBranch($event)"
 />

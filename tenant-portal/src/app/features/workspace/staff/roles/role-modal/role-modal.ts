@@ -1,18 +1,49 @@
-import { Component, ElementRef, Injector, afterNextRender, computed, inject, input, output, signal, viewChild } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  Injector,
+  afterNextRender,
+  computed,
+  inject,
+  input,
+  output,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
-import { FormField, form, maxLengthError, readonly, requiredError, submit, validate } from '@angular/forms/signals';
+import {
+  FormField,
+  form,
+  maxLengthError,
+  readonly,
+  requiredError,
+  submit,
+  validate,
+} from '@angular/forms/signals';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { tablerBuildingStore, tablerLock, tablerShieldLock, tablerWorld } from '@ng-icons/tabler-icons';
+import {
+  tablerBuildingStore,
+  tablerLock,
+  tablerShieldLock,
+  tablerWorld,
+} from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../../core/i18n/language';
 import { Notify } from '../../../../../core/notify/notify';
 import { Button } from '../../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
-import { ApiError, errorCodeOf, errorMessage, newIdempotencyKey } from '../../shared/staff.api';
-import { Role, STAFF_LIMITS } from '../../shared/staff.model';
-import { RolesApi, type CreateRoleBody } from '../roles.api';
+import {
+  ApiError,
+  errorCodeOf,
+  staffErrorMessage,
+  newIdempotencyKey,
+} from '../../shared/staff.api';
+import { fieldErrorsOf, isValidationError } from '../../../../../core/api/api-errors';
+import { StaffSession } from '../../shared/staff-session';
+import { Role, RoleDetail, STAFF_LIMITS } from '../../shared/staff.model';
+import { RolesApi, type CreateRoleBody, type UpdateRoleBody } from '../roles.api';
 
 interface RoleDraft {
   name: string;
@@ -24,7 +55,8 @@ const EMPTY_DRAFT: RoleDraft = { name: '', description: '' };
 function validateRoleName(value: string) {
   const trimmed = value.trim();
   if (!trimmed) return requiredError();
-  if (Array.from(trimmed).length > STAFF_LIMITS.roleName) return maxLengthError(STAFF_LIMITS.roleName);
+  if (Array.from(trimmed).length > STAFF_LIMITS.roleName)
+    return maxLengthError(STAFF_LIMITS.roleName);
   return undefined;
 }
 
@@ -45,27 +77,6 @@ function resolveRoleDescription(role: Role, language: 'ar' | 'en'): string {
   return localized?.trim() || role.description || '';
 }
 
-function resolveKey(transloco: TranslocoService, key: string, params?: Record<string, unknown>): string | null {
-  const value = transloco.translate(key, params);
-  return value && value !== key ? value : null;
-}
-
-function translateError(error: unknown, transloco: TranslocoService): string {
-  const code = errorCodeOf(error);
-  const details = error instanceof ApiError ? error.details : undefined;
-  if (code) {
-    const fromRoles = resolveKey(transloco, `roles.errors.${code}`, details);
-    if (fromRoles) return fromRoles;
-    const fromStaff = resolveKey(transloco, `staff.errors.${code}`, details);
-    if (fromStaff) return fromStaff;
-  }
-  const fromSettings = errorMessage(error, 'staff', transloco);
-  if (fromSettings && fromSettings !== 'settings.errors.generic') {
-    return fromSettings;
-  }
-  return resolveKey(transloco, 'staff.errors.generic') ?? transloco.translate('roles.errors.generic');
-}
-
 @Component({
   selector: 'app-role-modal',
   imports: [FormField, TranslocoPipe, NgIcon, Button, ConfirmDialog, Field, Modal],
@@ -80,6 +91,7 @@ export class RoleModal {
   private readonly injector = inject(Injector);
   private readonly notify = inject(Notify);
   private readonly api = inject(RolesApi);
+  private readonly session = inject(StaffSession);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly language = inject(LanguageState).current;
@@ -88,18 +100,38 @@ export class RoleModal {
   private readonly discardDialog = viewChild.required(ConfirmDialog);
 
   readonly canCreate = input(false);
-  readonly created = output<void>();
+  readonly created = output<RoleDetail>();
+  readonly saved = output<RoleDetail>();
+  readonly deletedRemotely = output<void>();
+  readonly deleteRequested = output<Role>();
+  readonly permissionsRequested = output<Role>();
+  readonly editingId = computed(() => this.editingRole()?.id ?? null);
+  protected readonly canDelete = computed(() => this.session.isTenantWide('roles.role.delete'));
+  protected readonly canReadPermissions = computed(() =>
+    this.editingRole()?.permissionMode === 'BRANCH'
+      ? this.session.canReadBranchPermissions()
+      : this.session.canReadRolePermissions(),
+  );
 
   protected readonly maxName = STAFF_LIMITS.roleName;
   protected readonly maxDescription = STAFF_LIMITS.roleDescription;
 
-  protected readonly mode = signal<'create' | 'details'>('create');
+  protected readonly mode = signal<'create' | 'edit'>('create');
   protected readonly editingRole = signal<Role | null>(null);
   protected readonly submitAttempted = signal(false);
   private readonly nameServerError = signal<{ code: string; value: string } | null>(null);
 
   private readonly draft = signal<RoleDraft>({ ...EMPTY_DRAFT });
-  protected readonly isReadonly = computed(() => this.mode() === 'details' || !this.canCreate());
+  private readonly baseline = signal<RoleDraft>({ ...EMPTY_DRAFT });
+  private readonly fieldMessages = signal<{
+    value: RoleDraft;
+    fields: Record<string, string[]>;
+  } | null>(null);
+  protected readonly isReadonly = computed(() =>
+    this.mode() === 'create'
+      ? !this.canCreate()
+      : Boolean(this.editingRole()?.isSystem) || !this.session.isTenantWide('roles.role.update'),
+  );
 
   protected readonly roleForm = form(this.draft, (path) => {
     validate(path.name, ({ value }) => validateRoleName(value()));
@@ -118,12 +150,18 @@ export class RoleModal {
       return this.transloco.translate('roles.modal.new');
     }
     const role = this.editingRole();
-    return role ? resolveRoleText(role, this.language()) : this.transloco.translate('roles.modal.title');
+    return role
+      ? resolveRoleText(role, this.language())
+      : this.transloco.translate('roles.modal.title');
   });
 
   protected readonly dirty = computed(() => {
     const current = this.draft();
-    return !this.isReadonly() && (current.name.trim() !== '' || current.description.trim() !== '');
+    return (
+      !this.isReadonly() &&
+      (current.name.trim() !== this.baseline().name.trim() ||
+        current.description.trim() !== this.baseline().description.trim())
+    );
   });
 
   private allowClose = false;
@@ -138,6 +176,8 @@ export class RoleModal {
     this.submitAttempted.set(false);
     this.nameServerError.set(null);
     this.clearIdempotency();
+    this.baseline.set({ ...EMPTY_DRAFT });
+    this.fieldMessages.set(null);
     this.roleForm().reset({ ...EMPTY_DRAFT });
     this.modal().open();
     afterNextRender(
@@ -148,15 +188,20 @@ export class RoleModal {
 
   openDetails(role: Role): void {
     this.allowClose = false;
-    this.mode.set('details');
+    this.mode.set('edit');
     this.editingRole.set(role);
     this.submitAttempted.set(false);
     this.nameServerError.set(null);
     this.clearIdempotency();
-    this.roleForm().reset({
+    this.fieldMessages.set(null);
+    const baseline = {
       name: role.isSystem ? resolveRoleText(role, this.language()) : role.name,
-      description: role.isSystem ? resolveRoleDescription(role, this.language()) : (role.description ?? ''),
-    });
+      description: role.isSystem
+        ? resolveRoleDescription(role, this.language())
+        : (role.description ?? ''),
+    };
+    this.baseline.set(baseline);
+    this.roleForm().reset({ ...baseline });
     this.modal().open();
     afterNextRender(
       () => this.host.nativeElement.querySelector<HTMLInputElement>(`#${this.uid}-name`)?.focus(),
@@ -175,6 +220,9 @@ export class RoleModal {
     if (server && server.value === this.draft().name.trim()) {
       return this.transloco.translate(`roles.errors.${server.code}`);
     }
+    const messages = this.fieldMessages();
+    if (messages?.value.name === this.draft().name && messages.fields['name']?.length)
+      return messages.fields['name'][0];
     const state = this.roleForm.name();
     const error = state.touched() || this.submitAttempted() ? state.errors()[0] : undefined;
     if (!error) return null;
@@ -182,18 +230,28 @@ export class RoleModal {
       return this.transloco.translate('roles.validation.nameRequired');
     }
     if (error.kind === 'maxLength') {
-      return this.transloco.translate('roles.validation.nameMaxLength', { max: STAFF_LIMITS.roleName });
+      return this.transloco.translate('roles.validation.nameMaxLength', {
+        max: STAFF_LIMITS.roleName,
+      });
     }
     return null;
   }
 
   protected descriptionError(): string | null {
     this.i18n();
+    const messages = this.fieldMessages();
+    if (
+      messages?.value.description === this.draft().description &&
+      messages.fields['description']?.length
+    )
+      return messages.fields['description'][0];
     const state = this.roleForm.description();
     const error = state.touched() || this.submitAttempted() ? state.errors()[0] : undefined;
     if (!error) return null;
     if (error.kind === 'maxLength') {
-      return this.transloco.translate('roles.validation.descriptionMaxLength', { max: STAFF_LIMITS.roleDescription });
+      return this.transloco.translate('roles.validation.descriptionMaxLength', {
+        max: STAFF_LIMITS.roleDescription,
+      });
     }
     return null;
   }
@@ -208,24 +266,85 @@ export class RoleModal {
       const trimmedName = value.name.trim();
       const trimmedDescription = value.description.trim();
 
-      const payload: CreateRoleBody = { name: trimmedName };
-      if (trimmedDescription) payload.description = trimmedDescription;
+      const creating = this.mode() === 'create';
+      const role = this.editingRole();
+      const payload: CreateRoleBody | UpdateRoleBody = {};
+      if (creating || trimmedName !== this.baseline().name.trim()) payload.name = trimmedName;
+      if (creating) {
+        if (trimmedDescription) payload.description = trimmedDescription;
+      } else if (trimmedDescription !== this.baseline().description.trim()) {
+        payload.description = trimmedDescription || null;
+      }
+      if (!creating && (!role || !this.dirty())) return undefined;
+      this.fieldMessages.set(null);
       try {
-        await this.api.create(payload, this.idempotencyKeyFor(payload));
+        const key = this.idempotencyKeyFor(payload);
+        const updated = creating
+          ? await this.api.create(payload as CreateRoleBody, key)
+          : await this.api.update(role!.id, payload, key);
         this.clearIdempotency();
-        this.notify.success(this.transloco.translate('roles.toast.created'));
-        this.closeImmediate();
-        this.created.emit();
+        this.nameServerError.set(null);
+        this.notify.success(
+          this.transloco.translate(creating ? 'roles.toast.created' : 'roles.toast.saved'),
+        );
+        if (creating) {
+          this.closeImmediate();
+          this.created.emit(updated);
+        } else {
+          this.editingRole.set(updated);
+          const baseline = { name: updated.name, description: updated.description ?? '' };
+          this.baseline.set(baseline);
+          this.roleForm().reset({ ...baseline });
+          this.saved.emit(updated);
+        }
       } catch (error) {
         const code = errorCodeOf(error);
         if (code === 'ROLE_NAME_TAKEN' || code === 'ROLE_NAME_RESERVED') {
           this.nameServerError.set({ code, value: trimmedName });
+        } else if (isValidationError(error)) {
+          const fields = fieldErrorsOf(error);
+          this.fieldMessages.set({ value: { ...value }, fields });
+          if (fields['_']?.length) this.notify.error(fields['_'].join(' '));
+          else if (!Object.keys(fields).length)
+            this.notify.error(staffErrorMessage(error, 'roles', this.transloco, 'write'));
         } else {
-          this.notify.error(translateError(error, this.transloco));
+          const message = staffErrorMessage(error, 'roles', this.transloco, 'write');
+          if (code === 'GW.IDEM.IN_FLIGHT') this.notify.info(message);
+          else if (code === 'GW.IDEM.MISMATCH') this.notify.warning(message);
+          else this.notify.error(message);
+          if (
+            !creating &&
+            (code === 'ROLE_NOT_FOUND' || (error instanceof ApiError && error.status === 404))
+          ) {
+            this.closeImmediate();
+            this.deletedRemotely.emit();
+          }
         }
       }
       return undefined;
     });
+  }
+
+  protected undo(): void {
+    if (this.saving()) return;
+    this.roleForm().reset({ ...this.baseline() });
+    this.fieldMessages.set(null);
+    this.nameServerError.set(null);
+    this.clearIdempotency();
+  }
+
+  protected requestDelete(): void {
+    const role = this.editingRole();
+    if (role && !role.isSystem && this.canDelete() && !this.saving())
+      this.deleteRequested.emit(role);
+  }
+
+  protected async openPermissions(): Promise<void> {
+    const role = this.editingRole();
+    if (!role || !this.canReadPermissions() || this.saving()) return;
+    if (this.dirty() && !(await this.confirmDiscard())) return;
+    this.closeImmediate();
+    this.permissionsRequested.emit(role);
   }
 
   protected async requestClose(): Promise<void> {
@@ -251,7 +370,7 @@ export class RoleModal {
     this.clearIdempotency();
   }
 
-  private idempotencyKeyFor(body: CreateRoleBody): string {
+  private idempotencyKeyFor(body: CreateRoleBody | UpdateRoleBody): string {
     const fingerprint = JSON.stringify(body);
     if (fingerprint !== this.lastFingerprint || !this.lastIdempotencyKey) {
       this.lastFingerprint = fingerprint;

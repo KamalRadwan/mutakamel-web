@@ -8,7 +8,7 @@
   (closed)="onClosed()"
 >
   <div class="flex flex-col gap-8">
-    <p class="text-12 leading-18 text-text-muted">{{ 'staff.blockers.intro' | transloco }}</p>
+    <p class="text-12 leading-18 text-text-muted">{{ (rows().length === 1 ? 'staff.blockers.introOne' : 'staff.blockers.intro') | transloco }}</p>
 
     @if (rows().length > 0) {
       <ul class="flex flex-col gap-6">

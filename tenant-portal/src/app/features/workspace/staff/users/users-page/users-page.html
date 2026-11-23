@@ -105,7 +105,8 @@
           @for (user of rows(); track user.id) {
             <div
               role="row"
-              class="mt-6 grid h-table-row rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card"
+              class="mt-6 grid h-table-row cursor-pointer rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card transition-colors duration-fast hover:bg-row-hover"
+              (click)="openUser(user)"
               [class]="tableColumns"
             >
               <span role="cell" class="flex min-w-0 items-center gap-8 border-s border-border px-10">
@@ -119,7 +120,9 @@
 
                 <span class="flex min-w-0 flex-1 flex-col justify-center">
                   <span class="flex min-w-0 items-center gap-6">
-                    <span class="min-w-0 truncate text-13 leading-18 font-medium">{{ fullName(user) }}</span>
+                    <button type="button"
+                      class="min-w-0 cursor-pointer truncate rounded-4 text-start text-13 leading-18 font-medium outline-none hover:text-accent focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                      (click)="$event.stopPropagation(); openUser(user)">{{ fullName(user) }}</button>
                     @if (user.isTenantOwner) {
                       <span class="inline-flex h-badge shrink-0 items-center gap-4 rounded-8 bg-brand-soft px-8 text-12 font-medium text-on-brand-soft whitespace-nowrap">
                         <ng-icon name="tablerCrown" size="11" aria-hidden="true" />
@@ -205,4 +208,19 @@
   [departments]="inviteDepartments()"
   [teams]="inviteTeams()"
   (invited)="onUserInvited()"
+/>
+
+<app-user-modal
+  [knownUsers]="rows()"
+  [statusActionsFor]="actionsFor"
+  (statusActionSelected)="onStatusAction($event)"
+  (userUpdated)="replaceUser($event)"
+  (deletedRemotely)="reload()"
+/>
+<ui-confirm-dialog
+  [title]="('users.confirm.' + confirmation().action + 'Title') | transloco"
+  [text]="('users.confirm.' + confirmation().action) | transloco: { name: confirmation().name }"
+  [confirmLabel]="('users.actions.' + confirmation().action) | transloco"
+  [cancelLabel]="'users.common.cancel' | transloco"
+  [tone]="confirmation().tone"
 />

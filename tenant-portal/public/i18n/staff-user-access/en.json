@@ -70,8 +70,7 @@
     "roleField": "Role",
     "roleFieldHint": "Select the role to grant at this scope.",
     "emptyScope": "No workspace or company roles assigned.",
-    "needsActive": "Scope roles can be given once the user is active.",
-    "notActiveReadonly": "Roles can be changed only for active users.",
+    "suspendedReadonly": "Roles can't be changed for suspended users.",
     "selfReadonly": "You can't change your own roles.",
     "ownerReadonly": "The workspace owner's roles can't be changed.",
     "err": {
@@ -175,6 +174,22 @@
     "SEAT_LIMIT_REACHED": "No free {{module}} seats. Ask the workspace owner to add seats.",
     "APPLICATION_ALLOWANCE_NOT_READY": "Only active users can take a seat.",
     "MODULE_NOT_SUBSCRIBED": "This application is not in your subscription.",
-    "ADDON_ASSIGNMENTS_EXIST": "Remove this user's add-on seats first in Operations › Add-on seats."
+    "ADDON_ASSIGNMENTS_EXIST": "Remove this user's add-on seats first in Operations › Add-on seats.",
+    "ROLE_PERMISSION_AUTHORITY_EXCEEDED": "You can only give permissions you hold in that branch.",
+    "BRANCH_OR_ROLE_INVALID": "The branch or role is no longer available. Choose again.",
+    "ASSIGNMENT_NOT_FOUND": "This assignment no longer exists. The list has been refreshed.",
+    "ROLE_ASSIGNMENT_LABELS_LIMIT_EXCEEDED": "Too many assignment labels. Narrow the search.",
+    "SEATS_MANAGED_BY_ROLES": "Seats follow roles. Change roles to change application access.",
+    "TENANT_USER_CHANGED": "The user changed branches. Review the refreshed access.",
+    "MODULE_NOT_FOUND": "This application is no longer available.",
+    "APPLICATION_ALLOWANCE_STALE": "Application access changed. Reload and try again.",
+    "APPLICATION_ALLOWANCE_UNAVAILABLE": "Application access is temporarily unavailable. Try again.",
+    "SUBSCRIPTION_NOT_FOUND": "No subscription was found for this workspace.",
+    "TEAM_REPORTING_SCOPE_REVIEW_REQUIRED": "Review this membership’s reporting branches before saving again.",
+    "TEAM_REPORTING_SCOPE_DTO_INVALID": "The reporting branch changes are invalid. Review your selection.",
+    "TEAM_MEMBERSHIP_PRIMARY_CONFLICT": "Exactly one home team membership is required. Review the user’s home team.",
+    "TEAM_MEMBERSHIP_NOT_FOUND": "This team membership no longer exists.",
+    "SCOPE_ROLE_ASSIGNMENT_OWNER_REQUIRED": "Only the workspace owner can manage scope roles.",
+    "SCOPE_ROLE_ASSIGNMENT_LIMIT_EXCEEDED": "Scope role assignment limit reached."
   }
 }

@@ -7,7 +7,12 @@
   [dismissable]="!saving()"
   (closed)="onModalClosed()"
 >
-  <form [id]="uid + '-form'" class="grid grid-cols-2 gap-x-10 gap-y-8" novalidate (submit)="save($event)">
+  <form
+    [id]="uid + '-form'"
+    class="grid grid-cols-2 gap-x-10 gap-y-8"
+    novalidate
+    (submit)="save($event)"
+  >
     @if (editingRole()?.isSystem) {
       <p class="col-span-2 flex items-center gap-6 text-12 leading-18 text-text-muted">
         <ng-icon name="tablerLock" size="14" aria-hidden="true" />
@@ -35,7 +40,9 @@
           [readOnly]="isReadonly()"
           [attr.aria-readonly]="isReadonly() ? 'true' : null"
           [attr.aria-invalid]="nameError() ? 'true' : null"
-          [attr.aria-describedby]="uid + '-name-hint' + (nameError() ? ' ' + uid + '-name-error' : '')"
+          [attr.aria-describedby]="
+            uid + '-name-hint' + (nameError() ? ' ' + uid + '-name-error' : '')
+          "
         />
       </ui-field>
     </div>
@@ -60,18 +67,26 @@
           [readOnly]="isReadonly()"
           [attr.aria-readonly]="isReadonly() ? 'true' : null"
           [attr.aria-invalid]="descriptionError() ? 'true' : null"
-          [attr.aria-describedby]="uid + '-description-hint' + (descriptionError() ? ' ' + uid + '-description-error' : '')"
+          [attr.aria-describedby]="
+            uid + '-description-hint' + (descriptionError() ? ' ' + uid + '-description-error' : '')
+          "
         ></textarea>
       </ui-field>
     </div>
 
-    @if (mode() === 'details' && editingRole(); as role) {
-      <div class="col-span-2 flex flex-wrap items-center gap-12 rounded-8 border border-border bg-surface-muted px-10 py-8 text-12">
+    @if (mode() === 'edit' && editingRole(); as role) {
+      <div
+        class="col-span-2 flex flex-wrap items-center gap-12 rounded-8 border border-border bg-surface-muted px-10 py-8 text-12"
+      >
         <span class="flex items-center gap-6">
           <span class="text-text-muted">{{ 'roles.cols.mode' | transloco }}:</span>
           <span
             class="inline-flex h-badge items-center gap-4 rounded-8 px-8 text-12 font-medium whitespace-nowrap"
-            [class]="role.permissionMode === 'BRANCH' ? 'bg-brand-soft text-on-brand-soft' : 'bg-neutral-soft text-text'"
+            [class]="
+              role.permissionMode === 'BRANCH'
+                ? 'bg-brand-soft text-on-brand-soft'
+                : 'bg-neutral-soft text-text'
+            "
           >
             <ng-icon
               [name]="role.permissionMode === 'BRANCH' ? 'tablerBuildingStore' : 'tablerWorld'"
@@ -91,7 +106,9 @@
 
         <span class="flex items-center gap-4">
           <span class="text-text-muted">{{ 'roles.cols.count' | transloco }}:</span>
-          <span dir="ltr" class="font-medium tabular-nums text-text">{{ role.permissionCount }}</span>
+          <span dir="ltr" class="font-medium tabular-nums text-text">{{
+            role.permissionCount
+          }}</span>
         </span>
 
         <span class="flex items-center gap-4">
@@ -115,19 +132,59 @@
           {{ 'roles.modal.create' | transloco }}
         </button>
       }
-      <button
-        type="button"
-        uiButton
-        variant="ghost"
-        [disabled]="saving()"
-        (click)="requestClose()"
-      >
+      <button type="button" uiButton variant="ghost" [disabled]="saving()" (click)="requestClose()">
         {{ 'roles.common.cancel' | transloco }}
       </button>
     } @else {
-      <button type="button" uiButton variant="ghost" (click)="requestClose()">
-        {{ 'roles.common.close' | transloco }}
+      @if (!isReadonly()) {
+        <button
+          type="submit"
+          [attr.form]="uid + '-form'"
+          uiButton
+          [loading]="saving()"
+          [disabled]="saving() || !dirty()"
+        >
+          {{ 'roles.common.save' | transloco }}
+        </button>
+
+        @if (dirty()) {
+          <button type="button" uiButton variant="secondary" [disabled]="saving()" (click)="undo()">
+            {{ 'roles.common.undo' | transloco }}
+          </button>
+          <span class="text-12 leading-18 text-text-muted">{{
+            'roles.common.unsaved' | transloco
+          }}</span>
+        }
+      }
+
+      <button type="button" uiButton variant="ghost" [disabled]="saving()" (click)="requestClose()">
+        {{ (!isReadonly() && dirty() ? 'roles.common.cancel' : 'roles.common.close') | transloco }}
       </button>
+
+      @if (editingRole(); as role) {
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          [disabled]="saving() || !canReadPermissions()"
+          (click)="openPermissions()"
+        >
+          {{ 'roles.modal.permissions' | transloco }}
+        </button>
+
+        @if (!role.isSystem && canDelete()) {
+          <button
+            type="button"
+            uiButton
+            variant="danger"
+            class="ms-auto"
+            [disabled]="saving()"
+            (click)="requestDelete()"
+          >
+            {{ 'roles.common.delete' | transloco }}
+          </button>
+        }
+      }
     }
   </div>
 </ui-modal>

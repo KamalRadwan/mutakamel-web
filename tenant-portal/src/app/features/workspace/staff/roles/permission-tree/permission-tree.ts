@@ -71,8 +71,8 @@ interface FilteredModule {
 @Component({
   selector: 'app-permission-tree',
   imports: [NgIcon, TranslocoPipe, Button, Checkbox, Dropdown],
+  viewProviders: [provideTranslocoScope('settings', 'staff', { scope: 'staff-permissions', alias: 'perm' })],
   providers: [
-    provideTranslocoScope('settings', 'staff', { scope: 'staff-permissions', alias: 'perm' }),
     provideIcons({ tablerChevronDown, tablerLock, tablerMinus, tablerSearch, tablerX }),
   ],
   templateUrl: './permission-tree.html',

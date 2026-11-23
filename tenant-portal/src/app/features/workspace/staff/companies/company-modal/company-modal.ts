@@ -4,6 +4,8 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerArrowBackUp, tablerBuildingSkyscraper } from '@ng-icons/tabler-icons';
 import { Notify } from '../../../../../core/notify/notify';
+import { ApiError, errorCodeOf, fieldErrorsOf, isValidationError } from '../../../../../core/api/api-errors';
+import { newIdempotencyKey } from '../../../../../core/api/idempotency';
 import { Button } from '../../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { Dropdown, DropdownOption } from '../../../../../shared/ui/dropdown/dropdown';
@@ -15,22 +17,16 @@ import { isCascadeRequired, seatErrorMessage } from '../../../seats/seat-errors'
 import { SeatImpact } from '../../../seats/seat-impact/seat-impact';
 import { SeatChange } from '../../../seats/seats.model';
 import { StaffSession } from '../../shared/staff-session';
-import { OrganizationCreateApi, type CreateCompanyBody } from '../../shared/organization-create.api';
+import { OrganizationWriteApi, type CreateCompanyBody } from '../../shared/organization-write.api';
 import { StatusBadge } from '../../shared/status-badge/status-badge';
-import {
-  ApiError,
-  errorCodeOf,
-  errorMessage,
-  newIdempotencyKey,
-  updateCompany,
-} from '../../shared/staff.api';
+import { staffErrorMessage } from '../../shared/staff.api';
 import { CODE_PATTERN, Company, Currency, OrgStatus, STAFF_LIMITS } from '../../shared/staff.model';
 
 interface CompanyPatch {
   name?: string;
   legalName?: string | null;
   taxNumber?: string | null;
-  currencyCode?: string | null;
+  currencyCode?: string;
   status?: OrgStatus;
 }
 
@@ -50,7 +46,7 @@ export class CompanyModal {
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly session = inject(StaffSession);
-  private readonly organizationCreate = inject(OrganizationCreateApi);
+  private readonly organization = inject(OrganizationWriteApi);
   private readonly cascadeConfirm = inject(SeatCascadeConfirm);
 
   private readonly modal = viewChild.required<Modal>('modal');
@@ -64,6 +60,7 @@ export class CompanyModal {
   readonly saved = output<{ company: Company; isNew: boolean }>();
   readonly deleteRequested = output<Company>();
   readonly deactivateBlocked = output<{ company: Company; blockers: string[] }>();
+  readonly unavailable = output<void>();
 
   protected readonly limits = STAFF_LIMITS;
 
@@ -100,11 +97,13 @@ export class CompanyModal {
   protected readonly submitAttempted = signal(false);
   protected readonly codeServerError = signal<string | null>(null);
   protected readonly currencyServerError = signal<string | null>(null);
+  private readonly serverFields = signal<Record<string, string[]>>({});
 
   private allowClose = false;
   private confirmingDiscard = false;
   private lastPayloadSignature = '';
   private lastIdempotencyKey = '';
+  private cascadeIdempotencyKey = '';
 
   protected readonly nameCount = computed(() => Array.from(this.name()).length);
   protected readonly legalNameCount = computed(() => Array.from(this.legalName()).length);
@@ -117,7 +116,8 @@ export class CompanyModal {
       return [{ value: code, label: code }];
     }
     return [
-      { value: '', label: this.transloco.translate('companies.fields.currencyDefault') },
+      ...(this.mode() === 'edit' && this.baseCompany()?.currencyCode
+        ? [] : [{ value: '', label: this.transloco.translate('companies.fields.currencyDefault') }]),
       ...active.map((currency) => ({
         value: currency.code,
         label: `${currency.code} — ${currency.name}`,
@@ -173,6 +173,8 @@ export class CompanyModal {
 
   protected readonly nameError = computed(() => {
     this.i18n();
+    const server = this.serverFields()['name']?.[0];
+    if (server) return server;
     if (!this.submitAttempted() && !this.touched().name) return null;
     const trimmed = this.name().trim();
     if (!trimmed) return this.transloco.translate('companies.validation.required');
@@ -184,6 +186,8 @@ export class CompanyModal {
 
   protected readonly legalNameError = computed(() => {
     this.i18n();
+    const server = this.serverFields()['legalName']?.[0];
+    if (server) return server;
     if (!this.submitAttempted() && !this.touched().legalName) return null;
     const trimmed = this.legalName().trim();
     if (Array.from(trimmed).length > STAFF_LIMITS.legalName) {
@@ -194,6 +198,8 @@ export class CompanyModal {
 
   protected readonly taxError = computed(() => {
     this.i18n();
+    const server = this.serverFields()['taxNumber']?.[0];
+    if (server) return server;
     if (!this.submitAttempted() && !this.touched().taxNumber) return null;
     const trimmed = this.taxNumber().trim();
     if (Array.from(trimmed).length > STAFF_LIMITS.taxNumber) {
@@ -265,19 +271,23 @@ export class CompanyModal {
   protected onNameInput(event: Event): void {
     if (!this.canManage()) return;
     this.name.set((event.target as HTMLInputElement).value);
+    this.serverFields.update((fields) => ({ ...fields, name: [] }));
   }
 
   protected onLegalNameInput(event: Event): void {
     if (!this.canManage()) return;
     this.legalName.set((event.target as HTMLInputElement).value);
+    this.serverFields.update((fields) => ({ ...fields, legalName: [] }));
   }
 
   protected onTaxInput(event: Event): void {
     if (!this.canManage()) return;
     this.taxNumber.set((event.target as HTMLInputElement).value);
+    this.serverFields.update((fields) => ({ ...fields, taxNumber: [] }));
   }
 
   protected onCurrencyChange(next: string): void {
+    if (!this.canManage() || this.saving() || (!next && this.baseCompany()?.currencyCode)) return;
     this.currencyCode.set(next);
     this.currencyServerError.set(null);
   }
@@ -301,6 +311,7 @@ export class CompanyModal {
     this.submitAttempted.set(true);
     this.codeServerError.set(null);
     this.currencyServerError.set(null);
+    this.serverFields.set({});
 
     if (this.codeError() || this.nameError() || this.legalNameError() || this.taxError()) {
       return;
@@ -323,7 +334,8 @@ export class CompanyModal {
 
       this.saving.set(true);
       try {
-        const created = await this.organizationCreate.createCompany(body, this.idempotencyKeyFor('create', body));
+        const created = await this.organization.createCompany(body, this.idempotencyKeyFor('create', body));
+        this.resetIdempotency();
         this.saved.emit({ company: created, isNew: true });
         this.notify.success(this.transloco.translate('companies.toast.created'));
         this.closeImmediate();
@@ -344,8 +356,7 @@ export class CompanyModal {
     if (nextLegal !== base.legalName) patch.legalName = nextLegal;
     const nextTax = trimmedTax || null;
     if (nextTax !== base.taxNumber) patch.taxNumber = nextTax;
-    const nextCurrency = currency || null;
-    if (nextCurrency !== base.currencyCode) patch.currencyCode = nextCurrency;
+    if (currency && currency !== base.currencyCode) patch.currencyCode = currency;
     const nextStatus: OrgStatus = this.isActive() ? 'ACTIVE' : 'INACTIVE';
     const isDeactivating = base.status === 'ACTIVE' && nextStatus === 'INACTIVE';
     if (nextStatus !== base.status) patch.status = nextStatus;
@@ -356,18 +367,17 @@ export class CompanyModal {
     try {
       let updated: Company;
       try {
-        updated = await updateCompany(base.id, patch, this.idempotencyKeyFor(base.id, patch));
+        updated = await this.organization.updateCompany(base.id, patch, this.idempotencyKeyFor(base.id, patch));
       } catch (error) {
         const cascade = isCascadeRequired(error);
         if (!cascade) throw error;
-        this.saving.set(false);
         const confirmed = await this.cascadeConfirm.confirm(cascade.addons);
-        if (!confirmed) return;
-        this.saving.set(true);
-        updated = await updateCompany(base.id, patch, this.idempotencyKeyFor(base.id, patch), {
+        if (!confirmed || !this.canManage()) return;
+        updated = await this.organization.updateCompany(base.id, patch, this.idempotencyKeyFor(base.id, patch, true), {
           confirmAddonCascade: true,
         });
       }
+      this.resetIdempotency();
       this.saved.emit({ company: updated, isNew: false });
       this.notify.success(this.transloco.translate('companies.toast.saved'));
       this.closeImmediate();
@@ -408,6 +418,14 @@ export class CompanyModal {
 
   private handleSaveError(error: unknown, isDeactivating: boolean, base?: Company): void {
     const code = errorCodeOf(error);
+    if (isValidationError(error)) {
+      const fields = fieldErrorsOf(error);
+      this.serverFields.set(fields);
+      this.codeServerError.set(fields['code']?.[0] ?? null);
+      this.currencyServerError.set(fields['currencyCode']?.[0] ?? null);
+      if (!fields['_']?.length && Object.keys(fields).some((field) =>
+        ['code', 'name', 'legalName', 'taxNumber', 'currencyCode'].includes(field))) return;
+    }
     if (code === 'ORG_CODE_TAKEN') {
       this.codeServerError.set(this.resolveError(error));
       return;
@@ -423,7 +441,15 @@ export class CompanyModal {
       this.deactivateBlocked.emit({ company: base, blockers });
       return;
     }
-    this.notify.error(this.resolveError(error));
+    if (code === 'ORG_NODE_NOT_FOUND') {
+      this.closeImmediate();
+      this.unavailable.emit();
+    }
+    if (error instanceof ApiError && error.status === 0) return;
+    const message = this.resolveError(error);
+    if (code === 'GW.IDEM.IN_FLIGHT') this.notify.info(message);
+    else if (code === 'GW.IDEM.MISMATCH') this.notify.warning(message);
+    else this.notify.error(message);
   }
 
   private applyCompanyToForm(company: Company): void {
@@ -436,6 +462,7 @@ export class CompanyModal {
   }
 
   private resetValidation(): void {
+    this.serverFields.set({});
     this.touched.set({});
     this.submitAttempted.set(false);
     this.codeServerError.set(null);
@@ -445,24 +472,24 @@ export class CompanyModal {
   private resetIdempotency(): void {
     this.lastPayloadSignature = '';
     this.lastIdempotencyKey = '';
+    this.cascadeIdempotencyKey = '';
   }
 
-  private idempotencyKeyFor(target: string, payload: unknown): string {
+  private idempotencyKeyFor(target: string, payload: unknown, cascade = false): string {
     const signature = `${target}:${JSON.stringify(payload)}`;
     if (signature !== this.lastPayloadSignature) {
       this.lastPayloadSignature = signature;
       this.lastIdempotencyKey = newIdempotencyKey();
+      this.cascadeIdempotencyKey = '';
     }
+    if (cascade) return this.cascadeIdempotencyKey ||= newIdempotencyKey();
     return this.lastIdempotencyKey;
   }
 
   private resolveError(error: unknown): string {
     const seatMsg = seatErrorMessage(this.transloco, error);
     if (seatMsg) return seatMsg;
-    const msg = errorMessage(error, 'staff', this.transloco);
-    if (msg && msg !== 'settings.errors.generic') return msg;
-    const fallback = this.transloco.translate('staff.errors.generic');
-    return fallback !== 'staff.errors.generic' ? fallback : msg;
+    return staffErrorMessage(error, 'staff', this.transloco, 'write');
   }
 
   private focusControl(selector: string): void {

@@ -8,7 +8,11 @@ import { Dropdown, DropdownOption } from '../../../../../shared/ui/dropdown/drop
 import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { StaffSession } from '../../shared/staff-session';
-import { errorMessage, newIdempotencyKey, updateBranch } from '../../shared/staff.api';
+import { ApiError, errorCodeOf } from '../../../../../core/api/api-errors';
+import { newIdempotencyKey } from '../../../../../core/api/idempotency';
+import { staffErrorMessage } from '../../shared/staff.api';
+import { OrganizationWriteApi } from '../../shared/organization-write.api';
+import { seatErrorMessage } from '../../../seats/seat-errors';
 import { Branch } from '../../shared/staff.model';
 
 export interface HqTransferRequest {
@@ -31,9 +35,11 @@ export class HqTransferModal {
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly session = inject(StaffSession);
+  private readonly organizationWrite = inject(OrganizationWriteApi);
   private readonly modal = viewChild.required(Modal);
 
   readonly transferred = output<Branch>();
+  readonly unavailable = output<void>();
   readonly addBranchRequested = output<string>();
 
   protected readonly sourceBranch = signal<Branch | null>(null);
@@ -89,14 +95,25 @@ export class HqTransferModal {
     const retry = this.pendingRetry;
     this.submitting.set(true);
     try {
-      const updated = await updateBranch(targetId, { isHeadquarters: true }, this.idempotencyKeyFor(targetId));
+      const updated = await this.organizationWrite.updateBranch(targetId, { isHeadquarters: true }, this.idempotencyKeyFor(targetId));
+      this.lastKeyPayload = '';
+      this.lastKey = '';
+      this.notify.success(this.transloco.translate('branches.toast.saved'));
       this.transferred.emit(updated);
       this.modal().close();
       if (retry) {
         await retry();
       }
     } catch (error) {
-      this.notify.error(this.resolveError(error));
+      const message = this.resolveError(error);
+      const code = errorCodeOf(error);
+      if (code === 'GW.IDEM.IN_FLIGHT') this.notify.info(message);
+      else if (code === 'GW.IDEM.MISMATCH') this.notify.warning(message);
+      else this.notify.error(message);
+      if (error instanceof ApiError && error.status === 404) {
+        this.modal().close();
+        this.unavailable.emit();
+      }
     } finally {
       this.submitting.set(false);
     }
@@ -124,9 +141,6 @@ export class HqTransferModal {
   }
 
   private resolveError(error: unknown): string {
-    const msg = errorMessage(error, 'staff', this.transloco);
-    if (msg && msg !== 'settings.errors.generic') return msg;
-    const fallback = this.transloco.translate('staff.errors.generic');
-    return fallback !== 'staff.errors.generic' ? fallback : msg;
+    return seatErrorMessage(this.transloco, error) || staffErrorMessage(error, 'staff', this.transloco, 'write');
   }
 }

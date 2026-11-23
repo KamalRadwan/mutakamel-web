@@ -94,6 +94,7 @@
               [user]="u"
               [knownUsers]="knownUsers()"
               (saved)="onProfileSaved($event)"
+              (reloadRequested)="reloadUser()"
               (closeRequested)="requestClose()"
               (deletedRemotely)="onDeletedRemotely()"
             >

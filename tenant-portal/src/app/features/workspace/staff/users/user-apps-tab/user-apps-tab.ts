@@ -1,4 +1,5 @@
 import { Component, computed, effect, inject, input, output, signal, viewChild } from '@angular/core';
+import { fieldErrorsOf } from '../../../../../core/api/api-errors';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
@@ -20,25 +21,18 @@ import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-d
 import { Dropdown, DropdownOption } from '../../../../../shared/ui/dropdown/dropdown';
 import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
-import { ApiError, assignModule, errorCodeOf, listModules, newIdempotencyKey, unassignModule } from '../../shared/staff.api';
-import { seatErrorMessage } from '../../../seats/seat-errors';
-import { getSeatUsage, listSeatHolders } from '../../../seats/seats.api';
+import { ApiError, errorCodeOf, newIdempotencyKey, staffErrorMessage } from '../../shared/staff.api';
+import { StaffUserAccessApi } from '../user-access.api';
+import { StaffUsersApi } from '../users.api';
+import { listSeatHolders } from '../../../seats/seats.api';
 import { SeatAccessState, SeatHolder, SeatMode } from '../../../seats/seats.model';
 import { StaffSession } from '../../shared/staff-session';
 import { ModuleAssignment, TenantUser } from '../../shared/staff.model';
-
-interface ModuleAssignmentExtra extends ModuleAssignment {
-  accessState?: SeatAccessState;
-  source?: 'ROLE' | 'MANUAL';
-  grantedAt?: string;
-}
 
 interface UserAppItem extends ModuleAssignment {
   accessState: SeatAccessState;
   source: 'ROLE' | 'MANUAL';
 }
-
-const SUBSCRIBED_MODULES = ['crm', 'trade'] as const;
 
 const MODULE_LOOK: Record<string, { icon: string; tile: string }> = {
   crm: { icon: 'tablerUsers', tile: 'bg-icon-blue' },
@@ -52,13 +46,15 @@ const SKELETON_ROWS = [0, 1] as const;
 @Component({
   selector: 'app-user-apps-tab',
   imports: [RouterLink, TranslocoPipe, NgIcon, Button, ConfirmDialog, Dropdown, Field, Modal],
-  providers: [
+  viewProviders: [
     provideTranslocoScope(
       'staff',
       'settings',
       { scope: 'staff-user-access', alias: 'access' },
       { scope: 'seats', alias: 'seats' },
     ),
+  ],
+  providers: [
     provideIcons({
       tablerLock,
       tablerUsers,
@@ -78,6 +74,8 @@ export class UserAppsTab {
   protected readonly uid = `user-apps-tab-${++UserAppsTab.nextId}`;
 
   private readonly session = inject(StaffSession);
+  private readonly api = inject(StaffUserAccessApi);
+  private readonly usersApi = inject(StaffUsersApi);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
@@ -91,10 +89,19 @@ export class UserAppsTab {
   readonly readonlyReason = input<string | null>(null);
   readonly changed = output<void>();
 
+  protected readonly validationErrors = signal<Record<string, string[]>>({});
+  protected fieldError(field: string): string | null {
+    const messages = Object.entries(this.validationErrors())
+      .filter(([path]) => path === field || path.startsWith(field + '.'))
+      .flatMap(([, messages]) => messages);
+    return messages.length ? messages.join(' ') : null;
+  }
+
   protected readonly skeletonRows = SKELETON_ROWS;
   protected readonly loading = signal(false);
   protected readonly loadFailed = signal(false);
   protected readonly seatMode = signal<SeatMode>('MANUAL');
+  protected readonly subscribedModules = signal<string[]>([]);
   protected readonly assignments = signal<UserAppItem[]>([]);
   protected readonly selectedModule = signal('');
   protected readonly assigning = signal(false);
@@ -104,7 +111,8 @@ export class UserAppsTab {
   protected readonly isSelf = computed(() => this.session.me()?.id === this.user().id);
   protected readonly isDerivedMode = computed(() => this.seatMode() === 'DERIVED');
   protected readonly effectiveReadonly = computed(
-    () => this.isDerivedMode() || this.readonly() || this.isSelf(),
+    () => this.isDerivedMode() || this.readonly() || this.isSelf() || this.user().isTenantOwner ||
+      this.loading() || this.loadFailed() || !this.session.can('users.user.manage_modules', this.user()),
   );
   protected readonly effectiveReadonlyReason = computed(() => {
     this.i18n();
@@ -112,12 +120,14 @@ export class UserAppsTab {
     const external = this.readonlyReason();
     if (external) return external;
     if (this.isSelf()) return this.transloco.translate('access.apps.selfReadonly');
+    if (this.user().isTenantOwner) return this.transloco.translate('staff.protected.owner');
+    if (!this.session.can('users.user.manage_modules', this.user())) return this.transloco.translate('staff.protected.scope');
     return null;
   });
 
   protected readonly availableModules = computed(() => {
     const assigned = new Set(this.assignments().map((item) => item.moduleKey));
-    return SUBSCRIBED_MODULES.filter((key) => !assigned.has(key));
+    return this.subscribedModules().filter((key) => !assigned.has(key));
   });
 
   protected readonly availableModuleOptions = computed<DropdownOption<string>[]>(() => {
@@ -143,12 +153,19 @@ export class UserAppsTab {
   });
 
   private loadSeq = 0;
+  private actionUserId: string | null = null;
   private assignKeyCache: { moduleKey: string; key: string } | null = null;
   private removeKeyCache: { moduleKey: string; key: string } | null = null;
 
   constructor() {
     effect(() => {
       const userId = this.user().id;
+      if (this.actionUserId !== userId) {
+        this.actionUserId = userId;
+        this.assignKeyCache = null;
+        this.removeKeyCache = null;
+        this.validationErrors.set({});
+      }
       if (!this.session.me()) {
         void this.session.load();
       }
@@ -160,7 +177,7 @@ export class UserAppsTab {
       const current = this.selectedModule();
       if (!available.length) {
         if (current) this.selectedModule.set('');
-      } else if (!available.includes(current as (typeof SUBSCRIBED_MODULES)[number])) {
+      } else if (!available.includes(current)) {
         this.selectedModule.set(available[0]);
       }
     });
@@ -201,15 +218,16 @@ export class UserAppsTab {
         : newIdempotencyKey();
     this.assignKeyCache = { moduleKey, key };
 
+    this.validationErrors.set({});
     this.assigning.set(true);
     try {
-      await assignModule(this.user().id, moduleKey, key);
+      await this.api.assignModule(this.user().id, moduleKey, key);
       this.assignKeyCache = null;
       await this.load(this.user().id);
       this.changed.emit();
       this.notify.success(this.transloco.translate('access.common.saved'));
     } catch (error) {
-      this.notify.error(this.resolveError(error, moduleKey));
+      await this.handleWriteError(error, moduleKey);
     } finally {
       this.assigning.set(false);
     }
@@ -217,9 +235,10 @@ export class UserAppsTab {
 
   protected async requestRemove(row: UserAppItem): Promise<void> {
     if (this.effectiveReadonly() || this.removingModuleKey()) return;
+    const userId = this.user().id;
     this.pendingRemove.set(row);
     const confirmed = await this.removeAppConfirm().open();
-    if (!confirmed) {
+    if (!confirmed || this.effectiveReadonly() || this.user().id !== userId) {
       this.pendingRemove.set(null);
       return;
     }
@@ -232,7 +251,7 @@ export class UserAppsTab {
 
     this.removingModuleKey.set(row.moduleKey);
     try {
-      await unassignModule(this.user().id, row.moduleKey, key);
+      await this.api.unassignModule(this.user().id, row.moduleKey, key);
       this.removeKeyCache = null;
       await this.load(this.user().id);
       this.changed.emit();
@@ -241,7 +260,7 @@ export class UserAppsTab {
       if (errorCodeOf(error) === 'ADDON_ASSIGNMENTS_EXIST') {
         this.addonsModal().open();
       } else {
-        this.notify.error(this.resolveError(error, row.moduleKey));
+        await this.handleWriteError(error, row.moduleKey);
       }
     } finally {
       this.removingModuleKey.set(null);
@@ -255,26 +274,27 @@ export class UserAppsTab {
     this.loadFailed.set(false);
     try {
       const [rawModules, usage] = await Promise.all([
-        listModules(userId),
-        getSeatUsage().catch(() => null),
+        this.api.listModules(userId),
+        this.usersApi.getSeatUsage(),
       ]);
       if (seq !== this.loadSeq) return;
 
-      const mode: SeatMode = usage?.mode ?? 'MANUAL';
+      const mode = usage.mode;
+      this.subscribedModules.set(usage.modules.map((mod) => mod.moduleKey));
       this.seatMode.set(mode);
 
       if (mode !== 'DERIVED') {
         this.assignments.set(
           rawModules.map((row) => ({
             ...row,
-            accessState: 'ACTIVE',
-            source: 'MANUAL',
+            accessState: row.accessState ?? 'ACTIVE',
+            source: row.source ?? 'MANUAL',
           })),
         );
         return;
       }
 
-      const moduleKeys = usage?.modules.map((mod) => mod.moduleKey) ?? [];
+      const moduleKeys = usage.modules.map((mod) => mod.moduleKey);
       const holderEntries = await Promise.all(
         moduleKeys.map(async (moduleKey) => {
           const holder = await this.findHolderForUser(moduleKey, userId);
@@ -290,8 +310,8 @@ export class UserAppsTab {
         }
       }
 
-      const rawByModule = new Map<string, ModuleAssignmentExtra>();
-      for (const row of rawModules as ModuleAssignmentExtra[]) {
+      const rawByModule = new Map<string, ModuleAssignment>();
+      for (const row of rawModules) {
         rawByModule.set(row.moduleKey, row);
       }
 
@@ -316,8 +336,8 @@ export class UserAppsTab {
       this.assignments.set(merged);
     } catch (error) {
       if (seq !== this.loadSeq) return;
-      this.loadFailed.set(true);
-      this.notify.error(this.resolveError(error));
+      this.loadFailed.set(!(error instanceof ApiError && error.status === 0 && this.assignments().length));
+      if (!(error instanceof ApiError && error.status === 0)) this.notify.error(this.resolveError(error));
     } finally {
       if (seq === this.loadSeq) {
         this.loading.set(false);
@@ -331,6 +351,7 @@ export class UserAppsTab {
   ): Promise<SeatHolder | null> {
     let page = 1;
     while (page <= 10) {
+      // FAKE, used by Users apps tab until Seats links GET /seats/usage/:moduleKey/holders
       const res = await listSeatHolders(moduleKey, { page, limit: 100 }).catch(
         () => null,
       );
@@ -343,38 +364,28 @@ export class UserAppsTab {
     return null;
   }
 
-  private resolveError(error: unknown, moduleKey?: string): string {
-    const seatMsg = seatErrorMessage(this.transloco, error);
-    if (seatMsg) return seatMsg;
-    const code = errorCodeOf(error);
-    const moduleLabel = moduleKey ? this.moduleLabel(moduleKey) : '';
-    const details = error instanceof ApiError ? error.details : undefined;
-    const params = moduleLabel ? { ...details, module: moduleLabel } : details;
-
-    if (code) {
-      if (code === 'SEAT_LIMIT_REACHED') {
-        const msg = this.transloco.translate('access.apps.noSeats', params);
-        if (msg !== 'access.apps.noSeats') return msg;
-      }
-      if (code === 'APPLICATION_ALLOWANCE_NOT_READY') {
-        const msg = this.transloco.translate('access.apps.notActive', params);
-        if (msg !== 'access.apps.notActive') return msg;
-      }
-
-      const accessKey = `access.errors.${code}`;
-      const accessMsg = this.transloco.translate(accessKey, params);
-      if (accessMsg && accessMsg !== accessKey) return accessMsg;
-
-      const staffKey = `staff.errors.${code}`;
-      const staffMsg = this.transloco.translate(staffKey, params);
-      if (staffMsg && staffMsg !== staffKey) return staffMsg;
+  private async handleWriteError(error: unknown, moduleKey: string): Promise<void> {
+    const fields = fieldErrorsOf(error);
+    this.validationErrors.set(fields);
+    if (Object.keys(fields).length) {
+      if (fields['_']?.length) this.notify.error(fields['_'].join(' '));
+      return;
     }
+    const code = errorCodeOf(error);
+    if (code === 'GW.IDEM.IN_FLIGHT') this.notify.info(this.resolveError(error, moduleKey, true));
+    else if (code === 'GW.IDEM.MISMATCH') {
+      this.notify.warning(this.resolveError(error, moduleKey, true));
+      this.assignKeyCache = this.removeKeyCache = null;
+      await this.load(this.user().id);
+    } else if (!(error instanceof ApiError && error.status === 0)) this.notify.error(this.resolveError(error, moduleKey, true));
+    if (code === 'SEATS_MANAGED_BY_ROLES' || code === 'TENANT_USER_CHANGED') await this.load(this.user().id);
+    if (code === 'TENANT_USER_CHANGED' || code === 'TENANT_USER_NOT_FOUND') this.changed.emit();
+  }
 
-    const settingsGeneric = this.transloco.translate('settings.errors.generic');
-    if (settingsGeneric !== 'settings.errors.generic') return settingsGeneric;
-    const staffGeneric = this.transloco.translate('staff.errors.generic');
-    return staffGeneric !== 'staff.errors.generic'
-      ? staffGeneric
-      : this.transloco.translate('access.common.loadFailed');
+  private resolveError(error: unknown, moduleKey?: string, write = false): string {
+    if (errorCodeOf(error) === 'SEAT_LIMIT_REACHED') {
+      return this.transloco.translate('access.apps.noSeats', { module: moduleKey ? this.moduleLabel(moduleKey) : '' });
+    }
+    return staffErrorMessage(error, 'access', this.transloco, write ? 'write' : 'read');
   }
 }

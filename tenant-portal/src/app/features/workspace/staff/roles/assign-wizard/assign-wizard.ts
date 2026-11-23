@@ -31,13 +31,12 @@ import { UnsavedDialog } from '../../../../../shared/ui/unsaved-dialog/unsaved-d
 import {
   ApiError,
   errorCodeOf,
-  errorMessage,
-  getRoleBranchPermissions,
-  listBranches,
-  listCompanies,
+  staffErrorMessage,
+  listAllPages,
   roleHolderCount,
-  setRoleBranchPermissions,
 } from '../../shared/staff.api';
+import { RolesApi } from '../roles.api';
+import { OrganizationReadApi } from '../../shared/organization-read.api';
 import { SeatCascadeConfirm } from '../../../seats/cascade-confirm/cascade-confirm';
 import { isCascadeRequired, seatErrorMessage } from '../../../seats/seat-errors';
 import { SeatImpact } from '../../../seats/seat-impact/seat-impact';
@@ -93,6 +92,7 @@ const WIZARD_STEPS: readonly { id: WizardStepId; labelKey: string; num: number }
   providers: [
     provideTranslocoScope(
       'settings',
+      { scope: 'staff-roles', alias: 'roles' },
       { scope: 'staff-permissions', alias: 'perm' },
       { scope: 'staff', alias: 'staff' },
       { scope: 'seats', alias: 'seats' },
@@ -111,6 +111,8 @@ export class AssignPermissionsWizard {
   private readonly destroyRef = inject(DestroyRef);
   private readonly injector = inject(Injector);
   private readonly notify = inject(Notify);
+  private readonly api = inject(RolesApi);
+  private readonly organization = inject(OrganizationReadApi);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly language = inject(LanguageState).current;
@@ -131,8 +133,11 @@ export class AssignPermissionsWizard {
   protected readonly isOpen = signal(false);
   protected readonly roleId = signal<string | null>(null);
   private readonly readonlyRequested = signal(false);
-  protected readonly readonly = computed(() =>
-    this.readonlyRequested() || !this.session.canUpdateBranchPermissions(),
+  protected readonly readonly = computed(
+    () =>
+      this.readonlyRequested() ||
+      Boolean(this.loaded()?.isSystem) ||
+      !this.session.canUpdateBranchPermissions(),
   );
   protected readonly step = signal<WizardStepId>('scope');
   protected readonly loading = signal(false);
@@ -168,6 +173,7 @@ export class AssignPermissionsWizard {
   private baseSnapshot = '';
   private allowClose = false;
   private loadSeq = 0;
+  private cascadeBodyJson: string | null = null;
 
   protected readonly roleName = computed(() => this.loaded()?.roleName ?? '');
   protected readonly profilesPayload = computed(() => this.buildProfilesPayload());
@@ -199,7 +205,9 @@ export class AssignPermissionsWizard {
 
   protected readonly dirty = computed(() => {
     if (this.readonly() || this.loading() || this.loadFailed() || !this.loaded()) return false;
-    return this.computeSnapshot(this.selectedBranchIds(), this.draftPermissions()) !== this.baseSnapshot;
+    return (
+      this.computeSnapshot(this.selectedBranchIds(), this.draftPermissions()) !== this.baseSnapshot
+    );
   });
 
   protected readonly step1Invalid = computed(
@@ -254,11 +262,7 @@ export class AssignPermissionsWizard {
       .map((id) => {
         const branch = branchMap.get(id);
         const companyName = branch ? (companyMap.get(branch.companyId)?.name ?? '') : '';
-        const label = branch
-          ? companyName
-            ? `${branch.name} — ${companyName}`
-            : branch.name
-          : id;
+        const label = branch ? (companyName ? `${branch.name} — ${companyName}` : branch.name) : id;
         const count = countEffectivePermissions(hierarchy, new Set(perms.get(id) ?? []));
         return { branchId: id, label, count };
       });
@@ -284,7 +288,9 @@ export class AssignPermissionsWizard {
       const companyName = branch ? (companyMap.get(branch.companyId)?.name ?? '') : '';
 
       if (!activeSet.has(branchId)) {
-        const baseIds = new Set(normalizeBranchPermissionIds(entries, this.basePermissions.get(branchId) ?? [], 'BRANCH'));
+        const baseIds = new Set(
+          normalizeBranchPermissionIds(entries, this.basePermissions.get(branchId) ?? [], 'BRANCH'),
+        );
         return {
           branchId,
           branchName,
@@ -298,7 +304,11 @@ export class AssignPermissionsWizard {
         };
       }
 
-      const draftNormalized = normalizeBranchPermissionIds(entries, draftMap.get(branchId) ?? [], 'BRANCH');
+      const draftNormalized = normalizeBranchPermissionIds(
+        entries,
+        draftMap.get(branchId) ?? [],
+        'BRANCH',
+      );
       const draftSet = new Set(draftNormalized);
       const chip = this.chipLabel(entries, draftSet);
 
@@ -417,7 +427,10 @@ export class AssignPermissionsWizard {
   }
 
   protected goToPermissions(focusBranchId?: string): void {
-    if (!this.readonly() && (this.selectedBranchIds().length === 0 || this.invalidBranchIds().size > 0)) {
+    if (
+      !this.readonly() &&
+      (this.selectedBranchIds().length === 0 || this.invalidBranchIds().size > 0)
+    ) {
       this.step1Attempted.set(true);
       this.step.set('scope');
       return;
@@ -427,7 +440,10 @@ export class AssignPermissionsWizard {
   }
 
   protected goToReview(): void {
-    if (!this.readonly() && (this.selectedBranchIds().length === 0 || this.invalidBranchIds().size > 0)) {
+    if (
+      !this.readonly() &&
+      (this.selectedBranchIds().length === 0 || this.invalidBranchIds().size > 0)
+    ) {
       this.step1Attempted.set(true);
       this.step.set('scope');
       return;
@@ -493,7 +509,10 @@ export class AssignPermissionsWizard {
       const confirmed = await this.askConfirm({
         tone: 'danger',
         title: this.transloco.translate('perm.s1.removeCompanyTitle', { company: companyName }),
-        text: this.transloco.translate(pluralKey('perm.s1.removeCompanyTextPlural', affectedCount, this.language()), { n: affectedCount }),
+        text: this.transloco.translate(
+          pluralKey('perm.s1.removeCompanyTextPlural', affectedCount, this.language()),
+          { n: affectedCount },
+        ),
         confirmLabel: this.transloco.translate('perm.s1.removeConfirm'),
       });
       if (!confirmed) return;
@@ -590,7 +609,10 @@ export class AssignPermissionsWizard {
         const confirmed = await this.askConfirm({
           tone: 'danger',
           title: this.transloco.translate('perm.s1.removeCompanyTitle', { company: companyName }),
-          text: this.transloco.translate(pluralKey('perm.s1.removeCompanyTextPlural', totalPerms, this.language()), { n: totalPerms }),
+          text: this.transloco.translate(
+            pluralKey('perm.s1.removeCompanyTextPlural', totalPerms, this.language()),
+            { n: totalPerms },
+          ),
           confirmLabel: this.transloco.translate('perm.s1.removeConfirm'),
         });
         if (!confirmed) return;
@@ -685,7 +707,8 @@ export class AssignPermissionsWizard {
       this.saving() ||
       this.loading() ||
       this.loadFailed() ||
-      this.seatBlocked()
+      this.seatBlocked() ||
+      this.conflictOpen()
     ) {
       return;
     }
@@ -701,18 +724,15 @@ export class AssignPermissionsWizard {
       catalogueRevision: currentLoaded.catalogueRevision,
       profiles: this.buildProfilesPayload(),
     };
+    const bodyJson = JSON.stringify(body);
+    if (confirmAddonCascade) this.cascadeBodyJson = bodyJson;
+    const cascadeConfirmed = this.cascadeBodyJson === bodyJson;
     this.saving.set(true);
 
     try {
-      const updated = confirmAddonCascade
-        ? await (
-            setRoleBranchPermissions as (
-              roleId: string,
-              payload: typeof body,
-              opts?: { confirmAddonCascade?: boolean },
-            ) => Promise<RoleBranchPermissions>
-          )(id, body, { confirmAddonCascade: true })
-        : await setRoleBranchPermissions(id, body);
+      const updated = await this.api.setBranchPermissions(id, body, {
+        confirmAddonCascade: cascadeConfirmed,
+      });
 
       const summary = this.buildSavedSummary(updated);
       this.closeImmediately();
@@ -720,7 +740,7 @@ export class AssignPermissionsWizard {
       this.savedDialog().open(summary);
     } catch (error) {
       const cascade = isCascadeRequired(error);
-      if (cascade && !confirmAddonCascade) {
+      if (cascade && !cascadeConfirmed) {
         this.saving.set(false);
         const confirmed = await this.openGuarded(() => this.cascadeConfirm.confirm(cascade.addons));
         if (confirmed) {
@@ -761,6 +781,7 @@ export class AssignPermissionsWizard {
   }
 
   protected async reloadFromConflict(): Promise<void> {
+    if (this.saving()) return;
     const id = this.roleId();
     this.conflictOpen.set(false);
     this.conflictModal().close();
@@ -770,6 +791,32 @@ export class AssignPermissionsWizard {
     this.invalidBranchIds.set(new Set());
     this.autoSelectedCompanyIds.set(new Set());
     await this.load(id);
+  }
+
+  protected async keepChangesFromConflict(): Promise<void> {
+    const id = this.roleId();
+    if (!id || this.saving()) return;
+    const seq = this.loadSeq;
+    this.saving.set(true);
+    try {
+      const latest = await this.api.getBranchPermissions(id);
+      if (seq !== this.loadSeq || id !== this.roleId()) return;
+      this.loaded.update((current) =>
+        current
+          ? {
+              ...current,
+              revision: latest.revision,
+              catalogueRevision: latest.catalogueRevision,
+            }
+          : current,
+      );
+      this.conflictOpen.set(false);
+      this.conflictModal().close();
+    } catch (error) {
+      this.notify.error(this.resolveErrorMessage(error, 'read'));
+    } finally {
+      this.saving.set(false);
+    }
   }
 
   protected onConflictClosed(): void {
@@ -786,20 +833,6 @@ export class AssignPermissionsWizard {
     this.dismissConfirmDialog(event);
   }
 
-  private async fetchAllPages<T>(
-    fetcher: (q: { page: number; limit: number }) => Promise<{ data: T[]; meta: { hasNext: boolean } }>,
-  ): Promise<T[]> {
-    const all: T[] = [];
-    let page = 1;
-    while (page <= 20) {
-      const res = await fetcher({ page, limit: 100 });
-      all.push(...res.data);
-      if (!res.meta.hasNext) break;
-      page += 1;
-    }
-    return all;
-  }
-
   private async load(roleId: string): Promise<void> {
     if (!this.session.canReadBranchPermissions()) return;
     const seq = ++this.loadSeq;
@@ -808,9 +841,10 @@ export class AssignPermissionsWizard {
 
     try {
       const [permsData, companiesRaw, branchesRaw, holders] = await Promise.all([
-        getRoleBranchPermissions(roleId),
-        this.fetchAllPages((q) => listCompanies(q)),
-        this.fetchAllPages((q) => listBranches(q)),
+        this.api.getBranchPermissions(roleId),
+        listAllPages((q) => this.organization.listCompanies(q), { limit: 100 }),
+        listAllPages((q) => this.organization.listBranches(q), { limit: 100 }),
+        // FAKE-ONLY, no backend route: holderCount on GET /roles/:id (BE-S1); FE-S6b swaps it in
         roleHolderCount(roleId).catch(() => 0),
       ]);
       if (seq !== this.loadSeq || !this.session.canReadBranchPermissions()) return;
@@ -867,7 +901,7 @@ export class AssignPermissionsWizard {
         (error instanceof ApiError && error.status === 403) ||
         errorCodeOf(error) === 'ROLE_BRANCH_OWNER_REQUIRED'
       ) {
-        this.notify.error(this.resolveErrorMessage(error));
+        this.notify.error(this.resolveErrorMessage(error, 'read'));
         this.closeImmediately();
         return;
       }
@@ -878,10 +912,7 @@ export class AssignPermissionsWizard {
 
   private handleSaveError(error: unknown): void {
     const code = errorCodeOf(error);
-    if (
-      code === 'ROLE_BRANCH_REVISION_CONFLICT' ||
-      code === 'ROLE_BRANCH_CATALOGUE_CHANGED'
-    ) {
+    if (code === 'ROLE_BRANCH_REVISION_CONFLICT' || code === 'ROLE_BRANCH_CATALOGUE_CHANGED') {
       this.conflictOpen.set(true);
       this.conflictModal().open();
       return;
@@ -898,6 +929,9 @@ export class AssignPermissionsWizard {
       if (error instanceof ApiError && error.details) {
         const detailBranchId = error.details['branchId'];
         if (typeof detailBranchId === 'string') nextInvalid.add(detailBranchId);
+        if (Array.isArray(detailBranchId)) {
+          for (const id of detailBranchId) if (typeof id === 'string') nextInvalid.add(id);
+        }
         const detailBranchIds = error.details['branchIds'];
         if (Array.isArray(detailBranchIds)) {
           for (const id of detailBranchIds) {
@@ -918,7 +952,10 @@ export class AssignPermissionsWizard {
       return;
     }
 
-    this.notify.error(this.resolveErrorMessage(error));
+    const message = this.resolveErrorMessage(error);
+    if (code === 'GW.IDEM.IN_FLIGHT') this.notify.info(message);
+    else if (code === 'GW.IDEM.MISMATCH') this.notify.warning(message);
+    else this.notify.error(message);
   }
 
   private buildProfilesPayload(): { branchId: string; permissionIds: string[] }[] {
@@ -1044,7 +1081,9 @@ export class AssignPermissionsWizard {
 
   private async askConfirm(prompt: ConfirmPrompt): Promise<boolean> {
     this.confirmPrompt.set(prompt);
-    await new Promise<void>((resolve) => afterNextRender(() => resolve(), { injector: this.injector }));
+    await new Promise<void>((resolve) =>
+      afterNextRender(() => resolve(), { injector: this.injector }),
+    );
     return this.openGuarded(() => this.confirmDialog().open());
   }
 
@@ -1078,7 +1117,8 @@ export class AssignPermissionsWizard {
   }
 
   private dismissConfirmDialog(event: Event): void {
-    const dialog = this.confirmDialogWrap()?.nativeElement.querySelector<HTMLDialogElement>('dialog');
+    const dialog =
+      this.confirmDialogWrap()?.nativeElement.querySelector<HTMLDialogElement>('dialog');
     if (!dialog?.open) return;
     event.preventDefault();
     event.stopPropagation();
@@ -1086,7 +1126,7 @@ export class AssignPermissionsWizard {
     dialog.close();
   }
 
-  private closeImmediately(): void {
+  closeImmediately(): void {
     this.allowClose = true;
     this.modal().close();
     this.resetStateOnClose();
@@ -1113,17 +1153,13 @@ export class AssignPermissionsWizard {
     this.autoSelectedCompanyIds.set(new Set());
     this.invalidBranchIds.set(new Set());
     this.step1Attempted.set(false);
+    this.cascadeBodyJson = null;
     this.baseBranchIds = [];
     this.basePermissions = new Map();
     this.baseSnapshot = '';
   }
 
-  private resolveErrorMessage(error: unknown): string {
-    const msg = errorMessage(error, 'staff', this.transloco);
-    if (msg === 'settings.errors.generic') {
-      const staffGeneric = this.transloco.translate('staff.errors.generic');
-      if (staffGeneric && staffGeneric !== 'staff.errors.generic') return staffGeneric;
-    }
-    return msg;
+  private resolveErrorMessage(error: unknown, operation: 'read' | 'write' = 'write'): string {
+    return staffErrorMessage(error, 'roles', this.transloco, operation);
   }
 }

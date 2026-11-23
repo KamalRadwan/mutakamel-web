@@ -59,7 +59,8 @@
     "departmentHasPlacedUsers": "Users still work in this department.",
     "departmentHasTeamMemberships": "Users still belong to teams of this department.",
     "teamHasPlacedUsers": "Users still have this team as their home team.",
-    "teamHasMemberships": "The team still has members."
+    "teamHasMemberships": "The team still has members.",
+    "introOne": "Fix this, then try again."
   },
   "conflict": {
     "title": "This record was changed",
@@ -177,12 +178,12 @@
     "TOO_MANY_REQUESTS": "Too many requests. Wait a moment and try again.",
     "GW": {
       "IDEM": {
-        "MISSING": "A request key is missing. Try again.",
-        "BAD_VALUE": "The request key is invalid. Try again.",
-        "IN_FLIGHT": "This request is already being processed.",
-        "MISMATCH": "This request no longer matches the earlier attempt. Try again."
+        "IN_FLIGHT": "Still saving. Wait a moment.",
+        "MISMATCH": "This change was already sent with different values. Reload."
       }
     },
-    "generic": "Something went wrong. Try again."
+    "generic": "Something went wrong. Try again.",
+    "notSaved": "Not saved. Try again.",
+    "PROFILE_EXTENSIONS_TOO_LARGE": "The extra profile data is too large to save."
   }
 }

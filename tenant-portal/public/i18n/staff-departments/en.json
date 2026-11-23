@@ -40,7 +40,8 @@
     "namePlaceholder": "Enter department name",
     "active": "Active",
     "activeHint": "Controls whether this department is active and can receive new teams or users.",
-    "activeHelp": "Inactive departments can't receive new teams or users."
+    "activeHelp": "Inactive departments can't receive new teams or users.",
+    "codeLocked": "Can't be changed after creation."
   },
   "validation": {
     "companyRequired": "Select a company.",
@@ -64,15 +65,15 @@
   "confirm": {
     "deleteTitle": "Delete {{name}}?",
     "deleteText": "A department that still has teams or users cannot be deleted.",
-    "staleTitle": "Department scope changed",
-    "staleText": "The organization hierarchy changed while you were editing. Reload to get the latest data.",
-    "reload": "Reload",
-    "keepChanges": "Keep my changes",
     "discardTitle": "Discard your changes?",
     "discardText": "Your unsaved changes to this department will be lost.",
     "discardConfirm": "Discard",
     "discardKeep": "Keep editing",
-    "blockersTitle": "Cannot complete action"
+    "blockersTitle": "Cannot complete action",
+    "deactivateTitle": "Deactivate {{name}}?",
+    "deactivateText": "Its teams must be inactive first, and no users can be placed in it.",
+    "activateTitle": "Activate {{name}}?",
+    "activateText": "This department will be able to receive teams and users again."
   },
   "toast": {
     "created": "Department created.",
@@ -86,5 +87,10 @@
   "unsaved": "Unsaved changes",
   "cancel": "Cancel",
   "close": "Close",
-  "delete": "Delete"
+  "delete": "Delete",
+  "blockers": {
+    "viewTeams": "View teams",
+    "viewUsers": "View users"
+  },
+  "parentInactive": "This branch is inactive. Activate it first."
 }

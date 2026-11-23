@@ -63,7 +63,10 @@ describe('Department and Team create from real Staff scopes', () => {
         config: { availableLangs: ['en'], defaultLang: 'en', missingHandler: { logMissingKey: false } },
         loader: EmptyLoader,
       }),
-      { provide: AuthSession, useValue: { me, status: signal('signed-in'), ensureLoaded: async () => 'signed-in' } },
+      { provide: AuthSession, useValue: {
+        me, status: signal('signed-in'), ensureLoaded: async () => 'signed-in',
+        requestVersion: () => ({ generation: 1 }),
+      } },
     ] });
     http = TestBed.inject(HttpTestingController);
     document = TestBed.inject(DOCUMENT);
@@ -178,15 +181,15 @@ describe('Department and Team create from real Staff scopes', () => {
     expect(page['total']()).toBe(21);
     expect(page['page']()).toBe(2);
 
-    page['openDetails'](page['rows']()[0]);
+    page['openEdit'](page['rows']()[0]);
     http.expectOne({ method: 'GET', url: `${prefix}/departments/${departmentId}` }).flush({ success: true, data: updatedDepartment });
     await settle(fixture);
-    expect(modal['mode']()).toBe('details');
-    expect(modal['canManage']()).toBe(false);
+    expect(modal['mode']()).toBe('edit');
+    expect(modal['canManage']()).toBe(true);
     expect(modal['name']()).toBe(department.name);
     const parents: HTMLInputElement[] = Array.from(fixture.nativeElement.querySelectorAll('dialog[open] app-org-cascade input'));
     expect(parents.map(({ value }) => value)).toEqual([company.name, branch.name]);
-    expect(page['actionsFor'](page['rows']()[0]).map(({ id }) => id)).toEqual(['open']);
+    expect(page['actionsFor'](page['rows']()[0]).map(({ id }) => id)).toEqual(['open', 'edit', 'toggleStatus', 'delete']);
   });
 
   it('creates a Team with a selected lead from its department branch and hides fake actions', async () => {
@@ -210,7 +213,7 @@ describe('Department and Team create from real Staff scopes', () => {
     expect(candidates.request.params.get('branchId')).toBe(branchId);
     candidates.flush(envelope([lead, { ...lead, id: 'outside', branchId: otherBranchId }]));
     await loading;
-    expect(modal['leadOptions']()).toEqual([lead]);
+    expect(modal['leadOptions']()).toEqual([{ ...lead, seats: [] }]);
     modal['selectLead'](modal['leadOptions']()[0]);
     modal['code'].set(team.code);
     modal['name'].set(team.name);
@@ -234,7 +237,7 @@ describe('Department and Team create from real Staff scopes', () => {
     http.expectOne((req) => req.url === usersPath && req.params.get('teamId') === teamId).flush(envelope([]));
     await settle(fixture);
     expect(page['rows']()).toEqual([team]);
-    expect(page['actionsFor'](page['rows']()[0]).map(({ id }) => id)).toEqual(['open', 'viewMembers']);
+    expect(page['actionsFor'](page['rows']()[0]).map(({ id }) => id)).toEqual(['open', 'edit', 'viewMembers', 'toggleStatus', 'delete']);
   });
 
   it('keeps an out-of-branch manage grant from enabling Department create and distinguishes 403', async () => {

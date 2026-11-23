@@ -254,11 +254,9 @@
   [cancelLabel]="'branches.cancel' | transloco"
 />
 
-<ui-confirm-dialog
-  #staleDialog
-  tone="warning"
-  [title]="'branches.confirm.staleTitle' | transloco"
-  [text]="'branches.confirm.staleText' | transloco"
-  [confirmLabel]="'branches.confirm.reload' | transloco"
-  [cancelLabel]="'branches.confirm.keepChanges' | transloco"
+<ui-conflict-dialog
+  [(open)]="conflictOpen"
+  [recordLabel]="conflictLabel()"
+  (reload)="resolveConflict(false)"
+  (keepEditing)="resolveConflict(true)"
 />

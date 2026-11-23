@@ -19,7 +19,8 @@ import { ActionItem, ActionSelection, ActionsMenu } from '../../../../../shared/
 import { Button } from '../../../../../shared/ui/button/button';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { UnsavedDialog } from '../../../../../shared/ui/unsaved-dialog/unsaved-dialog';
-import { ApiError, errorCodeOf, getUser } from '../../shared/staff.api';
+import { ApiError, errorCodeOf } from '../../shared/staff.api';
+import { StaffUsersApi } from '../users.api';
 import { StaffSession } from '../../shared/staff-session';
 import { StatusBadge } from '../../shared/status-badge/status-badge';
 import { TenantUser } from '../../shared/staff.model';
@@ -65,7 +66,6 @@ const TABS: readonly { id: UserModalTab; labelKey: string; icon: string }[] = [
     UserCallsTab,
   ],
   providers: [
-    provideTranslocoScope('settings', { scope: 'staff', alias: 'staff' }, { scope: 'staff-users', alias: 'users' }),
     provideIcons({
       tablerCrown,
       tablerX,
@@ -77,6 +77,7 @@ const TABS: readonly { id: UserModalTab; labelKey: string; icon: string }[] = [
       tablerHistory,
     }),
   ],
+  viewProviders: [provideTranslocoScope('settings', { scope: 'staff', alias: 'staff' }, { scope: 'staff-users', alias: 'users' })],
   templateUrl: './user-modal.html',
 })
 export class UserModal {
@@ -84,6 +85,7 @@ export class UserModal {
   protected readonly uid = `user-modal-${++UserModal.nextId}`;
 
   private readonly session = inject(StaffSession);
+  private readonly usersApi = inject(StaffUsersApi);
   private readonly language = inject(LanguageState).current;
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
@@ -175,7 +177,7 @@ export class UserModal {
     const u = this.user();
     if (!u) return true;
     return (
-      u.isTenantOwner ||
+      u.isTenantOwner || this.isSelf() ||
       !this.session.can('users.user.manage_memberships', { companyId: u.companyId, branchId: u.branchId })
     );
   });
@@ -185,6 +187,7 @@ export class UserModal {
     const u = this.user();
     if (!u) return null;
     if (u.isTenantOwner) return this.transloco.translate('staff.protected.owner');
+    if (this.isSelf()) return this.transloco.translate('staff.protected.self');
     if (!this.session.can('users.user.manage_memberships', { companyId: u.companyId, branchId: u.branchId })) {
       return this.transloco.translate('staff.protected.scope');
     }
@@ -194,7 +197,7 @@ export class UserModal {
   protected readonly appsReadonly = computed(() => {
     const u = this.user();
     if (!u) return true;
-    return u.isTenantOwner || !this.session.isTenantWide('users.user.manage_modules');
+    return u.isTenantOwner || this.isSelf() || !this.session.can('users.user.manage_modules', { companyId: u.companyId, branchId: u.branchId });
   });
 
   protected readonly appsReadonlyReason = computed<string | null>(() => {
@@ -202,7 +205,8 @@ export class UserModal {
     const u = this.user();
     if (!u) return null;
     if (u.isTenantOwner) return this.transloco.translate('staff.protected.owner');
-    if (!this.session.isTenantWide('users.user.manage_modules')) {
+    if (this.isSelf()) return this.transloco.translate('staff.protected.self');
+    if (!this.session.can('users.user.manage_modules', { companyId: u.companyId, branchId: u.branchId })) {
       return this.transloco.translate('staff.protected.scope');
     }
     return null;
@@ -294,12 +298,12 @@ export class UserModal {
     this.userUpdated.emit(updated);
   }
 
-  protected async reloadUser(): Promise<void> {
+  async reloadUser(): Promise<void> {
     const current = this.user();
     if (!current) return;
     const seq = ++this.reloadSeq;
     try {
-      const fresh = await getUser(current.id);
+      const fresh = await this.usersApi.getUser(current.id);
       if (seq !== this.reloadSeq || this.user()?.id !== current.id) return;
       this.user.set(fresh);
       this.userUpdated.emit(fresh);

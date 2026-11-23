@@ -1,4 +1,6 @@
-import { Component, computed, inject, input, linkedSignal, signal } from '@angular/core';
+import { Component, computed, effect, inject, input, linkedSignal, signal, untracked } from '@angular/core';
+import { ApiError, errorCodeOf } from '../../../../core/api/api-errors';
+import { LanguageState } from '../../../../core/i18n/language';
 import { translationEvents } from '../../../../core/i18n/translation-events';
 import { Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
@@ -27,9 +29,10 @@ import { ActionItem } from '../../../../shared/ui/actions-menu/actions-menu';
 import { Button } from '../../../../shared/ui/button/button';
 import { Field } from '../../../../shared/ui/field/field';
 import { Switch } from '../../../../shared/ui/switch/switch';
+import { RouteError } from '../../../../shared/ui/route-error/route-error';
 import { ViewOption, ViewSwitcher } from '../../../../shared/ui/view-switcher/view-switcher';
 import { StaffSession } from '../shared/staff-session';
-import { errorCodeOf, getOrgTree } from '../shared/staff.api';
+import { OrganizationReadApi } from '../shared/organization-read.api';
 import { OrgTreeNode } from '../shared/staff.model';
 import { OrgChart } from './org-chart/org-chart';
 import {
@@ -52,7 +55,7 @@ const VIEW_ICONS: Record<OrgViewMode, string> = {
 
 @Component({
   selector: 'app-organization-page',
-  imports: [NgIcon, TranslocoPipe, Button, Field, Switch, ViewSwitcher, TreeRows, TreeColumns, OrgChart],
+  imports: [NgIcon, TranslocoPipe, Button, Field, Switch, ViewSwitcher, TreeRows, TreeColumns, OrgChart, RouteError],
   providers: [
     provideTranslocoScope('settings', 'staff', { scope: 'staff-organization', alias: 'org' }),
     provideIcons({
@@ -83,6 +86,8 @@ export class OrganizationPage {
   private readonly router = inject(Router);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
+  private readonly language = inject(LanguageState).current;
+  private readonly api = inject(OrganizationReadApi);
   protected readonly session = inject(StaffSession);
 
   /** Bound from the `?view=` query parameter. */
@@ -97,6 +102,8 @@ export class OrganizationPage {
   protected readonly loading = signal(true);
   protected readonly loadFailed = signal(false);
   protected readonly tooLarge = signal(false);
+  protected readonly forbidden = signal(false);
+  protected readonly tooLargeText = signal({ key: 'org.tooLarge', limit: '5000' });
   protected readonly search = signal('');
   protected readonly showInactive = signal(false);
   protected readonly skeletonRows = [1, 2, 3, 4, 5];
@@ -107,8 +114,6 @@ export class OrganizationPage {
     computation: () => ({}),
   });
 
-  private loadSeq = 0;
-
   protected readonly canAddCompany = computed(() => this.session.isTenantWide('org.company.manage'));
   protected readonly isSearching = computed(() => this.search().trim().length > 0);
 
@@ -116,8 +121,8 @@ export class OrganizationPage {
     return buildOrgViewTree(this.rawTree(), {
       showInactive: this.showInactive(),
       search: this.search(),
+      locale: this.language(),
       canReadCompany: (companyId) => this.session.can('org.company.read', { companyId }),
-      canReadBranch: (companyId, branchId) => this.session.can('org.branch.read', { companyId, branchId }),
       canReadDepartments: (companyId, branchId) =>
         this.session.can('org.department.read', { companyId, branchId }),
       canReadTeams: (companyId, branchId) =>
@@ -156,7 +161,24 @@ export class OrganizationPage {
   });
 
   constructor() {
-    void this.load();
+    void this.session.load().catch(() => undefined);
+    effect(() => {
+      const scope = this.session.scopeRevision();
+      const state = this.session.state();
+      untracked(() => {
+        this.rawTree.set([]);
+        this.baseExpandedIds.set(new Set());
+        this.forbidden.set(false);
+        this.tooLarge.set(false);
+        this.loadFailed.set(false);
+        if (scope) {
+          void this.load(scope);
+        } else {
+          this.loading.set(state === 'pending');
+          this.loadFailed.set(state === 'failed');
+        }
+      });
+    });
   }
 
   protected reload(): void {
@@ -268,26 +290,40 @@ export class OrganizationPage {
     }
   }
 
-  private async load(): Promise<void> {
-    const seq = ++this.loadSeq;
+  private async load(scope = this.session.scopeRevision()): Promise<void> {
+    if (!scope) return;
     this.loading.set(true);
     this.loadFailed.set(false);
     this.tooLarge.set(false);
+    this.forbidden.set(false);
 
     try {
-      const [, tree] = await Promise.all([this.session.load().catch(() => undefined), getOrgTree()]);
-      if (seq !== this.loadSeq) return;
+      await this.session.load();
+      if (scope !== this.session.scopeRevision()) return;
+      const tree = await this.api.getTree();
+      if (scope !== this.session.scopeRevision()) return;
       this.rawTree.set(tree);
       this.baseExpandedIds.set(new Set(tree.map((company) => company.id)));
     } catch (error) {
-      if (seq !== this.loadSeq) return;
-      if (errorCodeOf(error) === 'ORG_TREE_TOO_LARGE') {
+      if (scope !== this.session.scopeRevision()) return;
+      if (error instanceof ApiError && error.status === 403) {
+        this.rawTree.set([]);
+        this.forbidden.set(true);
+      } else if (errorCodeOf(error) === 'ORG_TREE_TOO_LARGE') {
+        const details = error instanceof ApiError ? error.details : undefined;
+        const kind = Array.isArray(details?.['nodeKind']) ? details['nodeKind'][0] : undefined;
+        const limit = Array.isArray(details?.['limit']) ? details['limit'][0] : undefined;
+        this.tooLargeText.set({
+          key: ['companies', 'branches', 'departments', 'teams'].includes(kind)
+            ? `org.tooLargeKind.${kind}` : 'org.tooLarge',
+          limit: typeof limit === 'string' ? limit : '5000',
+        });
         this.tooLarge.set(true);
-      } else {
+      } else if (!(error instanceof ApiError && error.status === 0 && this.rawTree().length > 0)) {
         this.loadFailed.set(true);
       }
     } finally {
-      if (seq === this.loadSeq) {
+      if (scope === this.session.scopeRevision()) {
         this.loading.set(false);
       }
     }

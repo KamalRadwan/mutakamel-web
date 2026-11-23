@@ -2,7 +2,13 @@ import { Component, computed, inject, output, signal, viewChild } from '@angular
 import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { tablerAlertTriangle, tablerCloudOff, tablerListCheck, tablerLock, tablerRefresh } from '@ng-icons/tabler-icons';
+import {
+  tablerAlertTriangle,
+  tablerCloudOff,
+  tablerListCheck,
+  tablerLock,
+  tablerRefresh,
+} from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../../core/i18n/language';
 import { Notify } from '../../../../../core/notify/notify';
 import { Button } from '../../../../../shared/ui/button/button';
@@ -11,12 +17,11 @@ import { Modal } from '../../../../../shared/ui/modal/modal';
 import {
   ApiError,
   errorCodeOf,
-  errorMessage,
-  getRole,
-  listPermissions,
+  staffErrorMessage,
+  listAllPages,
   newIdempotencyKey,
-  setRolePermissions,
 } from '../../shared/staff.api';
+import { RolesApi } from '../roles.api';
 import { SeatCascadeConfirm } from '../../../seats/cascade-confirm/cascade-confirm';
 import { isCascadeRequired, seatErrorMessage } from '../../../seats/seat-errors';
 import { SeatImpact } from '../../../seats/seat-impact/seat-impact';
@@ -36,38 +41,29 @@ function sameIdSet(a: readonly string[], b: readonly string[]): boolean {
   return true;
 }
 
-function resolveKey(transloco: TranslocoService, key: string, params?: Record<string, unknown>): string | null {
-  const value = transloco.translate(key, params);
-  return value && value !== key ? value : null;
-}
-
-function translateError(error: unknown, transloco: TranslocoService): string {
-  const code = errorCodeOf(error);
-  const details = error instanceof ApiError ? error.details : undefined;
-  if (code) {
-    const fromRoles = resolveKey(transloco, `roles.errors.${code}`, details);
-    if (fromRoles) return fromRoles;
-    const fromStaff = resolveKey(transloco, `staff.errors.${code}`, details);
-    if (fromStaff) return fromStaff;
-  }
-  const fromSettings = errorMessage(error, 'staff', transloco);
-  if (fromSettings && fromSettings !== 'settings.errors.generic') {
-    return fromSettings;
-  }
-  return resolveKey(transloco, 'staff.errors.generic') ?? transloco.translate('roles.errors.generic');
-}
-
 @Component({
   selector: 'app-global-permissions-modal',
   imports: [TranslocoPipe, NgIcon, Button, ConfirmDialog, Modal, PermissionTree, SeatImpact],
   providers: [
-    provideTranslocoScope('settings', 'staff', { scope: 'seats', alias: 'seats' }),
-    provideIcons({ tablerListCheck, tablerLock, tablerAlertTriangle, tablerCloudOff, tablerRefresh }),
+    provideTranslocoScope(
+      'settings',
+      'staff',
+      { scope: 'staff-roles', alias: 'roles' },
+      { scope: 'seats', alias: 'seats' },
+    ),
+    provideIcons({
+      tablerListCheck,
+      tablerLock,
+      tablerAlertTriangle,
+      tablerCloudOff,
+      tablerRefresh,
+    }),
   ],
   templateUrl: './global-permissions-modal.html',
 })
 export class GlobalPermissionsModal {
   private readonly notify = inject(Notify);
+  private readonly api = inject(RolesApi);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly language = inject(LanguageState).current;
@@ -78,7 +74,8 @@ export class GlobalPermissionsModal {
   private readonly discardDialog = viewChild.required(ConfirmDialog);
 
   readonly saved = output<RoleDetail>();
-  readonly branchModeConflict = output<void>();
+  readonly branchModeConflict = output<string>();
+  readonly missing = output<void>();
 
   protected readonly maxPermissions = STAFF_LIMITS.rolePermissions;
   protected readonly skeletonRows = [1, 2, 3, 4, 5];
@@ -101,6 +98,7 @@ export class GlobalPermissionsModal {
   private confirmingDiscard = false;
   private lastFingerprint: string | null = null;
   private lastIdempotencyKey: string | null = null;
+  private lastCascadeConfirmed = false;
 
   protected readonly roleDisplayName = computed(() => {
     const current = this.role();
@@ -112,13 +110,29 @@ export class GlobalPermissionsModal {
   protected readonly isBranchRole = computed(() => this.role()?.permissionMode === 'BRANCH');
 
   protected readonly disabledPermissionIds = computed<readonly string[]>(() => {
-    return this.entries().filter((entry) => !this.session.isTenantWide(entry.key)).map((entry) => entry.id);
+    return this.entries()
+      .filter((entry) => !this.session.isTenantWide(entry.key))
+      .map((entry) => entry.id);
+  });
+
+  protected readonly exceedsAuthority = computed(() => {
+    const permittedIds = new Set(
+      this.entries()
+        .filter((entry) => this.session.isTenantWide(entry.key))
+        .map((entry) => entry.id),
+    );
+    return this.selected().some((id) => !permittedIds.has(id));
   });
 
   protected readonly isReadonly = computed(() => {
     const current = this.role();
-    return this.forceReadonly() || Boolean(current?.isSystem) || current?.permissionMode === 'BRANCH' ||
-      !this.session.canReadRolePermissions() || !this.session.isTenantWide('roles.role.update');
+    return (
+      this.forceReadonly() ||
+      Boolean(current?.isSystem) ||
+      current?.permissionMode === 'BRANCH' ||
+      !this.session.canReadRolePermissions() ||
+      !this.session.isTenantWide('roles.role.update')
+    );
   });
 
   protected readonly dirty = computed(() => {
@@ -158,6 +172,7 @@ export class GlobalPermissionsModal {
   protected reloadData(): void {
     if (!this.currentRoleId || this.loading() || this.saving()) return;
     this.listChangedError.set(false);
+    this.clearIdempotency();
     void this.loadData(this.currentRoleId);
   }
 
@@ -171,43 +186,53 @@ export class GlobalPermissionsModal {
 
   protected async save(confirmAddonCascade = false): Promise<void> {
     const current = this.role();
-    if (!current || this.isReadonly() || this.saving() || this.loading() || !this.dirty() || this.seatBlocked()) {
+    if (
+      !current ||
+      this.isReadonly() ||
+      this.saving() ||
+      this.loading() ||
+      !this.dirty() ||
+      this.seatBlocked()
+    ) {
       return;
     }
     if (this.selected().length > this.maxPermissions) {
-      this.notify.error(this.transloco.translate('roles.errors.TENANT_ROLE_PERMISSION_LIMIT_EXCEEDED'));
+      this.notify.error(
+        this.transloco.translate('roles.errors.TENANT_ROLE_PERMISSION_LIMIT_EXCEEDED'),
+      );
       return;
     }
 
     const permissionIds = [...this.selected()];
-    const permittedIds = new Set(this.entries().filter((entry) => this.session.isTenantWide(entry.key)).map((entry) => entry.id));
+    const permittedIds = new Set(
+      this.entries()
+        .filter((entry) => this.session.isTenantWide(entry.key))
+        .map((entry) => entry.id),
+    );
     if (permissionIds.some((id) => !permittedIds.has(id))) return;
-    const key = confirmAddonCascade
-      ? newIdempotencyKey()
-      : this.idempotencyKeyFor(current.id, permissionIds);
+    let key = this.idempotencyKeyFor(current.id, permissionIds);
+    if (confirmAddonCascade) {
+      key = newIdempotencyKey();
+      this.lastIdempotencyKey = key;
+      this.lastCascadeConfirmed = true;
+    }
+    const cascadeConfirmed = this.lastCascadeConfirmed;
     this.saving.set(true);
 
     try {
-      const updated = confirmAddonCascade
-        ? await (
-            setRolePermissions as (
-              id: string,
-              perms: string[],
-              idemKey: string,
-              opts?: { confirmAddonCascade?: boolean },
-            ) => Promise<RoleDetail>
-          )(current.id, permissionIds, key, { confirmAddonCascade: true })
-        : await setRolePermissions(current.id, permissionIds, key);
+      const updated = await this.api.setPermissions(current.id, permissionIds, key, {
+        confirmAddonCascade: cascadeConfirmed,
+      });
       this.clearIdempotency();
       this.notify.success(this.transloco.translate('roles.global.saved'));
       this.closeImmediate();
       this.saved.emit(updated);
     } catch (error) {
       const cascade = isCascadeRequired(error);
-      if (cascade && !confirmAddonCascade) {
-        this.saving.set(false);
+      if (cascade && !cascadeConfirmed) {
         const confirmed = await this.cascadeConfirm.confirm(cascade.addons);
         if (confirmed) {
+          this.saving.set(false);
           await this.save(true);
         }
         return;
@@ -219,7 +244,9 @@ export class GlobalPermissionsModal {
       }
       const code = errorCodeOf(error);
       if (code === 'TENANT_ROLE_PERMISSION_LIMIT_EXCEEDED') {
-        this.notify.error(this.transloco.translate('roles.errors.TENANT_ROLE_PERMISSION_LIMIT_EXCEEDED'));
+        this.notify.error(
+          this.transloco.translate('roles.errors.TENANT_ROLE_PERMISSION_LIMIT_EXCEEDED'),
+        );
         return;
       }
       if (code === 'PERMISSION_UNKNOWN') {
@@ -230,14 +257,17 @@ export class GlobalPermissionsModal {
       if (code === 'ROLE_BRANCH_MODE_REQUIRED') {
         this.notify.error(this.transloco.translate('roles.errors.ROLE_BRANCH_MODE_REQUIRED'));
         this.closeImmediate();
-        this.branchModeConflict.emit();
+        this.branchModeConflict.emit(current.id);
         return;
       }
-      if (code === 'ROLE_PERMISSION_GRANT_DENIED') {
-        this.notify.error(this.transloco.translate('roles.global.grantDenied'));
-        return;
+      const message = staffErrorMessage(error, 'roles', this.transloco, 'write');
+      if (code === 'GW.IDEM.IN_FLIGHT') this.notify.info(message);
+      else if (code === 'GW.IDEM.MISMATCH') this.notify.warning(message);
+      else this.notify.error(message);
+      if (code === 'ROLE_NOT_FOUND' || (error instanceof ApiError && error.status === 404)) {
+        this.closeImmediate();
+        this.missing.emit();
       }
-      this.notify.error(translateError(error, this.transloco));
     } finally {
       this.saving.set(false);
     }
@@ -281,7 +311,10 @@ export class GlobalPermissionsModal {
 
     try {
       if (!this.session.canReadRolePermissions()) return;
-      const [roleDetail, permissions] = await Promise.all([getRole(roleId), this.fetchAllPermissions()]);
+      const [roleDetail, permissions] = await Promise.all([
+        this.api.get(roleId),
+        this.fetchAllPermissions(),
+      ]);
       if (seq !== this.loadSeq || !this.session.canReadRolePermissions()) return;
       this.role.set(roleDetail);
       this.entries.set(fromPermissions(permissions));
@@ -299,21 +332,20 @@ export class GlobalPermissionsModal {
   }
 
   private async fetchAllPermissions(): Promise<Permission[]> {
-    const all: Permission[] = [];
-    let page = 1;
-    while (page <= 50) {
-      const res = await listPermissions({ page, limit: 100, sortBy: 'group', sortDir: 'ASC' });
-      all.push(...res.data);
-      if (!res.meta.hasNext || res.data.length === 0) break;
-      page++;
-    }
-    return all;
+    return listAllPages(
+      (query) => {
+        if ((query.page ?? 1) > 10) throw new ApiError(502, 'COMMON.GENERIC.INTERNAL_ERROR');
+        return this.api.listPermissions(query);
+      },
+      { limit: 100, sortBy: 'group', sortDir: 'ASC' },
+    );
   }
 
   private idempotencyKeyFor(roleId: string, permissionIds: string[]): string {
-    const fingerprint = `${roleId}:${JSON.stringify([...permissionIds].sort())}`;
+    const fingerprint = `${roleId}:${JSON.stringify(permissionIds)}`;
     if (fingerprint !== this.lastFingerprint || !this.lastIdempotencyKey) {
       this.lastFingerprint = fingerprint;
+      this.lastCascadeConfirmed = false;
       this.lastIdempotencyKey = newIdempotencyKey();
     }
     return this.lastIdempotencyKey;
@@ -322,6 +354,7 @@ export class GlobalPermissionsModal {
   private clearIdempotency(): void {
     this.lastFingerprint = null;
     this.lastIdempotencyKey = null;
+    this.lastCascadeConfirmed = false;
   }
 
   private async confirmDiscardAndClose(): Promise<void> {

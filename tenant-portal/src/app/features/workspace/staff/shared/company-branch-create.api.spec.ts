@@ -5,7 +5,7 @@ import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { newIdempotencyKey } from '../../../../core/api/idempotency';
 import { AuthSession } from '../../../../core/auth/auth-session';
-import { OrganizationCreateApi } from './organization-create.api';
+import { OrganizationWriteApi } from './organization-write.api';
 import { OrganizationReadApi } from './organization-read.api';
 import { StaffSession } from './staff-session';
 
@@ -15,7 +15,7 @@ const csrf = 'test-csrf-proof';
 const version = { generation: 1, revision: 0 };
 
 describe('Organization create HTTP contract', () => {
-  let api: OrganizationCreateApi;
+  let api: OrganizationWriteApi;
   let http: HttpTestingController;
   let cookie: string;
   const session = {
@@ -46,7 +46,7 @@ describe('Organization create HTTP contract', () => {
     cookie = `${name}=${csrf}`;
     vi.spyOn(doc, 'cookie', 'get').mockImplementation(() => cookie);
     http = TestBed.inject(HttpTestingController);
-    api = TestBed.inject(OrganizationCreateApi);
+    api = TestBed.inject(OrganizationWriteApi);
   });
 
   afterEach(() => {
@@ -101,7 +101,7 @@ describe('Organization create HTTP contract', () => {
     session.isTenantWide.mockReturnValue(true);
     cookie = '';
     await expect(api.createCompany({ code: 'A', name: 'A' }, newIdempotencyKey())).rejects.toMatchObject({
-      code: 'AUTH_CSRF_INVALID',
+      code: 'GW.AUTH.CSRF_INVALID',
     });
     http.expectNone((request) => request.method === 'POST');
   });

@@ -199,6 +199,7 @@
     "departmentRequired": "Select a department."
   },
   "errors": {
+    "USER_UNAVAILABLE": "No longer available",
     "cycle": "This would create a reporting loop."
   },
   "common": {

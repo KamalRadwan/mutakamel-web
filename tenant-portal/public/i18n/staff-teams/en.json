@@ -7,7 +7,10 @@
   "loadFailed": "Could not load teams.",
   "retry": "Try again",
   "notRecorded": "Not recorded",
-  "retryLater": "A team lead change is in progress. Try again in a moment.",
+  "parentInactive": "This department is inactive. Activate it first.",
+  "blockers": {
+    "viewUsers": "View users"
+  },
   "filters": {
     "company": "Company",
     "branch": "Branch",
@@ -43,7 +46,8 @@
     "nameHint": "Up to 120 characters.",
     "namePlaceholder": "Enter team name",
     "lead": "Team lead",
-    "leadHint": "Optional. Must work in this branch or have access to it.",
+    "leadHint": "Optional. Only active users placed in this branch are listed.",
+    "codeLocked": "Can't be changed after creation.",
     "leadSearch": "Search active users",
     "noLead": "No lead",
     "active": "Active",
@@ -81,10 +85,10 @@
   "confirm": {
     "deleteTitle": "Delete {{name}}?",
     "deleteText": "A team that still has placed users or memberships cannot be deleted.",
-    "staleTitle": "Team scope changed",
-    "staleText": "The organization hierarchy changed while you were editing. Reload to get the latest data.",
-    "reload": "Reload",
-    "keepChanges": "Keep my changes",
+    "deactivateTitle": "Deactivate {{name}}?",
+    "deactivateText": "A team with placed users or members can't be deactivated.",
+    "activateTitle": "Activate {{name}}?",
+    "activateText": "This team will be active again.",
     "discardTitle": "Discard your changes?",
     "discardText": "Your unsaved changes to this team will be lost.",
     "discardConfirm": "Discard",

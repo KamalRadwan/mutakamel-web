@@ -26,7 +26,7 @@ import { PhoneState } from '../../../core/phone/phone';
 export class AudioRow {
   protected readonly phone = inject(PhoneState);
 
-  readonly kind = input.required<'speaker' | 'mic'>();
+  readonly kind = input<'speaker' | 'mic'>('speaker');
 
   protected readonly isMuted = computed(() =>
     this.kind() === 'speaker' ? this.phone.speakerMuted() : this.phone.muted(),

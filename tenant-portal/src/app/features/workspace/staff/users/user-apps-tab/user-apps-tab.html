@@ -13,6 +13,7 @@
       [for]="uid + '-app'"
       [label]="'access.apps.field' | transloco"
       [hint]="'access.apps.fieldHint' | transloco"
+      [error]="fieldError('moduleKey')"
     >
       <ui-dropdown
         class="w-full"

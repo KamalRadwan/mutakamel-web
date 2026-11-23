@@ -12,19 +12,22 @@ import {
 } from '@angular/core';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { provideIcons } from '@ng-icons/core';
-import { tablerSitemap } from '@ng-icons/tabler-icons';
+import { NgIcon, provideIcons } from '@ng-icons/core';
+import { tablerArrowBackUp, tablerSitemap } from '@ng-icons/tabler-icons';
 import { Notify } from '../../../../../core/notify/notify';
 import { Button } from '../../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
+import { ConflictDialog } from '../../../../../shared/ui/conflict-dialog/conflict-dialog';
 import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
+import { Switch } from '../../../../../shared/ui/switch/switch';
 import { OrgCascade } from '../../shared/org-cascade/org-cascade';
 import { StatusBadge } from '../../shared/status-badge/status-badge';
 import { newIdempotencyKey } from '../../../../../core/api/idempotency';
-import { OrganizationCreateApi, type CreateDepartmentBody } from '../../shared/organization-create.api';
+import { OrganizationWriteApi, type CreateDepartmentBody, type UpdateDepartmentBody } from '../../shared/organization-write.api';
 import { OrganizationReadApi } from '../../shared/organization-read.api';
-import { errorCodeOf, errorMessage } from '../../shared/staff.api';
+import { ApiError, errorCodeOf, fieldErrorsOf, isValidationError } from '../../../../../core/api/api-errors';
+import { staffErrorMessage } from '../../shared/staff.api';
 import { Branch, CODE_PATTERN, Company, Department, OrgCascadeValue, STAFF_LIMITS } from '../../shared/staff.model';
 
 const EMPTY_CASCADE: OrgCascadeValue = {
@@ -36,8 +39,8 @@ const EMPTY_CASCADE: OrgCascadeValue = {
 
 @Component({
   selector: 'app-department-modal',
-  imports: [TranslocoPipe, Button, ConfirmDialog, Field, Modal, OrgCascade, StatusBadge],
-  providers: [provideIcons({ tablerSitemap })],
+  imports: [NgIcon, TranslocoPipe, Button, ConfirmDialog, ConflictDialog, Field, Modal, OrgCascade, StatusBadge, Switch],
+  providers: [provideIcons({ tablerArrowBackUp, tablerSitemap })],
   templateUrl: './department-modal.html',
 })
 export class DepartmentModal {
@@ -48,31 +51,35 @@ export class DepartmentModal {
   private readonly injector = inject(Injector);
   private readonly notify = inject(Notify);
   private readonly organization = inject(OrganizationReadApi);
-  private readonly createApi = inject(OrganizationCreateApi);
+  private readonly writeApi = inject(OrganizationWriteApi);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
 
   private readonly modal = viewChild.required<Modal>('modal');
   private readonly discardDialog = viewChild.required<ConfirmDialog>('discardDialog');
-  private readonly staleDialog = viewChild.required<ConfirmDialog>('staleDialog');
 
   readonly companies = input.required<readonly Company[]>();
   readonly branches = input.required<readonly Branch[]>();
   readonly createBranches = input.required<readonly Branch[]>();
+  readonly canEdit = input(false, { alias: 'canManage' });
   readonly saved = output<Department>();
+  readonly deleteRequested = output<Department>();
+  readonly deactivateBlocked = output<{ department: Department; blockers: string[] }>();
   readonly staleScopeDetected = output<void>();
 
   protected readonly limits = STAFF_LIMITS;
 
-  protected readonly mode = signal<'create' | 'details'>('create');
+  protected readonly mode = signal<'create' | 'edit'>('create');
+  protected readonly baseDepartment = signal<Department | null>(null);
+  protected readonly conflictOpen = signal(false);
   protected readonly saving = signal(false);
-  protected readonly canManage = computed(() => this.mode() === 'create' && this.createBranches().length > 0);
+  readonly canManage = computed(() => this.mode() === 'create' ? this.createBranches().length > 0 : this.canEdit());
   protected readonly branchOptions = computed(() => {
-    if (this.mode() === 'details') return this.branches();
+    if (this.mode() === 'edit') return this.branches();
     return this.createBranches();
   });
   protected readonly companyOptions = computed(() => {
-    if (this.mode() === 'details') return this.companies();
+    if (this.mode() === 'edit') return this.companies();
     const ids = new Set(this.branchOptions().map((branch) => branch.companyId));
     return this.companies().filter((company) => ids.has(company.id));
   });
@@ -85,6 +92,8 @@ export class DepartmentModal {
   protected readonly touched = signal<{ code?: boolean; name?: boolean }>({});
   protected readonly submitAttempted = signal(false);
   protected readonly codeServerError = signal<string | null>(null);
+  protected readonly nameServerError = signal<string | null>(null);
+  protected readonly branchServerError = signal<string | null>(null);
 
   private allowClose = false;
   private confirmingDiscard = false;
@@ -100,6 +109,10 @@ export class DepartmentModal {
     if (!this.canManage()) return false;
     const trimmedCode = this.code().trim();
     const trimmedName = this.name().trim();
+    if (this.mode() === 'edit') {
+      const base = this.baseDepartment();
+      return base !== null && (trimmedName !== base.name || (this.isActive() ? 'ACTIVE' : 'INACTIVE') !== base.status);
+    }
 
     const current = this.cascadeValue();
     const cascadeChanged = this.cascadeEditedByUser &&
@@ -118,6 +131,7 @@ export class DepartmentModal {
     if (!current.branchId) {
       errors.branch = this.transloco.translate('departments.validation.branchRequired');
     }
+    if (this.branchServerError()) errors.branch = this.branchServerError()!;
     return errors;
   });
 
@@ -138,6 +152,7 @@ export class DepartmentModal {
 
   protected readonly nameError = computed(() => {
     this.i18n();
+    if (this.nameServerError()) return this.nameServerError();
     if (!this.submitAttempted() && !this.touched().name) return null;
     const trimmed = this.name().trim();
     if (!trimmed) return this.transloco.translate('departments.validation.nameRequired');
@@ -151,6 +166,8 @@ export class DepartmentModal {
     const seq = ++this.openSeq;
     this.allowClose = false;
     this.mode.set('create');
+    this.baseDepartment.set(null);
+    this.conflictOpen.set(false);
     this.cascadeEditedByUser = false;
 
     const initialCascade: OrgCascadeValue = {
@@ -173,15 +190,18 @@ export class DepartmentModal {
     }
   }
 
-  openDetails(department: Department, companyId?: string | null): void {
+  openEdit(department: Department, companyId?: string | null): void {
     const seq = ++this.openSeq;
     this.allowClose = false;
-    this.mode.set('details');
+    this.mode.set('edit');
+    this.baseDepartment.set(department);
+    this.conflictOpen.set(false);
     this.cascadeEditedByUser = false;
     this.applyDepartmentToForm(department, companyId ?? null);
     this.resetValidation();
     this.resetIdempotency();
     this.modal().open();
+    if (this.canManage()) this.focusControl(`#${this.uid}-name`);
     if (!companyId) {
       void this.resolveCompanyFromBranch(department.branchId, seq);
     }
@@ -189,7 +209,31 @@ export class DepartmentModal {
 
   closeImmediate(): void {
     this.allowClose = true;
+    this.conflictOpen.set(false);
     this.modal().close();
+  }
+
+  editingId(): string | null {
+    return this.baseDepartment()?.id ?? null;
+  }
+
+  syncDepartment(updated: Department): void {
+    if (this.editingId() !== updated.id) return;
+    this.baseDepartment.set(updated);
+    this.applyDepartmentToForm(updated, this.cascadeValue().companyId);
+    this.resetValidation();
+    this.resetIdempotency();
+  }
+
+  protected undo(): void {
+    const base = this.baseDepartment();
+    if (this.saving() || !base) return;
+    this.syncDepartment(base);
+  }
+
+  protected requestDelete(): void {
+    const base = this.baseDepartment();
+    if (this.canManage() && !this.saving() && base) this.deleteRequested.emit(base);
   }
 
   protected onCascadeChange(next: OrgCascadeValue): void {
@@ -208,6 +252,7 @@ export class DepartmentModal {
     }
     this.cascadeEditedByUser = true;
     this.cascadeValue.set(next);
+    this.branchServerError.set(null);
   }
 
   protected onCodeInput(event: Event): void {
@@ -224,6 +269,7 @@ export class DepartmentModal {
   protected onNameInput(event: Event): void {
     if (!this.canManage()) return;
     this.name.set((event.target as HTMLInputElement).value);
+    this.nameServerError.set(null);
   }
 
   protected markTouched(field: 'code' | 'name'): void {
@@ -232,29 +278,42 @@ export class DepartmentModal {
 
   protected async save(event?: Event): Promise<void> {
     event?.preventDefault();
-    if (!this.canManage() || this.saving()) return;
+    if (!this.canManage() || this.saving() || (this.mode() === 'edit' && !this.dirty())) return;
 
     this.submitAttempted.set(true);
     this.codeServerError.set(null);
+    this.nameServerError.set(null);
+    this.branchServerError.set(null);
 
     const cascadeErrs = this.cascadeErrors();
     if (cascadeErrs.company || cascadeErrs.branch || this.codeError() || this.nameError()) {
       return;
     }
 
-    const { companyId, branchId } = this.cascadeValue();
-    const branch = this.createBranches().find((item) => item.id === branchId && item.companyId === companyId);
-    if (!branch) {
-      this.notify.error(this.transloco.translate('apiErrors.permission'));
-      return;
-    }
-    const body: CreateDepartmentBody = { branchId: branch.id, code: this.code().trim(), name: this.name().trim() };
-
     this.saving.set(true);
     try {
-      const created = await this.createApi.createDepartment(body, this.idempotencyKeyFor(body));
-      this.saved.emit(created);
-      this.notify.success(this.transloco.translate('departments.toast.created'));
+      let updated: Department;
+      let toast = 'departments.toast.created';
+      const base = this.baseDepartment();
+      if (this.mode() === 'edit' && base) {
+        const patch: UpdateDepartmentBody = {};
+        if (this.name().trim() !== base.name) patch.name = this.name().trim();
+        const status = this.isActive() ? 'ACTIVE' : 'INACTIVE';
+        if (status !== base.status) patch.status = status;
+        updated = await this.writeApi.updateDepartment(base.id, patch, this.idempotencyKeyFor(base.id, patch));
+        toast = !patch.name && patch.status
+          ? `departments.toast.${patch.status === 'ACTIVE' ? 'activated' : 'deactivated'}`
+          : 'departments.toast.saved';
+      } else {
+        const { companyId, branchId } = this.cascadeValue();
+        const branch = this.createBranches().find((item) => item.id === branchId && item.companyId === companyId);
+        if (!branch) throw new ApiError(403, 'BRANCH_PERMISSION_DENIED');
+        const body: CreateDepartmentBody = { branchId: branch.id, code: this.code().trim(), name: this.name().trim() };
+        updated = await this.writeApi.createDepartment(body, this.idempotencyKeyFor('create', body));
+      }
+      this.resetIdempotency();
+      this.saved.emit(updated);
+      this.notify.success(this.transloco.translate(toast));
       this.closeImmediate();
     } catch (error) {
       await this.handleSaveError(error);
@@ -288,15 +347,74 @@ export class DepartmentModal {
 
   private async handleSaveError(error: unknown): Promise<void> {
     const code = errorCodeOf(error);
+    const message = staffErrorMessage(error, 'staff', this.transloco, 'write');
+    if (isValidationError(error)) {
+      const fields = fieldErrorsOf(error);
+      if (fields['name']) this.nameServerError.set(fields['name'].join(' ') || message);
+      if (fields['code']) this.codeServerError.set(fields['code'].join(' ') || message);
+      if (fields['branchId']) this.branchServerError.set(fields['branchId'].join(' ') || message);
+      if (fields['_'] || !Object.keys(fields).some((key) => ['name', 'code', 'branchId'].includes(key))) {
+        this.notify.error(message);
+      }
+      return;
+    }
     if (code === 'ORG_CODE_TAKEN') {
-      this.codeServerError.set(this.resolveError(error));
+      this.codeServerError.set(message);
+      return;
+    }
+    if (code === 'ORG_PARENT_INACTIVE') {
+      const text = this.transloco.translate('departments.parentInactive');
+      if (this.mode() === 'create') this.branchServerError.set(text);
+      else this.notify.error(text);
+      return;
+    }
+    const base = this.baseDepartment();
+    if (code === 'ORG_NODE_NOT_EMPTY' && base && !this.isActive()) {
+      this.isActive.set(true);
+      const blockers = error instanceof ApiError ? error.details?.['blockers'] : undefined;
+      this.deactivateBlocked.emit({ department: base, blockers: Array.isArray(blockers) ? blockers.filter((v): v is string => typeof v === 'string') : [] });
       return;
     }
     if (code === 'ORG_BRANCH_SCOPE_STALE' || code === 'ORG_NODE_SCOPE_STALE') {
-      if (await this.staleDialog().open()) this.staleScopeDetected.emit();
+      this.conflictOpen.set(true);
       return;
     }
-    this.notify.error(this.resolveError(error));
+    if (code === 'GW.IDEM.IN_FLIGHT') this.notify.info(message);
+    else if (code === 'GW.IDEM.MISMATCH') this.notify.warning(message);
+    else this.notify.error(message);
+    if (error instanceof ApiError && error.status === 404) {
+      this.closeImmediate();
+      this.staleScopeDetected.emit();
+    }
+  }
+
+  protected async resolveConflict(keepChanges: boolean): Promise<void> {
+    if (this.saving()) return;
+    this.conflictOpen.set(false);
+    const base = this.baseDepartment();
+    const seq = this.openSeq;
+    this.saving.set(true);
+    try {
+      if (base) {
+        const fresh = await this.organization.getDepartment(base.id);
+        if (seq !== this.openSeq) return;
+        if (keepChanges) this.baseDepartment.set(fresh);
+        else this.syncDepartment(fresh);
+      } else if (!keepChanges) {
+        this.code.set('');
+        this.name.set('');
+        this.cascadeValue.set({ ...this.presetCascade });
+      }
+      this.resetValidation();
+      this.resetIdempotency();
+      if (!keepChanges) this.staleScopeDetected.emit();
+    } catch (error) {
+      this.notify.error(staffErrorMessage(error, 'staff', this.transloco));
+      this.closeImmediate();
+      this.staleScopeDetected.emit();
+    } finally {
+      this.saving.set(false);
+    }
   }
 
   private async resolveCompanyFromBranch(branchId: string, seq: number): Promise<void> {
@@ -332,6 +450,8 @@ export class DepartmentModal {
     this.touched.set({});
     this.submitAttempted.set(false);
     this.codeServerError.set(null);
+    this.nameServerError.set(null);
+    this.branchServerError.set(null);
   }
 
   private resetIdempotency(): void {
@@ -339,20 +459,13 @@ export class DepartmentModal {
     this.lastIdempotencyKey = '';
   }
 
-  private idempotencyKeyFor(payload: CreateDepartmentBody): string {
-    const signature = JSON.stringify(payload);
+  private idempotencyKeyFor(target: string, payload: CreateDepartmentBody | UpdateDepartmentBody): string {
+    const signature = JSON.stringify([target, payload]);
     if (signature !== this.lastPayloadSignature) {
       this.lastPayloadSignature = signature;
       this.lastIdempotencyKey = newIdempotencyKey();
     }
     return this.lastIdempotencyKey;
-  }
-
-  private resolveError(error: unknown): string {
-    const msg = errorMessage(error, 'staff', this.transloco);
-    if (msg && msg !== 'settings.errors.generic') return msg;
-    const fallback = this.transloco.translate('staff.errors.generic');
-    return fallback !== 'staff.errors.generic' ? fallback : msg;
   }
 
   private focusControl(selector?: string): void {

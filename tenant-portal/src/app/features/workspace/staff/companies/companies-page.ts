@@ -17,6 +17,8 @@ import {
 } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
+import { ApiError, errorCodeOf } from '../../../../core/api/api-errors';
+import { newIdempotencyKey } from '../../../../core/api/idempotency';
 import { ActionItem, ActionSelection, ActionsMenu } from '../../../../shared/ui/actions-menu/actions-menu';
 import { Button } from '../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
@@ -28,17 +30,10 @@ import { SeatChange } from '../../seats/seats.model';
 import { BlockersDialog } from '../shared/blockers-dialog/blockers-dialog';
 import { StaffSession } from '../shared/staff-session';
 import { OrganizationReadApi } from '../shared/organization-read.api';
+import { OrganizationWriteApi } from '../shared/organization-write.api';
 import { StaffList } from '../shared/staff-list/staff-list';
 import { StatusBadge as StaffStatusBadge } from '../shared/status-badge/status-badge';
-import {
-  ApiError,
-  deleteCompany,
-  errorCodeOf,
-  errorMessage,
-  listAllPages,
-  newIdempotencyKey,
-  updateCompany,
-} from '../shared/staff.api';
+import { listAllPages, staffErrorMessage } from '../shared/staff.api';
 import { Company, Currency, ListQuery, OrgStatus, StaffListFilter, StaffListSortOption } from '../shared/staff.model';
 import { CompanyModal } from './company-modal/company-modal';
 
@@ -82,7 +77,7 @@ const TABLE_COLUMNS = 'grid-cols-staff-company-row-actions';
     }),
   ],
   templateUrl: './companies-page.html',
-  host: { class: 'flex min-h-0 flex-1 flex-col' },
+  host: { class: 'flex flex-1 shrink-0 flex-col' },
 })
 export class CompaniesPage {
   private readonly route = inject(ActivatedRoute);
@@ -94,6 +89,7 @@ export class CompaniesPage {
   private readonly session = inject(StaffSession);
   private readonly destroyRef = inject(DestroyRef);
   private readonly organization = inject(OrganizationReadApi);
+  private readonly organizationWrite = inject(OrganizationWriteApi);
   private readonly cascadeConfirm = inject(SeatCascadeConfirm);
   private readonly queryParams = toSignal(this.route.queryParamMap);
 
@@ -138,8 +134,7 @@ export class CompaniesPage {
     () => this.pendingStatusChange()?.nextStatus === 'ACTIVE' && this.statusSeatBlocked(),
   );
 
-  // Records are served by Core while organization mutations still use fixtures.
-  protected readonly canManage = () => false;
+  protected readonly canManage = computed(() => this.session.isTenantWide('org.company.manage'));
   protected readonly canCreate = computed(() => this.session.isTenantWide('org.company.manage'));
   protected readonly currencies = signal<Currency[]>([]);
 
@@ -177,8 +172,14 @@ export class CompaniesPage {
   private prevCriteriaSignature: string | null = null;
   private handledDeepLinkKey = '';
   private statusConfirmResolver: ((confirmed: boolean) => void) | null = null;
+  private readonly actionKeys = new Map<string, { signature: string; key: string; cascadeKey?: string }>();
 
   constructor() {
+    const params = this.route.snapshot.queryParamMap;
+    const page = Number(params.get('page'));
+    const size = Number(params.get('size'));
+    if (Number.isSafeInteger(page) && page > 0) this.page.set(page);
+    if ([20, 50, 100].includes(size)) this.pageSize.set(size);
     if (!this.session.me()) {
       void this.session.load();
     }
@@ -200,7 +201,7 @@ export class CompaniesPage {
       this.prevCriteriaSignature = criteriaSignature;
 
       if (criteriaChanged && page !== 1) {
-        untracked(() => this.page.set(1));
+        untracked(() => this.onPageChange(1));
         return;
       }
 
@@ -241,6 +242,27 @@ export class CompaniesPage {
       status: this.filterValues()['status'] ?? null,
       page: this.page(),
       pageSize: this.pageSize(),
+    });
+  }
+
+  protected onPageChange(page: number): void {
+    this.page.set(page);
+    this.persistPagination();
+  }
+
+  protected onPageSizeChange(size: number): void {
+    if (![20, 50, 100].includes(size)) return;
+    this.pageSize.set(size);
+    this.page.set(1);
+    this.persistPagination();
+  }
+
+  private persistPagination(): void {
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { page: this.page(), size: this.pageSize() },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
     });
   }
 
@@ -366,7 +388,7 @@ export class CompaniesPage {
   protected async requestDelete(company: Company): Promise<void> {
     if (!this.canManage() || this.busyIds().has(company.id)) return;
     this.pendingDeleteCompany.set(company);
-    if (!(await this.deleteConfirm().open())) {
+    if (!(await this.deleteConfirm().open()) || !this.canManage()) {
       this.pendingDeleteCompany.set(null);
       return;
     }
@@ -374,13 +396,16 @@ export class CompaniesPage {
     this.setBusy(company.id, true);
     try {
       try {
-        await deleteCompany(company.id, newIdempotencyKey());
+        await this.organizationWrite.deleteCompany(company.id, this.actionKeyFor('delete', company.id));
       } catch (error) {
         const cascade = isCascadeRequired(error);
         if (!cascade) throw error;
         if (!(await this.cascadeConfirm.confirm(cascade.addons)) || !this.canManage()) return;
-        await deleteCompany(company.id, newIdempotencyKey(), { confirmAddonCascade: true });
+        await this.organizationWrite.deleteCompany(company.id, this.actionKeyFor('delete', company.id, undefined, true), {
+          confirmAddonCascade: true,
+        });
       }
+      this.actionKeys.delete(`delete:${company.id}`);
       if (this.companyModal().editingId() === company.id) {
         this.companyModal().closeImmediate();
       }
@@ -391,7 +416,7 @@ export class CompaniesPage {
         this.openCompanyBlockers(company, this.extractBlockers(error));
         return;
       }
-      this.notify.error(this.resolveError(error));
+      this.handleWriteError(error, company);
     } finally {
       this.setBusy(company.id, false);
       this.pendingDeleteCompany.set(null);
@@ -440,16 +465,19 @@ export class CompaniesPage {
     try {
       let updated: Company;
       try {
-        updated = await updateCompany(company.id, { status: nextStatus }, newIdempotencyKey());
+        updated = await this.organizationWrite.updateCompany(company.id, { status: nextStatus },
+          this.actionKeyFor('status', company.id, nextStatus));
       } catch (error) {
         const cascade = isCascadeRequired(error);
         if (!cascade) throw error;
         const confirmed = await this.cascadeConfirm.confirm(cascade.addons);
         if (!confirmed || !this.canManage()) return;
-        updated = await updateCompany(company.id, { status: nextStatus }, newIdempotencyKey(), {
+        updated = await this.organizationWrite.updateCompany(company.id, { status: nextStatus },
+          this.actionKeyFor('status', company.id, nextStatus, true), {
           confirmAddonCascade: true,
         });
       }
+      this.actionKeys.delete(`status:${company.id}`);
       this.companyModal().syncCompany(updated);
       this.notify.success(this.transloco.translate('companies.toast.saved'));
       this.reload();
@@ -458,7 +486,11 @@ export class CompaniesPage {
         this.openCompanyBlockers(company, this.extractBlockers(error));
         return;
       }
-      this.notify.error(this.resolveError(error));
+      if (errorCodeOf(error) === 'CURRENCY_NOT_ENABLED' && nextStatus === 'ACTIVE') {
+        this.notify.error(this.transloco.translate('companies.errors.currencyNotEnabledActivate'));
+      } else {
+        this.handleWriteError(error, company);
+      }
     } finally {
       this.setBusy(company.id, false);
       this.pendingStatusChange.set(null);
@@ -486,6 +518,10 @@ export class CompaniesPage {
         'company has active branches': branchesLink,
         'company has placed users': usersLink,
         'company has team memberships': usersLink,
+        'company has active taxes': {
+          label: t('companies.actions.viewTaxes'),
+          route: ['/workspace/settings/taxes'],
+        },
       },
     });
   }
@@ -571,12 +607,34 @@ export class CompaniesPage {
     });
   }
 
-  private resolveError(error: unknown): string {
+  private actionKeyFor(action: 'status' | 'delete', id: string, status?: OrgStatus, cascade = false): string {
+    const target = `${action}:${id}`;
+    const signature = status ?? '';
+    let held = this.actionKeys.get(target);
+    if (!held || held.signature !== signature) {
+      held = { signature, key: newIdempotencyKey() };
+      this.actionKeys.set(target, held);
+    }
+    if (cascade) return held.cascadeKey ||= newIdempotencyKey();
+    return held.key;
+  }
+
+  private handleWriteError(error: unknown, company: Company): void {
+    if (errorCodeOf(error) === 'ORG_NODE_NOT_FOUND') {
+      if (this.companyModal().editingId() === company.id) this.companyModal().closeImmediate();
+      this.reload();
+    }
+    if (error instanceof ApiError && error.status === 0) return;
+    const message = this.resolveError(error, 'write');
+    const code = errorCodeOf(error);
+    if (code === 'GW.IDEM.IN_FLIGHT') this.notify.info(message);
+    else if (code === 'GW.IDEM.MISMATCH') this.notify.warning(message);
+    else this.notify.error(message);
+  }
+
+  private resolveError(error: unknown, operation: 'read' | 'write' = 'read'): string {
     const seatMsg = seatErrorMessage(this.transloco, error);
     if (seatMsg) return seatMsg;
-    const msg = errorMessage(error, 'staff', this.transloco);
-    if (msg && msg !== 'settings.errors.generic') return msg;
-    const fallback = this.transloco.translate('staff.errors.generic');
-    return fallback !== 'staff.errors.generic' ? fallback : msg;
+    return staffErrorMessage(error, 'staff', this.transloco, operation);
   }
 }

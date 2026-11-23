@@ -1,5 +1,5 @@
 import { TranslocoService } from '@jsverse/transloco';
-import { errorMessage } from '../../shared/staff.api';
+import { staffErrorMessage } from '../../shared/staff.api';
 import { OrgCascadeValue, TenantUser } from '../../shared/staff.model';
 
 export type UserModalTab = 'profile' | 'roles' | 'teams' | 'apps' | 'phone' | 'calls';
@@ -55,7 +55,7 @@ export function formatStaffDate(iso: string, language: 'ar' | 'en'): string {
 }
 
 export function resolveStaffError(error: unknown, transloco: TranslocoService): string {
-  const msg = errorMessage(error, 'staff', transloco);
+  const msg = staffErrorMessage(error, 'users', transloco, 'write');
   if (msg && msg !== 'settings.errors.generic') return msg;
   const fallback = transloco.translate('staff.errors.generic');
   return fallback !== 'staff.errors.generic' ? fallback : msg;

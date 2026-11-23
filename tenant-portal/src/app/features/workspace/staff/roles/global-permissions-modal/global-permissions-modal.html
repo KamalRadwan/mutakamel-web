@@ -12,7 +12,11 @@
     <span
       modal-header-end
       class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium tabular-nums whitespace-nowrap"
-      [class]="selected().length > maxPermissions ? 'bg-danger-soft text-on-danger-soft' : 'bg-neutral-soft text-text-muted'"
+      [class]="
+        selected().length > maxPermissions
+          ? 'bg-danger-soft text-on-danger-soft'
+          : 'bg-neutral-soft text-text-muted'
+      "
     >
       {{ countText() }}
     </span>
@@ -22,7 +26,9 @@
     <div class="flex flex-col gap-8" aria-busy="true">
       @for (row of skeletonRows; track row) {
         <div class="h-table-row rounded-10 border border-border bg-surface p-10">
-          <div class="h-skeleton-line w-2/3 rounded-4 bg-neutral-soft motion-safe:animate-pulse"></div>
+          <div
+            class="h-skeleton-line w-2/3 rounded-4 bg-neutral-soft motion-safe:animate-pulse"
+          ></div>
         </div>
       }
     </div>
@@ -57,7 +63,7 @@
         [entries]="entries()"
         mode="GLOBAL"
         [(selected)]="selected"
-        [readonly]="isReadonly()"
+        [readonly]="isReadonly() || saving()"
         [disabledIds]="disabledPermissionIds()"
         [max]="maxPermissions"
       />
@@ -79,23 +85,26 @@
         type="button"
         uiButton
         [loading]="saving()"
-        [disabled]="saving() || !dirty() || selected().length > maxPermissions || seatBlocked()"
+        [disabled]="saving() || !dirty() || selected().length > maxPermissions || seatBlocked() || exceedsAuthority()"
+        [attr.aria-describedby]="exceedsAuthority() ? 'global-permissions-authority-hint' : null"
         (click)="save()"
       >
         {{ 'roles.common.save' | transloco }}
       </button>
 
       @if (dirty()) {
-        <button
-          type="button"
-          uiButton
-          variant="secondary"
-          [disabled]="saving()"
-          (click)="undo()"
-        >
+        <button type="button" uiButton variant="secondary" [disabled]="saving()" (click)="undo()">
           {{ 'roles.common.undo' | transloco }}
         </button>
-        <span class="text-12 leading-18 text-text-muted">{{ 'roles.common.unsaved' | transloco }}</span>
+      }
+      @if (exceedsAuthority()) {
+        <span id="global-permissions-authority-hint" class="text-12 leading-18 text-text-muted">{{
+          'roles.errors.ROLE_PERMISSION_AUTHORITY_EXCEEDED' | transloco
+        }}</span>
+      } @else if (dirty()) {
+        <span class="text-12 leading-18 text-text-muted">{{
+          'roles.common.unsaved' | transloco
+        }}</span>
       }
     }
 
@@ -112,13 +121,7 @@
       </button>
     }
 
-    <button
-      type="button"
-      uiButton
-      variant="ghost"
-      [disabled]="saving()"
-      (click)="requestClose()"
-    >
+    <button type="button" uiButton variant="ghost" [disabled]="saving()" (click)="requestClose()">
       {{ (!isReadonly() && dirty() ? 'roles.common.cancel' : 'roles.common.close') | transloco }}
     </button>
   </div>

@@ -38,6 +38,28 @@ async function mountRow(kind: 'mic' | 'speaker') {
 }
 
 describe('AudioRow', () => {
+  it('renders safely after a Phone reload before kind arrives, then follows the late mic input', async () => {
+    const fixture = TestBed.createComponent(AudioRow);
+    try {
+      const reload = phone.reload();
+      await ctx.flush(250);
+      await reload;
+      expect(() => fixture.detectChanges()).not.toThrow();
+
+      fixture.componentRef.setInput('kind', 'mic');
+      fixture.detectChanges();
+      const toggle = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('button')!;
+      expect(toggle.getAttribute('aria-label')).toBe('webPhone.audio.muteMic');
+      toggle.click();
+      fixture.detectChanges();
+      expect(phone.muted()).toBe(true);
+      expect(phone.speakerMuted()).toBe(false);
+      expect(toggle.getAttribute('aria-pressed')).toBe('true');
+    } finally {
+      fixture.destroy();
+    }
+  });
+
   it('mic: toggles mute on the phone, with icon, label and aria-pressed following it', async () => {
     const { toggle, c } = await mountRow('mic');
     expect(toggle.getAttribute('aria-label')).toBe('webPhone.audio.muteMic');

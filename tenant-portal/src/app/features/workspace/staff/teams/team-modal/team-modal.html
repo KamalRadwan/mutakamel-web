@@ -12,7 +12,7 @@
     <app-org-cascade
       [levels]="['company', 'branch', 'department']"
       [required]="mode() === 'create' ? ['company', 'branch', 'department'] : []"
-      [readonly]="mode() === 'details' || !canManage()"
+      [readonly]="mode() === 'edit' || !canManage()"
       [disabledLevels]="saving() ? ['company', 'branch', 'department'] : []"
       [activeOnly]="mode() === 'create'"
       [companySource]="companyOptions()"
@@ -26,7 +26,7 @@
       <ui-field
         [for]="uid + '-code'"
         [label]="'teams.fields.code' | transloco"
-        [hint]="'teams.fields.codeHint' | transloco"
+        [hint]="(mode() === 'create' ? 'teams.fields.codeHint' : 'teams.fields.codeLocked') | transloco"
         [required]="mode() === 'create'"
         [error]="codeError()"
       >
@@ -38,8 +38,8 @@
           [placeholder]="mode() === 'create' ? ('teams.fields.codePlaceholder' | transloco) : ''"
           [maxLength]="limits.code"
           [value]="code()"
-          [readOnly]="mode() === 'details' || !canManage() || saving()"
-          [attr.aria-readonly]="mode() === 'details' || !canManage() ? 'true' : null"
+          [readOnly]="mode() === 'edit' || !canManage() || saving()"
+          [attr.aria-readonly]="mode() === 'edit' || !canManage() ? 'true' : null"
           [attr.aria-invalid]="codeError() ? 'true' : null"
           (input)="onCodeInput($event)"
           (blur)="markTouched('code')"
@@ -75,7 +75,7 @@
 
     <div class="col-span-1" (keydown.escape)="onHostEscape($event)">
       <ui-field
-        [size]="canManage() ? 'bare' : 'default'"
+        [size]="canSelectLead() ? 'bare' : 'default'"
         [for]="uid + '-lead'"
         [label]="'teams.fields.lead' | transloco"
         [hint]="'teams.fields.leadHint' | transloco"
@@ -212,18 +212,27 @@
       }
     </div>
 
-    @if (mode() === 'details') {
+    @if (mode() === 'edit') {
       <div class="col-span-3">
         <ui-field
           size="bare"
           [for]="uid + '-active'"
           [label]="'teams.fields.active' | transloco"
-          [hint]="'teams.fields.activeHint' | transloco"
+          [hint]="'teams.fields.activeHelp' | transloco"
         >
           <div
             class="flex h-field items-center justify-between gap-8 rounded-8 border border-border-field bg-surface-field px-8"
           >
             <app-staff-status-badge [status]="isActive() ? 'ACTIVE' : 'INACTIVE'" />
+            @if (canManage()) {
+              <ui-switch
+                [id]="uid + '-active'"
+                [(checked)]="isActive"
+                [disabled]="!canManage() || saving()"
+                [label]="'teams.fields.active' | transloco"
+                [describedBy]="uid + '-active-hint'"
+              />
+            }
           </div>
         </ui-field>
       </div>
@@ -280,16 +289,28 @@
         [attr.form]="uid + '-form'"
         uiButton
         [loading]="saving()"
-        [disabled]="saving()"
+        [disabled]="saving() || (mode() === 'edit' && !dirty())"
       >
         {{ 'teams.save' | transloco }}
       </button>
 
+      @if (mode() === 'edit' && dirty()) {
+        <button type="button" uiButton variant="ghost" [disabled]="saving()" (click)="undo()">
+          <ng-icon name="tablerArrowBackUp" size="14" aria-hidden="true" />
+          {{ 'teams.undo' | transloco }}
+        </button>
+        <span class="text-12 leading-18 text-text-muted">{{ 'teams.unsaved' | transloco }}</span>
+      }
 
       <button type="button" uiButton variant="ghost" [disabled]="saving()" (click)="requestClose()">
         {{ (mode() === 'create' ? 'teams.cancel' : 'teams.close') | transloco }}
       </button>
 
+      @if (mode() === 'edit') {
+        <button type="button" uiButton variant="danger" class="ms-auto" [disabled]="saving()" (click)="requestDelete()">
+          {{ 'teams.delete' | transloco }}
+        </button>
+      }
     } @else {
       <button type="button" uiButton variant="ghost" (click)="requestClose()">
         {{ 'teams.close' | transloco }}
@@ -307,11 +328,9 @@
   [cancelLabel]="'teams.cancel' | transloco"
 />
 
-<ui-confirm-dialog
-  #staleDialog
-  tone="warning"
-  [title]="'teams.confirm.staleTitle' | transloco"
-  [text]="'teams.confirm.staleText' | transloco"
-  [confirmLabel]="'teams.confirm.reload' | transloco"
-  [cancelLabel]="'teams.confirm.keepChanges' | transloco"
+<ui-conflict-dialog
+  [(open)]="conflictOpen"
+  [recordLabel]="baseTeam()?.name ?? name()"
+  (reload)="reloadConflict()"
+  (keepEditing)="keepConflictChanges()"
 />

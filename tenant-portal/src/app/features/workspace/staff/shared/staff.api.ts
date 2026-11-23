@@ -1,3 +1,5 @@
+import { ApiError, errorCodeOf, errorMessage } from '../../../../core/api/api-errors';
+import type { SettingsTranslator } from '../../../../core/api/settings-translator';
 import {
   fakeActivateUser,
   fakeAddBranchRole,
@@ -87,115 +89,31 @@ import {
   TenantUser,
 } from './staff.model';
 
-export class ApiError extends Error {
-  constructor(
-    readonly status: number,
-    readonly code: string,
-    readonly details?: Record<string, unknown>,
-  ) {
-    super(code);
-    this.name = 'ApiError';
-  }
-}
+export { ApiError, errorCodeOf, errorMessage } from '../../../../core/api/api-errors';
+export { newIdempotencyKey } from '../../../../core/api/idempotency';
 
-Object.defineProperty(ApiError, Symbol.hasInstance, {
-  value(instance: unknown): boolean {
-    return (
-      typeof instance === 'object' &&
-      instance !== null &&
-      typeof (instance as { status?: unknown }).status === 'number' &&
-      typeof (instance as { code?: unknown }).code === 'string'
-    );
-  },
-});
-
-function uuidv7(): string {
-  const bytes = new Uint8Array(16);
-  crypto.getRandomValues(bytes);
-  const now = Date.now();
-  bytes[0] = Math.floor(now / 2 ** 40) & 0xff;
-  bytes[1] = Math.floor(now / 2 ** 32) & 0xff;
-  bytes[2] = Math.floor(now / 2 ** 24) & 0xff;
-  bytes[3] = Math.floor(now / 2 ** 16) & 0xff;
-  bytes[4] = Math.floor(now / 2 ** 8) & 0xff;
-  bytes[5] = now & 0xff;
-  bytes[6] = (bytes[6] & 0x0f) | 0x70;
-  bytes[8] = (bytes[8] & 0x3f) | 0x80;
-  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-}
-
-export function newIdempotencyKey(): string {
-  return uuidv7();
-}
-
-export function errorCodeOf(error: unknown): string | null {
-  if (typeof error === 'object' && error !== null && typeof (error as { code?: unknown }).code === 'string') {
-    return (error as { code: string }).code;
-  }
-  return null;
-}
-
-export type StaffTranslator =
-  | ((key: string, params?: Record<string, unknown>) => string)
-  | { translate(key: string, params?: Record<string, unknown>): string };
-
-const GENERIC_ERROR_KEYS: Readonly<Record<string, string>> = {
-  GENERIC: 'generic',
-  INTERNAL_ERROR: 'generic',
-  SERVER_ERROR: 'generic',
-  NETWORK: 'network',
-  NETWORK_ERROR: 'network',
-  NOT_FOUND: 'notFound',
-  PERMISSION: 'permission',
-  PERMISSION_DENIED: 'permission',
-  FORBIDDEN: 'permission',
-  UNAUTHORIZED: 'permission',
-  IDEMPOTENCY: 'idempotency',
-  IDEMPOTENCY_CONFLICT: 'idempotency',
-  IDEMPOTENCY_IN_PROGRESS: 'idempotency',
-  VALIDATION: 'validation',
-  'COMMON.GENERIC.VALIDATION_FAILED': 'validation',
-  SUBSCRIPTION: 'subscription',
-  SUBSCRIPTION_READ_ONLY: 'subscription',
-};
-
-function resolveTranslation(
-  translate: (key: string, params?: Record<string, unknown>) => string,
-  key: string,
-  params?: Record<string, unknown>,
-): string | null {
-  const translated = translate(key, params);
-  return translated && translated !== key ? translated : null;
-}
-
-export function errorMessage(error: unknown, scope: string, t: StaffTranslator): string {
+export function staffErrorMessage(
+  error: unknown,
+  scope: string,
+  t: SettingsTranslator,
+  operation: 'read' | 'write' = 'read',
+): string {
   const translate = typeof t === 'function' ? t : (key: string, params?: Record<string, unknown>) => t.translate(key, params);
-  const code = typeof error === 'string' ? error : errorCodeOf(error);
   const details = error instanceof ApiError ? error.details : undefined;
-  const scopePrefix = scope.endsWith('.errors.') ? scope : scope.endsWith('.errors') ? `${scope}.` : `${scope}.errors.`;
-
+  if (operation === 'write' && error instanceof ApiError && error.status === 401) {
+    return translate('staff.errors.notSaved', details);
+  }
+  const code = typeof error === 'string' ? error : errorCodeOf(error);
+  if (code === 'GW.IDEM.MISSING' || code === 'GW.IDEM.BAD_VALUE') {
+    return translate('staff.errors.generic', details);
+  }
   if (code) {
-    const scoped = resolveTranslation(translate, `${scopePrefix}${code}`, details);
-    if (scoped) return scoped;
-
-    const mapped = GENERIC_ERROR_KEYS[code] ?? code;
-    const shared = resolveTranslation(translate, `settings.errors.${mapped}`, details);
-    if (shared) return shared;
-
-    if (code.endsWith('_NOT_FOUND')) {
-      return translate('settings.errors.notFound', details);
+    for (const key of [`${scope}.errors.${code}`, `staff.errors.${code}`]) {
+      const message = translate(key, details);
+      if (message && message !== key) return message;
     }
   }
-
-  if (error instanceof ApiError) {
-    if (error.status === 0) return translate('settings.errors.network');
-    if (error.status === 403) return translate('settings.errors.permission');
-    if (error.status === 404) return translate('settings.errors.notFound');
-    if (error.status === 400 || error.status === 422) return translate('settings.errors.validation');
-  }
-
-  return translate('settings.errors.generic');
+  return errorMessage(error, 'staff', t);
 }
 
 export async function listAllPages<T>(
@@ -228,6 +146,7 @@ export function getOrgTree(): Promise<OrgTreeNode[]> {
   return fakeGetOrgTree();
 }
 
+// FAKE, used by billing/seats, operations/application-activation, seats/over-capacity until they link
 export function listCompanies(q: ListQuery = {}, canRead?: StaffFixtureReadScope): Promise<CorePage<Company>> {
   // GET /api/tenant/core/v1/organization/companies (sortBy: name|code|createdAt)
   return fakeListCompanies(q, canRead);
@@ -267,11 +186,13 @@ export function deleteCompany(id: string, key: string, opts?: ConfirmAddonCascad
   return fakeDeleteCompany(id, key, opts);
 }
 
+// FAKE, used by billing/seats, operations/activities, operations/application-activation, operations/audit-log, operations/party-directory, seats/over-capacity until they link
 export function listBranches(q: ListQuery = {}, canRead?: StaffFixtureReadScope): Promise<CorePage<Branch>> {
   // GET /api/tenant/core/v1/organization/branches
   return fakeListBranches(q, canRead);
 }
 
+// FAKE, used by operations/application-activation until it links
 export function getBranch(id: string): Promise<Branch> {
   // GET /api/tenant/core/v1/organization/branches/:id
   return fakeGetBranch(id);
@@ -371,11 +292,13 @@ export function deleteTeam(id: string, key: string): Promise<void> {
   return fakeDeleteTeam(id, key);
 }
 
+// FAKE, used by operations/addon-seats, operations/audit-log, operations/party-directory until they link
 export function listUsers(q: ListQuery = {}, canRead?: StaffFixtureReadScope): Promise<CorePage<TenantUser>> {
   // GET /api/tenant/core/v1/users (sortBy: email|firstName|lastName|employeeCode|createdAt)
   return fakeListUsers(q, canRead);
 }
 
+// FAKE, used by operations/addon-seats, operations/party-directory until they link
 export function getUser(id: string): Promise<TenantUser> {
   // GET /api/tenant/core/v1/users/:id
   return fakeGetUser(id);

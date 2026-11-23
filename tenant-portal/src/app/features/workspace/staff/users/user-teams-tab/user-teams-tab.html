@@ -1,11 +1,11 @@
-@if (readonly()) {
+@if (effectiveReadonly()) {
   <p class="flex items-center gap-6 text-12 leading-18 text-text-muted">
     <ng-icon name="tablerLock" size="11" class="shrink-0" aria-hidden="true" />
-    <span>{{ readonlyReason() || ('access.common.readonly' | transloco) }}</span>
+    <span>{{ effectiveReadonlyReason() || ('access.common.readonly' | transloco) }}</span>
   </p>
 }
 
-@if (!readonly()) {
+@if (!effectiveReadonly()) {
   <div class="flex justify-end">
     <button type="button" uiButton variant="secondary" size="small" (click)="openAddTeamModal()">
       <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
@@ -52,7 +52,7 @@
         <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
           {{ 'access.teams.cols.reporting' | transloco }}
         </span>
-        @if (!readonly()) {
+        @if (!effectiveReadonly()) {
           <span role="columnheader" class="border-s border-on-nav-line">
             <span class="sr-only">{{ 'access.common.actions' | transloco }}</span>
           </span>
@@ -79,7 +79,7 @@
             <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
               <span class="h-skeleton-line w-time-dd rounded-4 bg-neutral-soft motion-safe:animate-pulse"></span>
             </span>
-            @if (!readonly()) {
+            @if (!effectiveReadonly()) {
               <span role="cell" class="flex items-center justify-center border-s border-border">
                 <span class="size-icon-tile-sm rounded-6 bg-neutral-soft motion-safe:animate-pulse"></span>
               </span>
@@ -136,7 +136,7 @@
               }
             </span>
 
-            @if (!readonly()) {
+            @if (!effectiveReadonly()) {
               <span role="cell" class="flex items-center justify-center border-s border-border">
                 <ui-actions-menu
                   [items]="actionsFor(membership)"
@@ -180,6 +180,7 @@
       [for]="uid + '-add-role'"
       [label]="'access.teams.roleField' | transloco"
       [hint]="'access.teams.roleFieldHint' | transloco"
+      [error]="fieldError('role') || fieldError('memberships')"
       [required]="true"
     >
       <div>
@@ -232,6 +233,7 @@
     [for]="uid + '-change-role'"
     [label]="'access.teams.roleField' | transloco"
     [hint]="'access.teams.roleFieldHint' | transloco"
+      [error]="fieldError('role') || fieldError('memberships')"
     [required]="true"
   >
     <div>
@@ -353,6 +355,7 @@
           [for]="uid + '-reporting-branches'"
           [label]="'access.rep.add' | transloco"
           [hint]="'access.rep.addHint' | transloco"
+      [error]="fieldError('addBranchIds') || fieldError('removeBranchIds')"
         >
           <div
             [id]="uid + '-reporting-branches'"
@@ -415,17 +418,8 @@
   </button>
 </ui-modal>
 
-<ui-modal
-  #conflictModal
-  size="confirm"
-  icon="tablerAlertTriangle"
-  tile="bg-icon-orange"
-  [title]="'access.rep.conflictTitle' | transloco"
-  [closeLabel]="'access.common.close' | transloco"
->
-  <p class="text-12 leading-18 text-text-muted">{{ 'access.rep.conflictText' | transloco }}</p>
-
-  <button modal-footer type="button" uiButton (click)="reloadReportingAfterConflict()">
-    {{ 'access.common.reload' | transloco }}
-  </button>
-</ui-modal>
+<ui-conflict-dialog
+  [(open)]="conflictOpen"
+  (reload)="reloadReportingAfterConflict()"
+  (keepEditing)="keepReportingAfterConflict()"
+/>

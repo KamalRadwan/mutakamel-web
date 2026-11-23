@@ -36,16 +36,11 @@ import { StaffList } from '../shared/staff-list/staff-list';
 import { StaffSession } from '../shared/staff-session';
 import { OrganizationReadApi } from '../shared/organization-read.api';
 import { StatusBadge as StaffStatusBadge } from '../shared/status-badge/status-badge';
-import {
-  ApiError,
-  deleteBranch,
-  errorCodeOf,
-  errorMessage,
-  listAllPages,
-  newIdempotencyKey,
-  updateBranch,
-} from '../shared/staff.api';
-import { BlockerLink, Branch, Company, ListQuery, OrgStatus, StaffListFilter, StaffListSortOption } from '../shared/staff.model';
+import { ApiError, errorCodeOf } from '../../../../core/api/api-errors';
+import { newIdempotencyKey } from '../../../../core/api/idempotency';
+import { listAllPages, staffErrorMessage } from '../shared/staff.api';
+import { OrganizationWriteApi } from '../shared/organization-write.api';
+import { BlockerLink, Branch, Company, ConfirmAddonCascadeOptions, ListQuery, OrgStatus, StaffListFilter, StaffListSortOption } from '../shared/staff.model';
 import { BranchModal } from './branch-modal/branch-modal';
 import { HqTransferModal } from './hq-transfer-modal/hq-transfer-modal';
 
@@ -93,7 +88,7 @@ const TABLE_COLUMNS = 'grid-cols-staff-branch-row-actions';
     }),
   ],
   templateUrl: './branches-page.html',
-  host: { class: 'flex min-h-0 flex-1 flex-col' },
+  host: { class: 'flex flex-1 shrink-0 flex-col' },
 })
 export class BranchesPage {
   private readonly route = inject(ActivatedRoute);
@@ -106,6 +101,8 @@ export class BranchesPage {
   private readonly destroyRef = inject(DestroyRef);
   private readonly organization = inject(OrganizationReadApi);
   private readonly cascadeConfirm = inject(SeatCascadeConfirm);
+  private readonly organizationWrite = inject(OrganizationWriteApi);
+  private readonly actionKeys = new Map<string, { key: string; confirmedKey?: string }>();
   private readonly queryParams = toSignal(this.route.queryParamMap);
 
   private readonly branchModal = viewChild.required(BranchModal);
@@ -304,8 +301,8 @@ export class BranchesPage {
     });
   }
 
-  protected canManageBranch(_branch: Branch): boolean {
-    return false;
+  protected canManageBranch(branch: Branch): boolean {
+    return this.session.can('org.branch.manage', { companyId: branch.companyId, branchId: branch.id });
   }
 
   private canReadBranch(branch: Branch): boolean {
@@ -320,8 +317,8 @@ export class BranchesPage {
     return branch.isHeadquarters ? this.canChangeHeadquarters(branch) : this.canManageBranch(branch);
   }
 
-  protected canAddDepartmentTo(_branch: Branch): boolean {
-    return false;
+  protected canAddDepartmentTo(branch: Branch): boolean {
+    return this.session.can('org.department.manage', { companyId: branch.companyId, branchId: branch.id });
   }
 
   protected companyName(companyId: string): string {
@@ -369,7 +366,7 @@ export class BranchesPage {
   }
 
   protected onHqTransferred(): void {
-    void this.loadLookups();
+    this.reload();
   }
 
   protected actionsFor(branch: Branch): ActionItem[] {
@@ -521,12 +518,13 @@ export class BranchesPage {
 
     this.setBusy(branch.id, true);
     try {
-      const updated = await updateBranch(branch.id, { isHeadquarters: true }, newIdempotencyKey());
+      const updated = await this.organizationWrite.updateBranch(branch.id, { isHeadquarters: true }, this.actionKeyFor(`hq:${branch.id}`).key);
+      this.actionKeys.delete(`hq:${branch.id}`);
       this.branchModal().syncBranch(updated);
       this.notify.success(this.transloco.translate('branches.toast.saved'));
       this.reload();
     } catch (error) {
-      this.notify.error(this.resolveError(error));
+      this.showWriteError(error, branch);
     } finally {
       this.setBusy(branch.id, false);
       this.pendingHqBranch.set(null);
@@ -575,26 +573,17 @@ export class BranchesPage {
   }
 
   private async performActivate(branch: Branch): Promise<void> {
-    if (!this.canChangeLifecycle(branch)) { this.pendingStatusChange.set(null); return; }
+    if (!this.canChangeLifecycle(branch) || this.busyIds().has(branch.id)) { this.pendingStatusChange.set(null); return; }
     this.setBusy(branch.id, true);
     try {
-      let updated: Branch;
-      try {
-        updated = await updateBranch(branch.id, { status: 'ACTIVE' }, newIdempotencyKey());
-      } catch (error) {
-        const cascade = isCascadeRequired(error);
-        if (!cascade) throw error;
-        const confirmed = await this.cascadeConfirm.confirm(cascade.addons);
-        if (!confirmed || !this.canChangeLifecycle(branch)) return;
-        updated = await updateBranch(branch.id, { status: 'ACTIVE' }, newIdempotencyKey(), {
-          confirmAddonCascade: true,
-        });
-      }
+      const updated = await this.writeWithCascade('activate', branch, (key, opts) =>
+        this.organizationWrite.updateBranch(branch.id, { status: 'ACTIVE' }, key, opts));
+      if (!updated) return;
       this.branchModal().syncBranch(updated);
       this.notify.success(this.transloco.translate('branches.toast.saved'));
       this.reload();
     } catch (error) {
-      this.notify.error(this.resolveError(error));
+      this.showWriteError(error, branch);
     } finally {
       this.setBusy(branch.id, false);
       this.pendingStatusChange.set(null);
@@ -602,21 +591,12 @@ export class BranchesPage {
   }
 
   private async performDeactivate(branch: Branch): Promise<void> {
-    if (!this.canChangeLifecycle(branch)) { this.pendingStatusChange.set(null); return; }
+    if (!this.canChangeLifecycle(branch) || this.busyIds().has(branch.id)) { this.pendingStatusChange.set(null); return; }
     this.setBusy(branch.id, true);
     try {
-      let updated: Branch;
-      try {
-        updated = await updateBranch(branch.id, { status: 'INACTIVE' }, newIdempotencyKey());
-      } catch (error) {
-        const cascade = isCascadeRequired(error);
-        if (!cascade) throw error;
-        const confirmed = await this.cascadeConfirm.confirm(cascade.addons);
-        if (!confirmed || !this.canChangeLifecycle(branch)) return;
-        updated = await updateBranch(branch.id, { status: 'INACTIVE' }, newIdempotencyKey(), {
-          confirmAddonCascade: true,
-        });
-      }
+      const updated = await this.writeWithCascade('deactivate', branch, (key, opts) =>
+        this.organizationWrite.updateBranch(branch.id, { status: 'INACTIVE' }, key, opts));
+      if (!updated) return;
       this.branchModal().syncBranch(updated);
       this.notify.success(this.transloco.translate('branches.toast.saved'));
       this.reload();
@@ -630,7 +610,7 @@ export class BranchesPage {
         this.openBranchBlockers(branch, this.extractBlockers(error));
         return;
       }
-      this.notify.error(this.resolveError(error));
+      this.showWriteError(error, branch);
     } finally {
       this.setBusy(branch.id, false);
       this.pendingStatusChange.set(null);
@@ -638,17 +618,12 @@ export class BranchesPage {
   }
 
   private async performDelete(branch: Branch): Promise<void> {
-    if (!this.canChangeLifecycle(branch)) { this.pendingDeleteBranch.set(null); return; }
+    if (!this.canChangeLifecycle(branch) || this.busyIds().has(branch.id)) { this.pendingDeleteBranch.set(null); return; }
     this.setBusy(branch.id, true);
     try {
-      try {
-        await deleteBranch(branch.id, newIdempotencyKey());
-      } catch (error) {
-        const cascade = isCascadeRequired(error);
-        if (!cascade) throw error;
-        if (!(await this.cascadeConfirm.confirm(cascade.addons)) || !this.canChangeLifecycle(branch)) return;
-        await deleteBranch(branch.id, newIdempotencyKey(), { confirmAddonCascade: true });
-      }
+      const result = await this.writeWithCascade('delete', branch, (key, opts) =>
+        this.organizationWrite.deleteBranch(branch.id, key, opts));
+      if (result === null) return;
       if (this.branchModal().editingId() === branch.id) {
         this.branchModal().closeImmediate();
       }
@@ -664,7 +639,7 @@ export class BranchesPage {
         this.openBranchBlockers(branch, this.extractBlockers(error));
         return;
       }
-      this.notify.error(this.resolveError(error));
+      this.showWriteError(error, branch);
     } finally {
       this.setBusy(branch.id, false);
       this.pendingDeleteBranch.set(null);
@@ -693,7 +668,10 @@ export class BranchesPage {
       candidateBranches: candidates.filter((candidate) =>
         candidate.companyId === branch.companyId && this.canChangeHeadquarters(candidate),
       ),
-      retryAction: () => (action === 'delete' ? this.performDelete(branch) : this.performDeactivate(branch)),
+      retryAction: () => {
+        const demoted = { ...branch, isHeadquarters: false };
+        return action === 'delete' ? this.performDelete(demoted) : this.performDeactivate(demoted);
+      },
     });
   }
 
@@ -710,15 +688,10 @@ export class BranchesPage {
       queryParams: { branchId: branch.id },
     };
 
-    const hasDeactivateSuggestion = blockers.some((phrase) => {
-      const normalized = phrase.toLowerCase();
-      return (
-        normalized === 'branch has references; deactivate the branch instead' ||
-        normalized === 'branch reference checks are unavailable; deactivate the branch instead' ||
-        normalized.includes('deactivate instead') ||
-        normalized.includes('references')
-      );
-    });
+    const hasDeactivateSuggestion = blockers.length === 1 && (
+      blockers[0] === 'branch has references; deactivate the branch instead' ||
+      blockers[0] === 'branch reference checks are unavailable; deactivate the branch instead'
+    );
 
     void this.blockersDialog().open({
       title: branch.name,
@@ -837,12 +810,51 @@ export class BranchesPage {
     });
   }
 
-  private resolveError(error: unknown): string {
+  private actionKeyFor(action: string): { key: string; confirmedKey?: string } {
+    let held = this.actionKeys.get(action);
+    if (!held) {
+      held = { key: newIdempotencyKey() };
+      this.actionKeys.set(action, held);
+    }
+    return held;
+  }
+
+  private async writeWithCascade<T>(
+    action: string,
+    branch: Branch,
+    write: (key: string, opts?: ConfirmAddonCascadeOptions) => Promise<T>,
+  ): Promise<T | null> {
+    const signature = `${action}:${branch.id}`;
+    const held = this.actionKeyFor(signature);
+    let result: T;
+    try {
+      result = await write(held.confirmedKey ?? held.key,
+        held.confirmedKey ? { confirmAddonCascade: true } : undefined);
+    } catch (error) {
+      const cascade = isCascadeRequired(error);
+      if (!cascade) throw error;
+      if (!(await this.cascadeConfirm.confirm(cascade.addons)) || !this.canChangeLifecycle(branch)) return null;
+      held.confirmedKey ??= newIdempotencyKey();
+      result = await write(held.confirmedKey, { confirmAddonCascade: true });
+    }
+    this.actionKeys.delete(signature);
+    return result;
+  }
+
+  private showWriteError(error: unknown, branch: Branch): void {
+    const message = this.resolveError(error, 'write');
+    const code = errorCodeOf(error);
+    if (code === 'GW.IDEM.IN_FLIGHT') this.notify.info(message);
+    else if (code === 'GW.IDEM.MISMATCH') this.notify.warning(message);
+    else this.notify.error(message);
+    if (error instanceof ApiError && error.status === 404) {
+      if (this.branchModal().editingId() === branch.id) this.branchModal().closeImmediate();
+      this.reload();
+    }
+  }
+
+  private resolveError(error: unknown, operation: 'read' | 'write' = 'read'): string {
     const seatMsg = seatErrorMessage(this.transloco, error);
-    if (seatMsg) return seatMsg;
-    const msg = errorMessage(error, 'staff', this.transloco);
-    if (msg && msg !== 'settings.errors.generic') return msg;
-    const fallback = this.transloco.translate('staff.errors.generic');
-    return fallback !== 'staff.errors.generic' ? fallback : msg;
+    return seatMsg || staffErrorMessage(error, 'staff', this.transloco, operation);
   }
 }

@@ -290,7 +290,7 @@ export function fromPermissions(perms: Permission[]): TreeEntry[] {
     return {
       id: perm.id,
       key: perm.key,
-      label: { en: perm.nameEn, ar: perm.nameAr },
+      label: perm.descriptionI18n ?? { en: perm.nameEn, ar: perm.nameAr },
       module: moduleMeta.label,
       moduleId: moduleMeta.id,
       area: perm.groupI18n,

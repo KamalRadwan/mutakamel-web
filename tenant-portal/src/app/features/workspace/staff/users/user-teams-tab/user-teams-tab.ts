@@ -1,4 +1,5 @@
 import { Component, computed, effect, inject, input, output, signal, viewChild } from '@angular/core';
+import { fieldErrorsOf } from '../../../../../core/api/api-errors';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
@@ -19,20 +20,10 @@ import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-d
 import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { Segmented, SegmentedOption } from '../../../../../shared/ui/segmented/segmented';
-import {
-  addMembership,
-  ApiError,
-  errorCodeOf,
-  getReportingScopes,
-  listBranches,
-  listDepartments,
-  listMemberships,
-  listTeams,
-  newIdempotencyKey,
-  patchReportingScopes,
-  removeMembership,
-  setMemberships,
-} from '../../shared/staff.api';
+import { ApiError, errorCodeOf, listAllPages, newIdempotencyKey, staffErrorMessage } from '../../shared/staff.api';
+import { StaffUserAccessApi } from '../user-access.api';
+import { OrganizationReadApi } from '../../shared/organization-read.api';
+import { ConflictDialog } from '../../../../../shared/ui/conflict-dialog/conflict-dialog';
 import { OrgCascade } from '../../shared/org-cascade/org-cascade';
 import { StaffSession } from '../../shared/staff-session';
 import {
@@ -79,13 +70,14 @@ const SKELETON_ROWS = [0, 1, 2] as const;
     Button,
     Checkbox,
     ConfirmDialog,
+    ConflictDialog,
     Field,
     Modal,
     OrgCascade,
     Segmented,
   ],
+  viewProviders: [provideTranslocoScope('staff', 'settings', { scope: 'staff-user-access', alias: 'access' }, { scope: 'record-page', alias: 'recordPage' })],
   providers: [
-    provideTranslocoScope('staff', 'settings', { scope: 'staff-user-access', alias: 'access' }),
     provideIcons({
       tablerLock,
       tablerPlus,
@@ -105,19 +97,37 @@ export class UserTeamsTab {
 
   private readonly notify = inject(Notify);
   private readonly session = inject(StaffSession);
+  private readonly api = inject(StaffUserAccessApi);
+  private readonly organization = inject(OrganizationReadApi);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
 
   private readonly addTeamModal = viewChild.required<Modal>('addTeamModal');
   private readonly changeRoleModal = viewChild.required<Modal>('changeRoleModal');
   private readonly reportingModal = viewChild.required<Modal>('reportingModal');
-  private readonly conflictModal = viewChild.required<Modal>('conflictModal');
+  protected readonly conflictOpen = signal(false);
   private readonly removeTeamConfirm = viewChild.required<ConfirmDialog>('removeTeamConfirm');
 
   readonly user = input.required<TenantUser>();
   readonly readonly = input(false);
   readonly readonlyReason = input<string | null>(null);
   readonly changed = output<void>();
+
+  protected readonly effectiveReadonly = computed(() => this.readonly() || this.session.me()?.id === this.user().id || this.user().isTenantOwner);
+  protected readonly effectiveReadonlyReason = computed(() => {
+    this.i18n();
+    if (this.session.me()?.id === this.user().id) return this.transloco.translate('staff.protected.self');
+    if (this.user().isTenantOwner) return this.transloco.translate('staff.protected.owner');
+    return this.readonlyReason();
+  });
+
+  protected readonly validationErrors = signal<Record<string, string[]>>({});
+  protected fieldError(field: string): string | null {
+    const messages = Object.entries(this.validationErrors())
+      .filter(([path]) => path === field || path.startsWith(field + '.'))
+      .flatMap(([, messages]) => messages);
+    return messages.length ? messages.join(' ') : null;
+  }
 
   protected readonly skeletonRows = SKELETON_ROWS;
   protected readonly roleBadge = ROLE_BADGE;
@@ -152,7 +162,7 @@ export class UserTeamsTab {
   protected readonly savingReporting = signal(false);
 
   protected readonly gridColumns = computed(() =>
-    this.readonly()
+    this.effectiveReadonly()
       ? 'grid-cols-staff-user-team-row'
       : 'grid-cols-staff-user-team-row-actions',
   );
@@ -210,15 +220,24 @@ export class UserTeamsTab {
   });
 
   private loadSeq = 0;
+  private actionUserId: string | null = null;
   private reportingSeq = 0;
-  private addKeyCache: { body: string; key: string } | null = null;
-  private roleKeyCache: { body: string; key: string } | null = null;
+  private addKeyCache: { bodyJson: string; key: string } | null = null;
+  private roleKeyCache: { bodyJson: string; key: string } | null = null;
   private removeKeyCache: { id: string; key: string } | null = null;
-  private reportingKeyCache: { body: string; key: string } | null = null;
+  private reportingKeyCache: { bodyJson: string; key: string } | null = null;
 
   constructor() {
     effect(() => {
       const userId = this.user().id;
+      if (this.actionUserId !== userId) {
+        this.actionUserId = userId;
+        this.addKeyCache = null;
+        this.roleKeyCache = null;
+        this.removeKeyCache = null;
+        this.reportingKeyCache = null;
+        this.validationErrors.set({});
+      }
       void this.loadAll(userId);
     });
   }
@@ -285,7 +304,7 @@ export class UserTeamsTab {
   }
 
   protected onAction(membership: TeamMembership, selection: ActionSelection): void {
-    if (this.readonly()) return;
+    if (this.effectiveReadonly()) return;
     switch (selection.id) {
       case 'changeRole':
         this.openChangeRoleModal(membership);
@@ -300,7 +319,7 @@ export class UserTeamsTab {
   }
 
   protected openAddTeamModal(): void {
-    if (this.readonly()) return;
+    if (this.effectiveReadonly()) return;
     this.cascadeValue.set({ ...EMPTY_CASCADE });
     this.cascadeErrors.set({});
     this.addRole.set('MEMBER');
@@ -315,7 +334,7 @@ export class UserTeamsTab {
   }
 
   protected async saveAddTeam(): Promise<void> {
-    if (this.savingAdd() || this.readonly()) return;
+    if (this.savingAdd() || this.effectiveReadonly()) return;
     const cascade = this.cascadeValue();
     const requiredMsg = this.requiredText();
     const errors: Partial<Record<OrgLevel, string>> = {};
@@ -325,17 +344,22 @@ export class UserTeamsTab {
     if (!cascade.teamId) errors.team = requiredMsg;
     this.cascadeErrors.set(errors);
     if (Object.keys(errors).length) return;
+    if (this.memberships().length >= 500) {
+      await this.handleWriteError(new ApiError(422, 'TEAM_MEMBERSHIP_LIMIT_EXCEEDED'));
+      return;
+    }
     if (!this.canManageMembership(cascade)) return;
 
     const payload = { teamId: cascade.teamId!, role: this.addRole() };
-    const body = JSON.stringify(payload);
-    const key = this.addKeyCache?.body === body ? this.addKeyCache.key : newIdempotencyKey();
-    this.addKeyCache = { body, key };
+    const bodyJson = JSON.stringify(payload);
+    const key = this.addKeyCache?.bodyJson === bodyJson ? this.addKeyCache.key : newIdempotencyKey();
+    this.addKeyCache = { bodyJson, key };
 
+    this.validationErrors.set({});
     this.savingAdd.set(true);
     try {
       const userId = this.user().id;
-      const memberships = await addMembership(userId, payload, key);
+      const memberships = await this.api.addMembership(userId, payload, key);
       this.addKeyCache = null;
       this.addTeamModal().close();
       if (this.user().id === userId) {
@@ -345,7 +369,7 @@ export class UserTeamsTab {
       this.changed.emit();
       this.notify.success(this.transloco.translate('access.common.saved'));
     } catch (error) {
-      this.notify.error(this.resolveError(error));
+      await this.handleWriteError(error);
     } finally {
       this.savingAdd.set(false);
     }
@@ -370,29 +394,34 @@ export class UserTeamsTab {
     const current = this.memberships().find(({ id }) => id === targetId);
     if (!current || this.savingRole() ||
         !this.canManageMembership(current) || !this.canReplaceMemberships()) return;
+    if (this.memberships().length > 500) {
+      await this.handleWriteError(new ApiError(422, 'TEAM_MEMBERSHIP_LIMIT_EXCEEDED'));
+      return;
+    }
     const role = this.nextRole();
     if (role === current.role) {
       this.changeRoleModal().close();
       return;
     }
 
-    const updated = this.memberships().map((item) =>
-      item.id === current.id ? { ...item, role } : item,
-    );
-    const body = JSON.stringify(updated.map((item) => ({ id: item.id, role: item.role })));
-    const key = this.roleKeyCache?.body === body ? this.roleKeyCache.key : newIdempotencyKey();
-    this.roleKeyCache = { body, key };
+    const updated = this.memberships().map((item) => ({
+      teamId: item.teamId, role: item.id === current.id ? role : item.role, isPrimary: item.isPrimary,
+    }));
+    const bodyJson = JSON.stringify(updated);
+    const key = this.roleKeyCache?.bodyJson === bodyJson ? this.roleKeyCache.key : newIdempotencyKey();
+    this.roleKeyCache = { bodyJson, key };
 
+    this.validationErrors.set({});
     this.savingRole.set(true);
     try {
-      await setMemberships(this.user().id, updated, key);
+      await this.api.setMemberships(this.user().id, updated, key);
       this.roleKeyCache = null;
       this.changeRoleModal().close();
       await this.loadMembershipsOnly(this.user().id);
       this.changed.emit();
       this.notify.success(this.transloco.translate('access.common.saved'));
     } catch (error) {
-      this.notify.error(this.resolveError(error));
+      await this.handleWriteError(error);
     } finally {
       this.savingRole.set(false);
     }
@@ -414,7 +443,7 @@ export class UserTeamsTab {
 
     this.removing.set(true);
     try {
-      await removeMembership(this.user().id, membership.id, key);
+      await this.api.removeMembership(this.user().id, membership.id, key);
       this.removeKeyCache = null;
       await this.loadMembershipsOnly(this.user().id);
       this.changed.emit();
@@ -423,7 +452,7 @@ export class UserTeamsTab {
       if (errorCodeOf(error) === 'PRIMARY_TEAM_MEMBERSHIP_PROTECTED') {
         this.notify.error(this.transloco.translate('access.teams.homeProtected'));
       } else {
-        this.notify.error(this.resolveError(error));
+        await this.handleWriteError(error);
       }
     } finally {
       this.removing.set(false);
@@ -443,7 +472,7 @@ export class UserTeamsTab {
   }
 
   protected stageRemoveExplicit(branchId: string): void {
-    if (!this.canManageReporting()) return;
+    if (!this.canManageReporting() || !this.reportingScopes()?.items.some((item) => item.branchId === branchId && item.capabilities.canRemove && item.origin !== 'HOME')) return;
     this.pendingRemoveBranchIds.update((current) =>
       current.includes(branchId) ? current : [...current, branchId],
     );
@@ -478,14 +507,15 @@ export class UserTeamsTab {
       ...(addBranchIds.length ? { addBranchIds } : {}),
       ...(removeBranchIds.length ? { removeBranchIds } : {}),
     };
-    const body = JSON.stringify(patch);
+    const bodyJson = JSON.stringify(patch);
     const key =
-      this.reportingKeyCache?.body === body ? this.reportingKeyCache.key : newIdempotencyKey();
-    this.reportingKeyCache = { body, key };
+      this.reportingKeyCache?.bodyJson === bodyJson ? this.reportingKeyCache.key : newIdempotencyKey();
+    this.reportingKeyCache = { bodyJson, key };
 
+    this.validationErrors.set({});
     this.savingReporting.set(true);
     try {
-      const result = await patchReportingScopes(this.user().id, membership.id, patch, key);
+      const result = await this.api.patchReportingScopes(this.user().id, membership.id, patch, key);
       this.reportingKeyCache = null;
       await this.loadReporting(this.user().id, membership.id);
       if (result.outcome === 'NO_CHANGE') {
@@ -496,12 +526,12 @@ export class UserTeamsTab {
       }
     } catch (error) {
       const code = errorCodeOf(error);
-      if (code === 'TEAM_REPORTING_SCOPE_REVISION_CONFLICT') {
-        this.conflictModal().open();
-      } else if (code === 'TEAM_REPORTING_SCOPE_CHANGE_CONFLICT') {
-        this.notify.warning(this.transloco.translate('access.rep.retry'));
+      if (code === 'TEAM_REPORTING_SCOPE_REVISION_CONFLICT' || code === 'TEAM_REPORTING_SCOPE_CHANGE_CONFLICT') {
+        this.conflictOpen.set(true);
+      } else if (code === 'TEAM_REPORTING_SCOPE_REVIEW_REQUIRED') {
+        this.notify.warning(this.resolveError(error, true));
       } else {
-        this.notify.error(this.resolveError(error));
+        await this.handleWriteError(error);
       }
     } finally {
       this.savingReporting.set(false);
@@ -509,8 +539,11 @@ export class UserTeamsTab {
   }
 
   protected async reloadReportingAfterConflict(): Promise<void> {
+    this.pendingAddBranchIds.set([]);
+    this.pendingRemoveBranchIds.set([]);
     const membership = this.reportingMembership();
-    this.conflictModal().close();
+    this.conflictOpen.set(false);
+    this.reportingKeyCache = null;
     if (!membership) return;
     await this.loadReporting(this.user().id, membership.id);
   }
@@ -521,18 +554,11 @@ export class UserTeamsTab {
     void this.loadReporting(this.user().id, membership.id);
   }
 
-  private async fetchAllPages<T>(
-    fetcher: (q: { page: number; limit: number }) => Promise<{ data: T[]; meta: { hasNext: boolean } }>,
-  ): Promise<T[]> {
-    const all: T[] = [];
-    let page = 1;
-    while (page <= 20) {
-      const res = await fetcher({ page, limit: 100 });
-      all.push(...res.data);
-      if (!res.meta.hasNext) break;
-      page += 1;
-    }
-    return all;
+  protected async keepReportingAfterConflict(): Promise<void> {
+    const membership = this.reportingMembership();
+    this.conflictOpen.set(false);
+    this.reportingKeyCache = null;
+    if (membership) await this.loadReporting(this.user().id, membership.id, true);
   }
 
   private async loadAll(userId: string): Promise<void> {
@@ -541,10 +567,10 @@ export class UserTeamsTab {
     this.loadFailed.set(false);
     try {
       const [memberships, branches, depts, teams] = await Promise.all([
-        listMemberships(userId),
-        this.fetchAllPages((q) => listBranches(q)),
-        this.fetchAllPages((q) => listDepartments(q)),
-        this.fetchAllPages((q) => listTeams(q)),
+        this.api.listMemberships(userId),
+        listAllPages((q) => this.organization.listBranches(q)),
+        listAllPages((q) => this.organization.listDepartments(q)),
+        listAllPages((q) => this.organization.listTeams(q)),
       ]);
       if (seq !== this.loadSeq) return;
       this.memberships.set(memberships);
@@ -554,8 +580,8 @@ export class UserTeamsTab {
       void this.refreshReportingCounts(userId, memberships);
     } catch (error) {
       if (seq !== this.loadSeq) return;
-      this.loadFailed.set(true);
-      this.notify.error(this.resolveError(error));
+      this.loadFailed.set(!(error instanceof ApiError && error.status === 0 && this.memberships().length));
+      if (!(error instanceof ApiError && error.status === 0)) this.notify.error(this.resolveError(error));
     } finally {
       if (seq === this.loadSeq) {
         this.loading.set(false);
@@ -564,7 +590,7 @@ export class UserTeamsTab {
   }
 
   private async loadMembershipsOnly(userId: string): Promise<void> {
-    const memberships = await listMemberships(userId);
+    const memberships = await this.api.listMemberships(userId);
     if (this.user().id !== userId) return;
     this.memberships.set(memberships);
     await this.refreshReportingCounts(userId, memberships);
@@ -579,7 +605,7 @@ export class UserTeamsTab {
     const entries = await Promise.all(
       targets.map(async (item) => {
         try {
-          const scopes = await getReportingScopes(userId, item.id);
+          const scopes = await this.api.getReportingScopes(userId, item.id);
           return [item.id, scopes.items.length] as const;
         } catch {
           return [item.id, 1] as const;
@@ -594,24 +620,27 @@ export class UserTeamsTab {
     this.reportingCounts.set(map);
   }
 
-  private async loadReporting(userId: string, membershipId: string): Promise<void> {
+  private async loadReporting(userId: string, membershipId: string, keepChanges = false): Promise<void> {
     const seq = ++this.reportingSeq;
     this.reportingLoading.set(true);
     this.reportingFailed.set(false);
     try {
-      const scopes = await getReportingScopes(userId, membershipId);
-      if (seq !== this.reportingSeq) return;
+      const scopes = await this.api.getReportingScopes(userId, membershipId);
+      if (seq !== this.reportingSeq || this.user().id !== userId || this.reportingMembership()?.id !== membershipId) return;
       this.reportingScopes.set(scopes);
-      this.pendingAddBranchIds.set([]);
-      this.pendingRemoveBranchIds.set([]);
+      if (!keepChanges) {
+        this.pendingAddBranchIds.set([]);
+        this.pendingRemoveBranchIds.set([]);
+      }
+      this.memberships.update((rows) => rows.map((row) => row.id === membershipId ? { ...row, reportingScopeRevision: scopes.revision } : row));
       this.reportingCounts.update((current) => ({
         ...current,
         [membershipId]: scopes.items.length,
       }));
     } catch (error) {
-      if (seq !== this.reportingSeq) return;
-      this.reportingFailed.set(true);
-      this.notify.error(this.resolveError(error));
+      if (seq !== this.reportingSeq || this.user().id !== userId || this.reportingMembership()?.id !== membershipId) return;
+      this.reportingFailed.set(!(error instanceof ApiError && error.status === 0 && this.reportingScopes()));
+      if (!(error instanceof ApiError && error.status === 0)) this.notify.error(this.resolveError(error));
     } finally {
       if (seq === this.reportingSeq) {
         this.reportingLoading.set(false);
@@ -620,7 +649,7 @@ export class UserTeamsTab {
   }
 
   private canManageMembership(target: Pick<CascadeValue, 'companyId' | 'branchId'> | null): boolean {
-    return !this.readonly() && !!target?.branchId &&
+    return !this.effectiveReadonly() && !!target?.branchId &&
       this.session.can('users.user.manage_memberships', target);
   }
 
@@ -635,23 +664,37 @@ export class UserTeamsTab {
     return this.transloco.translate('staff.common.required');
   }
 
-  private resolveError(error: unknown): string {
-    const code = errorCodeOf(error);
-    const details = error instanceof ApiError ? error.details : undefined;
-    if (code) {
-      const accessKey = `access.errors.${code}`;
-      const accessMsg = this.transloco.translate(accessKey, details);
-      if (accessMsg && accessMsg !== accessKey) return accessMsg;
-
-      const staffKey = `staff.errors.${code}`;
-      const staffMsg = this.transloco.translate(staffKey, details);
-      if (staffMsg && staffMsg !== staffKey) return staffMsg;
+  private async handleWriteError(error: unknown): Promise<void> {
+    const fields = fieldErrorsOf(error);
+    if (Object.keys(fields).length) {
+      const cascade: Partial<Record<OrgLevel, string>> = {};
+      for (const level of ['company', 'branch', 'department', 'team'] as const) {
+        const messages = fields[level + 'Id'];
+        if (messages?.length) cascade[level] = messages.join(' ');
+      }
+      this.cascadeErrors.set(cascade);
     }
-    const settingsGeneric = this.transloco.translate('settings.errors.generic');
-    if (settingsGeneric !== 'settings.errors.generic') return settingsGeneric;
-    const staffGeneric = this.transloco.translate('staff.errors.generic');
-    return staffGeneric !== 'staff.errors.generic'
-      ? staffGeneric
-      : this.transloco.translate('access.common.loadFailed');
+    this.validationErrors.set(fields);
+    if (Object.keys(fields).length) {
+      if (fields['_']?.length) this.notify.error(fields['_'].join(' '));
+      return;
+    }
+    const code = errorCodeOf(error);
+    if (code === 'GW.IDEM.IN_FLIGHT') this.notify.info(this.resolveError(error, true));
+    else if (code === 'GW.IDEM.MISMATCH' || code === 'TEAM_REPORTING_SCOPE_IDEMPOTENCY_CONFLICT') {
+      const messageError = code === 'TEAM_REPORTING_SCOPE_IDEMPOTENCY_CONFLICT'
+        ? new ApiError(422, 'GW.IDEM.MISMATCH') : error;
+      this.notify.warning(this.resolveError(messageError, true));
+      this.addKeyCache = this.roleKeyCache = this.reportingKeyCache = null;
+      this.removeKeyCache = null;
+      const membership = this.reportingMembership();
+      await this.loadAll(this.user().id);
+      if (membership) await this.loadReporting(this.user().id, membership.id);
+    } else if (!(error instanceof ApiError && error.status === 0)) this.notify.error(this.resolveError(error, true));
+    if (code === 'TENANT_USER_NOT_FOUND') this.changed.emit();
+  }
+
+  private resolveError(error: unknown, write = false): string {
+    return staffErrorMessage(error, 'access', this.transloco, write ? 'write' : 'read');
   }
 }

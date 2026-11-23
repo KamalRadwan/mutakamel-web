@@ -9,7 +9,9 @@ import { LanguageState } from '../../../../../core/i18n/language';
 import { Notify } from '../../../../../core/notify/notify';
 import { Button } from '../../../../../shared/ui/button/button';
 import { Field } from '../../../../../shared/ui/field/field';
-import { ApiError, errorCodeOf, newIdempotencyKey, updateUser } from '../../shared/staff.api';
+import { ApiError, errorCodeOf, newIdempotencyKey } from '../../shared/staff.api';
+import { fieldErrorsOf, isValidationError } from '../../../../../core/api/api-errors';
+import { StaffUsersApi, type UpdateUserBody } from '../users.api';
 import { OrgCascade } from '../../shared/org-cascade/org-cascade';
 import { StaffSession } from '../../shared/staff-session';
 import { StatusBadge } from '../../shared/status-badge/status-badge';
@@ -30,7 +32,7 @@ interface ProfileDraft {
   jobTitle: string;
 }
 
-type UserPatch = Parameters<typeof updateUser>[1];
+type UserPatch = UpdateUserBody;
 
 const EMPTY_DRAFT: ProfileDraft = {
   firstName: '',
@@ -56,6 +58,7 @@ export class UserProfileTab {
 
   private readonly session = inject(StaffSession);
   private readonly notify = inject(Notify);
+  private readonly usersApi = inject(StaffUsersApi);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   protected readonly language = inject(LanguageState).current;
@@ -68,6 +71,8 @@ export class UserProfileTab {
   readonly saved = output<TenantUser>();
   readonly closeRequested = output<void>();
   readonly deletedRemotely = output<void>();
+  readonly reloadRequested = output<void>();
+  private readonly fieldServerErrors = signal<Record<string, { value: string; message: string }>>({});
 
   protected readonly limits = STAFF_LIMITS;
 
@@ -175,6 +180,8 @@ export class UserProfileTab {
 
   protected readonly firstNameError = computed(() => {
     this.i18n();
+    const server = this.fieldServerErrors()['firstName'];
+    if (server && server.value === this.draft().firstName.trim()) return server.message;
     const state = this.profileForm.firstName();
     const error = state.touched() || this.submitAttempted() ? state.errors()[0] : undefined;
     if (!error) return null;
@@ -187,6 +194,8 @@ export class UserProfileTab {
 
   protected readonly lastNameError = computed(() => {
     this.i18n();
+    const server = this.fieldServerErrors()['lastName'];
+    if (server && server.value === this.draft().lastName.trim()) return server.message;
     const state = this.profileForm.lastName();
     const error = state.touched() || this.submitAttempted() ? state.errors()[0] : undefined;
     if (!error) return null;
@@ -212,6 +221,8 @@ export class UserProfileTab {
 
   protected readonly jobTitleError = computed(() => {
     this.i18n();
+    const server = this.fieldServerErrors()['jobTitle'];
+    if (server && server.value === this.draft().jobTitle.trim()) return server.message;
     const state = this.profileForm.jobTitle();
     const error = state.touched() || this.submitAttempted() ? state.errors()[0] : undefined;
     if (!error) return null;
@@ -285,6 +296,7 @@ export class UserProfileTab {
     if (this.isReadonly() || this.saving()) return false;
     if (!this.dirty()) return true;
 
+    this.fieldServerErrors.set({});
     this.submitAttempted.set(true);
     this.codeServerError.set(null);
     this.managerServerError.set(null);
@@ -334,7 +346,7 @@ export class UserProfileTab {
 
       try {
         const key = this.idempotencyKeyFor(base.id, patch);
-        const updated = await updateUser(base.id, patch, key);
+        const updated = await this.usersApi.updateUser(base.id, patch, key);
         this.clearIdempotency();
         this.syncedUserId = updated.id;
         this.syncedUpdatedAt = updated.updatedAt;
@@ -344,6 +356,31 @@ export class UserProfileTab {
         savedOk = true;
       } catch (error) {
         const code = errorCodeOf(error);
+        if (isValidationError(error)) {
+          const fields = fieldErrorsOf(error);
+          const message = resolveStaffError(error, this.transloco);
+          const errors: Record<string, { value: string; message: string }> = {};
+          for (const field of ['firstName', 'lastName', 'jobTitle'] as const) {
+            if (fields[field]) errors[field] = { value: d[field].trim(), message: fields[field][0] || message };
+          }
+          this.fieldServerErrors.set(errors);
+          if (fields['employeeCode']) this.codeServerError.set({ value: employeeCode ?? '', message: fields['employeeCode'][0] || message });
+          if (fields['managerId']) this.managerServerError.set({ value: managerId, message: fields['managerId'][0] || message });
+          const placement = ['companyId', 'branchId', 'departmentId', 'teamId'].find((field) => fields[field]);
+          if (placement) this.placementServerError.set(fields[placement][0] || message);
+          if (fields['_'] || Object.keys(fields).length === 0) this.notify.error(fields['_']?.join(' ') || message);
+          return undefined;
+        }
+        if (code === 'GW.IDEM.IN_FLIGHT') {
+          this.notify.info(resolveStaffError(error, this.transloco));
+          return undefined;
+        }
+        if (code === 'GW.IDEM.MISMATCH') {
+          this.notify.warning(resolveStaffError(error, this.transloco));
+          this.reloadRequested.emit();
+          return undefined;
+        }
+        if (error instanceof ApiError && error.status === 0) return undefined;
         if (code === 'MANAGER_CYCLE') {
           this.managerServerError.set({
             message: this.transloco.translate('users.errors.cycle'),
@@ -370,6 +407,7 @@ export class UserProfileTab {
           return undefined;
         }
         this.notify.error(resolveStaffError(error, this.transloco));
+        if (code === 'USER_SELF_FORBIDDEN' || code === 'TENANT_OWNER_PROTECTED') this.reloadRequested.emit();
         if (code === 'TENANT_USER_NOT_FOUND' || (error instanceof ApiError && error.status === 404)) {
           this.deletedRemotely.emit();
         }
@@ -382,6 +420,7 @@ export class UserProfileTab {
 
   private applyUserToForm(u: TenantUser): void {
     this.cascadeInteracted = false;
+    this.fieldServerErrors.set({});
     this.submitAttempted.set(false);
     this.codeServerError.set(null);
     this.managerServerError.set(null);

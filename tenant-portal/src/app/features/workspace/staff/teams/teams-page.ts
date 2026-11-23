@@ -5,6 +5,10 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
+  tablerCheck,
+  tablerCircleOff,
+  tablerEdit,
+  tablerTrash,
   tablerCloudOff,
   tablerEye,
   tablerUsers,
@@ -17,9 +21,13 @@ import { Button } from '../../../../shared/ui/button/button';
 import { StaffList } from '../shared/staff-list/staff-list';
 import { StaffSession } from '../shared/staff-session';
 import { StatusBadge } from '../shared/status-badge/status-badge';
-import { ApiError } from '../../../../core/api/api-errors';
+import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
+import { BlockersDialog } from '../shared/blockers-dialog/blockers-dialog';
+import { OrganizationWriteApi } from '../shared/organization-write.api';
+import { newIdempotencyKey } from '../../../../core/api/idempotency';
+import { ApiError, errorCodeOf } from '../../../../core/api/api-errors';
 import { OrganizationReadApi } from '../shared/organization-read.api';
-import { errorMessage, listAllPages } from '../shared/staff.api';
+import { staffErrorMessage, listAllPages } from '../shared/staff.api';
 import { StaffUsersApi } from '../users/users.api';
 import {
   Branch,
@@ -48,6 +56,8 @@ const TABLE_COLUMNS = 'grid-cols-staff-team-row-actions';
     StaffList,
     StatusBadge,
     TeamModal,
+    ConfirmDialog,
+    BlockersDialog,
   ],
   providers: [
     provideTranslocoScope(
@@ -56,6 +66,7 @@ const TABLE_COLUMNS = 'grid-cols-staff-team-row-actions';
       { scope: 'staff-teams', alias: 'teams' },
     ),
     provideIcons({
+      tablerCheck, tablerCircleOff, tablerEdit, tablerTrash,
       tablerUsersGroup,
       tablerCloudOff,
       tablerEye,
@@ -63,7 +74,7 @@ const TABLE_COLUMNS = 'grid-cols-staff-team-row-actions';
     }),
   ],
   templateUrl: './teams-page.html',
-  host: { class: 'flex min-h-0 flex-1 flex-col' },
+  host: { class: 'flex flex-1 shrink-0 flex-col' },
 })
 export class TeamsPage {
   private readonly route = inject(ActivatedRoute);
@@ -74,10 +85,24 @@ export class TeamsPage {
   private readonly language = inject(LanguageState).current;
   private readonly session = inject(StaffSession);
   private readonly organization = inject(OrganizationReadApi);
+  private readonly writeApi = inject(OrganizationWriteApi);
   private readonly usersApi = inject(StaffUsersApi);
   private readonly queryParams = toSignal(this.route.queryParamMap);
 
   private readonly teamModal = viewChild.required(TeamModal);
+  private readonly statusDialog = viewChild.required<ConfirmDialog>('statusDialog');
+  private readonly deleteConfirm = viewChild.required<ConfirmDialog>('deleteConfirm');
+  private readonly blockersDialog = viewChild.required(BlockersDialog);
+  protected readonly openedTeam = signal<Team | null>(null);
+  protected readonly canManageOpenedTeam = computed(() => {
+    const team = this.openedTeam();
+    return team !== null && this.canManageTeam(team);
+  });
+  protected readonly busyIds = signal<ReadonlySet<string>>(new Set());
+  protected readonly pendingDeleteTeam = signal<Team | null>(null);
+  protected readonly pendingStatusChange = signal<{ team: Team; nextStatus: 'ACTIVE' | 'INACTIVE' } | null>(null);
+  private readonly actionKeys = new Map<string, string>();
+
   protected readonly skeletonRows = SKELETON_ROWS;
   protected readonly tableColumns = TABLE_COLUMNS;
 
@@ -427,6 +452,7 @@ export class TeamsPage {
 
     const department = matching.length === 1 ? matching[0] : null;
     this.detailSeq++;
+    this.openedTeam.set(null);
     this.teamModal().openCreate({
       companyId: department ? this.branchMap().get(department.branchId)?.companyId : matching.length ? companyId : null,
       branchId: department?.branchId ?? (matching.length ? branchId : null),
@@ -438,11 +464,12 @@ export class TeamsPage {
     void this.openTeamById(team.id);
   }
 
-  protected async onModalSaved(): Promise<void> {
-    const revision = this.session.scopeRevision();
-    if (!revision) return;
-    await this.organization.invalidateScope(revision);
-    if (revision === this.session.scopeRevision()) this.reload();
+  protected onModalSaved(): void {
+    this.reload();
+  }
+
+  protected canManageTeam(team: Team): boolean {
+    return this.canOnTeam('org.team.manage', team);
   }
 
   protected actionsFor(team: Team): ActionItem[] {
@@ -455,17 +482,123 @@ export class TeamsPage {
       tile: 'bg-icon-blue',
     }];
 
+    if (this.canManageTeam(team)) {
+      items.push({ id: 'edit', title: t('teams.actions.edit'), icon: 'tablerEdit', tile: 'bg-icon-orange' });
+    }
     if (this.canOnTeam('users.user.read', team)) {
       items.push({ id: 'viewMembers', title: t('teams.actions.viewMembers'), icon: 'tablerUsers', tile: 'bg-icon-blue' });
+    }
+    if (this.canManageTeam(team)) {
+      const active = team.status === 'ACTIVE';
+      const busy = this.busyIds().has(team.id);
+      items.push(
+        { id: 'toggleStatus', title: t(active ? 'teams.actions.deactivate' : 'teams.actions.activate'),
+          icon: active ? 'tablerCircleOff' : 'tablerCheck',
+          tile: busy ? 'bg-icon-gray' : active ? 'bg-icon-orange' : 'bg-icon-green', disabled: busy },
+        { id: 'delete', title: t('teams.actions.delete'), icon: 'tablerTrash', tile: 'bg-icon-red', danger: true, disabled: busy },
+      );
     }
     return items;
   }
 
   protected onAction(team: Team, selection: ActionSelection): void {
-    if (selection.id === 'open') this.openDetails(team);
+    if (selection.id === 'toggleStatus') void this.requestToggleStatus(team);
+    if (selection.id === 'delete') void this.requestDelete(team);
+    if (selection.id === 'open' || selection.id === 'edit') this.openDetails(team);
     if (selection.id === 'viewMembers' && this.canOnTeam('users.user.read', team)) {
       void this.router.navigate(['/workspace/staff/users'], { queryParams: { teamId: team.id } });
     }
+  }
+
+  protected async requestToggleStatus(team: Team): Promise<void> {
+    if (!this.canManageTeam(team) || this.busyIds().has(team.id) || this.pendingStatusChange()) return;
+    const nextStatus = team.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+    this.pendingStatusChange.set({ team, nextStatus });
+    try {
+      if (!(await this.statusDialog().open()) || !this.canManageTeam(team)) return;
+      this.setBusy(team.id, true);
+      const action = `${nextStatus}:${team.id}`;
+      const updated = await this.writeApi.updateTeam(team.id, { status: nextStatus }, this.keyForAction(action));
+      this.actionKeys.delete(action);
+      this.teamModal().syncTeam(updated);
+      if (this.openedTeam()?.id === team.id) this.openedTeam.set(updated);
+      this.notify.success(this.transloco.translate(nextStatus === 'ACTIVE' ? 'teams.toast.activated' : 'teams.toast.deactivated'));
+      this.reload();
+    } catch (error) {
+      this.handleActionError(error, team);
+    } finally {
+      this.setBusy(team.id, false);
+      this.pendingStatusChange.set(null);
+    }
+  }
+
+  protected async requestDelete(team: Team): Promise<void> {
+    if (!this.canManageTeam(team) || this.busyIds().has(team.id) || this.pendingDeleteTeam()) return;
+    this.pendingDeleteTeam.set(team);
+    try {
+      if (!(await this.deleteConfirm().open()) || !this.canManageTeam(team)) return;
+      this.setBusy(team.id, true);
+      const action = `delete:${team.id}`;
+      await this.writeApi.deleteTeam(team.id, this.keyForAction(action));
+      this.actionKeys.delete(action);
+      if (this.teamModal().editingId() === team.id) this.teamModal().closeImmediate();
+      this.notify.success(this.transloco.translate('teams.toast.deleted'));
+      this.reload();
+    } catch (error) {
+      this.handleActionError(error, team);
+    } finally {
+      this.setBusy(team.id, false);
+      this.pendingDeleteTeam.set(null);
+    }
+  }
+
+  protected onDeactivateBlocked(event: { team: Team; blockers: string[] }): void {
+    this.openTeamBlockers(event.team, event.blockers);
+  }
+
+  private handleActionError(error: unknown, team: Team): void {
+    const code = errorCodeOf(error);
+    if (code === 'ORG_NODE_NOT_EMPTY') {
+      const blockers = error instanceof ApiError ? error.details?.['blockers'] : undefined;
+      this.openTeamBlockers(team, Array.isArray(blockers)
+        ? blockers.filter((item): item is string => typeof item === 'string') : []);
+      return;
+    }
+    const message = code === 'ORG_PARENT_INACTIVE' ? this.transloco.translate('teams.parentInactive')
+      : staffErrorMessage(error, 'staff', this.transloco, 'write');
+    if (code === 'GW.IDEM.IN_FLIGHT') this.notify.info(message);
+    else if (code === 'GW.IDEM.MISMATCH') this.notify.warning(message);
+    else this.notify.error(message);
+    if (code === 'ORG_NODE_NOT_FOUND') {
+      if (this.teamModal().editingId() === team.id) this.teamModal().closeImmediate();
+      this.reload();
+    }
+  }
+
+  private openTeamBlockers(team: Team, blockers: string[]): void {
+    const usersLink = { label: this.transloco.translate('teams.blockers.viewUsers'),
+      route: ['/workspace/staff/users'], queryParams: { teamId: team.id } };
+    void this.blockersDialog().open({ title: team.name, blockers: blockers.slice(0, 1), links: {
+      'team has placed users': usersLink, 'team has memberships': usersLink,
+    } });
+  }
+
+  private keyForAction(action: string): string {
+    let key = this.actionKeys.get(action);
+    if (!key) {
+      key = newIdempotencyKey();
+      this.actionKeys.set(action, key);
+    }
+    return key;
+  }
+
+  private setBusy(id: string, busy: boolean): void {
+    this.busyIds.update((current) => {
+      const next = new Set(current);
+      if (busy) next.add(id);
+      else next.delete(id);
+      return next;
+    });
   }
 
   private async openTeamById(id: string): Promise<void> {
@@ -474,9 +607,13 @@ export class TeamsPage {
     try {
       const team = await this.organization.getTeam(id);
       if (seq !== this.detailSeq || revision !== this.session.scopeRevision()) return;
-      this.teamModal().openDetails(team, this.resolveParentIds({ departmentId: team.departmentId }));
+      this.openedTeam.set(team);
+      this.teamModal().openEdit(team, this.resolveParentIds({ departmentId: team.departmentId }));
     } catch (error) {
-      if (seq === this.detailSeq && revision === this.session.scopeRevision()) this.notify.error(this.resolveError(error));
+      if (seq === this.detailSeq && revision === this.session.scopeRevision()) {
+        this.notify.error(staffErrorMessage(error, 'staff', this.transloco));
+        if (errorCodeOf(error) === 'ORG_NODE_NOT_FOUND') this.reload();
+      }
     }
   }
 
@@ -620,10 +757,5 @@ export class TeamsPage {
     });
   }
 
-  private resolveError(error: unknown): string {
-    const msg = errorMessage(error, 'staff', this.transloco);
-    if (msg && msg !== 'settings.errors.generic') return msg;
-    const fallback = this.transloco.translate('staff.errors.generic');
-    return fallback !== 'staff.errors.generic' ? fallback : msg;
-  }
+
 }

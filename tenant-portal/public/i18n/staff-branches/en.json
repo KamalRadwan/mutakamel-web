@@ -68,10 +68,6 @@
     "activateText": "This branch will be able to receive departments and users again.",
     "hqTitle": "Change the headquarters?",
     "hqText": "{{name}} will become the headquarters of {{company}}, and {{old}} will stop being the headquarters.",
-    "staleTitle": "Branch scope changed",
-    "staleText": "The organization hierarchy changed while you were editing. Reload to get the latest data.",
-    "reload": "Reload",
-    "keepChanges": "Keep my changes",
     "discardTitle": "Discard unsaved changes?",
     "discardText": "Your changes to this branch have not been saved.",
     "discardConfirm": "Discard"

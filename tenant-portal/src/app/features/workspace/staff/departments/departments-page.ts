@@ -10,22 +10,32 @@ import {
   tablerPlus,
   tablerSitemap,
   tablerUsers,
+  tablerCheck,
+  tablerCircleOff,
+  tablerEdit,
+  tablerTrash,
 } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
 import { ActionItem, ActionSelection, ActionsMenu } from '../../../../shared/ui/actions-menu/actions-menu';
 import { Button } from '../../../../shared/ui/button/button';
+import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
+import { ConflictDialog } from '../../../../shared/ui/conflict-dialog/conflict-dialog';
+import { BlockersDialog } from '../shared/blockers-dialog/blockers-dialog';
 import { StaffList } from '../shared/staff-list/staff-list';
 import { StaffSession } from '../shared/staff-session';
 import { StatusBadge } from '../shared/status-badge/status-badge';
-import { ApiError } from '../../../../core/api/api-errors';
+import { ApiError, errorCodeOf } from '../../../../core/api/api-errors';
+import { newIdempotencyKey } from '../../../../core/api/idempotency';
 import { OrganizationReadApi } from '../shared/organization-read.api';
-import { errorMessage, listAllPages } from '../shared/staff.api';
+import { staffErrorMessage, listAllPages } from '../shared/staff.api';
+import { OrganizationWriteApi } from '../shared/organization-write.api';
 import {
   Branch,
   Company,
   Department,
   ListQuery,
+  OrgStatus,
   StaffListFilter,
   StaffListSortOption,
 } from '../shared/staff.model';
@@ -43,6 +53,9 @@ const TABLE_COLUMNS = 'grid-cols-staff-department-row-actions';
     TranslocoPipe,
     ActionsMenu,
     Button,
+    ConfirmDialog,
+    ConflictDialog,
+    BlockersDialog,
     DepartmentModal,
     StaffList,
     StatusBadge,
@@ -59,10 +72,14 @@ const TABLE_COLUMNS = 'grid-cols-staff-department-row-actions';
       tablerEye,
       tablerPlus,
       tablerUsers,
+      tablerCheck,
+      tablerCircleOff,
+      tablerEdit,
+      tablerTrash,
     }),
   ],
   templateUrl: './departments-page.html',
-  host: { class: 'flex min-h-0 flex-1 flex-col' },
+  host: { class: 'flex flex-1 shrink-0 flex-col' },
 })
 export class DepartmentsPage {
   private readonly route = inject(ActivatedRoute);
@@ -73,9 +90,24 @@ export class DepartmentsPage {
   private readonly language = inject(LanguageState).current;
   private readonly session = inject(StaffSession);
   private readonly organization = inject(OrganizationReadApi);
+  private readonly writeApi = inject(OrganizationWriteApi);
   private readonly queryParams = toSignal(this.route.queryParamMap);
 
   private readonly departmentModal = viewChild.required(DepartmentModal);
+  private readonly statusDialog = viewChild.required<ConfirmDialog>('statusDialog');
+  private readonly deleteConfirm = viewChild.required<ConfirmDialog>('deleteConfirm');
+  private readonly blockersDialog = viewChild.required(BlockersDialog);
+  protected readonly openedDepartment = signal<Department | null>(null);
+  protected readonly modalCanManage = computed(() => {
+    const department = this.openedDepartment();
+    return department !== null && this.canManageDepartment(department);
+  });
+  protected readonly busyIds = signal<ReadonlySet<string>>(new Set());
+  protected readonly pendingStatusChange = signal<{ department: Department; nextStatus: OrgStatus } | null>(null);
+  protected readonly pendingDeleteDepartment = signal<Department | null>(null);
+  protected readonly conflictDepartment = signal<Department | null>(null);
+  protected readonly conflictOpen = signal(false);
+  private readonly actionKeys = new Map<string, string>();
   protected readonly skeletonRows = SKELETON_ROWS;
   protected readonly tableColumns = TABLE_COLUMNS;
 
@@ -302,6 +334,13 @@ export class DepartmentsPage {
     return this.session.can('org.team.read', target) && this.session.can('org.team.manage', target);
   }
 
+  protected canManageDepartment(department: Department): boolean {
+    return this.session.can('org.department.manage', {
+      companyId: this.branchMap().get(department.branchId)?.companyId,
+      branchId: department.branchId,
+    });
+  }
+
   protected branchName(branchId: string): string {
     return this.branchMap().get(branchId)?.name ?? '—';
   }
@@ -340,21 +379,19 @@ export class DepartmentsPage {
 
     const branch = matching.length === 1 ? matching[0] : null;
     this.detailSeq++;
+    this.openedDepartment.set(null);
     this.departmentModal().openCreate({
       companyId: branch?.companyId ?? (matching.length ? companyId : null),
       branchId: branch?.id,
     });
   }
 
-  protected openDetails(department: Department): void {
+  protected openEdit(department: Department): void {
     void this.openDepartmentById(department.id);
   }
 
-  protected async onModalSaved(): Promise<void> {
-    const revision = this.session.scopeRevision();
-    if (!revision) return;
-    await this.organization.invalidateScope(revision);
-    if (revision === this.session.scopeRevision()) this.reload();
+  protected onModalSaved(): void {
+    this.reload();
   }
 
   protected actionsFor(department: Department): ActionItem[] {
@@ -366,6 +403,10 @@ export class DepartmentsPage {
       icon: 'tablerEye',
       tile: 'bg-icon-blue',
     }];
+
+    const manage = this.canManageDepartment(department);
+    const busy = this.busyIds().has(department.id);
+    if (manage) items.push({ id: 'edit', title: t('departments.actions.edit'), icon: 'tablerEdit', tile: 'bg-icon-orange' });
 
     if (this.canAddTeamTo(department)) {
       const inactive = department.status !== 'ACTIVE';
@@ -381,13 +422,22 @@ export class DepartmentsPage {
     if (this.session.can('users.user.read', { branchId: department.branchId })) {
       items.push({ id: 'viewUsers', title: t('departments.actions.viewUsers'), icon: 'tablerUsers', tile: 'bg-icon-blue' });
     }
+    if (manage) {
+      const active = department.status === 'ACTIVE';
+      items.push(
+        { id: 'toggleStatus', title: t(active ? 'departments.actions.deactivate' : 'departments.actions.activate'),
+          icon: active ? 'tablerCircleOff' : 'tablerCheck', tile: busy ? 'bg-icon-gray' : active ? 'bg-icon-orange' : 'bg-icon-green', disabled: busy },
+        { id: 'delete', title: t('departments.actions.delete'), icon: 'tablerTrash', tile: 'bg-icon-red', danger: true, disabled: busy },
+      );
+    }
     return items;
   }
 
   protected onAction(department: Department, selection: ActionSelection): void {
     switch (selection.id) {
       case 'open':
-        this.openDetails(department);
+      case 'edit':
+        this.openEdit(department);
         break;
       case 'addTeam':
         if (this.canAddTeamTo(department) && department.status === 'ACTIVE') {
@@ -401,7 +451,129 @@ export class DepartmentsPage {
           void this.router.navigate(['/workspace/staff/users'], { queryParams: { departmentId: department.id } });
         }
         break;
+      case 'toggleStatus':
+        void this.requestToggleStatus(department);
+        break;
+      case 'delete':
+        void this.requestDelete(department);
+        break;
     }
+  }
+
+  protected async requestToggleStatus(department: Department): Promise<void> {
+    if (!this.canManageDepartment(department) || this.busyIds().has(department.id) || this.pendingStatusChange()) return;
+    const nextStatus: OrgStatus = department.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+    this.pendingStatusChange.set({ department, nextStatus });
+    try {
+      if (!(await this.statusDialog().open()) || !this.canManageDepartment(department)) return;
+      this.setBusy(department.id, true);
+      const action = `${nextStatus}:${department.id}`;
+      const updated = await this.writeApi.updateDepartment(department.id, { status: nextStatus }, this.keyFor(action));
+      this.actionKeys.delete(action);
+      this.departmentModal().syncDepartment(updated);
+      if (this.openedDepartment()?.id === updated.id) this.openedDepartment.set(updated);
+      this.notify.success(this.transloco.translate(nextStatus === 'ACTIVE' ? 'departments.toast.activated' : 'departments.toast.deactivated'));
+      this.reload();
+    } catch (error) {
+      this.handleWriteError(error, department);
+    } finally {
+      this.setBusy(department.id, false);
+      this.pendingStatusChange.set(null);
+    }
+  }
+
+  protected async requestDelete(department: Department): Promise<void> {
+    if (!this.canManageDepartment(department) || this.busyIds().has(department.id) || this.pendingDeleteDepartment()) return;
+    this.pendingDeleteDepartment.set(department);
+    try {
+      if (!(await this.deleteConfirm().open()) || !this.canManageDepartment(department)) return;
+      this.setBusy(department.id, true);
+      const action = `delete:${department.id}`;
+      await this.writeApi.deleteDepartment(department.id, this.keyFor(action));
+      this.actionKeys.delete(action);
+      if (this.departmentModal().editingId() === department.id) this.departmentModal().closeImmediate();
+      this.notify.success(this.transloco.translate('departments.toast.deleted'));
+      this.reload();
+    } catch (error) {
+      this.handleWriteError(error, department);
+    } finally {
+      this.setBusy(department.id, false);
+      this.pendingDeleteDepartment.set(null);
+    }
+  }
+
+  protected onDeactivateBlocked(event: { department: Department; blockers: string[] }): void {
+    this.openDepartmentBlockers(event.department, event.blockers);
+  }
+
+  private openDepartmentBlockers(department: Department, blockers: string[]): void {
+    const teamsLink = { label: this.transloco.translate('departments.blockers.viewTeams'), route: ['/workspace/staff/teams'], queryParams: { departmentId: department.id } };
+    const usersLink = { label: this.transloco.translate('departments.blockers.viewUsers'), route: ['/workspace/staff/users'], queryParams: { departmentId: department.id } };
+    void this.blockersDialog().open({ title: department.name, blockers, links: {
+      'department has teams': teamsLink,
+      'department has active teams': teamsLink,
+      'department has placed users': usersLink,
+      'department has team memberships': usersLink,
+    } });
+  }
+
+  private handleWriteError(error: unknown, department: Department): void {
+    const code = errorCodeOf(error);
+    if (code === 'ORG_NODE_NOT_EMPTY') {
+      const blockers = error instanceof ApiError ? error.details?.['blockers'] : undefined;
+      this.openDepartmentBlockers(department, Array.isArray(blockers) ? blockers.filter((v): v is string => typeof v === 'string') : []);
+      return;
+    }
+    if (code === 'ORG_NODE_SCOPE_STALE' || code === 'ORG_BRANCH_SCOPE_STALE') {
+      this.conflictDepartment.set(department);
+      this.conflictOpen.set(true);
+      return;
+    }
+    const message = code === 'ORG_PARENT_INACTIVE'
+      ? this.transloco.translate('departments.parentInactive')
+      : staffErrorMessage(error, 'staff', this.transloco, 'write');
+    if (code === 'GW.IDEM.IN_FLIGHT') this.notify.info(message);
+    else if (code === 'GW.IDEM.MISMATCH') this.notify.warning(message);
+    else this.notify.error(message);
+    if (error instanceof ApiError && error.status === 404) {
+      if (this.departmentModal().editingId() === department.id) this.departmentModal().closeImmediate();
+      this.reload();
+    }
+  }
+
+  protected async resolveActionConflict(keepChanges: boolean): Promise<void> {
+    this.conflictOpen.set(false);
+    const department = this.conflictDepartment();
+    if (!department) return;
+    try {
+      const fresh = await this.organization.getDepartment(department.id);
+      this.departmentModal().syncDepartment(fresh);
+      for (const action of ['ACTIVE', 'INACTIVE', 'delete']) this.actionKeys.delete(`${action}:${department.id}`);
+      this.reload();
+      if (keepChanges) this.openedDepartment.set(fresh);
+    } catch (error) {
+      this.notify.error(staffErrorMessage(error, 'staff', this.transloco));
+      if (this.departmentModal().editingId() === department.id) this.departmentModal().closeImmediate();
+      this.reload();
+    }
+  }
+
+  private keyFor(action: string): string {
+    let key = this.actionKeys.get(action);
+    if (!key) {
+      key = newIdempotencyKey();
+      this.actionKeys.set(action, key);
+    }
+    return key;
+  }
+
+  private setBusy(id: string, busy: boolean): void {
+    this.busyIds.update((current) => {
+      const next = new Set(current);
+      if (busy) next.add(id);
+      else next.delete(id);
+      return next;
+    });
   }
 
   private async openDepartmentById(id: string): Promise<void> {
@@ -410,9 +582,10 @@ export class DepartmentsPage {
     try {
       const department = await this.organization.getDepartment(id);
       if (seq !== this.detailSeq || revision !== this.session.scopeRevision()) return;
-      this.departmentModal().openDetails(department, this.branchMap().get(department.branchId)?.companyId);
+      this.openedDepartment.set(department);
+      this.departmentModal().openEdit(department, this.branchMap().get(department.branchId)?.companyId);
     } catch (error) {
-      if (seq === this.detailSeq && revision === this.session.scopeRevision()) this.notify.error(this.resolveError(error));
+      if (seq === this.detailSeq && revision === this.session.scopeRevision()) this.notify.error(staffErrorMessage(error, 'staff', this.transloco));
     }
   }
 
@@ -518,10 +691,4 @@ export class DepartmentsPage {
     });
   }
 
-  private resolveError(error: unknown): string {
-    const msg = errorMessage(error, 'staff', this.transloco);
-    if (msg && msg !== 'settings.errors.generic') return msg;
-    const fallback = this.transloco.translate('staff.errors.generic');
-    return fallback !== 'staff.errors.generic' ? fallback : msg;
-  }
 }

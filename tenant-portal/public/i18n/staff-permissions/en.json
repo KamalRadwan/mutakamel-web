@@ -259,7 +259,8 @@
   "conflict": {
     "title": "Permissions changed",
     "text": "This role or the permission list changed. Reload to start from the latest version.",
-    "reload": "Reload"
+    "reload": "Reload",
+    "keep": "Keep my changes"
   },
   "unsaved": {
     "title": "Unsaved draft",

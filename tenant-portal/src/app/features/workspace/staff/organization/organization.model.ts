@@ -94,14 +94,16 @@ export interface OrgViewTreeResult {
 export interface BuildOrgTreeOptions {
   showInactive: boolean;
   search: string;
+  locale: 'ar' | 'en';
   canReadCompany?: (companyId: string) => boolean;
-  canReadBranch?: (companyId: string, branchId: string) => boolean;
   canReadDepartments: (companyId: string, branchId: string) => boolean;
   canReadTeams: (companyId: string, branchId: string) => boolean;
 }
 
 export function buildOrgViewTree(raw: readonly OrgTreeNode[], options: BuildOrgTreeOptions): OrgViewTreeResult {
   const term = options.search.trim().toLowerCase();
+  const compareSiblings = (a: OrgViewNode, b: OrgViewNode) =>
+    a.name.localeCompare(b.name, options.locale) || a.code.localeCompare(b.code, options.locale);
   const counts: OrgTreeCounts = { c: 0, b: 0, d: 0, t: 0 };
   const expandableIds: string[] = [];
   const autoExpandIds: string[] = [];
@@ -117,7 +119,6 @@ export function buildOrgViewTree(raw: readonly OrgTreeNode[], options: BuildOrgT
     ancestorMatched: boolean,
   ): OrgViewNode | null => {
     if (depth === 0 && options.canReadCompany?.(node.id) === false) return null;
-    if (depth === 1 && options.canReadBranch?.(companyId, node.id) === false) return null;
     if (!options.showInactive && node.status === 'INACTIVE') {
       return null;
     }
@@ -188,7 +189,7 @@ export function buildOrgViewTree(raw: readonly OrgTreeNode[], options: BuildOrgT
       isMatch,
       hasMatchingDescendant,
       hiddenByPermission,
-      children,
+      children: children.sort(compareSiblings),
     };
   };
 
@@ -200,7 +201,7 @@ export function buildOrgViewTree(raw: readonly OrgTreeNode[], options: BuildOrgT
     }
   }
 
-  return { tree, matchCount, counts, expandableIds, autoExpandIds };
+  return { tree: tree.sort(compareSiblings), matchCount, counts, expandableIds, autoExpandIds };
 }
 
 export function buildNodeActions(

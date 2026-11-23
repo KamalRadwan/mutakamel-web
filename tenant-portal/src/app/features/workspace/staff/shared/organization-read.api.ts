@@ -1,11 +1,10 @@
-import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
 import { Service, inject } from '@angular/core';
 import { QueryClient } from '@tanstack/angular-query';
-import { firstValueFrom } from 'rxjs';
 import { ApiError } from '../../../../core/api/api-errors';
-import type { CorePage, CorePageMeta } from '../../../../core/api/core-page';
-import type { Branch, Company, Currency, Department, ListQuery, Team } from './staff.model';
+import type { CorePage } from '../../../../core/api/core-page';
+import type { Branch, Company, Currency, Department, ListQuery, OrgTreeNode, Team } from './staff.model';
 import { StaffSession } from './staff-session';
+import { StaffHttp, type StaffEnvelope } from './staff-http';
 
 const ORGANIZATION_PATH = '/api/tenant/core/v1/organization';
 type CompanyQuery = Pick<ListQuery, 'page' | 'limit' | 'search' | 'sortBy' | 'sortDir' | 'status'>;
@@ -19,15 +18,9 @@ type ReadPermission =
   | 'org.team.read'
   | 'currencies.currency.read';
 
-interface ReadEnvelope<T> {
-  success: true;
-  data: T;
-  meta?: CorePageMeta;
-}
-
 @Service()
 export class OrganizationReadApi {
-  private readonly http = inject(HttpClient);
+  private readonly http = inject(StaffHttp);
   private readonly session = inject(StaffSession);
   private readonly queries = new QueryClient({
     defaultOptions: { queries: { gcTime: 0, networkMode: 'always', retry: false } },
@@ -73,6 +66,21 @@ export class OrganizationReadApi {
     return result.data;
   }
 
+  async getTree(): Promise<OrgTreeNode[]> {
+    const scope = this.session.scopeRevision();
+    if (!scope || !this.session.can('org.company.read')) {
+      throw new ApiError(403, 'COMMON.GENERIC.FORBIDDEN');
+    }
+    return this.queries.fetchQuery({
+      queryKey: ['staff-organization', scope, 'tree'],
+      queryFn: async () => {
+        const { data } = await this.http.read<OrgTreeNode[]>(`${ORGANIZATION_PATH}/tree`);
+        if (!Array.isArray(data)) throw new ApiError(502, 'COMMON.GENERIC.INTERNAL_ERROR');
+        return data;
+      },
+    });
+  }
+
   async invalidateScope(scope: string): Promise<void> {
     const filters = { queryKey: ['staff-organization', scope] };
     await this.queries.cancelQueries(filters);
@@ -89,29 +97,14 @@ export class OrganizationReadApi {
     return { data, meta };
   }
 
-  private async read<T>(path: string, permission: ReadPermission, query: TeamQuery = {}): Promise<ReadEnvelope<T>> {
+  private async read<T>(path: string, permission: ReadPermission, query: TeamQuery = {}): Promise<StaffEnvelope<T>> {
     const scope = this.session.scopeRevision();
     if (!scope || !this.session.can(permission)) {
       throw new ApiError(403, 'COMMON.GENERIC.FORBIDDEN');
     }
-    let params = new HttpParams();
-    for (const [key, value] of Object.entries(query)) {
-      if (value !== undefined && value !== '') params = params.set(key, value);
-    }
     return this.queries.fetchQuery({
       queryKey: ['staff-organization', scope, path, query],
-      queryFn: async () => {
-        try {
-          const envelope = await firstValueFrom(this.http.get<ReadEnvelope<T>>(path, { params }));
-          if (envelope?.success !== true || envelope.data == null) {
-            throw new ApiError(502, 'COMMON.GENERIC.INTERNAL_ERROR');
-          }
-          return envelope;
-        } catch (error) {
-          if (!(error instanceof HttpErrorResponse)) throw error;
-          throw ApiError.fromResponse(error.status, error.error);
-        }
-      },
+      queryFn: () => this.http.read<T>(path, query),
     });
   }
 }

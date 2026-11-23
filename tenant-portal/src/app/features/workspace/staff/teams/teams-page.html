@@ -198,11 +198,32 @@
 </app-staff-list>
 
 <app-team-modal
+  [canManage]="canManageOpenedTeam()"
   [companies]="companies()"
   [branches]="branches()"
   [departments]="departments()"
   [createDepartments]="createDepartments()"
   [knownUsers]="users()"
   (saved)="onModalSaved()"
+  (deleteRequested)="requestDelete($event)"
+  (deactivateBlocked)="onDeactivateBlocked($event)"
   (staleScopeDetected)="reload()"
 />
+
+<ui-confirm-dialog
+  #statusDialog
+  tone="warning"
+  [title]="(pendingStatusChange()?.nextStatus === 'ACTIVE' ? 'teams.confirm.activateTitle' : 'teams.confirm.deactivateTitle') | transloco: { name: pendingStatusChange()?.team?.name ?? '' }"
+  [text]="(pendingStatusChange()?.nextStatus === 'ACTIVE' ? 'teams.confirm.activateText' : 'teams.confirm.deactivateText') | transloco"
+  [confirmLabel]="(pendingStatusChange()?.nextStatus === 'ACTIVE' ? 'teams.actions.activate' : 'teams.actions.deactivate') | transloco"
+  [cancelLabel]="'teams.cancel' | transloco"
+/>
+<ui-confirm-dialog
+  #deleteConfirm
+  tone="danger"
+  [title]="'teams.confirm.deleteTitle' | transloco: { name: pendingDeleteTeam()?.name ?? '' }"
+  [text]="'teams.confirm.deleteText' | transloco"
+  [confirmLabel]="'teams.delete' | transloco"
+  [cancelLabel]="'teams.cancel' | transloco"
+/>
+<app-blockers-dialog />

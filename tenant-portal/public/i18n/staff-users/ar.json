@@ -223,6 +223,7 @@
     "departmentRequired": "اختر الإدارة."
   },
   "errors": {
+    "USER_UNAVAILABLE": "لم يعد متاحًا",
     "cycle": "سيؤدي هذا إلى حلقة في التسلسل الإداري."
   },
   "common": {

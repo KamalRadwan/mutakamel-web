@@ -16,6 +16,7 @@ import { Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
+  tablerArrowBackUp,
   tablerCheck,
   tablerChevronDown,
   tablerLoader2,
@@ -24,6 +25,9 @@ import {
 } from '@ng-icons/tabler-icons';
 import { Notify } from '../../../../../core/notify/notify';
 import { Button } from '../../../../../shared/ui/button/button';
+import { ConflictDialog } from '../../../../../shared/ui/conflict-dialog/conflict-dialog';
+import { Switch } from '../../../../../shared/ui/switch/switch';
+import { ApiError, errorCodeOf, fieldErrorsOf } from '../../../../../core/api/api-errors';
 import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
@@ -31,9 +35,9 @@ import { rectInPage, viewport } from '../../../../../shared/ui/overlay/zoom';
 import { OrgCascade } from '../../shared/org-cascade/org-cascade';
 import { StatusBadge } from '../../shared/status-badge/status-badge';
 import { newIdempotencyKey } from '../../../../../core/api/idempotency';
-import { OrganizationCreateApi, type CreateTeamBody } from '../../shared/organization-create.api';
+import { OrganizationWriteApi, type CreateTeamBody, type UpdateTeamBody } from '../../shared/organization-write.api';
 import { OrganizationReadApi } from '../../shared/organization-read.api';
-import { errorCodeOf, errorMessage } from '../../shared/staff.api';
+import { staffErrorMessage } from '../../shared/staff.api';
 import { StaffSession } from '../../shared/staff-session';
 import { StaffUsersApi } from '../../users/users.api';
 import {
@@ -65,8 +69,8 @@ const SEARCH_DEBOUNCE_MS = 200;
 
 @Component({
   selector: 'app-team-modal',
-  imports: [NgIcon, TranslocoPipe, Button, ConfirmDialog, Field, Modal, OrgCascade, StatusBadge],
-  providers: [provideIcons({ tablerUsersGroup, tablerChevronDown, tablerSearch, tablerLoader2, tablerCheck })],
+  imports: [NgIcon, TranslocoPipe, Button, ConfirmDialog, ConflictDialog, Switch, Field, Modal, OrgCascade, StatusBadge],
+  providers: [provideIcons({ tablerArrowBackUp, tablerUsersGroup, tablerChevronDown, tablerSearch, tablerLoader2, tablerCheck })],
   templateUrl: './team-modal.html',
   host: {
     '(document:click)': 'closeLeadMenuIfOutside($event)',
@@ -84,7 +88,7 @@ export class TeamModal {
   private readonly router = inject(Router);
   private readonly notify = inject(Notify);
   private readonly organization = inject(OrganizationReadApi);
-  private readonly createApi = inject(OrganizationCreateApi);
+  private readonly writeApi = inject(OrganizationWriteApi);
   private readonly session = inject(StaffSession);
   private readonly usersApi = inject(StaffUsersApi);
   private readonly transloco = inject(TranslocoService);
@@ -92,7 +96,6 @@ export class TeamModal {
 
   private readonly modal = viewChild.required<Modal>('modal');
   private readonly discardDialog = viewChild.required<ConfirmDialog>('discardDialog');
-  private readonly staleDialog = viewChild.required<ConfirmDialog>('staleDialog');
   private readonly leadTrigger = viewChild<ElementRef<HTMLButtonElement>>('leadTrigger');
   private readonly leadMenuPanel = viewChild<ElementRef<HTMLElement>>('leadMenuPanel');
   private readonly leadSearchInput = viewChild<ElementRef<HTMLInputElement>>('leadSearchInput');
@@ -102,22 +105,25 @@ export class TeamModal {
   readonly departments = input.required<readonly Department[]>();
   readonly createDepartments = input.required<readonly Department[]>();
   readonly knownUsers = input<TenantUser[]>([]);
+  readonly canEdit = input(false, { alias: 'canManage' });
   readonly saved = output<Team>();
+  readonly deleteRequested = output<Team>();
+  readonly deactivateBlocked = output<{ team: Team; blockers: string[] }>();
   readonly staleScopeDetected = output<void>();
 
   protected readonly limits = STAFF_LIMITS;
 
-  protected readonly mode = signal<'create' | 'details'>('create');
+  protected readonly mode = signal<'create' | 'edit'>('create');
   protected readonly baseTeam = signal<Team | null>(null);
   protected readonly saving = signal(false);
-  protected readonly canManage = computed(() => this.mode() === 'create' && this.createDepartments().length > 0);
+  protected readonly canManage = computed(() => this.mode() === 'create' ? this.createDepartments().length > 0 : this.canEdit());
   protected readonly branchOptions = computed(() => {
-    if (this.mode() === 'details') return this.branches();
+    if (this.mode() === 'edit') return this.branches();
     const ids = new Set(this.createDepartments().map((department) => department.branchId));
     return this.branches().filter((branch) => ids.has(branch.id));
   });
   protected readonly companyOptions = computed(() => {
-    if (this.mode() === 'details') return this.companies();
+    if (this.mode() === 'edit') return this.companies();
     const ids = new Set(this.branchOptions().map((branch) => branch.companyId));
     return this.companies().filter((company) => ids.has(company.id));
   });
@@ -130,9 +136,8 @@ export class TeamModal {
   });
   protected readonly canSelectLead = computed(() => {
     const { branchId, departmentId } = this.cascadeValue();
-    return this.canManage() && this.canReadBranchUsers() && this.createDepartments().some((department) =>
-      department.id === departmentId && department.branchId === branchId,
-    );
+    return this.canManage() && this.canReadBranchUsers() && (this.mode() === 'edit' ||
+      this.createDepartments().some((department) => department.id === departmentId && department.branchId === branchId));
   });
 
 
@@ -157,6 +162,9 @@ export class TeamModal {
   protected readonly touched = signal<{ code?: boolean; name?: boolean }>({});
   protected readonly submitAttempted = signal(false);
   protected readonly codeServerError = signal<string | null>(null);
+  protected readonly conflictOpen = signal(false);
+  protected readonly nameServerError = signal<string | null>(null);
+  protected readonly departmentServerError = signal<string | null>(null);
   protected readonly leadServerError = signal<string | null>(null);
 
   private allowClose = false;
@@ -195,6 +203,11 @@ export class TeamModal {
 
   protected readonly dirty = computed(() => {
     if (!this.canManage()) return false;
+    if (this.mode() === 'edit') {
+      const base = this.baseTeam();
+      return Boolean(base && (this.name().trim() !== base.name.trim() || this.leadUserId() !== base.leadUserId ||
+        (this.isActive() ? 'ACTIVE' : 'INACTIVE') !== base.status));
+    }
     const trimmedCode = this.code().trim();
     const trimmedName = this.name().trim();
 
@@ -207,7 +220,9 @@ export class TeamModal {
 
   protected readonly cascadeErrors = computed<{ company?: string; branch?: string; department?: string }>(() => {
     this.i18n();
-    if (this.mode() !== 'create' || !this.submitAttempted()) return {};
+    if (this.mode() !== 'create') return {};
+    if (this.departmentServerError()) return { department: this.departmentServerError()! };
+    if (!this.submitAttempted()) return {};
     const current = this.cascadeValue();
     const errors: { company?: string; branch?: string; department?: string } = {};
     if (!current.companyId) {
@@ -239,6 +254,7 @@ export class TeamModal {
 
   protected readonly nameError = computed(() => {
     this.i18n();
+    if (this.nameServerError()) return this.nameServerError();
     if (!this.submitAttempted() && !this.touched().name) return null;
     const trimmed = this.name().trim();
     if (!trimmed) return this.transloco.translate('teams.validation.nameRequired');
@@ -300,11 +316,11 @@ export class TeamModal {
     }
   }
 
-  openDetails(team: Team, parents?: { companyId?: string | null; branchId?: string | null }): void {
+  openEdit(team: Team, parents?: { companyId?: string | null; branchId?: string | null }): void {
     const seq = ++this.openSeq;
     this.allowClose = false;
     this.closeLeadMenu();
-    this.mode.set('details');
+    this.mode.set('edit');
     this.cascadeEditedByUser = false;
     this.baseTeam.set(team);
     this.applyTeamToForm(team, parents?.companyId ?? null, parents?.branchId ?? null);
@@ -314,8 +330,35 @@ export class TeamModal {
     void this.loadDetails(team, seq);
   }
 
+  editingId(): string | null {
+    return this.baseTeam()?.id ?? null;
+  }
+
+  syncTeam(team: Team): void {
+    if (this.editingId() !== team.id) return;
+    this.baseTeam.set(team);
+    const parents = this.cascadeValue();
+    this.applyTeamToForm(team, parents.companyId, parents.branchId);
+    this.resetValidation();
+    this.resetIdempotency();
+    if (team.leadUserId && this.canReadBranchUsers()) void this.resolveLeadUser(team.leadUserId, this.openSeq);
+  }
+
+  protected undo(): void {
+    const base = this.baseTeam();
+    if (!base || this.saving()) return;
+    this.closeLeadMenu();
+    this.syncTeam(base);
+  }
+
+  protected requestDelete(): void {
+    const team = this.baseTeam();
+    if (team && this.canManage() && !this.saving()) this.deleteRequested.emit(team);
+  }
+
   closeImmediate(): void {
     this.closeLeadMenu();
+    this.conflictOpen.set(false);
     this.allowClose = true;
     this.modal().close();
   }
@@ -357,6 +400,7 @@ export class TeamModal {
     this.cascadeEditedByUser = true;
     this.cascadeValue.set(next);
     this.leadServerError.set(null);
+    this.departmentServerError.set(null);
   }
 
   protected onCodeInput(event: Event): void {
@@ -373,6 +417,7 @@ export class TeamModal {
   protected onNameInput(event: Event): void {
     if (!this.canManage()) return;
     this.name.set((event.target as HTMLInputElement).value);
+    this.nameServerError.set(null);
   }
 
   protected markTouched(field: 'code' | 'name'): void {
@@ -468,7 +513,7 @@ export class TeamModal {
   }
 
   protected selectLead(user: TenantUser | null): void {
-    if (!this.canSelectLead() || (user && user.branchId !== this.cascadeValue().branchId)) return;
+    if (!this.canSelectLead() || this.saving() || (user && (user.branchId !== this.cascadeValue().branchId || user.status !== 'ACTIVE'))) return;
     this.leadUserId.set(user?.id ?? null);
     this.resolvedSelectedLead.set(user);
     this.leadServerError.set(null);
@@ -487,44 +532,55 @@ export class TeamModal {
 
   protected async save(event?: Event): Promise<void> {
     event?.preventDefault();
-    if (!this.canManage() || this.saving()) return;
-
+    if (!this.canManage() || this.saving() || this.conflictOpen() || (this.mode() === 'edit' && !this.dirty())) return;
     this.submitAttempted.set(true);
     this.codeServerError.set(null);
+    this.nameServerError.set(null);
+    this.departmentServerError.set(null);
     this.leadServerError.set(null);
+    const errors = this.cascadeErrors();
+    if (errors.company || errors.branch || errors.department || this.codeError() || this.nameError()) return;
 
-    const cascadeErrs = this.cascadeErrors();
-    if (cascadeErrs.company || cascadeErrs.branch || cascadeErrs.department || this.codeError() || this.nameError()) {
-      return;
-    }
-
+    const base = this.baseTeam();
     const { companyId, branchId, departmentId } = this.cascadeValue();
-    const department = this.createDepartments().find((item) => item.id === departmentId && item.branchId === branchId);
-    const branch = this.branchOptions().find((item) => item.id === branchId && item.companyId === companyId);
-    if (!department || !branch) {
-      this.notify.error(this.transloco.translate('apiErrors.permission'));
-      return;
-    }
     const lead = this.leadUserId();
-    if (lead && (!this.canSelectLead() || this.selectedLead()?.branchId !== branch.id)) {
-      this.leadServerError.set(this.transloco.translate('staff.errors.ORG_LEAD_BRANCH_REQUIRED'));
+    if (lead && lead !== base?.leadUserId &&
+        (!this.canSelectLead() || this.selectedLead()?.branchId !== branchId)) {
+      this.leadServerError.set(staffErrorMessage('ORG_LEAD_BRANCH_REQUIRED', 'staff', this.transloco));
       return;
     }
-    const body: CreateTeamBody = {
-      departmentId: department.id,
-      code: this.code().trim(),
-      name: this.name().trim(),
-      ...(lead ? { leadUserId: lead } : {}),
-    };
-
+    let body: CreateTeamBody | UpdateTeamBody;
+    if (this.mode() === 'create') {
+      const department = this.createDepartments().find((item) => item.id === departmentId && item.branchId === branchId);
+      const branch = this.branchOptions().find((item) => item.id === branchId && item.companyId === companyId);
+      if (!department || !branch) {
+        this.notify.error(staffErrorMessage(new ApiError(403, 'MISSING_REQUIRED_PERMISSIONS'), 'staff', this.transloco));
+        return;
+      }
+      body = { departmentId: department.id, code: this.code().trim(), name: this.name().trim(),
+        ...(lead ? { leadUserId: lead } : {}) };
+    } else {
+      if (!base) return;
+      body = {};
+      if (this.name().trim() !== base.name.trim()) body.name = this.name().trim();
+      if (lead !== base.leadUserId) body.leadUserId = lead;
+      const status = this.isActive() ? 'ACTIVE' : 'INACTIVE';
+      if (status !== base.status) body.status = status;
+    }
     this.saving.set(true);
     try {
-      const created = await this.createApi.createTeam(body, this.idempotencyKeyFor(body), branch.id);
-      this.saved.emit(created);
-      this.notify.success(this.transloco.translate('teams.toast.created'));
+      const key = this.idempotencyKeyFor(base?.id ?? 'create', body);
+      const updated = base
+        ? await this.writeApi.updateTeam(base.id, body, key)
+        : await this.writeApi.createTeam(body as CreateTeamBody, key, branchId!);
+      this.resetIdempotency();
+      const toast = !base ? 'created' : Object.keys(body).length === 1 && 'status' in body
+        ? body.status === 'ACTIVE' ? 'activated' : 'deactivated' : 'saved';
+      this.notify.success(this.transloco.translate(`teams.toast.${toast}`));
+      this.saved.emit(updated);
       this.closeImmediate();
     } catch (error) {
-      await this.handleSaveError(error);
+      this.handleSaveError(error);
     } finally {
       this.saving.set(false);
     }
@@ -561,21 +617,72 @@ export class TeamModal {
     this.resetValidation();
   }
 
-  private async handleSaveError(error: unknown): Promise<void> {
+  private handleSaveError(error: unknown): void {
     const code = errorCodeOf(error);
-    if (code === 'ORG_CODE_TAKEN') {
-      this.codeServerError.set(this.resolveError(error));
-      return;
-    }
+    const message = staffErrorMessage(error, 'staff', this.transloco, 'write');
     if (code === 'ORG_LEAD_USER_NOT_FOUND' || code === 'ORG_LEAD_BRANCH_REQUIRED') {
-      this.leadServerError.set(this.resolveError(error));
-      return;
+      this.leadServerError.set(message);
+    } else if (code === 'ORG_CODE_TAKEN') {
+      this.codeServerError.set(message);
+    } else if (code === 'ORG_PARENT_INACTIVE') {
+      const text = this.transloco.translate('teams.parentInactive');
+      if (this.mode() === 'create') this.departmentServerError.set(text);
+      else this.notify.error(text);
+    } else if (code === 'ORG_NODE_NOT_EMPTY' && this.baseTeam() && !this.isActive()) {
+      this.isActive.set(true);
+      const blockers = error instanceof ApiError ? error.details?.['blockers'] : undefined;
+      this.deactivateBlocked.emit({ team: this.baseTeam()!, blockers: Array.isArray(blockers)
+        ? blockers.filter((item): item is string => typeof item === 'string').slice(0, 1) : [] });
+    } else if (code === 'ORG_LEAD_CHANGE_CONFLICT' || code === 'ORG_BRANCH_SCOPE_STALE' || code === 'ORG_NODE_SCOPE_STALE') {
+      this.conflictOpen.set(true);
+    } else if (code === 'ORG_NODE_NOT_FOUND') {
+      this.notify.error(message);
+      this.closeImmediate();
+      this.staleScopeDetected.emit();
+    } else {
+      const fields = fieldErrorsOf(error);
+      this.nameServerError.set(fields['name']?.join(' ') || null);
+      this.codeServerError.set(fields['code']?.join(' ') || null);
+      this.leadServerError.set(fields['leadUserId']?.join(' ') || null);
+      this.departmentServerError.set(fields['departmentId']?.join(' ') || null);
+      if (code === 'GW.IDEM.IN_FLIGHT') this.notify.info(message);
+      else if (code === 'GW.IDEM.MISMATCH') this.notify.warning(message);
+      else if (fields['_'] || !Object.keys(fields).length) this.notify.error(message);
     }
-    if (code === 'ORG_BRANCH_SCOPE_STALE' || code === 'ORG_NODE_SCOPE_STALE') {
-      if (await this.staleDialog().open()) this.staleScopeDetected.emit();
-      return;
+  }
+
+  protected async reloadConflict(): Promise<void> {
+    await this.resolveConflict(false);
+  }
+
+  protected async keepConflictChanges(): Promise<void> {
+    await this.resolveConflict(true);
+  }
+
+  private async resolveConflict(keepChanges: boolean): Promise<void> {
+    this.conflictOpen.set(false);
+    const team = this.baseTeam();
+    const seq = this.openSeq;
+    this.saving.set(true);
+    try {
+      if (team) {
+        const fresh = await this.organization.getTeam(team.id);
+        if (seq !== this.openSeq) return;
+        if (keepChanges) this.baseTeam.set(fresh);
+        else this.syncTeam(fresh);
+      } else if (!keepChanges) {
+        this.openCreate(this.presetCascade);
+      }
+      this.resetIdempotency();
+      if (!keepChanges) this.staleScopeDetected.emit();
+    } catch (error) {
+      if (seq !== this.openSeq) return;
+      this.notify.error(staffErrorMessage(error, 'staff', this.transloco));
+      this.closeImmediate();
+      this.staleScopeDetected.emit();
+    } finally {
+      this.saving.set(false);
     }
-    this.notify.error(this.resolveError(error));
   }
 
   private async loadLeadOptions(search: string): Promise<void> {
@@ -629,7 +736,7 @@ export class TeamModal {
     }
     try {
       const user = await this.usersApi.getUser(userId);
-      if (seq !== this.openSeq) return;
+      if (seq !== this.openSeq || this.leadUserId() !== userId || !this.canReadBranchUsers()) return;
       this.resolvedSelectedLead.set(user);
     } catch {
       // Leave fallback if user cannot be loaded.
@@ -761,6 +868,8 @@ export class TeamModal {
   private resetValidation(): void {
     this.touched.set({});
     this.submitAttempted.set(false);
+    this.nameServerError.set(null);
+    this.departmentServerError.set(null);
     this.codeServerError.set(null);
     this.leadServerError.set(null);
   }
@@ -770,20 +879,13 @@ export class TeamModal {
     this.lastIdempotencyKey = '';
   }
 
-  private idempotencyKeyFor(payload: CreateTeamBody): string {
-    const signature = JSON.stringify(payload);
+  private idempotencyKeyFor(target: string, payload: CreateTeamBody | UpdateTeamBody): string {
+    const signature = JSON.stringify({ target, payload });
     if (signature !== this.lastPayloadSignature) {
       this.lastPayloadSignature = signature;
       this.lastIdempotencyKey = newIdempotencyKey();
     }
     return this.lastIdempotencyKey;
-  }
-
-  private resolveError(error: unknown): string {
-    const msg = errorMessage(error, 'staff', this.transloco);
-    if (msg && msg !== 'settings.errors.generic') return msg;
-    const fallback = this.transloco.translate('staff.errors.generic');
-    return fallback !== 'staff.errors.generic' ? fallback : msg;
   }
 
   private focusControl(selector?: string): void {

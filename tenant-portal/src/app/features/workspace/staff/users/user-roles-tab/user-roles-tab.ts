@@ -1,5 +1,6 @@
 import { Component, computed, effect, inject, input, output, signal, viewChild } from '@angular/core';
 import { pluralKey } from '../../../../../core/i18n/plural';
+import { fieldErrorsOf } from '../../../../../core/api/api-errors';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
@@ -13,19 +14,15 @@ import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { Segmented, SegmentedOption } from '../../../../../shared/ui/segmented/segmented';
 import {
-  addBranchRole,
   ApiError,
   errorCodeOf,
-  listAssignmentOptions,
-  listBranches,
-  listBranchRoles,
-  listCompanies,
-  listRoles,
-  listScopeRoles,
+  listAllPages,
   newIdempotencyKey,
-  removeBranchRole,
-  setScopeRoles,
+  staffErrorMessage,
 } from '../../shared/staff.api';
+import { StaffUserAccessApi } from '../user-access.api';
+import { OrganizationReadApi } from '../../shared/organization-read.api';
+import { RolesApi } from '../../roles/roles.api';
 import { SeatCascadeConfirm } from '../../../seats/cascade-confirm/cascade-confirm';
 import { isCascadeRequired, seatErrorMessage } from '../../../seats/seat-errors';
 import { SeatImpact } from '../../../seats/seat-impact/seat-impact';
@@ -68,15 +65,15 @@ export function scopeAssignmentInvalidIndexes(error: unknown): number[] {
 @Component({
   selector: 'app-user-roles-tab',
   imports: [TranslocoPipe, NgIcon, Button, Checkbox, Dropdown, Field, Modal, SeatImpact, Segmented],
-  providers: [
+  viewProviders: [
     provideTranslocoScope(
       'staff',
       'settings',
       { scope: 'staff-user-access', alias: 'access' },
       { scope: 'seats', alias: 'seats' },
     ),
-    provideIcons({ tablerCloudOff, tablerLock, tablerPlus, tablerTrash }),
   ],
+  providers: [provideIcons({ tablerCloudOff, tablerLock, tablerPlus, tablerTrash })],
   templateUrl: './user-roles-tab.html',
   host: { class: 'flex flex-col gap-16' },
 })
@@ -85,6 +82,9 @@ export class UserRolesTab {
   protected readonly uid = `user-roles-tab-${++UserRolesTab.nextId}`;
 
   private readonly session = inject(StaffSession);
+  private readonly api = inject(StaffUserAccessApi);
+  private readonly organization = inject(OrganizationReadApi);
+  private readonly rolesApi = inject(RolesApi);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
@@ -99,6 +99,14 @@ export class UserRolesTab {
   readonly readonly = input(false);
   readonly readonlyReason = input<string | null>(null);
   readonly changed = output<void>();
+
+  protected readonly validationErrors = signal<Record<string, string[]>>({});
+  protected fieldError(field: string): string | null {
+    const messages = Object.entries(this.validationErrors())
+      .filter(([path]) => path === field || path.startsWith(field + '.'))
+      .flatMap(([, messages]) => messages);
+    return messages.length ? messages.join(' ') : null;
+  }
 
   protected readonly skeletonRows = SKELETON_ROWS;
 
@@ -125,6 +133,7 @@ export class UserRolesTab {
   protected readonly choices = signal<AssignmentChoice[]>([]);
   protected readonly choicesHasMore = signal(false);
   protected readonly loadingChoices = signal(false);
+  protected readonly choicesLoadFailed = signal(false);
   protected readonly loadingMoreChoices = signal(false);
   protected readonly selectedChoices = signal<AssignmentChoice[]>([]);
   protected readonly addBranchSeatBlocked = signal(false);
@@ -195,16 +204,16 @@ export class UserRolesTab {
     }),
   );
   protected readonly canViewBranchRoles = computed(() => !this.isSelf() && this.hasAssignRoles());
-  protected readonly isNotActive = computed(() => this.user().status !== 'ACTIVE');
+  protected readonly isRolesLocked = computed(
+    () => this.user().status !== 'ACTIVE' && this.user().status !== 'INVITED',
+  );
   protected readonly effectiveReadonly = computed(
     () =>
       this.readonly() ||
       this.user().isTenantOwner ||
       this.isSelf() ||
-      this.isNotActive() ||
-      !this.hasAssignRoles() ||
-      // The current role choices are fixture data and cannot prove delegated coverage.
-      !this.isOwnerActor(),
+      this.isRolesLocked() ||
+      !this.hasAssignRoles(),
   );
   protected readonly effectiveReadonlyReason = computed(() => {
     this.i18n();
@@ -213,7 +222,7 @@ export class UserRolesTab {
     if (this.user().isTenantOwner) return this.transloco.translate('access.roles.ownerReadonly');
     if (this.isSelf()) return this.transloco.translate('access.roles.selfReadonly');
     if (!this.hasAssignRoles()) return this.transloco.translate('staff.protected.scope');
-    if (this.isNotActive()) return this.transloco.translate('access.roles.notActiveReadonly');
+    if (this.isRolesLocked()) return this.transloco.translate('access.roles.suspendedReadonly');
     return null;
   });
 
@@ -252,11 +261,13 @@ export class UserRolesTab {
 
   protected readonly scopeRoleOptions = computed<DropdownOption<string>[]>(() => {
     const lang = this.language();
-    return this.roles()
+    const roles = this.roles();
+    const options = roles.length ? roles : Object.entries(this.extraRoleLabels()).map(([id, role]) => ({ id, ...role }));
+    return options
       .filter((role) => !isExcludedRoleName(role.name, role.nameI18n))
       .map((role) => ({
         value: role.id,
-        label: role.nameI18n[lang] || role.name,
+        label: role.nameI18n?.[lang] || role.name,
       }));
   });
 
@@ -289,18 +300,26 @@ export class UserRolesTab {
   });
 
   private loadSeq = 0;
+  private actionUserId: string | null = null;
   private scopeSeq = 0;
   private loadedScopeKey: string | null = null;
   private choicesSeq = 0;
   private choicesPage = 1;
-  private addKeys = new Map<string, string>();
-  private removeKeyCache: { id: string; key: string } | null = null;
-  private scopeKeyCache: { body: string; key: string } | null = null;
+  private addKeyCache: { bodyJson: string; key: string; confirmAddonCascade?: boolean } | null = null;
+  private removeKeyCache: { id: string; key: string; confirmAddonCascade?: boolean } | null = null;
+  private scopeKeyCache: { bodyJson: string; key: string; confirmAddonCascade?: boolean } | null = null;
   private removeBranchConfirmResolver: ((confirmed: boolean) => void) | null = null;
 
   constructor() {
     effect(() => {
       const userId = this.user().id;
+      if (this.actionUserId !== userId) {
+        this.actionUserId = userId;
+        this.addKeyCache = null;
+        this.removeKeyCache = null;
+        this.scopeKeyCache = null;
+        this.validationErrors.set({});
+      }
       this.invalidScopeIndexes.set([]);
       this.loadedScopeKey = null;
       void this.loadAll(userId);
@@ -309,7 +328,7 @@ export class UserRolesTab {
     effect(() => {
       const u = this.user();
       const key = `${u.id}:${u.status}`;
-      if (this.isOwnerActor() && u.status === 'ACTIVE' && this.loadedScopeKey !== key) {
+      if (!this.isSelf() && this.isOwnerActor() && !this.isRolesLocked() && this.loadedScopeKey !== key) {
         void this.loadScope(u.id);
       }
     });
@@ -394,7 +413,7 @@ export class UserRolesTab {
     this.choiceSearch.set('');
     this.selectedChoices.set([]);
     this.addBranchSeatBlocked.set(false);
-    this.addKeys.clear();
+    this.addKeyCache = null;
     this.choicesPage = 1;
     this.addBranchModal().open();
     void this.fetchChoices(true);
@@ -415,6 +434,11 @@ export class UserRolesTab {
     if (this.loadingMoreChoices() || !this.choicesHasMore()) return;
     this.choicesPage += 1;
     void this.fetchChoices(false);
+  }
+
+  protected retryChoices(): void {
+    this.choicesPage = 1;
+    void this.fetchChoices(true);
   }
 
   protected choiceId(choice: AssignmentChoice): string {
@@ -443,42 +467,38 @@ export class UserRolesTab {
   }
 
   protected async saveBranchChoices(): Promise<void> {
-    if (this.savingBranchAdd() || this.addBranchSeatBlocked() || this.effectiveReadonly()) return;
+    if (this.savingBranchAdd() || this.addBranchSeatBlocked() || this.effectiveReadonly() || this.loadingBranch() || this.branchLoadFailed()) return;
+    const userId = this.user().id;
     const queue = this.selectedChoices().slice();
-    if (!queue.length) return;
+    if (!queue.length || queue.some((choice) => !this.session.can('users.user.assign_roles', { branchId: choice.branchId }))) return;
+    const assignments = [...this.branchRoles(), ...queue].map(({ branchId, roleId }) => ({ branchId, roleId }));
+    if (assignments.length > 500) {
+      this.notify.error(this.resolveError(new ApiError(422, 'TENANT_ROLE_ASSIGNMENT_LIMIT_EXCEEDED')));
+      return;
+    }
+    const bodyJson = JSON.stringify(assignments);
+    if (this.addKeyCache?.bodyJson !== bodyJson) this.addKeyCache = { bodyJson, key: newIdempotencyKey() };
 
+    this.validationErrors.set({});
     this.savingBranchAdd.set(true);
-    let addedCount = 0;
-    const succeededKeys = new Set<string>();
-
     try {
-      for (const choice of queue) {
-        if (this.effectiveReadonly() || !this.session.can('users.user.assign_roles', { branchId: choice.branchId })) break;
-        const keyId = choiceKey(choice);
-        const idempotencyKey = this.addKeys.get(keyId) ?? newIdempotencyKey();
-        this.addKeys.set(keyId, idempotencyKey);
-        await addBranchRole(
-          this.user().id,
-          { branchId: choice.branchId, roleId: choice.roleId },
-          idempotencyKey,
-        );
-        this.addKeys.delete(keyId);
-        succeededKeys.add(keyId);
-        addedCount += 1;
+      try {
+        await this.api.setBranchRoles(userId, assignments, this.addKeyCache.key, this.addKeyCache);
+      } catch (error) {
+        const cascade = isCascadeRequired(error);
+        if (!cascade) throw error;
+        if (!await this.cascadeConfirm.confirm(cascade.addons) || this.effectiveReadonly() || this.user().id !== userId) return;
+        this.addKeyCache = { bodyJson, key: newIdempotencyKey(), confirmAddonCascade: true };
+        await this.api.setBranchRoles(userId, assignments, this.addKeyCache.key, this.addKeyCache);
       }
-
+      this.addKeyCache = null;
       this.addBranchModal().close();
       await this.loadBranch(this.user().id);
       this.changed.emit();
+      const addedCount = queue.length;
       this.notify.success(this.transloco.translate(pluralKey('access.roles.addedPlural', addedCount, this.language()), { n: addedCount }));
     } catch (error) {
-      if (addedCount > 0) {
-        this.selectedChoices.update((current) => current.filter((item) => !succeededKeys.has(choiceKey(item))));
-        await this.loadBranch(this.user().id);
-        this.changed.emit();
-        this.notify.warning(this.transloco.translate('access.roles.partial', { n: addedCount }));
-      }
-      this.notify.error(this.resolveError(error));
+      await this.handleWriteError(error);
     } finally {
       this.savingBranchAdd.set(false);
     }
@@ -508,7 +528,8 @@ export class UserRolesTab {
   }
 
   protected async requestRemoveBranch(row: BranchRoleAssignment): Promise<void> {
-    const allowed = () => !this.effectiveReadonly() &&
+    const userId = this.user().id;
+    const allowed = () => this.user().id === userId && !this.effectiveReadonly() &&
       this.session.can('users.user.assign_roles', { branchId: row.branchId });
     if (!allowed() || this.removingBranchId()) return;
     this.pendingRemoveBranch.set(row);
@@ -520,31 +541,25 @@ export class UserRolesTab {
 
     const key =
       this.removeKeyCache?.id === row.id ? this.removeKeyCache.key : newIdempotencyKey();
-    this.removeKeyCache = { id: row.id, key };
+    if (this.removeKeyCache?.id !== row.id) this.removeKeyCache = { id: row.id, key };
     this.removingBranchId.set(row.id);
     try {
       try {
-        await removeBranchRole(this.user().id, row.id, key);
+        await this.api.removeBranchRole(this.user().id, row.id, key, this.removeKeyCache);
       } catch (error) {
         const cascade = isCascadeRequired(error);
         if (!cascade) throw error;
         const cascadeConfirmed = await this.cascadeConfirm.confirm(cascade.addons);
         if (!cascadeConfirmed || !allowed()) return;
-        await (
-          removeBranchRole as (
-            userId: string,
-            assignmentId: string,
-            idemKey: string,
-            opts?: { confirmAddonCascade?: boolean },
-          ) => Promise<void>
-        )(this.user().id, row.id, newIdempotencyKey(), { confirmAddonCascade: true });
+        this.removeKeyCache = { id: row.id, key: newIdempotencyKey(), confirmAddonCascade: true };
+        await this.api.removeBranchRole(this.user().id, row.id, this.removeKeyCache.key, this.removeKeyCache);
       }
       this.removeKeyCache = null;
       await this.loadBranch(this.user().id);
       this.changed.emit();
       this.notify.success(this.transloco.translate('access.common.removed'));
     } catch (error) {
-      this.notify.error(this.resolveError(error));
+      await this.handleWriteError(error);
     } finally {
       this.removingBranchId.set(null);
       this.pendingRemoveBranch.set(null);
@@ -552,7 +567,7 @@ export class UserRolesTab {
   }
 
   protected openAddScopeModal(): void {
-    if (this.effectiveReadonly() || !this.isOwnerActor() || this.user().status !== 'ACTIVE') return;
+    if (this.effectiveReadonly() || !this.isOwnerActor() || this.loadingScope() || this.scopeLoadFailed()) return;
     this.scopeTarget.set('TENANT');
     const firstCompanyId = this.companies().find((c) => c.status === 'ACTIVE')?.id ?? '';
     this.scopeCompanyId.set(firstCompanyId);
@@ -640,127 +655,71 @@ export class UserRolesTab {
 
   private async commitScopeRoles(
     assignments: { scopeTarget: ScopeTarget; roleId: string; companyId?: string; branchId?: string }[],
-    confirmAddonCascade = false,
   ): Promise<boolean> {
-    if (this.effectiveReadonly() || !this.session.isTenantWide('users.user.assign_roles')) return false;
-    if (assignments.some(({ scopeTarget, companyId, branchId }) =>
-      scopeTarget !== 'TENANT' && !this.session.can('users.user.assign_roles', { companyId, branchId }),
-    )) return false;
-    const body = JSON.stringify(assignments);
-    const key = confirmAddonCascade
-      ? newIdempotencyKey()
-      : this.scopeKeyCache?.body === body
-        ? this.scopeKeyCache.key
-        : newIdempotencyKey();
-    if (!confirmAddonCascade) {
-      this.scopeKeyCache = { body, key };
+    if (this.effectiveReadonly() || !this.isOwnerActor() || this.loadingScope() || this.scopeLoadFailed()) return false;
+    const userId = this.user().id;
+    if (assignments.length > 500) {
+      this.notify.error(this.resolveError(new ApiError(422, 'SCOPE_ROLE_ASSIGNMENT_LIMIT_EXCEEDED')));
+      return false;
     }
+    const bodyJson = JSON.stringify(assignments);
+    if (this.scopeKeyCache?.bodyJson !== bodyJson) this.scopeKeyCache = { bodyJson, key: newIdempotencyKey() };
+    this.validationErrors.set({});
     this.savingScope.set(true);
     this.invalidScopeIndexes.set([]);
     try {
-      if (confirmAddonCascade) {
-        await (
-          setScopeRoles as (
-            userId: string,
-            payload: typeof assignments,
-            idemKey: string,
-            opts?: { confirmAddonCascade?: boolean },
-          ) => Promise<ScopeRoleAssignment[]>
-        )(this.user().id, assignments, key, { confirmAddonCascade: true });
-      } else {
-        await setScopeRoles(this.user().id, assignments, key);
+      try {
+        await this.api.setScopeRoles(userId, assignments, this.scopeKeyCache.key, this.scopeKeyCache);
+      } catch (error) {
+        const cascade = isCascadeRequired(error);
+        if (!cascade) throw error;
+        if (!await this.cascadeConfirm.confirm(cascade.addons) || this.effectiveReadonly() || !this.isOwnerActor() || this.user().id !== userId) return false;
+        this.scopeKeyCache = { bodyJson, key: newIdempotencyKey(), confirmAddonCascade: true };
+        await this.api.setScopeRoles(userId, assignments, this.scopeKeyCache.key, this.scopeKeyCache);
       }
       this.scopeKeyCache = null;
       await this.loadScope(this.user().id);
       this.changed.emit();
       return true;
     } catch (error) {
-      const cascade = isCascadeRequired(error);
-      if (cascade && !confirmAddonCascade) {
-        this.savingScope.set(false);
-        const confirmed = await this.cascadeConfirm.confirm(cascade.addons);
-        if (confirmed) {
-          return this.commitScopeRoles(assignments, true);
-        }
-        return false;
-      }
-      if (error instanceof ApiError && error.code === 'SCOPE_ROLE_ASSIGNMENT_INVALID') {
+      if (errorCodeOf(error) === 'SCOPE_ROLE_ASSIGNMENT_INVALID') {
         this.invalidScopeIndexes.set(scopeAssignmentInvalidIndexes(error));
       }
-      this.notify.error(this.resolveError(error));
+      await this.handleWriteError(error);
       return false;
     } finally {
       this.savingScope.set(false);
     }
   }
 
-  private async fetchAllPages<T>(
-    fetcher: (q: { page: number; limit: number }) => Promise<{ data: T[]; meta: { hasNext: boolean } }>,
-  ): Promise<T[]> {
-    const all: T[] = [];
-    let page = 1;
-    while (page <= 20) {
-      const res = await fetcher({ page, limit: 100 });
-      all.push(...res.data);
-      if (!res.meta.hasNext) break;
-      page += 1;
-    }
-    return all;
-  }
-
   private async loadAll(userId: string): Promise<void> {
     const seq = ++this.loadSeq;
-    const canFetchBranch = !this.isSelf() && this.hasAssignRoles();
-    this.loadingBranch.set(canFetchBranch);
-    this.branchLoadFailed.set(false);
     if (!this.session.me()) {
-      try {
-        await this.session.load();
-      } catch {
-        // Ignore session load failure here; branch roles can still attempt to load.
-      }
+      try { await this.session.load(); } catch { return; }
       if (seq !== this.loadSeq) return;
     }
-
-    const owner = this.isOwnerActor();
-    const canFetchScope = owner && this.user().status === 'ACTIVE';
-    if (owner) {
-      this.loadedScopeKey = `${userId}:${this.user().status}`;
-      this.loadingScope.set(canFetchScope);
-      this.scopeLoadFailed.set(false);
+    if (this.isSelf()) {
+      this.branchRoles.set([]);
+      this.scopeRoles.set([]);
+      return;
     }
-
-    try {
-      const [branchRoles, branches, companies, roles, scopeRoles] = await Promise.all([
-        this.canViewBranchRoles()
-          ? listBranchRoles(userId)
-          : Promise.resolve<BranchRoleAssignment[]>([]),
-        this.fetchAllPages((q) => listBranches(q)),
-        this.fetchAllPages((q) => listCompanies(q)),
-        this.fetchAllPages((q) => listRoles(q)),
-        canFetchScope ? listScopeRoles(userId) : Promise.resolve<ScopeRoleAssignment[]>([]),
-      ]);
-      if (seq !== this.loadSeq) return;
-      this.branchRoles.set(branchRoles);
-      this.branches.set(branches);
-      this.companies.set(companies);
-      this.roles.set(roles);
-      this.scopeRoles.set(scopeRoles);
-    } catch (error) {
-      if (seq !== this.loadSeq) return;
-      if (canFetchBranch) {
-        this.branchLoadFailed.set(true);
-      }
-      if (canFetchScope) {
-        this.scopeLoadFailed.set(true);
-      }
-      this.notify.error(this.resolveError(error));
-    } finally {
-      if (seq === this.loadSeq) {
-        this.loadingBranch.set(false);
-        this.loadingScope.set(false);
-      }
-    }
+    await Promise.all([
+      this.loadBranch(userId),
+      this.loadScope(userId),
+      listAllPages((q) => this.organization.listBranches(q)).then((rows) => {
+        if (seq === this.loadSeq) this.branches.set(rows);
+      }).catch(() => {}),
+      listAllPages((q) => this.organization.listCompanies(q)).then((rows) => {
+        if (seq === this.loadSeq) this.companies.set(rows);
+      }).catch(() => {}),
+      this.isOwnerActor() ? listAllPages((q) => this.rolesApi.list(q)).then((rows) => {
+        if (seq === this.loadSeq) this.roles.set(rows);
+      }).catch(() => {
+        if (seq === this.loadSeq) this.roles.set([]);
+      }) : Promise.resolve(),
+    ]);
+    // Labels remain available when the actor cannot read the organization or role catalogues.
+    if (seq === this.loadSeq && this.canViewBranchRoles()) await this.fetchChoices(true);
   }
 
   private async loadBranch(userId: string): Promise<void> {
@@ -773,13 +732,13 @@ export class UserRolesTab {
     this.loadingBranch.set(true);
     this.branchLoadFailed.set(false);
     try {
-      const rows = await listBranchRoles(userId);
+      const rows = await this.api.listBranchRoles(userId);
       if (this.user().id !== userId) return;
       this.branchRoles.set(rows);
     } catch (error) {
       if (this.user().id !== userId) return;
-      this.branchLoadFailed.set(true);
-      this.notify.error(this.resolveError(error));
+      this.branchLoadFailed.set(!(error instanceof ApiError && error.status === 0 && this.branchRoles().length));
+      if (!(error instanceof ApiError && error.status === 0)) this.notify.error(this.resolveError(error));
     } finally {
       if (this.user().id === userId) {
         this.loadingBranch.set(false);
@@ -788,7 +747,7 @@ export class UserRolesTab {
   }
 
   private async loadScope(userId: string): Promise<void> {
-    if (!this.isOwnerActor() || this.user().status !== 'ACTIVE') {
+    if (this.isSelf() || !this.isOwnerActor() || this.isRolesLocked()) {
       this.scopeRoles.set([]);
       this.loadingScope.set(false);
       this.scopeLoadFailed.set(false);
@@ -799,13 +758,13 @@ export class UserRolesTab {
     this.loadingScope.set(true);
     this.scopeLoadFailed.set(false);
     try {
-      const rows = await listScopeRoles(userId);
+      const rows = await this.api.listScopeRoles(userId);
       if (seq !== this.scopeSeq || this.user().id !== userId) return;
       this.scopeRoles.set(rows);
     } catch (error) {
       if (seq !== this.scopeSeq || this.user().id !== userId) return;
-      this.scopeLoadFailed.set(true);
-      this.notify.error(this.resolveError(error));
+      this.scopeLoadFailed.set(!(error instanceof ApiError && error.status === 0 && this.scopeRoles().length));
+      if (!(error instanceof ApiError && error.status === 0)) this.notify.error(this.resolveError(error));
     } finally {
       if (seq === this.scopeSeq && this.user().id === userId) {
         this.loadingScope.set(false);
@@ -814,15 +773,17 @@ export class UserRolesTab {
   }
 
   private async fetchChoices(reset: boolean): Promise<void> {
+    if (!this.canViewBranchRoles()) return;
     const seq = ++this.choicesSeq;
+    this.choicesLoadFailed.set(false);
     if (reset) {
       this.loadingChoices.set(true);
     } else {
       this.loadingMoreChoices.set(true);
     }
     try {
-      const search = this.choiceSearch().trim();
-      const result = await listAssignmentOptions(this.user().id, {
+      const search = this.choiceSearch().trim().slice(0, 200);
+      const result = await this.api.listAssignmentOptions(this.user().id, {
         page: this.choicesPage,
         limit: 20,
         ...(search ? { search } : {}),
@@ -841,7 +802,9 @@ export class UserRolesTab {
       this.choicesHasMore.set(result.hasMore);
     } catch (error) {
       if (seq === this.choicesSeq) {
-        this.notify.error(this.resolveError(error));
+        if (!reset) this.choicesPage -= 1;
+        this.choicesLoadFailed.set(!(error instanceof ApiError && error.status === 0 && this.choices().length));
+        if (!(error instanceof ApiError && error.status === 0)) this.notify.error(this.resolveError(error));
       }
     } finally {
       if (seq === this.choicesSeq) {
@@ -872,33 +835,33 @@ export class UserRolesTab {
     }
   }
 
-  private resolveError(error: unknown): string {
-    const seatMsg = seatErrorMessage(this.transloco, error);
-    if (seatMsg) return seatMsg;
-    const code = errorCodeOf(error);
-    const details = error instanceof ApiError ? error.details : undefined;
-    if (code) {
-      if (code === 'ROLE_PRIVILEGE_ESCALATION') {
-        const msg = this.transloco.translate('access.roles.err.escalation', details);
-        if (msg !== 'access.roles.err.escalation') return msg;
-      }
-      if (code === 'ROLE_BRANCH_SCOPE_INVALID') {
-        const msg = this.transloco.translate('access.roles.err.noProfile', details);
-        if (msg !== 'access.roles.err.noProfile') return msg;
-      }
-      const accessKey = `access.errors.${code}`;
-      const accessMsg = this.transloco.translate(accessKey, details);
-      if (accessMsg && accessMsg !== accessKey) return accessMsg;
-
-      const staffKey = `staff.errors.${code}`;
-      const staffMsg = this.transloco.translate(staffKey, details);
-      if (staffMsg && staffMsg !== staffKey) return staffMsg;
+  private async handleWriteError(error: unknown): Promise<void> {
+    const fields = fieldErrorsOf(error);
+    this.validationErrors.set(fields);
+    if (Object.keys(fields).length) {
+      if (fields['_']?.length) this.notify.error(fields['_'].join(' '));
+      return;
     }
-    const settingsGeneric = this.transloco.translate('settings.errors.generic');
-    if (settingsGeneric !== 'settings.errors.generic') return settingsGeneric;
-    const staffGeneric = this.transloco.translate('staff.errors.generic');
-    return staffGeneric !== 'staff.errors.generic'
-      ? staffGeneric
-      : this.transloco.translate('access.common.loadFailed');
+    const code = errorCodeOf(error);
+    if (code === 'GW.IDEM.IN_FLIGHT') this.notify.info(this.resolveError(error, true));
+    else if (code === 'GW.IDEM.MISMATCH') this.notify.warning(this.resolveError(error, true));
+    else if (!(error instanceof ApiError && error.status === 0)) this.notify.error(this.resolveError(error, true));
+    if (code === 'TENANT_USER_NOT_FOUND') this.changed.emit();
+    if (code === 'BRANCH_OR_ROLE_INVALID') {
+      this.choicesPage = 1;
+      await this.fetchChoices(true);
+    }
+    if (code === 'ASSIGNMENT_EXISTS' || code === 'ASSIGNMENT_NOT_FOUND') await this.loadBranch(this.user().id);
+    if (code === 'GW.IDEM.MISMATCH') {
+      this.addKeyCache = null;
+      this.removeKeyCache = null;
+      this.scopeKeyCache = null;
+      await Promise.all([this.loadBranch(this.user().id), this.loadScope(this.user().id)]);
+    }
+  }
+
+  private resolveError(error: unknown, write = false): string {
+    return seatErrorMessage(this.transloco, error) ??
+      staffErrorMessage(error, 'access', this.transloco, write ? 'write' : 'read');
   }
 }

@@ -7,8 +7,10 @@
   [filters]="filters()"
   [sortOptions]="sortOptions()"
   [(search)]="search"
-  [(page)]="page"
-  [(pageSize)]="pageSize"
+  [page]="page()"
+  (pageChange)="onPageChange($event)"
+  [pageSize]="pageSize()"
+  (pageSizeChange)="onPageSizeChange($event)"
   [(sort)]="sort"
   [(filterValues)]="filterValues"
   (add)="openCreate()"
@@ -182,6 +184,7 @@
 
 <app-company-modal
   [canManage]="canManage()"
+  (unavailable)="reload()"
   [canCreate]="canCreate()"
   [currencies]="currencies()"
   (saved)="onModalSaved($event)"

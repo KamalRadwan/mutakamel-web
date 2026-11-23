@@ -47,6 +47,7 @@
     "addBranch": "Add branch",
     "viewBranches": "View branches",
     "viewUsers": "View users",
+    "viewTaxes": "View taxes",
     "activation": "Application activation",
     "activate": "Activate",
     "deactivate": "Deactivate",
@@ -73,6 +74,9 @@
     "created": "Company created.",
     "saved": "Changes saved.",
     "deleted": "Company deleted."
+  },
+  "errors": {
+    "currencyNotEnabledActivate": "Enable the company's currency first in Settings › Currencies."
   },
   "save": "Save",
   "undo": "Undo changes",

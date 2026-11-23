@@ -3,7 +3,8 @@ import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { Dropdown, DropdownOption } from '../../../../../shared/ui/dropdown/dropdown';
 import { Field } from '../../../../../shared/ui/field/field';
-import { listAllPages, listBranches, listCompanies, listDepartments, listTeams } from '../staff.api';
+import { listAllPages } from '../staff.api';
+import { OrganizationReadApi } from '../organization-read.api';
 import { Branch, Company, Department, OrgCascadeLevel, OrgCascadeValue, STAFF_LIMITS, Team } from '../staff.model';
 
 @Component({
@@ -18,6 +19,7 @@ export class OrgCascade {
 
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly transloco = inject(TranslocoService);
+  private readonly organization = inject(OrganizationReadApi);
   private readonly i18n = translationEvents(this.transloco);
 
   protected readonly useContents =
@@ -286,7 +288,7 @@ export class OrgCascade {
   private async fetchCompanies(activeOnly: boolean): Promise<void> {
     const seq = ++this.companiesSeq;
     try {
-      const items = await listAllPages(listCompanies, {
+      const items = await listAllPages((q) => this.organization.listCompanies(q), {
         status: activeOnly ? 'ACTIVE' : undefined,
         limit: STAFF_LIMITS.pageSize,
         sortBy: 'name',
@@ -317,7 +319,7 @@ export class OrgCascade {
   private async fetchBranches(companyId: string, activeOnly: boolean): Promise<void> {
     const seq = ++this.branchesSeq;
     try {
-      const items = await listAllPages(listBranches, {
+      const items = await listAllPages((q) => this.organization.listBranches(q), {
         companyId,
         status: activeOnly ? 'ACTIVE' : undefined,
         limit: STAFF_LIMITS.pageSize,
@@ -348,7 +350,7 @@ export class OrgCascade {
   private async fetchDepartments(branchId: string, activeOnly: boolean): Promise<void> {
     const seq = ++this.departmentsSeq;
     try {
-      const items = await listAllPages(listDepartments, {
+      const items = await listAllPages((q) => this.organization.listDepartments(q), {
         branchId,
         status: activeOnly ? 'ACTIVE' : undefined,
         limit: STAFF_LIMITS.pageSize,
@@ -378,7 +380,7 @@ export class OrgCascade {
   private async fetchTeams(departmentId: string, activeOnly: boolean): Promise<void> {
     const seq = ++this.teamsSeq;
     try {
-      const items = await listAllPages(listTeams, {
+      const items = await listAllPages((q) => this.organization.listTeams(q), {
         departmentId,
         status: activeOnly ? 'ACTIVE' : undefined,
         limit: STAFF_LIMITS.pageSize,

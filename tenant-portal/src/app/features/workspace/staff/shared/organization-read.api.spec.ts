@@ -1,6 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
+import { QueryClient } from '@tanstack/angular-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { OrganizationReadApi } from './organization-read.api';
 import { StaffSession } from './staff-session';
@@ -79,5 +80,70 @@ describe('OrganizationReadApi', () => {
     can.mockImplementation((permission) => permission === 'org.branch.read');
     await expect(api.listCompanies()).rejects.toMatchObject({ status: 403 });
     http.expectNone(`${path}/companies`);
+  });
+
+  it('reads the tree', async () => {
+    for (const tree of [[{ ...company, children: [] }], []]) {
+      const pending = api.getTree();
+      const req = http.expectOne({ method: 'GET', url: `${path}/tree` });
+      expect(req.request.params.keys()).toEqual([]);
+      expect(req.request.body).toBeNull();
+      req.flush({ success: true, data: tree });
+      await expect(pending).resolves.toEqual(tree);
+    }
+  });
+
+  it('rejects a tree that is not an array', async () => {
+    const pending = api.getTree();
+    http.expectOne(`${path}/tree`).flush({ success: true, data: {} });
+    await expect(pending).rejects.toMatchObject({ status: 502, code: 'COMMON.GENERIC.INTERNAL_ERROR' });
+  });
+
+  it('skips the tree without company read', async () => {
+    can.mockReturnValue(false);
+    await expect(api.getTree()).rejects.toMatchObject({ status: 403, code: 'COMMON.GENERIC.FORBIDDEN' });
+    http.expectNone(`${path}/tree`);
+  });
+
+  it('keeps the tree size details', async () => {
+    const pending = api.getTree();
+    const details = { nodeKind: ['teams'], limit: ['5000'] };
+    http.expectOne(`${path}/tree`).flush({ success: false, errorCode: 'ORG_TREE_TOO_LARGE', details },
+      { status: 422, statusText: 'Too large' });
+    await expect(pending).rejects.toMatchObject({ status: 422, code: 'ORG_TREE_TOO_LARGE', details });
+  });
+
+  it.each([
+    [403, 'MISSING_REQUIRED_PERMISSIONS'], [403, 'PERMISSION_SCOPE_UNAVAILABLE'],
+    [422, 'PERMISSION_SCOPE_AUTHORITY_INCONSISTENT'],
+  ])('keeps tree errors: %s %s', async (status, code) => {
+    const pending = api.getTree();
+    http.expectOne(`${path}/tree`).flush({ success: false, errorCode: code }, { status, statusText: 'Rejected' });
+    await expect(pending).rejects.toMatchObject({ status, code });
+  });
+
+  it('the tree shares the scope key', async () => {
+    const fetch = vi.spyOn(QueryClient.prototype, 'fetchQuery');
+    const invalidate = vi.spyOn(QueryClient.prototype, 'invalidateQueries');
+    try {
+      const first = api.getTree();
+      const second = api.getTree();
+      http.expectOne(`${path}/tree`).flush({ success: true, data: [] });
+      await expect(first).resolves.toEqual([]);
+      await expect(second).resolves.toEqual([]);
+      expect(fetch).toHaveBeenCalledWith(expect.objectContaining({
+        queryKey: ['staff-organization', 'tenant-actor-access', 'tree'],
+      }));
+      await api.invalidateScope('tenant-actor-access');
+      expect(invalidate).toHaveBeenCalledWith({
+        queryKey: ['staff-organization', 'tenant-actor-access'], refetchType: 'none',
+      });
+      const refreshed = api.getTree();
+      http.expectOne(`${path}/tree`).flush({ success: true, data: [] });
+      await refreshed;
+    } finally {
+      fetch.mockRestore();
+      invalidate.mockRestore();
+    }
   });
 });

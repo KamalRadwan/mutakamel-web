@@ -45,9 +45,10 @@ describe('phone.api contract (Core webphone)', () => {
     expect(saved).not.toHaveProperty('phoneDigits');
     expect(saved?.phoneNumber).toBe('+20 100 555 0199');
 
-    const listed = await listCallLogs({ page: 1, limit: 1 });
-    expect(listed.data[0].id).toBe(saved?.id);
-    expect(listed.data[0]).toHaveProperty('ownerName');
+    const listed = await listCallLogs({ page: 1, limit: 100, q: saved?.phoneNumber });
+    const listedRow = listed.data.find((row) => row.id === saved?.id);
+    expect(listedRow).toBeDefined();
+    expect(listedRow).toHaveProperty('ownerName');
   });
 });
 

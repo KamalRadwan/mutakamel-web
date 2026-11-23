@@ -47,6 +47,13 @@
   "addCompany": "Add company",
   "hiddenByPermission": "Hidden by your permissions",
   "empty": "No companies yet.",
+  "emptyScoped": "No organization units are visible to you.",
+  "tooLargeKind": {
+    "companies": "There are more than {{limit}} companies, so the structure is too large to show here. Use the Companies and Branches pages.",
+    "branches": "There are more than {{limit}} branches, so the structure is too large to show here. Use the Companies and Branches pages.",
+    "departments": "There are more than {{limit}} departments, so the structure is too large to show here. Use the Companies and Branches pages.",
+    "teams": "There are more than {{limit}} teams, so the structure is too large to show here. Use the Companies and Branches pages."
+  },
   "tooLarge": "The structure is too large to show here. Use the Companies and Branches pages.",
   "openCompanies": "Open companies",
   "loadFailed": "Could not load the structure.",
