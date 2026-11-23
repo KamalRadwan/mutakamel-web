@@ -1,4 +1,5 @@
 import type { TranslocoService } from '@jsverse/transloco';
+import { ApiError } from '../../../../../core/api/api-errors';
 import { BulkJobsTracker } from '../../../../../shared/bulk-jobs/bulk-jobs-tracker';
 import {
   BULK_JOB_LIMITS,
@@ -7,7 +8,7 @@ import {
   type BulkJobSubmit,
   isBulkJobActive,
 } from '../../../../../shared/bulk-jobs/bulk-jobs.model';
-import { ApiError as TradeApiError, type TradeContext } from '../../../shared/trade-api';
+import type { TradeContext } from '../../../shared/trade-api';
 import type {
   ItemKind,
   ItemStatus,
@@ -84,14 +85,27 @@ export interface BulkErrorInfo {
   details?: Record<string, unknown>;
 }
 
-export interface SubmitItemsBulkOptions {
-  action: ItemBulkAction;
+/** Payloads of trade-items-bulk.schemas.ts; validation and reason lookup stay on the server. */
+export interface ItemBulkParamsByAction {
+  SET_STATUS: SetStatusParams;
+  SET_CATEGORY: SetCategoryParams;
+  ENABLE_FOR_COMPANY: EnableForCompanyParams;
+  SET_CAPABILITIES: SetCapabilitiesParams;
+}
+
+interface SubmitItemsBulkBase {
   context: TradeContext;
   selection: BulkJobSelection;
-  params: unknown;
   idempotencyKey: string;
   tracker: BulkJobsTracker;
 }
+
+export type SubmitItemsBulkOptions = {
+  [Action in ItemBulkAction]: SubmitItemsBulkBase & {
+    action: Action;
+    params: ItemBulkParamsByAction[Action];
+  };
+}[ItemBulkAction];
 
 /** Item master actions: the backend handler allows them in tenant scope only (else 403 TRADE.AUTH.TARGET_DENIED). */
 export const ITEM_BULK_MASTER_ACTIONS: readonly ItemBulkAction[] = ['SET_STATUS', 'SET_CATEGORY'];
@@ -113,7 +127,7 @@ export function toBulkScope(
 }
 
 export function bulkErrorInfo(error: unknown): BulkErrorInfo {
-  if (error instanceof TradeApiError) {
+  if (error instanceof ApiError) {
     return { status: error.status, code: error.code, details: error.details };
   }
   if (error && typeof error === 'object') {
