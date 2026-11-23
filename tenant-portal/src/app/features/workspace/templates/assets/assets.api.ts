@@ -1,11 +1,4 @@
 import { newIdempotencyKey as newTemplateIdempotencyKey } from '../../../../core/api/idempotency';
-import {
-  fakeGetAsset,
-  fakeGetAssetContent,
-  fakeListAssets,
-  fakeRetireAsset,
-  fakeUploadAsset,
-} from '../templates.fake';
 import type {
   TemplateAssetDetailResponse,
   TemplateAssetDto,
@@ -43,11 +36,12 @@ export class AssetsApi {
     return this.read('content', assetId, () => this.http.readBlob(`${this.path(assetId)}/content`));
   }
 
-  async uploadAsset(request: UploadTemplateAssetRequest, key = newTemplateIdempotencyKey()): Promise<UploadTemplateAssetResponse> {
+  async uploadAsset(request: UploadTemplateAssetRequest, key = newTemplateIdempotencyKey()): Promise<Pick<UploadTemplateAssetResponse, 'asset'>> {
     const form = new FormData();
     form.append('metadata', JSON.stringify(request.metadata));
     form.append('file', request.file);
-    const result = await this.http.writeMultipart<UploadTemplateAssetResponse>(ASSETS_PATH, form, { key });
+    // Core's createAsset receipt contains only asset; delivery belongs to getAsset.
+    const result = await this.http.writeMultipart<Pick<UploadTemplateAssetResponse, 'asset'>>(ASSETS_PATH, form, { key });
     await this.invalidate();
     return result.data;
   }
@@ -79,38 +73,38 @@ export class AssetsApi {
   }
 }
 
-// FAKE-ONLY compatibility exports: templates.api.ts must retain these exports in this wave.
-// DesignerState still calls getAssetContent; its migration belongs to TPL-1/TPL-9.
+// Compatibility for templates.api.ts re-exports. Call in an injection context;
+// components and asynchronous consumers inject AssetsApi directly.
 /** GET /api/tenant/core/v1/templates/assets */
 export function listAssets(query: TemplateAssetsListQuery = {}): Promise<TemplateCursorPage<TemplateAssetDto>> {
-  return fakeListAssets(query);
+  return inject(AssetsApi).listAssets(query);
 }
 
 /** GET /api/tenant/core/v1/templates/assets/:id */
 export function getAsset(assetId: string): Promise<TemplateAssetDetailResponse> {
-  return fakeGetAsset(assetId);
+  return inject(AssetsApi).getAsset(assetId);
 }
 
 /** GET /api/tenant/core/v1/templates/assets/:id/content */
 export function getAssetContent(assetId: string): Promise<Blob> {
-  return fakeGetAssetContent(assetId);
+  return inject(AssetsApi).getAssetContent(assetId);
 }
 
 /** POST /api/tenant/core/v1/templates/assets (x-idempotency-key); 201 Location: /api/tenant/core/v1/templates/assets/{assetId} */
 export function uploadAsset(
   request: UploadTemplateAssetRequest,
   idempotencyKey = newTemplateIdempotencyKey(),
-): Promise<UploadTemplateAssetResponse> {
-  return fakeUploadAsset(request, idempotencyKey);
+): Promise<Pick<UploadTemplateAssetResponse, 'asset'>> {
+  return inject(AssetsApi).uploadAsset(request, idempotencyKey);
 }
 
 /** DELETE /api/tenant/core/v1/templates/assets/:id (If-Match, x-idempotency-key) */
 export function retireAsset(
   assetId: string,
   ifMatch: string,
-  _idempotencyKey = newTemplateIdempotencyKey(),
+  idempotencyKey = newTemplateIdempotencyKey(),
 ): Promise<void> {
-  return fakeRetireAsset(assetId, ifMatch);
+  return inject(AssetsApi).retireAsset(assetId, ifMatch, idempotencyKey);
 }
 
 import { computed, inject, Service } from '@angular/core';
