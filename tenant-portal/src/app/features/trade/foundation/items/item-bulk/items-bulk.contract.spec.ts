@@ -1,4 +1,4 @@
-import { fakeSubmitBulkJob } from '../../../../../shared/bulk-jobs/bulk-jobs.fake';
+import { fakeSubmitBulkJob, resetBulkJobsFake } from '../../../../../shared/bulk-jobs/bulk-jobs.fake';
 import type {
   BulkJobSelection,
   BulkJobSubmit,
@@ -52,7 +52,7 @@ const ENABLE = {
 };
 
 describe('trading.items bulk contract (strict fake)', () => {
-  beforeEach(() => vi.useFakeTimers());
+  beforeEach(() => { resetBulkJobsFake(); vi.useFakeTimers(); });
   afterEach(() => vi.useRealTimers());
 
   it('sends master actions in tenant scope and company actions with the company', () => {

@@ -19,10 +19,13 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
-  ctx.destroy();
-  TestBed.resetTestingModule();
-  h.restore();
-  vi.useRealTimers();
+  try {
+    ctx?.destroy();
+    TestBed.resetTestingModule();
+    h?.restore();
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 const TEXT_BLOCKS: Exclude<PhoneBlock, null | 'loading'>[] = [

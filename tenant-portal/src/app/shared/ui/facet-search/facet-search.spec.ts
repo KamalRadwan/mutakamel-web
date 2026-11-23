@@ -26,6 +26,7 @@ const PRESETS: SearchOption[] = [
 @Component({
   imports: [FacetSearch],
   template: `<ui-facet-search
+    dir="ltr"
     [fields]="fields"
     [presets]="presets"
     placeholder="Search leads"

@@ -5,7 +5,7 @@ import { TestBed } from '@angular/core/testing';
 import { throwError } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, isRetryableWriteError } from './api-errors';
-import { CoreHttp } from './core-http';
+import { CoreHttp, type CoreReadOptions } from './core-http';
 import { newIdempotencyKey } from './idempotency';
 
 const path = '/api/tenant/core/v1/templates';
@@ -40,6 +40,63 @@ describe('CoreHttp', () => {
       expect(request.request.withCredentials).toBe(true);
       request.flush({ success: true, data });
       await expect(pending).resolves.toEqual(data);
+    }
+  });
+
+  it('read sends scope headers when asked', async () => {
+    const scope = { companyId: '01934b10-0000-7000-8000-000000000101', branchId: '01934b10-0000-7000-8000-000000000102' };
+    const pending = api.read(path, { active: true }, { scope });
+    const request = http.expectOne(`${path}?active=true`);
+    expect(request.request.headers.get('x-mutakamel-company-id')).toBe(scope.companyId);
+    expect(request.request.headers.get('x-mutakamel-branch-id')).toBe(scope.branchId);
+    expect(request.request.withCredentials).toBe(true);
+    request.flush({ success: true, data: [] });
+    await expect(pending).resolves.toEqual([]);
+  });
+
+  it('read stays header-free by default', async () => {
+    const options: (CoreReadOptions | undefined)[] = [undefined, {}, { scope: {} },
+      { scope: { companyId: undefined, branchId: undefined } }];
+    for (const option of options) {
+      const reads = [api.read(path, undefined, option), api.readPage(path, undefined, option),
+        api.readWithEtag(path, undefined, option), api.readBlob(path, undefined, option)];
+      const requests = http.match(path);
+      expect(requests).toHaveLength(4);
+      for (const request of requests) {
+        expect(request.request.headers.keys()).toEqual([]);
+        request.flush(request.request.responseType === 'blob' ? new Blob(['bytes']) : { success: true, data: [], meta });
+      }
+      await Promise.all(reads);
+    }
+  });
+
+  it('paged, etag and blob reads forward scope', async () => {
+    const scope = { companyId: 'Company-ID', branchId: 'Branch-ID' };
+    const page = api.readPage(path, { page: 1 }, { scope });
+    const etag = api.readWithEtag(path, { version: 3 }, { scope });
+    const blob = api.readBlob(path, { size: 'thumb' }, { scope });
+    for (const request of http.match((req) => req.url === path)) {
+      expect(request.request.headers.get('x-mutakamel-company-id')).toBe(scope.companyId);
+      expect(request.request.headers.get('x-mutakamel-branch-id')).toBe(scope.branchId);
+      expect(request.request.withCredentials).toBe(true);
+      expect(request.request.params.keys()).toHaveLength(1);
+      request.flush(request.request.responseType === 'blob' ? new Blob(['bytes']) : { success: true, data: [], meta },
+        { headers: { ETag: 'W/"revision:3"' } });
+    }
+    await expect(page).resolves.toEqual({ data: [], meta });
+    await expect(etag).resolves.toEqual({ data: [], etag: 'W/"revision:3"' });
+    await expect(blob).resolves.toBeInstanceOf(Blob);
+  });
+
+  it('read sends only the provided scope header', async () => {
+    for (const scope of [{ branchId: 'Branch-ID' }, { companyId: 'Company-ID' }, { branchId: '' }]) {
+      const pending = api.read(path, undefined, { scope });
+      const request = http.expectOne(path);
+      expect(request.request.headers.get('x-mutakamel-company-id')).toBe(scope.companyId ?? null);
+      expect(request.request.headers.get('x-mutakamel-branch-id')).toBe(scope.branchId ?? null);
+      expect(request.request.headers.keys()).toHaveLength(1);
+      request.flush({ success: true, data: [] });
+      await pending;
     }
   });
 

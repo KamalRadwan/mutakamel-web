@@ -4,6 +4,7 @@ import {
   fakeGetBulkJob,
   fakeListBulkJobItems,
   fakeSubmitBulkJob,
+  resetBulkJobsFake,
 } from '../../../../shared/bulk-jobs/bulk-jobs.fake';
 import { type BulkJob, type BulkJobItem, type BulkJobSubmit, isBulkJobActive } from '../../../../shared/bulk-jobs/bulk-jobs.model';
 import { newIdempotencyKey } from '../../shared/trade-api';
@@ -47,6 +48,7 @@ async function run(submit: BulkJobSubmit): Promise<{ job: BulkJob; items: BulkJo
 describe('documents bulk fake follows the trade-app document bulk handlers', () => {
   const chunkMs = FAKE_BULK.chunkMs;
   beforeEach(() => {
+    resetBulkJobsFake();
     FAKE_BULK.chunkMs = 0;
   });
   afterEach(() => {

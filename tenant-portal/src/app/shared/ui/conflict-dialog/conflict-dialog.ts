@@ -8,10 +8,8 @@ import { Button } from '../button/button';
 @Component({
   selector: 'ui-conflict-dialog',
   imports: [NgIcon, TranslocoPipe, Button],
-  providers: [
-    provideTranslocoScope({ scope: 'record-page', alias: 'recordPage' }),
-    provideIcons({ tablerAlertTriangle }),
-  ],
+  providers: [provideIcons({ tablerAlertTriangle })],
+  viewProviders: [provideTranslocoScope({ scope: 'record-page', alias: 'recordPage' })],
   templateUrl: './conflict-dialog.html',
 })
 export class ConflictDialog {

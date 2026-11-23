@@ -80,6 +80,19 @@ const submitIdempotency = new Map<string, StoredIdempotentResult>();
 const retryIdempotency = new Map<string, StoredIdempotentResult>();
 const idempotencyInFlight = new Set<string>();
 
+/** Test isolation keeps completed jobs and pending worker timers out of the next case. */
+export function resetBulkJobsFake(): void {
+  for (const jobs of jobsByApp.values()) {
+    for (const stored of jobs) {
+      if (stored.timer !== null) clearTimeout(stored.timer);
+    }
+  }
+  jobsByApp.clear();
+  submitIdempotency.clear();
+  retryIdempotency.clear();
+  idempotencyInFlight.clear();
+}
+
 /** Canonical JSON (sorted keys) so the same body always gives the same fingerprint. */
 function fingerprintOf(value: unknown): string {
   const canonical = (input: unknown): unknown => {

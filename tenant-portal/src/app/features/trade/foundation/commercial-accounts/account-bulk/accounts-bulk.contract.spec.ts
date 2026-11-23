@@ -1,4 +1,4 @@
-import { fakeSubmitBulkJob } from '../../../../../shared/bulk-jobs/bulk-jobs.fake';
+import { fakeSubmitBulkJob, resetBulkJobsFake } from '../../../../../shared/bulk-jobs/bulk-jobs.fake';
 import type { BulkJobSubmit } from '../../../../../shared/bulk-jobs/bulk-jobs.model';
 import { ApiError } from '../../../shared/trade-api';
 import { TRADE_FAKE_DB } from '../../../shared/trade-foundation.fake';
@@ -46,7 +46,7 @@ function usableReason(kind: 'ACCOUNT_BLOCK' | 'ACCOUNT_UNBLOCK'): string {
 }
 
 describe('trading.commercial-accounts bulk contract (strict fake)', () => {
-  beforeEach(() => vi.useFakeTimers());
+  beforeEach(() => { resetBulkJobsFake(); vi.useFakeTimers(); });
   afterEach(() => vi.useRealTimers());
 
   it('takes the reason note as `note` and rejects `reasonNote`', async () => {

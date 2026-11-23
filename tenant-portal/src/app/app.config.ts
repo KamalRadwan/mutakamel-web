@@ -1,4 +1,7 @@
 import { ApplicationConfig, inject, isDevMode, provideAppInitializer, provideBrowserGlobalErrorListeners } from '@angular/core';
+import { EnvironmentInjector } from '@angular/core';
+import { bindCrmHttp, CrmHttp, crmQueries } from './features/crm/shared/crm-http';
+import { bindCrmInjector } from './features/crm/shared/crm-runtime';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { TitleStrategy, provideRouter, withComponentInputBinding } from '@angular/router';
 import { provideTransloco } from '@jsverse/transloco';
@@ -12,6 +15,7 @@ import { ViewScale } from './core/view/view-scale';
 import { TabLeader } from './core/tabs/tab-leader';
 import { AppTitleStrategy } from './layout/title/app-title-strategy';
 import { provideBulkJobModules } from './shared/bulk-jobs/bulk-job-modules';
+import { CORE_USERS_BULK_MODULE } from './features/workspace/staff/users/users-bulk/users-bulk.descriptor';
 import { bindAnalyticsPermissions } from './shared/widgets/dashboard/analytics-permissions';
 import { CRM_CUSTOMERS_BULK_MODULE } from './features/crm/customers/customer-bulk/customers-bulk.descriptor';
 import { CRM_LEADS_BULK_MODULE } from './features/crm/leads/lead-bulk/leads-bulk.descriptor';
@@ -23,6 +27,7 @@ import { registerFakeBulkModuleLoader } from './shared/bulk-jobs/bulk-jobs.fake'
 import { routes } from './app.routes';
 
 // Large fake data stays out of the initial bundle: loaded on the first bulk-jobs fake call for this module.
+registerFakeBulkModuleLoader('core', 'core.users', () => import('./features/workspace/staff/users/users-bulk/users-bulk.fake-module'));
 registerFakeBulkModuleLoader('crm', 'crm.leads', () => import('./features/crm/leads/lead-bulk/leads-bulk.fake-module'));
 registerFakeBulkModuleLoader(
   'crm',
@@ -56,6 +61,7 @@ export const appConfig: ApplicationConfig = {
       loader: TranslationLoader,
     }),
     provideBulkJobModules([
+      CORE_USERS_BULK_MODULE,
       CRM_LEADS_BULK_MODULE,
       CRM_OPPORTUNITIES_BULK_MODULE,
       CRM_CUSTOMERS_BULK_MODULE,
@@ -64,6 +70,7 @@ export const appConfig: ApplicationConfig = {
     ]),
     provideAutomationBulkModules(),
     provideAppInitializer(() => { const session = inject(AuthSession); bindAnalyticsPermissions(() => session.me()?.permissions ?? []); }),
+    provideAppInitializer(() => { const injector = inject(EnvironmentInjector); bindCrmHttp(inject(CrmHttp), crmQueries()); bindCrmInjector(() => injector); }),
     provideAppInitializer(() => {
       inject(LanguageState);
       inject(ThemeState);

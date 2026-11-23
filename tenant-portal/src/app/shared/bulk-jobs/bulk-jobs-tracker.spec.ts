@@ -13,7 +13,7 @@ import { TRADE_ACCOUNTS_BULK_MODULE } from '../../features/trade/foundation/comm
 import { TRADE_ITEMS_BULK_MODULE } from '../../features/trade/foundation/items/item-bulk/items-bulk.descriptor';
 import { submitItemsBulkJob } from '../../features/trade/foundation/items/item-bulk/item-bulk.model';
 import { type BulkJobModuleDescriptor, provideBulkJobModules } from './bulk-job-modules';
-import { FAKE_BULK, type FakeBulkModule, fakeCancelBulkJob, fakeListBulkJobs, fakeSubmitBulkJob, registerFakeBulkModule } from './bulk-jobs.fake';
+import { FAKE_BULK, type FakeBulkModule, fakeCancelBulkJob, fakeListBulkJobs, fakeSubmitBulkJob, registerFakeBulkModule, resetBulkJobsFake } from './bulk-jobs.fake';
 import { BulkJobsTracker } from './bulk-jobs-tracker';
 import { submitBulkJob } from './bulk-jobs.api';
 import type { BulkJob, BulkJobItem, BulkJobItemStatus, BulkJobSubmit } from './bulk-jobs.model';
@@ -176,6 +176,7 @@ async function drainFakeJobs(): Promise<void> {
 }
 
 beforeEach(() => {
+  resetBulkJobsFake();
   vi.useFakeTimers();
   localStorage.clear();
   visibility = 'visible';

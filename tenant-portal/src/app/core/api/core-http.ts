@@ -7,7 +7,10 @@ import type { CorePage, CorePageMeta } from './core-page';
 
 export type CoreWriteMethod = 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 export type CoreQuery = Record<string, string | number | boolean | readonly (string | number)[] | null | undefined>;
-export interface CoreReadOptions { bare?: boolean; }
+export interface CoreReadOptions {
+  bare?: boolean;
+  scope?: { companyId?: string; branchId?: string };
+}
 export interface CoreWriteOptions {
   key?: string;
   ifMatch?: string;
@@ -24,12 +27,12 @@ export class CoreHttp {
   private readonly document = inject(DOCUMENT);
 
   async read<T>(path: string, query?: CoreQuery, options?: CoreReadOptions): Promise<T> {
-    const response = await this.readResponse(path, query);
+    const response = await this.readResponse(path, query, options);
     return options?.bare ? response.body as T : this.unwrap<T>(response.body).data;
   }
 
-  async readPage<T>(path: string, query?: CoreQuery): Promise<CorePage<T>> {
-    const { data, meta } = this.unwrap<T[]>((await this.readResponse(path, query)).body);
+  async readPage<T>(path: string, query?: CoreQuery, options?: CoreReadOptions): Promise<CorePage<T>> {
+    const { data, meta } = this.unwrap<T[]>((await this.readResponse(path, query, options)).body);
     if (!Array.isArray(data) || !meta ||
         ![meta.page, meta.limit, meta.total, meta.totalPages].every((value) => typeof value === 'number' && Number.isFinite(value)) ||
         typeof meta.hasNext !== 'boolean' || typeof meta.hasPrev !== 'boolean') {
@@ -38,18 +41,18 @@ export class CoreHttp {
     return { data, meta };
   }
 
-  async readWithEtag<T>(path: string, query?: CoreQuery): Promise<{ data: T; etag: string | null }> {
-    const response = await this.readResponse(path, query);
+  async readWithEtag<T>(path: string, query?: CoreQuery, options?: CoreReadOptions): Promise<{ data: T; etag: string | null }> {
+    const response = await this.readResponse(path, query, options);
     const { data } = this.unwrap<T>(response.body);
     const bodyEtag = typeof data === 'object' && data !== null && 'etag' in data && typeof data.etag === 'string'
       ? data.etag : null;
     return { data, etag: response.headers.get('ETag') ?? bodyEtag };
   }
 
-  async readBlob(path: string, query?: CoreQuery): Promise<Blob> {
+  async readBlob(path: string, query?: CoreQuery, options?: CoreReadOptions): Promise<Blob> {
     try {
       return await firstValueFrom(this.http.get(path, {
-        params: queryParams(query), responseType: 'blob', withCredentials: true,
+        headers: scopeHeaders(options?.scope), params: queryParams(query), responseType: 'blob', withCredentials: true,
       }));
     } catch (error) {
       if (error instanceof HttpErrorResponse) throw await this.toApiError(error);
@@ -60,11 +63,9 @@ export class CoreHttp {
   async write<T>(method: CoreWriteMethod, path: string, body?: unknown, options?: CoreWriteOptions): Promise<CoreWriteResult<T>> {
     const csrf = readCsrfCookie(this.document);
     if (!csrf) throw new ApiError(403, 'GW.AUTH.CSRF_INVALID');
-    const headers: Record<string, string> = { 'x-csrf-token': csrf };
+    const headers: Record<string, string> = { ...scopeHeaders(options?.scope), 'x-csrf-token': csrf };
     if (options?.key !== undefined) headers['x-idempotency-key'] = options.key;
     if (options?.ifMatch !== undefined) headers['If-Match'] = options.ifMatch;
-    if (options?.scope?.companyId !== undefined) headers['x-mutakamel-company-id'] = options.scope.companyId;
-    if (options?.scope?.branchId !== undefined) headers['x-mutakamel-branch-id'] = options.scope.branchId;
     try {
       const response = await firstValueFrom(this.http.request<unknown>(method, path, {
         body: options?.noBody ? undefined : body,
@@ -87,10 +88,10 @@ export class CoreHttp {
     return this.write<T>('POST', path, form, options);
   }
 
-  private async readResponse(path: string, query?: CoreQuery): Promise<HttpResponse<unknown>> {
+  private async readResponse(path: string, query?: CoreQuery, options?: CoreReadOptions): Promise<HttpResponse<unknown>> {
     try {
       return await firstValueFrom(this.http.get<unknown>(path, {
-        params: queryParams(query), observe: 'response', withCredentials: true,
+        headers: scopeHeaders(options?.scope), params: queryParams(query), observe: 'response', withCredentials: true,
       }));
     } catch (error) {
       if (error instanceof HttpErrorResponse) throw await this.toApiError(error);
@@ -129,6 +130,13 @@ export class CoreHttp {
     }
     return error;
   }
+}
+
+function scopeHeaders(scope?: CoreReadOptions['scope']): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (scope?.companyId !== undefined) headers['x-mutakamel-company-id'] = scope.companyId;
+  if (scope?.branchId !== undefined) headers['x-mutakamel-branch-id'] = scope.branchId;
+  return headers;
 }
 
 function queryParams(query?: CoreQuery): HttpParams {

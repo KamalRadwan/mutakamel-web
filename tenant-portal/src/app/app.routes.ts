@@ -1,4 +1,5 @@
-import { Routes, UrlSegment } from '@angular/router';
+import { inject } from '@angular/core';
+import { Router, Routes, UrlSegment } from '@angular/router';
 import { provideTranslocoScope } from '@jsverse/transloco';
 import { authGuard } from './core/auth/auth.guards';
 import { requirePermission } from './core/auth/permission.guard';
@@ -171,6 +172,12 @@ export const routes: Routes = [
         path: 'trade/settings',
         canActivate: [requireApp('trade')],
         loadChildren: () => import('./features/trade/settings/settings.routes').then((m) => m.tradeSettingsRoutes),
+      },
+      {
+        path: 'core/activities',
+        pathMatch: 'full',
+        redirectTo: ({ queryParams, fragment }) =>
+          inject(Router).createUrlTree(['/workspace/operations/activities'], { queryParams, fragment: fragment ?? undefined }),
       },
       {
         path: 'forbidden',
