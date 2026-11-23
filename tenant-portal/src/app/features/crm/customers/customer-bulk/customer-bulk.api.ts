@@ -3,51 +3,15 @@ import { newIdempotencyKey } from '../../../../core/api/idempotency';
 import { crmHttp, crmQueries } from '../../shared/crm-http';
 import { listAssignableOwners } from '../../shared/lookups/assignable-owners';
 import { sessionBranch } from '../../shared/lookups/session-branch';
-import { fakeSearchCustomers } from '../customers.fake';
-import { CustomerRow, CustomerSearchBody, OwnerOption } from '../customers.model';
+import { CustomerSearchBody, OwnerOption } from '../customers.model';
 import {
   CUSTOMER_SELECTION_LIMIT,
   CustomerBulkSort,
   CustomerSelectionResult,
-  SelectedCustomerRow,
 } from './customer-bulk.model';
 
-function toSelectedFromRow(row: CustomerRow): SelectedCustomerRow {
-  return {
-    id: row.id,
-    displayName: row.displayName,
-    ownerUserId: row.ownerUserId,
-    status: row.status,
-    updatedAt: row.updatedAt,
-  };
-}
-
-/**
- * Selection preview over `customers.fake.ts` search/filter logic.
- * Throws `CUSTOMER_PROFILE_SELECTION_TOO_LARGE` when `limit > 10_000`.
- */
-export async function fakeSelectCustomers(
-  body: CustomerSearchBody,
-  sort: CustomerBulkSort | undefined,
-  limit = CUSTOMER_SELECTION_LIMIT,
-): Promise<CustomerSelectionResult> {
-  if (!Number.isInteger(limit) || limit < 1 || limit > CUSTOMER_SELECTION_LIMIT) {
-    throw new ApiError(400, 'CUSTOMER_PROFILE_SELECTION_TOO_LARGE');
-  }
-
-  const effectiveSort = sort ?? body.sort ?? 'createdAt:DESC';
-  const searchBody: CustomerSearchBody = {
-    ...body,
-    sort: effectiveSort,
-  };
-
-  const page = await fakeSearchCustomers(searchBody, 1, limit);
-  return {
-    items: page.items.map(toSelectedFromRow),
-    total: page.total,
-    truncated: page.total > limit,
-  };
-}
+/** @deprecated Compatibility name for legacy consumers; selection always uses the live API. */
+export { selectCustomers as fakeSelectCustomers };
 
 /** BRANCH_REQUIRED: selection is a read-only POST with both session scope headers. */
 export function selectCustomers(

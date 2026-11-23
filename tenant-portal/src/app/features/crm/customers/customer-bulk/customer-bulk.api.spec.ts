@@ -4,7 +4,7 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { TenantScopeState } from '../../../../core/scope/tenant-scope';
 import { bindCrmHttpForTest, CrmHttp, crmQueries } from '../../shared/crm-http';
-import { listCustomerBulkOwners, selectCustomers } from './customer-bulk.api';
+import { fakeSelectCustomers, listCustomerBulkOwners, selectCustomers } from './customer-bulk.api';
 import { CUSTOMER_SELECTION_LIMIT } from './customer-bulk.model';
 
 const companyId = '019f0000-0000-7000-8000-000000000010';
@@ -39,8 +39,25 @@ describe.each([['en', 'light'], ['en', 'dark'], ['ar', 'light'], ['ar', 'dark']]
     dispose();
     crmQueries().clear();
     document.cookie = 'mutakamel-http-tenant-csrf=; Max-Age=0; path=/';
-    ['lang', 'dir', 'data-theme'].forEach((name, i) => attributes[i] === null
-      ? document.documentElement.removeAttribute(name) : document.documentElement.setAttribute(name, attributes[i]!));
+    ['lang', 'dir', 'data-theme'].forEach((name, i) => {
+      const value = attributes[i];
+      if (value == null) document.documentElement.removeAttribute(name);
+      else document.documentElement.setAttribute(name, value);
+    });
+  });
+
+  it('keeps the legacy selection name as an alias to the live API', () => {
+    expect(fakeSelectCustomers).toBe(selectCustomers);
+  });
+
+  it('propagates backend errors without substituting fake selection rows', async () => {
+    const promise = selectCustomers({ branchId }, undefined);
+    const rejected = expect(promise).rejects.toMatchObject({ code: 'CRM_SCOPED_PERMISSION_DENIED' });
+    http.expectOne(`${base}/customer-profiles/selection`).flush(
+      { code: 'CRM_SCOPED_PERMISSION_DENIED', message: 'Denied' },
+      { status: 403, statusText: 'Forbidden' },
+    );
+    await rejected;
   });
 
   it('selection sends its key and both scope headers, accepts the bare result, and omits page-only fields', async () => {

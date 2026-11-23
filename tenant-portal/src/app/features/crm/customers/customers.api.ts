@@ -6,18 +6,17 @@ import { type CoreWriteMethod } from '../../../core/api/core-http';
 import { crmHttp, crmQueries, type CrmHttpTransport } from '../shared/crm-http';
 import { runInCrm } from '../shared/crm-runtime';
 import { sessionBranch } from '../shared/lookups/session-branch';
+import { can } from '../../../shared/widgets/dashboard/analytics-permissions';
 import {
-  fakeCanExport,
-  fakeCanManageStatus,
-  fakeCanManageTags,
-  fakeListBranchOwners,
-  fakeListBranches,
-  fakeListCurrencies,
-  fakeListCustomerCustomFields,
-  fakeListCustomerStatusOptions,
-  fakeListSources,
-  fakeListTags,
-} from './customers.fake';
+  canManageFormStatus,
+  listFormBranches,
+  listFormCurrencies,
+  listFormCustomFields,
+  listFormOwners,
+  listFormSources,
+  listFormStatuses,
+  listFormTags,
+} from './customer-form/customer-lookups.api';
 import {
   BoardLane,
   BoardResponse,
@@ -326,27 +325,27 @@ async function refreshCustomerQueries(): Promise<void> {
 
 /** GET /api/tenant/crm/v1/custom-fields?ownerType=CUSTOMER_PROFILE */
 export function listCustomerCustomFields(): Promise<CustomerCustomField[]> {
-  return fakeListCustomerCustomFields();
+  return listFormCustomFields();
 }
 
 /** GET /api/tenant/crm/v1/static-data -> enumOptions.customerStatuses */
 export function listCustomerStatusOptions(): Promise<CustomerStatusOption[]> {
-  return fakeListCustomerStatusOptions();
+  return listFormStatuses();
 }
 
 /** Session permission check: crm.customer_profiles.status.manage */
 export function canManageStatus(): boolean {
-  return fakeCanManageStatus();
+  return canManageFormStatus();
 }
 
 /** Session permission check: crm.tags.manage */
 export function canManageTags(): boolean {
-  return fakeCanManageTags();
+  return can('crm.tags.manage');
 }
 
 /** Session permission check: crm.customer_profiles.export */
 export function canExport(): boolean {
-  return fakeCanExport();
+  return can('crm.customer_profiles.export');
 }
 
 /**
@@ -386,29 +385,31 @@ function imageCreateBody(body: CreateCustomerBody): CreateCustomerBody {
   };
 }
 
-/** GET /api/tenant/core/v1/branches */
+/** GET /api/tenant/core/v1/organization/branches */
 export function listBranches(): Promise<BranchOption[]> {
-  return fakeListBranches();
+  return listFormBranches();
 }
 
 /** GET /api/tenant/crm/v1/assignable-owners?resource=customer_profiles&branchId=:branchId */
-export function listBranchOwners(branchId: string): Promise<OwnerOption[]> {
-  return fakeListBranchOwners(branchId);
+export function listBranchOwners(branchId: string, action: 'create' | 'update' = 'update'): Promise<OwnerOption[]> {
+  return listFormOwners(branchId, action);
 }
 
 /** GET /api/tenant/crm/v1/acquisition-sources */
 export function listSources(): Promise<SourceOption[]> {
-  return fakeListSources();
+  return listFormSources();
 }
 
 /** GET /api/tenant/crm/v1/tags */
 export function listTags(): Promise<TagSummary[]> {
-  return fakeListTags();
+  return listFormTags();
 }
 
 /** GET /api/tenant/core/v1/currencies */
-export function listCurrencies(): Promise<CurrencyOption[]> {
-  return fakeListCurrencies();
+export async function listCurrencies(): Promise<CurrencyOption[]> {
+  return (await listFormCurrencies()).map(({ code, name, decimalPlaces, isDefault }) => ({
+    id: code, label: name, decimals: decimalPlaces, isDefault,
+  }));
 }
 
 /** GET /api/tenant/core/v1/geo/countries */
