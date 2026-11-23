@@ -9,7 +9,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import globalEn from '../../../../../../../public/i18n/en.json';
 import createEn from '../../../../../../../public/i18n/templates-create/en.json';
 import designerEn from '../../../../../../../public/i18n/templates-designer/en.json';
+import emailEn from '../../../../../../../public/i18n/templates-designer-email/en.json';
 import fieldsEn from '../../../../../../../public/i18n/templates-designer-fields/en.json';
+import tablesEn from '../../../../../../../public/i18n/templates-designer-tables/en.json';
+import toolsEn from '../../../../../../../public/i18n/templates-designer-tools/en.json';
 import templatesPageEn from '../../../../../../../public/i18n/templates-page/en.json';
 import validationEn from '../../../../../../../public/i18n/templates-validation/en.json';
 import templatesEn from '../../../../../../../public/i18n/templates/en.json';
@@ -30,6 +33,9 @@ class Loader {
     if (lang.startsWith('templates-page/')) return of(templatesPageEn as Translation);
     if (lang.startsWith('templates-validation/')) return of(validationEn as Translation);
     if (lang.startsWith('templates-designer-fields/')) return of(fieldsEn as Translation);
+    if (lang.startsWith('templates-designer-tools/')) return of(toolsEn as Translation);
+    if (lang.startsWith('templates-designer-tables/')) return of(tablesEn as Translation);
+    if (lang.startsWith('templates-designer-email/')) return of(emailEn as Translation);
     if (lang.startsWith('templates-designer/')) return of(designerEn as Translation);
     if (lang.startsWith('templates-create/')) return of(createEn as Translation);
     if (lang.startsWith('templates/')) return of(templatesEn as Translation);
@@ -210,6 +216,14 @@ describe('TemplatePage', () => {
     });
     selection.set(null);
 
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    );
     vi.spyOn(document, 'cookie', 'get').mockReturnValue('mutakamel-http-tenant-csrf=csrf-proof');
     Object.defineProperty(HTMLDialogElement.prototype, 'showModal', {
       configurable: true,
@@ -248,6 +262,7 @@ describe('TemplatePage', () => {
     fixture?.destroy();
     http.verify();
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
     Reflect.deleteProperty(HTMLDialogElement.prototype, 'showModal');
     Reflect.deleteProperty(HTMLDialogElement.prototype, 'close');
   });
@@ -587,5 +602,130 @@ describe('TemplatePage', () => {
     await deletePromise;
     expect(notify.success).toHaveBeenCalledWith(templatesPageEn.header.deletedToast);
     expect(navSpy).toHaveBeenCalledWith(['/workspace/operations/template-platform']);
+  });
+
+  it('renders compact single-band header and toggles fullscreen class on the design tab with Escape exit', async () => {
+    await mountAndFlush();
+
+    const hostEl = fixture.nativeElement as HTMLElement;
+    const header = hostEl.querySelector('header');
+    expect(header).not.toBeNull();
+    expect(header?.classList.contains('desktop:h-table-row')).toBe(true);
+
+    const title = header?.querySelector('h1');
+    expect(title?.textContent?.trim()).toBe('Sales Quotation');
+    expect(title?.getAttribute('title')).toBe('Sales Quotation');
+    expect(title?.classList.contains('text-15')).toBe(true);
+
+    const tablist = header?.querySelector('[role="tablist"]');
+    expect(tablist).not.toBeNull();
+    const activeTabBtn = tablist?.querySelector('[role="tab"][aria-selected="true"]');
+    expect(activeTabBtn?.classList.contains('subnav-active')).toBe(true);
+
+    // Trailing modal hosts use display: contents so they do not consume flex height
+    expect(hostEl.querySelector(':scope > app-tpl-publish-modal')?.classList.contains('contents')).toBe(true);
+    expect(hostEl.querySelector(':scope > ui-unsaved-dialog')?.classList.contains('contents')).toBe(true);
+
+    // Switch to the Design tab and flush DesignerState load
+    fixture.componentRef.setInput('tab', 'design');
+    fixture.detectChanges();
+    await tick();
+
+    http.expectOne(`${BASE_URL}/${TEMPLATE_ID}`).flush(
+      { success: true, data: makeDefinition() },
+      { headers: { ETag: '"2"' } },
+    );
+    await tick();
+    const designDraft = makeDraft();
+    const selectedNodeId = '01948100-0000-7000-8000-000000006001';
+    designDraft.editorDocument.page = {
+      unit: 'MM',
+      preset: 'A4',
+      widthMm: 210,
+      heightMm: 297,
+      orientation: 'PORTRAIT',
+      marginMm: { top: 12, end: 12, bottom: 12, start: 12 },
+    };
+    designDraft.editorDocument.rootNodeIds = [selectedNodeId];
+    designDraft.editorDocument.nodes[selectedNodeId] = {
+      id: selectedNodeId,
+      type: 'text',
+      parentId: null,
+      childIds: [],
+      locked: false,
+      hidden: false,
+      layout: { kind: 'ABSOLUTE', unit: 'MM', x: 12, y: 12, width: 50, height: 10, rotationDeg: 0, zIndex: 0 },
+      style: {},
+      props: { text: 'Selected heading' },
+    };
+    http.expectOne(`${BASE_URL}/${TEMPLATE_ID}/draft`).flush(
+      { success: true, data: designDraft },
+      { headers: { ETag: '"3"' } },
+    );
+    await tick();
+    http
+      .expectOne((req) => req.url === `${BASE_URL}/data-sources/TRADE_QUOTATION_PRINT_V1/schema`)
+      .flush({
+        success: true,
+        data: {
+          adapterKey: 'TRADE_QUOTATION_PRINT_V1',
+          productionAssignmentEnabled: true,
+          productionDisabledReason: null,
+          schemaVersion: 1,
+          schemaChecksum: CHECKSUM,
+          documentType: 'QUOTATION',
+          allowedOutputChannels: ['PRINT'],
+          allowedLayoutModes: ['HYBRID_DOCUMENT'],
+          supportedLocales: ['en-US'],
+          fieldCount: 0,
+          fields: [],
+          syntheticFixtures: [],
+        },
+      });
+    await tick();
+
+    const fullscreenBtn = hostEl.querySelector<HTMLButtonElement>('[data-ribbon-tool="fullscreen"]');
+    expect(fullscreenBtn).not.toBeNull();
+    expect(hostEl.classList.contains('fixed')).toBe(false);
+
+    fullscreenBtn?.click();
+    fixture.detectChanges();
+    expect(hostEl.classList.contains('fixed')).toBe(true);
+    expect(hostEl.classList.contains('inset-0')).toBe(true);
+    expect(hostEl.classList.contains('z-nav')).toBe(true);
+
+    // A canvas selection must not consume the Escape meant to exit fullscreen.
+    const designerState = component['designerState'];
+    designerState.select([selectedNodeId]);
+    fixture.detectChanges();
+    expect(designerState.selectedIds().length).toBeGreaterThan(0);
+    const canvas = hostEl.querySelector<HTMLElement>('[role="application"]');
+    expect(canvas).not.toBeNull();
+    canvas?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    fixture.detectChanges();
+    expect(hostEl.classList.contains('fixed')).toBe(false);
+    expect(designerState.selectedIds().length).toBeGreaterThan(0);
+
+    // Outside fullscreen, Escape still clears the canvas selection.
+    canvas?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    fixture.detectChanges();
+    expect(designerState.selectedIds()).toEqual([]);
+
+    // Escape exits fullscreen on DesignTab
+    fullscreenBtn?.click();
+    fixture.detectChanges();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    fixture.detectChanges();
+    expect(hostEl.classList.contains('fixed')).toBe(false);
+
+    // Switching away from design also clears fullscreen
+    fullscreenBtn?.click();
+    fixture.detectChanges();
+    expect(hostEl.classList.contains('fixed')).toBe(true);
+
+    vi.spyOn(router, 'navigate').mockResolvedValue(true);
+    component['selectTab']('overview');
+    fixture.detectChanges();
+    expect(component['designerState'].fullscreen()).toBe(false);
   });
 });

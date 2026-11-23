@@ -1,14 +1,15 @@
 @if (state.loading()) {
   <!-- Skeleton while the draft loads -->
-  <div class="flex min-h-0 flex-1 flex-col gap-8" aria-busy="true">
-    <div class="h-table-head shrink-0 animate-pulse rounded-10 border border-border bg-surface shadow-card"></div>
-    <div class="flex min-h-0 flex-1 items-center justify-center rounded-10 border border-border bg-surface-muted p-16">
+  <div class="flex min-h-0 flex-1 flex-col overflow-hidden" aria-busy="true">
+    <div class="h-table-head shrink-0 animate-pulse border-b border-border bg-surface"></div>
+    <div class="flex min-h-0 flex-1 items-center justify-center bg-surface-muted p-16">
       <div class="h-full w-modal-form animate-pulse rounded-4 bg-paper shadow-card"></div>
     </div>
+    <div class="h-btn shrink-0 animate-pulse border-t border-border bg-surface"></div>
   </div>
 } @else if (state.loadError(); as err) {
   <!-- Load failure / 404 / 403 -->
-  <div class="flex flex-1 items-center justify-center">
+  <div class="flex min-h-0 flex-1 items-center justify-center p-12">
     <div class="flex w-full max-w-modal-confirm flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
       @if (err === 'notFound') {
         <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
@@ -50,7 +51,7 @@
   </div>
 } @else if (state.noPublished()) {
   <!-- Read-only with no published version -->
-  <div class="flex flex-1 items-center justify-center">
+  <div class="flex min-h-0 flex-1 items-center justify-center p-12">
     <div class="flex w-full max-w-modal-confirm flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
       <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-neutral-soft text-text-muted">
         <ng-icon name="tablerTemplate" size="18" aria-hidden="true" />
@@ -61,17 +62,19 @@
     </div>
   </div>
 } @else {
-  <div class="flex min-h-0 min-w-0 flex-1 flex-col gap-8">
+  <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
     <app-tpl-ribbon class="shrink-0" />
     @if (state.selectedIds().length > 0) {
-      <app-tpl-selection-bar class="shrink-0" />
+      <div class="shrink-0 border-b border-border bg-brand-soft">
+        <app-tpl-selection-bar class="block" />
+      </div>
     }
     <app-tpl-canvas class="min-h-0 flex-1" />
     <app-tpl-status-bar class="shrink-0" />
   </div>
 
-  <app-tpl-tools-host />
-  <app-tpl-fields-host />
-  <app-tpl-tables-host />
-  <app-tpl-email-host />
+  <app-tpl-tools-host class="contents" />
+  <app-tpl-fields-host class="contents" />
+  <app-tpl-tables-host class="contents" />
+  <app-tpl-email-host class="contents" />
 }

@@ -431,8 +431,35 @@ describe('DesignerState', () => {
     expect(state.loadError()).toBeNull();
     expect(state.readOnly()).toBe(false);
     expect(state.dirty()).toBe(false);
+    expect(state.zoom()).toBe(1);
+    expect(state.zoomMode()).toBe('MANUAL');
+    expect(state.fullscreen()).toBe(false);
     expect(pageService.draft()?.etag).toBe('"7"');
     expect(state.draftSaveIfMatch()).toBe(`"draft-schema:${SCHEMA_CHECKSUM}:7"`);
+  });
+
+  it('defaults to 100% MANUAL zoom and resets zoom, zoomMode, and fullscreen on template load and resetForTemplate', async () => {
+    expect(state.zoom()).toBe(1);
+    expect(state.zoomMode()).toBe('MANUAL');
+    expect(state.fullscreen()).toBe(false);
+
+    state.zoom.set(1.84);
+    state.zoomMode.set('FIT_WIDTH');
+
+    await loadEditableQuotation();
+
+    expect(state.zoom()).toBe(1);
+    expect(state.zoomMode()).toBe('MANUAL');
+
+    state.zoom.set(2);
+    state.zoomMode.set('FIT_PAGE');
+    state.fullscreen.set(true);
+
+    state.resetForTemplate();
+
+    expect(state.zoom()).toBe(1);
+    expect(state.zoomMode()).toBe('MANUAL');
+    expect(state.fullscreen()).toBe(false);
   });
 
   it('falls back to published version via getVersion when getDraft returns 403, and handles noPublished', async () => {

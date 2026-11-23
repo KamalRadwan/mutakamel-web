@@ -29,6 +29,10 @@
     "imageUnavailable": "Image unavailable",
     "formula": "Formula"
   },
+  "ribbon": {
+    "fullscreen": "Fullscreen",
+    "exitFullscreen": "Exit fullscreen"
+  },
   "guide": {
     "alignedWith": "Aligned with {{name}}",
     "pageCentre": "Centre of page",

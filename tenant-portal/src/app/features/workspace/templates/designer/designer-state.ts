@@ -201,7 +201,8 @@ export class DesignerState {
   });
 
   readonly zoom: WritableSignal<number> = signal(1);
-  readonly zoomMode: WritableSignal<'FIT_WIDTH' | 'FIT_PAGE' | 'MANUAL'> = signal('FIT_WIDTH');
+  readonly zoomMode: WritableSignal<'FIT_WIDTH' | 'FIT_PAGE' | 'MANUAL'> = signal('MANUAL');
+  readonly fullscreen: WritableSignal<boolean> = signal(false);
   readonly emailWidthPx: WritableSignal<600 | 320> = signal(600);
 
   private readonly baseJson = computed(() => {
@@ -304,6 +305,10 @@ export class DesignerState {
     this._loadError.set(null);
     this._loadCorrelationId.set(null);
     this._noPublished.set(false);
+    this.pageIndex.set(0);
+    this.zoom.set(1);
+    this.zoomMode.set('MANUAL');
+    this.fullscreen.set(false);
     this.draftEtag = '"1"';
     this.draftRevision = 1;
     this.draftContentChecksum = '';
@@ -403,7 +408,8 @@ export class DesignerState {
       this._base.set(structuredClone(resolvedDoc));
       this._document.set(resolvedDoc);
       this.pageIndex.set(0);
-      this.zoomMode.set('FIT_WIDTH');
+      this.zoom.set(1);
+      this.zoomMode.set('MANUAL');
 
       await this.loadSchemaFor(def, resolvedDoc.dataSourceKey, loadedSchemaVersion, expectedSchemaChecksum, seq);
     } catch (error) {

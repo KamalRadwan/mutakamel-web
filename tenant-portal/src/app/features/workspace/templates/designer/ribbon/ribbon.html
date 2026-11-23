@@ -2,7 +2,7 @@
   #toolbar
   role="toolbar"
   [attr.aria-label]="'tplTools.ribbon.label' | transloco"
-  class="flex items-center gap-4 rounded-10 border border-border bg-surface p-4 shadow-card"
+  class="flex min-h-table-head items-center gap-4 border-b border-border bg-surface px-12 py-3"
   (keydown)="onToolbarKeydown($event)"
 >
   <!-- Groups 1-3 never move into More -->
@@ -11,13 +11,15 @@
     <button
       type="button"
       data-ribbon-tool="select"
-      class="inline-flex h-btn shrink-0 cursor-pointer items-center gap-4 rounded-8 bg-brand-soft px-8 text-12 leading-18 font-medium whitespace-nowrap text-on-brand-soft outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      class="inline-flex h-btn-h-sm shrink-0 cursor-pointer items-center gap-4 rounded-6 bg-brand-soft px-8 text-12 leading-18 font-medium whitespace-nowrap text-on-brand-soft outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
       aria-pressed="true"
+      [attr.aria-label]="'tplTools.ribbon.select' | transloco"
+      [title]="'tplTools.ribbon.select' | transloco"
       [attr.tabindex]="tabIndexFor('select')"
       (focus)="activeToolKey.set('select')"
     >
-      <ng-icon name="tablerPointer" size="15" aria-hidden="true" />
-      <span>{{ 'tplTools.ribbon.select' | transloco }}</span>
+      <ng-icon name="tablerPointer" size="14" aria-hidden="true" />
+      <span class="hidden desktop:inline">{{ 'tplTools.ribbon.select' | transloco }}</span>
     </button>
 
     <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
@@ -28,17 +30,18 @@
       <button
         type="button"
         data-ribbon-tool="text"
-        class="inline-flex h-btn shrink-0 items-center gap-4 rounded-8 px-8 text-12 leading-18 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        class="inline-flex h-btn-h-sm shrink-0 items-center gap-4 rounded-6 px-8 text-12 leading-18 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
         [class]="toolButtonClass(sText.state === 'ENABLED')"
+        [attr.aria-label]="'tplTools.ribbon.text' | transloco"
         [attr.aria-disabled]="sText.state !== 'ENABLED' ? 'true' : null"
         [attr.aria-description]="reasonText(sText.reasonKey)"
-        [title]="reasonText(sText.reasonKey) ?? ''"
+        [title]="reasonText(sText.reasonKey) ?? ('tplTools.ribbon.text' | transloco)"
         [attr.tabindex]="tabIndexFor('text')"
         (focus)="activeToolKey.set('text')"
         (click)="insertText()"
       >
-        <ng-icon name="tablerTypography" size="15" aria-hidden="true" />
-        <span>{{ 'tplTools.ribbon.text' | transloco }}</span>
+        <ng-icon name="tablerTypography" size="14" aria-hidden="true" />
+        <span class="hidden desktop:inline">{{ 'tplTools.ribbon.text' | transloco }}</span>
       </button>
     }
 
@@ -47,17 +50,18 @@
       <button
         type="button"
         data-ribbon-tool="image"
-        class="inline-flex h-btn shrink-0 items-center gap-4 rounded-8 px-8 text-12 leading-18 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        class="inline-flex h-btn-h-sm shrink-0 items-center gap-4 rounded-6 px-8 text-12 leading-18 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
         [class]="toolButtonClass(sImage.state === 'ENABLED')"
+        [attr.aria-label]="'tplTools.ribbon.image' | transloco"
         [attr.aria-disabled]="sImage.state !== 'ENABLED' ? 'true' : null"
         [attr.aria-description]="reasonText(sImage.reasonKey)"
-        [title]="reasonText(sImage.reasonKey) ?? ''"
+        [title]="reasonText(sImage.reasonKey) ?? ('tplTools.ribbon.image' | transloco)"
         [attr.tabindex]="tabIndexFor('image')"
         (focus)="activeToolKey.set('image')"
         (click)="runToolCommand('IMAGE', 'insertImage')"
       >
-        <ng-icon name="tablerPhoto" size="15" aria-hidden="true" />
-        <span>{{ 'tplTools.ribbon.image' | transloco }}</span>
+        <ng-icon name="tablerPhoto" size="14" aria-hidden="true" />
+        <span class="hidden desktop:inline">{{ 'tplTools.ribbon.image' | transloco }}</span>
       </button>
     }
 
@@ -66,17 +70,18 @@
       <button
         type="button"
         data-ribbon-tool="dataField"
-        class="inline-flex h-btn shrink-0 items-center gap-4 rounded-8 px-8 text-12 leading-18 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        class="inline-flex h-btn-h-sm shrink-0 items-center gap-4 rounded-6 px-8 text-12 leading-18 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
         [class]="toolButtonClass(sField.state === 'ENABLED')"
+        [attr.aria-label]="'tplTools.ribbon.dataField' | transloco"
         [attr.aria-disabled]="sField.state !== 'ENABLED' ? 'true' : null"
         [attr.aria-description]="reasonText(sField.reasonKey)"
-        [title]="reasonText(sField.reasonKey) ?? ''"
+        [title]="reasonText(sField.reasonKey) ?? ('tplTools.ribbon.dataField' | transloco)"
         [attr.tabindex]="tabIndexFor('dataField')"
         (focus)="activeToolKey.set('dataField')"
         (click)="runToolCommand('DATA_FIELD', 'insertDataField')"
       >
-        <ng-icon name="tablerBraces" size="15" aria-hidden="true" />
-        <span>{{ 'tplTools.ribbon.dataField' | transloco }}</span>
+        <ng-icon name="tablerBraces" size="14" aria-hidden="true" />
+        <span class="hidden desktop:inline">{{ 'tplTools.ribbon.dataField' | transloco }}</span>
       </button>
     }
 
@@ -86,36 +91,38 @@
         <button
           type="button"
           data-ribbon-tool="table"
-          class="inline-flex h-btn shrink-0 items-center gap-4 rounded-8 px-8 text-12 leading-18 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          class="inline-flex h-btn-h-sm shrink-0 items-center gap-4 rounded-6 px-8 text-12 leading-18 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
           [class]="toolButtonClass(sTable.state === 'ENABLED')"
+          [attr.aria-label]="'tplTools.ribbon.table' | transloco"
           [attr.aria-disabled]="sTable.state !== 'ENABLED' ? 'true' : null"
           [attr.aria-description]="reasonText(sTable.reasonKey)"
-          [title]="reasonText(sTable.reasonKey) ?? ''"
+          [title]="reasonText(sTable.reasonKey) ?? ('tplTools.ribbon.table' | transloco)"
           [attr.tabindex]="tabIndexFor('table')"
           (focus)="activeToolKey.set('table')"
           (click)="insertStaticTable()"
         >
-          <ng-icon name="tablerTable" size="15" aria-hidden="true" />
-          <span>{{ 'tplTools.ribbon.table' | transloco }}</span>
+          <ng-icon name="tablerTable" size="14" aria-hidden="true" />
+          <span class="hidden desktop:inline">{{ 'tplTools.ribbon.table' | transloco }}</span>
         </button>
       }
     } @else {
       <button
         type="button"
         data-ribbon-tool="table"
-        class="inline-flex h-btn shrink-0 items-center gap-4 rounded-8 px-8 text-12 leading-18 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        class="inline-flex h-btn-h-sm shrink-0 items-center gap-4 rounded-6 px-8 text-12 leading-18 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
         [class]="toolButtonClass(!tableMenuDisabled(), openMenu() === 'table')"
         aria-haspopup="menu"
+        [attr.aria-label]="'tplTools.ribbon.table' | transloco"
         [attr.aria-expanded]="openMenu() === 'table'"
         [attr.aria-disabled]="tableMenuDisabled() ? 'true' : null"
         [attr.aria-description]="tableMenuReason()"
-        [title]="tableMenuReason() ?? ''"
+        [title]="tableMenuReason() ?? ('tplTools.ribbon.table' | transloco)"
         [attr.tabindex]="tabIndexFor('table')"
         (focus)="activeToolKey.set('table')"
         (click)="toggleMenu('table', $event)"
       >
-        <ng-icon name="tablerTable" size="15" aria-hidden="true" />
-        <span>{{ 'tplTools.ribbon.table' | transloco }}</span>
+        <ng-icon name="tablerTable" size="14" aria-hidden="true" />
+        <span class="hidden desktop:inline">{{ 'tplTools.ribbon.table' | transloco }}</span>
         <ng-icon name="tablerChevronDown" size="14" class="text-text-muted" aria-hidden="true" />
       </button>
     }
@@ -125,17 +132,18 @@
       <button
         type="button"
         data-ribbon-tool="formula"
-        class="inline-flex h-btn shrink-0 items-center gap-4 rounded-8 px-8 text-12 leading-18 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        class="inline-flex h-btn-h-sm shrink-0 items-center gap-4 rounded-6 px-8 text-12 leading-18 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
         [class]="toolButtonClass(sFormula.state === 'ENABLED')"
+        [attr.aria-label]="'tplTools.ribbon.formula' | transloco"
         [attr.aria-disabled]="sFormula.state !== 'ENABLED' ? 'true' : null"
         [attr.aria-description]="reasonText(sFormula.reasonKey)"
-        [title]="reasonText(sFormula.reasonKey) ?? ''"
+        [title]="reasonText(sFormula.reasonKey) ?? ('tplTools.ribbon.formula' | transloco)"
         [attr.tabindex]="tabIndexFor('formula')"
         (focus)="activeToolKey.set('formula')"
         (click)="runToolCommand('FORMULA', 'insertFormula')"
       >
-        <ng-icon name="tablerMathFunction" size="15" aria-hidden="true" />
-        <span>{{ 'tplTools.ribbon.formula' | transloco }}</span>
+        <ng-icon name="tablerMathFunction" size="14" aria-hidden="true" />
+        <span class="hidden desktop:inline">{{ 'tplTools.ribbon.formula' | transloco }}</span>
       </button>
     }
 
@@ -144,17 +152,18 @@
       <button
         type="button"
         data-ribbon-tool="line"
-        class="inline-flex h-btn shrink-0 items-center gap-4 rounded-8 px-8 text-12 leading-18 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        class="inline-flex h-btn-h-sm shrink-0 items-center gap-4 rounded-6 px-8 text-12 leading-18 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
         [class]="toolButtonClass(sLine.state === 'ENABLED')"
+        [attr.aria-label]="'tplTools.ribbon.line' | transloco"
         [attr.aria-disabled]="sLine.state !== 'ENABLED' ? 'true' : null"
         [attr.aria-description]="reasonText(sLine.reasonKey)"
-        [title]="reasonText(sLine.reasonKey) ?? ''"
+        [title]="reasonText(sLine.reasonKey) ?? ('tplTools.ribbon.line' | transloco)"
         [attr.tabindex]="tabIndexFor('line')"
         (focus)="activeToolKey.set('line')"
         (click)="insertLine()"
       >
-        <ng-icon name="tablerLine" size="15" aria-hidden="true" />
-        <span>{{ 'tplTools.ribbon.line' | transloco }}</span>
+        <ng-icon name="tablerLine" size="14" aria-hidden="true" />
+        <span class="hidden desktop:inline">{{ 'tplTools.ribbon.line' | transloco }}</span>
       </button>
     }
 
@@ -164,17 +173,18 @@
         <button
           type="button"
           data-ribbon-tool="button"
-          class="inline-flex h-btn shrink-0 items-center gap-4 rounded-8 px-8 text-12 leading-18 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          class="inline-flex h-btn-h-sm shrink-0 items-center gap-4 rounded-6 px-8 text-12 leading-18 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
           [class]="toolButtonClass(sButton.state === 'ENABLED')"
+          [attr.aria-label]="'tplTools.ribbon.button' | transloco"
           [attr.aria-disabled]="sButton.state !== 'ENABLED' ? 'true' : null"
           [attr.aria-description]="reasonText(sButton.reasonKey)"
-          [title]="reasonText(sButton.reasonKey) ?? ''"
+          [title]="reasonText(sButton.reasonKey) ?? ('tplTools.ribbon.button' | transloco)"
           [attr.tabindex]="tabIndexFor('button')"
           (focus)="activeToolKey.set('button')"
           (click)="runToolCommand('BUTTON', 'insertButton')"
         >
-          <ng-icon name="tablerClick" size="15" aria-hidden="true" />
-          <span>{{ 'tplTools.ribbon.button' | transloco }}</span>
+          <ng-icon name="tablerClick" size="14" aria-hidden="true" />
+          <span class="hidden desktop:inline">{{ 'tplTools.ribbon.button' | transloco }}</span>
         </button>
       }
 
@@ -183,17 +193,18 @@
         <button
           type="button"
           data-ribbon-tool="link"
-          class="inline-flex h-btn shrink-0 items-center gap-4 rounded-8 px-8 text-12 leading-18 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          class="inline-flex h-btn-h-sm shrink-0 items-center gap-4 rounded-6 px-8 text-12 leading-18 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
           [class]="toolButtonClass(sLink.state === 'ENABLED')"
+          [attr.aria-label]="'tplTools.ribbon.link' | transloco"
           [attr.aria-disabled]="sLink.state !== 'ENABLED' ? 'true' : null"
           [attr.aria-description]="reasonText(sLink.reasonKey)"
-          [title]="reasonText(sLink.reasonKey) ?? ''"
+          [title]="reasonText(sLink.reasonKey) ?? ('tplTools.ribbon.link' | transloco)"
           [attr.tabindex]="tabIndexFor('link')"
           (focus)="activeToolKey.set('link')"
           (click)="runToolCommand('LINK', 'insertLink')"
         >
-          <ng-icon name="tablerLink" size="15" aria-hidden="true" />
-          <span>{{ 'tplTools.ribbon.link' | transloco }}</span>
+          <ng-icon name="tablerLink" size="14" aria-hidden="true" />
+          <span class="hidden desktop:inline">{{ 'tplTools.ribbon.link' | transloco }}</span>
         </button>
       }
     }
@@ -204,7 +215,7 @@
     <button
       type="button"
       data-ribbon-tool="undoStep"
-      class="inline-flex size-btn shrink-0 items-center justify-center rounded-8 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      class="inline-flex size-btn-h-sm shrink-0 items-center justify-center rounded-6 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
       [class]="toolButtonClass(state.canUndo())"
       [attr.aria-disabled]="!state.canUndo() ? 'true' : null"
       [attr.aria-label]="'tplTools.ribbon.undoStep' | transloco"
@@ -213,13 +224,13 @@
       (focus)="activeToolKey.set('undoStep')"
       (click)="undoStep()"
     >
-      <ng-icon name="tablerArrowBackUp" size="15" aria-hidden="true" />
+      <ng-icon name="tablerArrowBackUp" size="14" aria-hidden="true" />
     </button>
 
     <button
       type="button"
       data-ribbon-tool="redoStep"
-      class="inline-flex size-btn shrink-0 items-center justify-center rounded-8 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      class="inline-flex size-btn-h-sm shrink-0 items-center justify-center rounded-6 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
       [class]="toolButtonClass(state.canRedo())"
       [attr.aria-disabled]="!state.canRedo() ? 'true' : null"
       [attr.aria-label]="'tplTools.ribbon.redoStep' | transloco"
@@ -228,7 +239,7 @@
       (focus)="activeToolKey.set('redoStep')"
       (click)="redoStep()"
     >
-      <ng-icon name="tablerArrowForwardUp" size="15" aria-hidden="true" />
+      <ng-icon name="tablerArrowForwardUp" size="14" aria-hidden="true" />
     </button>
   </div>
 
@@ -236,22 +247,18 @@
     <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
   }
 
-  <!-- Groups 4 & 5: overflow into More below 1366 -->
-  <div #overflowArea class="flex min-w-0 flex-1 items-center gap-4">
+  <!-- Groups 4 & 5: Group 5 merges visually into one compact segment; overflows into More on narrow widths -->
+  <div #overflowArea class="flex min-w-0 flex-1 items-center">
     @for (toolId of overflowTools(); track toolId; let idx = $index) {
       @if (idx < visibleOverflow()) {
-        <div
-          data-fit-item
-          class="flex shrink-0 items-center gap-4"
-          [class.ms-auto]="toolId === firstGroup5Id() && !hasOverflow()"
-        >
+        <div data-fit-item [class]="wrapperClass(toolId)">
           @switch (toolId) {
             @case ('align') {
               @let sAlign = alignState();
               <button
                 type="button"
                 data-ribbon-tool="align"
-                class="inline-flex h-btn shrink-0 items-center gap-4 rounded-8 px-8 text-12 leading-18 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                class="inline-flex h-btn-h-sm shrink-0 items-center gap-4 rounded-6 px-8 text-12 leading-18 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
                 [class]="toolButtonClass(sAlign.state === 'ENABLED', openMenu() === 'align')"
                 aria-haspopup="menu"
                 [attr.aria-expanded]="openMenu() === 'align'"
@@ -262,7 +269,7 @@
                 (focus)="activeToolKey.set('align')"
                 (click)="toggleMenu('align', $event)"
               >
-                <ng-icon name="tablerLayoutAlignLeft" size="15" class="rtl:-scale-x-100" aria-hidden="true" />
+                <ng-icon name="tablerLayoutAlignLeft" size="14" class="rtl:-scale-x-100" aria-hidden="true" />
                 <span>{{ 'tplTools.ribbon.align' | transloco }}</span>
                 <ng-icon name="tablerChevronDown" size="14" class="text-text-muted" aria-hidden="true" />
               </button>
@@ -272,7 +279,7 @@
               <button
                 type="button"
                 data-ribbon-tool="arrange"
-                class="inline-flex h-btn shrink-0 items-center gap-4 rounded-8 px-8 text-12 leading-18 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                class="inline-flex h-btn-h-sm shrink-0 items-center gap-4 rounded-6 px-8 text-12 leading-18 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
                 [class]="toolButtonClass(sArrange.state === 'ENABLED', openMenu() === 'arrange')"
                 aria-haspopup="menu"
                 [attr.aria-expanded]="openMenu() === 'arrange'"
@@ -283,7 +290,7 @@
                 (focus)="activeToolKey.set('arrange')"
                 (click)="toggleMenu('arrange', $event)"
               >
-                <ng-icon name="tablerStack2" size="15" aria-hidden="true" />
+                <ng-icon name="tablerStack2" size="14" aria-hidden="true" />
                 <span>{{ 'tplTools.ribbon.arrange' | transloco }}</span>
                 <ng-icon name="tablerChevronDown" size="14" class="text-text-muted" aria-hidden="true" />
               </button>
@@ -293,7 +300,7 @@
               <button
                 type="button"
                 data-ribbon-tool="layers"
-                class="inline-flex h-btn shrink-0 items-center gap-4 rounded-8 px-8 text-12 leading-18 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                class="inline-flex h-btn-h-sm shrink-0 items-center gap-4 rounded-6 px-8 text-12 leading-18 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
                 [class]="toolButtonClass(sLayers.state === 'ENABLED')"
                 [attr.aria-disabled]="sLayers.state !== 'ENABLED' ? 'true' : null"
                 [attr.aria-description]="reasonText(sLayers.reasonKey)"
@@ -302,7 +309,7 @@
                 (focus)="activeToolKey.set('layers')"
                 (click)="runToolCommand('LAYERS', 'openLayers')"
               >
-                <ng-icon name="tablerStack2" size="15" aria-hidden="true" />
+                <ng-icon name="tablerStack2" size="14" aria-hidden="true" />
                 <span>{{ 'tplTools.ribbon.layers' | transloco }}</span>
               </button>
             }
@@ -311,7 +318,7 @@
               <button
                 type="button"
                 data-ribbon-tool="pages"
-                class="inline-flex h-btn shrink-0 items-center gap-4 rounded-8 px-8 text-12 leading-18 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                class="inline-flex h-btn-h-sm shrink-0 items-center gap-4 rounded-6 px-8 text-12 leading-18 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
                 [class]="toolButtonClass(sPages.state === 'ENABLED')"
                 [attr.aria-disabled]="sPages.state !== 'ENABLED' ? 'true' : null"
                 [attr.aria-description]="reasonText(sPages.reasonKey)"
@@ -320,49 +327,8 @@
                 (focus)="activeToolKey.set('pages')"
                 (click)="runToolCommand('PAGES', 'openPages')"
               >
-                <ng-icon name="tablerFiles" size="15" aria-hidden="true" />
+                <ng-icon name="tablerFiles" size="14" aria-hidden="true" />
                 <span>{{ 'tplTools.ribbon.pages' | transloco }}</span>
-              </button>
-            }
-            @case ('layoutTag') {
-              <span class="inline-flex h-filter-chip shrink-0 items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium whitespace-nowrap text-on-neutral-soft">
-                {{ layoutLabel() }}
-              </span>
-            }
-            @case ('pageSetup') {
-              @let sSetup = pageSetupState();
-              <button
-                type="button"
-                data-ribbon-tool="pageSetup"
-                class="inline-flex h-btn shrink-0 items-center gap-4 rounded-8 px-8 text-12 leading-18 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
-                [class]="toolButtonClass(sSetup.state === 'ENABLED')"
-                [attr.aria-disabled]="sSetup.state !== 'ENABLED' ? 'true' : null"
-                [attr.aria-description]="reasonText(sSetup.reasonKey)"
-                [title]="reasonText(sSetup.reasonKey) ?? ('tplTools.ribbon.pageSetup' | transloco)"
-                [attr.tabindex]="tabIndexFor('pageSetup')"
-                (focus)="activeToolKey.set('pageSetup')"
-                (click)="runToolCommand('PAGE_SETUP', 'openPageSetup')"
-              >
-                <ng-icon name="tablerFileDescription" size="15" aria-hidden="true" />
-                <span>{{ pageSetupLabel() }}</span>
-              </button>
-            }
-            @case ('emailSettings') {
-              @let sEmail = emailSettingsState();
-              <button
-                type="button"
-                data-ribbon-tool="emailSettings"
-                class="inline-flex h-btn shrink-0 items-center gap-4 rounded-8 px-8 text-12 leading-18 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
-                [class]="toolButtonClass(sEmail.state === 'ENABLED')"
-                [attr.aria-disabled]="sEmail.state !== 'ENABLED' ? 'true' : null"
-                [attr.aria-description]="reasonText(sEmail.reasonKey)"
-                [title]="reasonText(sEmail.reasonKey) ?? ''"
-                [attr.tabindex]="tabIndexFor('emailSettings')"
-                (focus)="activeToolKey.set('emailSettings')"
-                (click)="runToolCommand('EMAIL_SETTINGS', 'openEmailSettings')"
-              >
-                <ng-icon name="tablerMail" size="15" aria-hidden="true" />
-                <span>{{ 'tplTools.ribbon.emailSettings' | transloco }}</span>
               </button>
             }
             @case ('emailWidth') {
@@ -386,13 +352,62 @@
                 />
               </ui-field>
             }
+            @case ('layoutTag') {
+              <span class="px-4 text-11 leading-16 font-medium whitespace-nowrap text-on-neutral-soft">
+                {{ layoutLabel() }}
+              </span>
+            }
+            @case ('pageSetup') {
+              @if (toolId !== firstVisibleSegmentId()) {
+                <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
+              }
+              @let sSetup = pageSetupState();
+              <button
+                type="button"
+                data-ribbon-tool="pageSetup"
+                class="inline-flex h-btn-h-sm shrink-0 items-center gap-4 rounded-6 px-6 text-12 leading-18 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [class]="segmentButtonClass(sSetup.state === 'ENABLED')"
+                [attr.aria-disabled]="sSetup.state !== 'ENABLED' ? 'true' : null"
+                [attr.aria-description]="reasonText(sSetup.reasonKey)"
+                [title]="reasonText(sSetup.reasonKey) ?? ('tplTools.ribbon.pageSetup' | transloco)"
+                [attr.tabindex]="tabIndexFor('pageSetup')"
+                (focus)="activeToolKey.set('pageSetup')"
+                (click)="runToolCommand('PAGE_SETUP', 'openPageSetup')"
+              >
+                <ng-icon name="tablerFileDescription" size="14" aria-hidden="true" />
+                <span>{{ pageSetupLabel() }}</span>
+              </button>
+            }
+            @case ('emailSettings') {
+              @if (toolId !== firstVisibleSegmentId()) {
+                <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
+              }
+              @let sEmail = emailSettingsState();
+              <button
+                type="button"
+                data-ribbon-tool="emailSettings"
+                class="inline-flex h-btn-h-sm shrink-0 items-center gap-4 rounded-6 px-6 text-12 leading-18 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [class]="segmentButtonClass(sEmail.state === 'ENABLED')"
+                [attr.aria-disabled]="sEmail.state !== 'ENABLED' ? 'true' : null"
+                [attr.aria-description]="reasonText(sEmail.reasonKey)"
+                [title]="reasonText(sEmail.reasonKey) ?? ''"
+                [attr.tabindex]="tabIndexFor('emailSettings')"
+                (focus)="activeToolKey.set('emailSettings')"
+                (click)="runToolCommand('EMAIL_SETTINGS', 'openEmailSettings')"
+              >
+                <ng-icon name="tablerMail" size="14" aria-hidden="true" />
+                <span>{{ 'tplTools.ribbon.emailSettings' | transloco }}</span>
+              </button>
+            }
             @case ('zoom') {
-              <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
+              @if (toolId !== firstVisibleSegmentId()) {
+                <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
+              }
               <button
                 type="button"
                 data-ribbon-tool="zoom"
-                class="inline-flex h-btn shrink-0 cursor-pointer items-center gap-4 rounded-8 px-8 text-12 leading-18 font-medium whitespace-nowrap text-text outline-none transition-colors duration-fast hover:bg-neutral-soft active:bg-border focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
-                [class.bg-neutral-soft]="openMenu() === 'zoom'"
+                class="inline-flex h-btn-h-sm shrink-0 cursor-pointer items-center gap-4 rounded-6 px-6 text-12 leading-18 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [class]="segmentButtonClass(true, openMenu() === 'zoom')"
                 aria-haspopup="menu"
                 [attr.aria-expanded]="openMenu() === 'zoom'"
                 [attr.aria-label]="('tplTools.ribbon.zoom' | transloco) + ' ' + zoomLabel()"
@@ -401,7 +416,7 @@
                 (focus)="activeToolKey.set('zoom')"
                 (click)="toggleMenu('zoom', $event)"
               >
-                <ng-icon name="tablerZoomIn" size="15" aria-hidden="true" />
+                <ng-icon name="tablerZoomIn" size="14" aria-hidden="true" />
                 <bdi dir="ltr" class="tabular-nums">{{ zoomLabel() }}</bdi>
                 <ng-icon name="tablerChevronDown" size="14" class="text-text-muted" aria-hidden="true" />
               </button>
@@ -410,14 +425,32 @@
               <button
                 type="button"
                 data-ribbon-tool="fit"
-                class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text outline-none transition-colors duration-fast hover:bg-neutral-soft active:bg-border focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [class]="segmentButtonClass(true, state.zoomMode() !== 'MANUAL')"
+                [attr.aria-pressed]="state.zoomMode() !== 'MANUAL'"
                 [attr.aria-label]="'tplTools.ribbon.fit' | transloco"
                 [title]="fitTitle()"
                 [attr.tabindex]="tabIndexFor('fit')"
                 (focus)="activeToolKey.set('fit')"
                 (click)="toggleFit()"
               >
-                <ng-icon name="tablerMaximize" size="15" aria-hidden="true" />
+                <ng-icon name="tablerAspectRatio" size="14" aria-hidden="true" />
+              </button>
+            }
+            @case ('fullscreen') {
+              <button
+                type="button"
+                data-ribbon-tool="fullscreen"
+                class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [class]="state.fullscreen() ? 'bg-brand text-on-brand hover:bg-brand-hover active:bg-brand-pressed' : 'text-text hover:bg-surface active:bg-border'"
+                [attr.aria-pressed]="state.fullscreen()"
+                [attr.aria-label]="fullscreenLabel()"
+                [title]="fullscreenLabel()"
+                [attr.tabindex]="tabIndexFor('fullscreen')"
+                (focus)="activeToolKey.set('fullscreen')"
+                (click)="toggleFullscreen()"
+              >
+                <ng-icon [name]="state.fullscreen() ? 'tablerMinimize' : 'tablerMaximize'" size="14" aria-hidden="true" />
               </button>
             }
           }
@@ -428,7 +461,7 @@
     @if (hasOverflow()) {
       <ui-menu
         data-ribbon-more
-        class="ms-auto shrink-0"
+        [class]="firstGroup5Visible() ? 'ms-4 shrink-0' : 'ms-auto shrink-0'"
         variant="icon"
         align="end"
         [items]="moreItems()"
@@ -436,7 +469,7 @@
         (focusin)="onMoreFocusIn($event)"
         (selected)="onMoreSelected($event)"
       >
-        <ng-icon name="tablerDots" size="15" aria-hidden="true" />
+        <ng-icon name="tablerDots" size="14" aria-hidden="true" />
       </ui-menu>
     }
   </div>
@@ -468,7 +501,7 @@
           [attr.aria-checked]="item.selected !== undefined ? item.selected : null"
           class="flex h-menu-item w-full cursor-pointer items-center justify-between gap-8 whitespace-nowrap rounded-6 px-8 text-12 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
           [class]="item.selected ? 'bg-brand-soft text-on-brand-soft' : 'text-text hover:bg-row-hover'"
-          [disabled]="!!item.disabled"
+          [disabled]="item.disabled === true"
           [title]="item.tooltip || ''"
           (click)="onMenuRowClick(item)"
         >

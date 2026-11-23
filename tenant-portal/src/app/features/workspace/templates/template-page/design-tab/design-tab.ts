@@ -1,4 +1,5 @@
-import { Component, effect, inject } from '@angular/core';
+import { DOCUMENT } from '@angular/common';
+import { Component, DestroyRef, effect, inject } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { provideTranslocoScope, TranslocoPipe } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
@@ -44,9 +45,12 @@ import { TemplatePageService } from '../template-page.service';
   templateUrl: './design-tab.html',
   host: {
     class: 'flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden',
+    '(document:keydown.escape)': 'onEscape($event)',
   },
 })
 export class DesignTab {
+  private readonly doc = inject(DOCUMENT);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly route = inject(ActivatedRoute);
   private readonly pageService = inject(TemplatePageService);
   protected readonly state = inject(DesignerState);
@@ -61,6 +65,19 @@ export class DesignTab {
         void this.state.init(id);
       }
     });
+
+    this.destroyRef.onDestroy(() => {
+      if (this.state.fullscreen()) {
+        this.state.fullscreen.set(false);
+      }
+    });
+  }
+
+  protected onEscape(event: Event): void {
+    if (!this.state.fullscreen() || event.defaultPrevented) return;
+    if (this.doc.querySelector('dialog[open]')) return;
+    event.preventDefault();
+    this.state.fullscreen.set(false);
   }
 
   protected retry(): void {

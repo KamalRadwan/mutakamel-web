@@ -116,7 +116,7 @@ const VALID_TABS = new Set<string>(TEMPLATE_PAGE_TABS);
   ],
   templateUrl: './template-page.html',
   host: {
-    class: 'flex min-h-0 flex-1 flex-col p-12 gap-10',
+    '[class]': 'hostClasses()',
     '(window:beforeunload)': 'onBeforeUnload($event)',
   },
 })
@@ -174,6 +174,16 @@ export class TemplatePage {
     }
     return resolved;
   });
+
+  protected readonly isFullscreenDesign = computed(
+    () => this.activeTab() === 'design' && this.designerState.fullscreen(),
+  );
+
+  protected readonly hostClasses = computed(() =>
+    this.isFullscreenDesign()
+      ? 'fixed inset-0 z-nav flex min-h-0 min-w-0 flex-col overflow-hidden bg-bg'
+      : 'flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden',
+  );
 
   protected readonly familyLook = computed(() => {
     const def = this.service.definition();
@@ -353,6 +363,12 @@ export class TemplatePage {
     });
 
     effect(() => {
+      if (this.activeTab() !== 'design' && this.designerState.fullscreen()) {
+        this.designerState.fullscreen.set(false);
+      }
+    });
+
+    effect(() => {
       const req = this.service.reloadRequestCount();
       if (req <= 0) return;
       const templateId = this.id();
@@ -417,6 +433,9 @@ export class TemplatePage {
   protected selectTab(tab: TemplatePageTab): void {
     const templateId = this.id();
     if (!templateId || tab === this.activeTab()) return;
+    if (tab !== 'design' && this.designerState.fullscreen()) {
+      this.designerState.fullscreen.set(false);
+    }
     this.navigatingWithinTemplate = true;
     void this.router
       .navigate(['/workspace/operations/template-platform', templateId, tab])

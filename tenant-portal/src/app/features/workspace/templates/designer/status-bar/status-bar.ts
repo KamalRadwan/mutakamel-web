@@ -90,6 +90,9 @@ function rotatedNodeBoundsMm(doc: TemplateDocumentV1, node: TemplateNode): RectM
     }),
   ],
   templateUrl: './status-bar.html',
+  host: {
+    class: 'block shrink-0',
+  },
 })
 export class StatusBar {
   protected readonly state = inject(DesignerState);

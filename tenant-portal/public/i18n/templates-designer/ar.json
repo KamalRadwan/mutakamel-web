@@ -29,6 +29,10 @@
     "imageUnavailable": "الصورة غير متاحة",
     "formula": "معادلة"
   },
+  "ribbon": {
+    "fullscreen": "ملء الشاشة",
+    "exitFullscreen": "إنهاء ملء الشاشة"
+  },
   "guide": {
     "alignedWith": "محاذاة مع {{name}}",
     "pageCentre": "منتصف الصفحة",

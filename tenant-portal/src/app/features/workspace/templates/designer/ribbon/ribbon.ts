@@ -17,6 +17,7 @@ import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   tablerArrowBackUp,
   tablerArrowForwardUp,
+  tablerAspectRatio,
   tablerBraces,
   tablerCheck,
   tablerChevronDown,
@@ -35,6 +36,7 @@ import {
   tablerMail,
   tablerMathFunction,
   tablerMaximize,
+  tablerMinimize,
   tablerPhoto,
   tablerPointer,
   tablerStack2,
@@ -62,12 +64,22 @@ type OverflowToolId =
   | 'arrange'
   | 'layers'
   | 'pages'
+  | 'emailWidth'
   | 'layoutTag'
   | 'pageSetup'
   | 'emailSettings'
-  | 'emailWidth'
   | 'zoom'
-  | 'fit';
+  | 'fit'
+  | 'fullscreen';
+
+const SEGMENT_TOOLS = new Set<OverflowToolId>([
+  'layoutTag',
+  'pageSetup',
+  'emailSettings',
+  'zoom',
+  'fit',
+  'fullscreen',
+]);
 
 interface RibbonMenuItem {
   id: string;
@@ -122,7 +134,9 @@ const ZOOM_PRESETS = [25, 50, 60, 75, 100, 125, 150, 200, 300, 400] as const;
       tablerFileDescription,
       tablerMail,
       tablerZoomIn,
+      tablerAspectRatio,
       tablerMaximize,
+      tablerMinimize,
       tablerDots,
       tablerChevronDown,
       tablerCheck,
@@ -234,6 +248,14 @@ export class Ribbon {
     return `${this.transloco.translate('tplTools.ribbon.fit')} (${this.transloco.translate(target)})`;
   });
 
+  protected readonly fullscreenLabel = computed(() => {
+    this.language();
+    this.i18n();
+    return this.transloco.translate(
+      this.state.fullscreen() ? 'tplDesigner.ribbon.exitFullscreen' : 'tplDesigner.ribbon.fullscreen',
+    );
+  });
+
   protected readonly emailWidthStr = computed(() => String(this.state.emailWidthPx()));
   protected readonly emailWidthOptions = computed<SegmentedOption[]>(() => [
     { value: '600', label: '600' },
@@ -246,19 +268,26 @@ export class Ribbon {
     if (this.arrangeState().state !== 'HIDDEN') tools.push('arrange');
     if (this.layersState().state !== 'HIDDEN') tools.push('layers');
     if (this.pagesState().state !== 'HIDDEN') tools.push('pages');
+    if (this.isEmail()) tools.push('emailWidth');
     if (this.layoutLabel()) tools.push('layoutTag');
     if (this.pageSetupState().state !== 'HIDDEN') tools.push('pageSetup');
     if (this.emailSettingsState().state !== 'HIDDEN') tools.push('emailSettings');
-    if (this.isEmail()) tools.push('emailWidth');
-    tools.push('zoom', 'fit');
+    tools.push('zoom', 'fit', 'fullscreen');
     return tools;
   });
 
   protected readonly firstGroup5Id = computed<OverflowToolId | null>(() => {
     const tools = this.overflowTools();
-    return tools.find(
-      (id) => id === 'layoutTag' || id === 'pageSetup' || id === 'emailSettings' || id === 'emailWidth' || id === 'zoom',
-    ) ?? null;
+    return (
+      tools.find(
+        (id) =>
+          id === 'emailWidth' ||
+          id === 'layoutTag' ||
+          id === 'pageSetup' ||
+          id === 'emailSettings' ||
+          id === 'zoom',
+      ) ?? null
+    );
   });
 
   protected readonly hasGroup4Tools = computed(() =>
@@ -276,6 +305,42 @@ export class Ribbon {
       this.zoomLabel(),
     ]),
   );
+
+  private readonly visibleOverflowSlice = computed<OverflowToolId[]>(() =>
+    this.overflowTools().slice(0, this.visibleOverflow()),
+  );
+
+  protected readonly firstGroup5Visible = computed(() => {
+    const first = this.firstGroup5Id();
+    return first !== null && this.visibleOverflowSlice().includes(first);
+  });
+
+  protected readonly firstVisibleSegmentId = computed<OverflowToolId | null>(
+    () => this.visibleOverflowSlice().find((id) => SEGMENT_TOOLS.has(id)) ?? null,
+  );
+
+  protected readonly lastVisibleSegmentId = computed<OverflowToolId | null>(() => {
+    const segs = this.visibleOverflowSlice().filter((id) => SEGMENT_TOOLS.has(id));
+    return segs.length > 0 ? (segs[segs.length - 1] ?? null) : null;
+  });
+
+  protected wrapperClass(toolId: OverflowToolId): string {
+    const pushEnd = toolId === this.firstGroup5Id() ? 'ms-auto ' : '';
+    if (!SEGMENT_TOOLS.has(toolId)) {
+      return `${pushEnd}flex shrink-0 items-center pe-4`;
+    }
+    const firstSeg = this.firstVisibleSegmentId();
+    const lastSeg = this.lastVisibleSegmentId();
+    const radius =
+      toolId === firstSeg && toolId === lastSeg
+        ? 'rounded-8'
+        : toolId === firstSeg
+          ? 'rounded-s-8'
+          : toolId === lastSeg
+            ? 'rounded-e-8'
+            : '';
+    return `${pushEnd}flex h-btn shrink-0 items-center gap-2 bg-neutral-soft px-2 py-2 ${radius}`.trim();
+  }
 
   protected readonly hasOverflow = computed(() => this.moreItems().length > 0);
 
@@ -507,7 +572,14 @@ export class Ribbon {
           items.push({
             id: 'fit',
             label: this.fitTitle(),
-            icon: 'tablerMaximize',
+            icon: 'tablerAspectRatio',
+          });
+          break;
+        case 'fullscreen':
+          items.push({
+            id: 'fullscreen',
+            label: this.fullscreenLabel(),
+            icon: this.state.fullscreen() ? 'tablerMinimize' : 'tablerMaximize',
           });
           break;
         case 'layoutTag':
@@ -629,6 +701,7 @@ export class Ribbon {
       case 'emailWidth':
       case 'zoom':
       case 'fit':
+      case 'fullscreen':
         return visibleSet.has(key) ? key : 'select';
       case 'more':
         return this.hasOverflow() ? key : 'select';
@@ -645,6 +718,13 @@ export class Ribbon {
     if (active) return 'cursor-pointer bg-neutral-soft text-text';
     return enabled
       ? 'cursor-pointer text-text hover:bg-neutral-soft active:bg-border'
+      : 'cursor-not-allowed text-text-placeholder';
+  }
+
+  protected segmentButtonClass(enabled: boolean, active = false): string {
+    if (active) return 'cursor-pointer bg-surface text-text shadow-card';
+    return enabled
+      ? 'cursor-pointer text-text hover:bg-surface active:bg-border'
       : 'cursor-not-allowed text-text-placeholder';
   }
 
@@ -713,6 +793,10 @@ export class Ribbon {
   protected toggleFit(): void {
     const next = this.state.zoomMode() === 'FIT_WIDTH' ? 'FIT_PAGE' : 'FIT_WIDTH';
     this.state.zoomMode.set(next);
+  }
+
+  protected toggleFullscreen(): void {
+    this.state.fullscreen.update((v) => !v);
   }
 
   protected toggleMenu(kind: RibbonMenuKind, event: Event): void {
@@ -812,6 +896,9 @@ export class Ribbon {
         break;
       case 'fit':
         this.toggleFit();
+        break;
+      case 'fullscreen':
+        this.toggleFullscreen();
         break;
     }
   }

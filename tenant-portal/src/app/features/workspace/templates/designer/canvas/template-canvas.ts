@@ -92,7 +92,7 @@ type DragSession =
   imports: [TranslocoPipe, Ruler, NodeView],
   templateUrl: './template-canvas.html',
   host: {
-    class: 'flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-10 border border-border bg-surface-muted',
+    class: 'flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-muted',
     dir: 'ltr',
   },
 })
@@ -260,11 +260,13 @@ export class TemplateCanvas implements AfterViewInit {
       }
     });
 
-    // Recompute fit zoom when page or email width or zoomMode changes
+    // Recompute fit zoom and ruler offsets when zoom, mode, page, email width, or fullscreen changes
     effect(() => {
+      this.state.zoom();
       this.state.zoomMode();
       this.state.currentPage();
       this.state.emailWidthPx();
+      this.state.fullscreen();
       queueMicrotask(() => {
         this.recomputeFitZoom();
         this.measureOffsets();
@@ -737,6 +739,11 @@ export class TemplateCanvas implements AfterViewInit {
       return;
     }
     if (key === 'Escape') {
+      if (this.state.fullscreen()) {
+        event.preventDefault();
+        this.state.fullscreen.set(false);
+        return;
+      }
       if (this.state.selectedIds().length > 0) {
         event.preventDefault();
         this.state.clearSelection();

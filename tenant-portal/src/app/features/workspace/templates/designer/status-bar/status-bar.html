@@ -1,9 +1,9 @@
 <div
   role="status"
-  class="flex h-btn items-center gap-8 rounded-10 border border-border bg-surface px-10 text-12 leading-18 text-text-muted"
+  class="flex h-btn items-center gap-8 border-t border-border bg-surface px-12 text-11 leading-16 text-text-muted"
 >
   @if (layoutFacts()) {
-    <span class="inline-flex h-filter-chip shrink-0 items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium whitespace-nowrap text-on-neutral-soft">
+    <span class="inline-flex h-chip shrink-0 items-center rounded-6 bg-neutral-soft px-6 text-11 leading-16 font-medium whitespace-nowrap text-on-neutral-soft">
       {{ layoutFacts() }}
     </span>
   }
@@ -50,7 +50,7 @@
         <ng-icon name="tablerChevronLeft" size="14" class="rtl:-scale-x-100" aria-hidden="true" />
       </button>
 
-      <span class="px-4 text-12 whitespace-nowrap tabular-nums text-text">
+      <span class="px-4 text-11 leading-16 whitespace-nowrap tabular-nums text-text">
         {{ 'tplTools.status.page' | transloco: { i: state.pageIndex() + 1, n: state.pageCount() } }}
       </span>
 
