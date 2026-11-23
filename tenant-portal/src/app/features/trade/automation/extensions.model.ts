@@ -1,4 +1,4 @@
-import type { ScopeTarget } from './automation-fake-actors';
+import type { ScopeTarget } from './automation-shared/automation.model';
 import type {
   ExtensionDefaultStrategy,
   ExtensionScalarType,

@@ -2,7 +2,7 @@ import { Component, input } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerBuilding } from '@ng-icons/tabler-icons';
-import type { ScopeTarget } from '../../automation-fake-actors';
+import type { ScopeTarget } from '../automation.model';
 
 @Component({
   selector: 'app-scope-chip',

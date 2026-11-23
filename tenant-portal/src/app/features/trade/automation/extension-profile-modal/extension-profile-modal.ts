@@ -16,7 +16,7 @@ import { ActionKeys } from '../automation-shared/action-keys';
 import { ExtensionFieldModal } from '../extension-field-modal/extension-field-modal';
 import { isForbiddenError, isIdempotencyMismatch } from '../extension-profiles-page/extension-access';
 import { createProfile } from '../extensions.api';
-import type { ScopeTarget } from '../automation-fake-actors';
+import type { ScopeTarget } from '../automation-shared/automation.model';
 import type { CreateExtensionProfileInput, ExtensionProfile, ExtensionProfileDraftResult } from '../extensions.model';
 import { TARGET_CODES, toFieldInput } from '../extensions.registry';
 

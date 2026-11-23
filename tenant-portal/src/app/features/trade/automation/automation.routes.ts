@@ -1,7 +1,5 @@
-import { provideEnvironmentInitializer } from '@angular/core';
 import type { Routes } from '@angular/router';
 import { provideTranslocoScope } from '@jsverse/transloco';
-import { seedAutomationReasons } from './automation-reasons.seed';
 
 export const automationRoutes: Routes = [
   {
@@ -11,9 +9,6 @@ export const automationRoutes: Routes = [
         { scope: 'trade-automation', alias: 'automation' },
         { scope: 'trade-shared', alias: 'tradeShared' },
       ),
-      provideEnvironmentInitializer(() => {
-        seedAutomationReasons();
-      }),
     ],
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'extension-profiles' },

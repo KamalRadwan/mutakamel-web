@@ -1,5 +1,17 @@
 import { newIdempotencyKey } from '../../shared/trade-api';
-import { stableStringify } from '../automation-fake-actors';
+
+/** Stable object ordering keeps retries of the same payload on the same action key. */
+function stableStringify(value: unknown): string {
+  if (value === null || value === undefined) return 'null';
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
+  if (typeof value === 'object') {
+    const entries = Object.entries(value)
+      .filter(([, item]) => item !== undefined)
+      .sort(([left], [right]) => left.localeCompare(right));
+    return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${stableStringify(item)}`).join(',')}}`;
+  }
+  return JSON.stringify(value) ?? 'null';
+}
 
 /**
  * Holds one X-Idempotency-Key per user action. A retry of the same request reuses the key,

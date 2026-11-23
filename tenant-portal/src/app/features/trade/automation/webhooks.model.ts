@@ -1,4 +1,4 @@
-import type { ScopeTarget } from './automation-fake-actors';
+import type { ScopeTarget } from './automation-shared/automation.model';
 import type { RetryPolicyCode, WebhookRetryClass } from './webhooks.registry';
 
 // Shapes follow trade-app src/modules/extensions-automation/webhook-subscriptions.service.ts,

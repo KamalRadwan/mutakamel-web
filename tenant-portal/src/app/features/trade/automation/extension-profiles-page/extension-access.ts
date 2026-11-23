@@ -1,11 +1,10 @@
 import { type Injector, inject, runInInjectionContext } from '@angular/core';
 import { ApiError as CoreApiError } from '../../../../core/api/api-errors';
-import type { TenantMe } from '../../../../core/auth/auth-session.model';
 import type { ScopeState } from '../../../../core/scope/scope';
 import { TenantScopeState } from '../../../../core/scope/tenant-scope';
 import { anyGrant, branchGrants, tenantWide } from '../../shared/trade-access';
 import { ApiError, errorCodeOf } from '../../shared/trade-api';
-import type { ScopeTarget } from '../automation-fake-actors';
+import type { ScopeTarget } from '../automation-shared/automation.model';
 
 export const EXTENSION_PERMISSIONS = {
   read: 'trade.extensions.read',
@@ -65,18 +64,6 @@ export function hasExtensionScopeGrant(
   );
 }
 
-export function extensionActorDisplayName(
-  authorUserId: string | null | undefined,
-  me: TenantMe | null,
-  noneLabel: string,
-): string {
-  if (!authorUserId) return noneLabel;
-  if (me && me.id === authorUserId) {
-    const full = `${me.firstName} ${me.lastName}`.trim();
-    return full || me.email || authorUserId;
-  }
-  return authorUserId;
-}
 
 export function parseExtensionScope(raw: string | undefined): ScopeTarget {
   const upper = raw?.trim().toUpperCase();

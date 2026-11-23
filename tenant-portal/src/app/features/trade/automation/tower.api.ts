@@ -1,4 +1,5 @@
 import type { CoreQuery } from '../../../core/api/core-http';
+import { submitBulkJob } from '../../../shared/bulk-jobs/bulk-jobs.api';
 import type { BulkJobSubmitResult } from '../../../shared/bulk-jobs/bulk-jobs.model';
 import {
   ApiError,
@@ -6,6 +7,7 @@ import {
   ifMatch,
   newIdempotencyKey,
   scopeFor,
+  toTradeError,
   type TradeContext,
 } from '../shared/trade-api';
 import { tradeHttp } from '../shared/trade-http';
@@ -135,11 +137,29 @@ export async function resolve(
   return data;
 }
 
-// B13 is out of the MVP (owner 2026-11-23): bulk resolve stays hidden and unlinked.
-export function bulkResolve(
-  _ctx: TradeContext,
-  _input: BulkResolveExceptionsInput,
-  _idempotencyKey: string,
+// The shared worker platform owns submission, execution, progress and retry.
+export async function bulkResolve(
+  ctx: TradeContext,
+  input: BulkResolveExceptionsInput,
+  idempotencyKey: string,
 ): Promise<BulkJobSubmitResult> {
-  return Promise.reject(new ApiError(501, 'TRADE.CONTROL_TOWER.BULK_RESOLVE_DISABLED'));
+  scopeFor(ctx, 'COMPANY');
+  const scope = scopeFor(ctx, 'OPTIONAL') ?? {};
+  const params: ResolveExceptionInput = {
+    resolutionCode: input.resolutionCode,
+    reasonCode: input.reasonCode,
+    ...(input.note !== undefined && input.note !== null ? { note: input.note } : {}),
+    evidence: input.evidence,
+  };
+  try {
+    return await submitBulkJob('trading', {
+      module: 'trading.control-tower-exceptions',
+      action: 'RESOLVE',
+      scope,
+      selection: input.selection,
+      params,
+    }, assertIdempotencyKey(idempotencyKey));
+  } catch (error) {
+    throw toTradeError(error);
+  }
 }

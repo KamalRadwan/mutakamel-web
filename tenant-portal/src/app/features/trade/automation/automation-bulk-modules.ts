@@ -3,15 +3,7 @@ import {
   type BulkJobModuleDescriptor,
   provideBulkJobModules,
 } from '../../../shared/bulk-jobs/bulk-job-modules';
-import { registerFakeBulkModuleLoader } from '../../../shared/bulk-jobs/bulk-jobs.fake';
 import type { BulkJob, BulkJobItem } from '../../../shared/bulk-jobs/bulk-jobs.model';
-
-registerFakeBulkModuleLoader('trading', 'trading.catalog-import', () => import('./imports.fake'));
-registerFakeBulkModuleLoader(
-  'trading',
-  'trading.control-tower-exceptions',
-  () => import('./tower.fake'),
-);
 
 export const TRADE_CATALOG_IMPORT_BULK_MODULE: BulkJobModuleDescriptor = {
   app: 'trading',

@@ -4,6 +4,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CoreHttp } from '../../../core/api/core-http';
+import { BulkJobsApi, bindBulkJobsApi } from '../../../shared/bulk-jobs/bulk-jobs.api';
 import { ApiError, type TradeContext, newIdempotencyKey } from '../shared/trade-api';
 import { TradeHttpStub } from '../shared/testing/trade-http-testing';
 import { TradeHttp, bindTradeHttp, bindTradeHttpForTest, tradeQueries } from '../shared/trade-http';
@@ -343,14 +344,14 @@ describe('tower.api (TradeHttpStub)', () => {
     }
   });
 
-  it('keeps bulkResolve disabled (B13) and exposes no retry function (ق7)', async () => {
+  it('requires company scope and a valid key before bulk submission, and exposes no retry function', async () => {
     const stub = new TradeHttpStub();
     const dispose = bindTradeHttpForTest(stub);
 
     try {
       await expect(
         bulkResolve(
-          C1,
+          TENANT,
           {
             selection: { kind: 'IDS', ids: [EXC_ID] },
             ...OWNER_INPUT,
@@ -358,8 +359,15 @@ describe('tower.api (TradeHttpStub)', () => {
           newIdempotencyKey(),
         ),
       ).rejects.toMatchObject({
-        status: 501,
-        code: 'TRADE.CONTROL_TOWER.BULK_RESOLVE_DISABLED',
+        status: 400,
+        code: 'TRADE.SCOPE.REQUIRED',
+      });
+      await expect(bulkResolve(C1, {
+        selection: { kind: 'IDS', ids: [EXC_ID] },
+        ...OWNER_INPUT,
+      }, 'invalid-key')).rejects.toMatchObject({
+        status: 422,
+        code: 'TRADE.IDEMPOTENCY.KEY_REQUIRED',
       });
       expect(stub.recordedReads()).toEqual([]);
       expect(stub.recordedWrites()).toEqual([]);
@@ -392,6 +400,7 @@ describe('tower.api (TradeHttp wire contract & envelope unwrap)', () => {
         : 'mutakamel-http-tenant-csrf';
     vi.spyOn(doc, 'cookie', 'get').mockReturnValue(`${cookieName}=csrf-proof`);
     bindTradeHttp(TestBed.inject(TradeHttp), tradeQueries(), TestBed.inject(CoreHttp));
+    bindBulkJobsApi(() => TestBed.inject(BulkJobsApi));
     http = TestBed.inject(HttpTestingController);
   });
 
@@ -399,6 +408,36 @@ describe('tower.api (TradeHttp wire contract & envelope unwrap)', () => {
     http.verify();
     vi.restoreAllMocks();
     dispose();
+  });
+
+  it.each(['IDS', 'QUERY'] as const)('submits %s resolution as a real worker job and unwraps the acceptance', async (kind) => {
+    const key = newIdempotencyKey();
+    const selection = kind === 'IDS'
+      ? { kind, ids: [EXC_ID] }
+      : { kind, query: { status: ['OPEN' as const], includeBranches: true }, excludedIds: [EXC_ID] };
+    const accepted = {
+      jobId: '0193a000-0000-7000-8000-000000000909', status: 'QUEUED', total: 2,
+      skippedAtSubmit: 0, failedAtSubmit: 0, chunkCount: 1,
+    };
+    const pending = bulkResolve(C1_B1, { selection, ...OWNER_INPUT, note: null }, key);
+    const req = http.expectOne(`${base}/bulk-jobs`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.headers.get('x-idempotency-key')).toBe(key);
+    expect(req.request.body).toEqual({
+      module: 'trading.control-tower-exceptions', action: 'RESOLVE',
+      scope: { companyId: COMPANY_ID, branchId: BRANCH_ID }, selection,
+      params: { resolutionCode: OWNER_INPUT.resolutionCode, reasonCode: OWNER_INPUT.reasonCode, evidence: OWNER_INPUT.evidence },
+    });
+    req.flush(envelope(accepted), { status: 202, statusText: 'Accepted' });
+    await expect(pending).resolves.toEqual(accepted);
+  });
+
+  it('propagates worker submission errors without synthesizing a job', async () => {
+    const pending = bulkResolve(C1, { selection: { kind: 'IDS', ids: [EXC_ID] }, ...OWNER_INPUT }, newIdempotencyKey());
+    const req = http.expectOne(`${base}/bulk-jobs`);
+    req.flush({ success: false, errorCode: 'BULK_JOB_ACTIVE', details: { jobId: ['active-job'] } },
+      { status: 409, statusText: 'Conflict' });
+    await expect(pending).rejects.toMatchObject({ status: 409, code: 'BULK_JOB_ACTIVE', details: { jobId: ['active-job'] } });
   });
 
   it('unwraps { success, data } envelope for counts, list (keeping asOf), detail, and resolve with headers', async () => {

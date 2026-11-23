@@ -7,6 +7,7 @@ import {
   inject,
   input,
   linkedSignal,
+  resource,
   signal,
   untracked,
   viewChild,
@@ -36,21 +37,23 @@ import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
 import { ScopeState } from '../../../../core/scope/scope';
 import { TenantScopeState } from '../../../../core/scope/tenant-scope';
+import { WorkspaceLookups } from '../../../../shared/widgets/workspace-lookups/workspace-lookups.api';
+import type { WorkspaceUser } from '../../../../shared/widgets/workspace-lookups/workspace-lookups.model';
 import { Button } from '../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { UnsavedDialog } from '../../../../shared/ui/unsaved-dialog/unsaved-dialog';
 import { ApiError, type TradeContext, errorCodeOf, tradeContext } from '../../shared/trade-api';
 import { ActionKeys } from '../automation-shared/action-keys';
+import { actorDisplayName } from '../automation-shared/actor';
 import { formatDate } from '../../shared/trade-format';
-import type { ScopeTarget } from '../automation-fake-actors';
+import type { ScopeTarget } from '../automation-shared/automation.model';
 import { AutomationBadge } from '../automation-shared/automation-badge/automation-badge';
 import { ConflictDialog } from '../automation-shared/conflict-dialog/conflict-dialog';
 import { ExtensionFieldModal } from '../extension-field-modal/extension-field-modal';
 import { ExtensionFieldsTable } from '../extension-fields-table/extension-fields-table';
 import {
   EXTENSION_PERMISSIONS,
-  extensionActorDisplayName,
   hasExtensionReadGrant,
   hasExtensionScopeGrant,
   isExtensionConflictError,
@@ -135,6 +138,7 @@ export class ExtensionProfilePage {
   private readonly injector = inject(Injector);
   private readonly scopeState = inject(ScopeState);
   private readonly tenantScope = inject(TenantScopeState);
+  private readonly workspaceLookups = inject(WorkspaceLookups);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
@@ -187,6 +191,27 @@ export class ExtensionProfilePage {
   protected readonly busy = signal(false);
 
   protected readonly versions = signal<ExtVersion[]>([]);
+  private readonly publishers = resource({
+    params: () => {
+      const me = this.tenantScope.me();
+      if (!me || this.isForbidden()) return undefined;
+      const ids = [...new Set(this.versions().map((version) => version.publishedBy))]
+        .filter((id): id is string => Boolean(id) && id !== me.id);
+      return { ids, me, profileId: this.id(), context: this.ctx() };
+    },
+    loader: async ({ params }) => {
+      const users: Record<string, WorkspaceUser> = {};
+      await Promise.all(params.ids.map(async (id) => {
+        try {
+          const user = await this.workspaceLookups.user(id);
+          if (user.id === id) users[id] = user;
+        } catch {
+          // Deleted or inaccessible authors use the existing empty-value label.
+        }
+      }));
+      return users;
+    },
+  });
   protected readonly versionsLoading = signal(false);
   protected readonly versionsFailed = signal(false);
   protected readonly expandedVersionId = signal<string | null>(null);
@@ -657,9 +682,10 @@ export class ExtensionProfilePage {
   protected publishedByName(ver: ExtVersion): string {
     this.i18n();
     this.language();
-    return extensionActorDisplayName(
+    return actorDisplayName(
       ver.publishedBy,
       this.tenantScope.me(),
+      ver.publishedBy ? this.publishers.value()?.[ver.publishedBy] : undefined,
       this.transloco.translate('extensions.profile.versions.none'),
     );
   }

@@ -18,6 +18,7 @@ import type { TenantMe } from '../../../../core/auth/auth-session.model';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
 import { TenantScopeState } from '../../../../core/scope/tenant-scope';
+import { WorkspaceLookups } from '../../../../shared/widgets/workspace-lookups/workspace-lookups.api';
 import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { ApiError } from '../../shared/trade-api';
 import { TradeHttpStub } from '../../shared/testing/trade-http-testing';
@@ -134,6 +135,7 @@ for (const lang of ['en', 'ar'] as const) {
         close: dialogProto['close'],
       };
       const me = signal<TenantMe | null>(FAKE_TENANT_ME);
+      const lookupUser = vi.fn<WorkspaceLookups['user']>();
       const selection = signal<{ companyId: string; branchId: string | null } | null>({
         companyId: COMPANY_ID,
         branchId: null,
@@ -203,6 +205,7 @@ for (const lang of ['en', 'ar'] as const) {
         document.documentElement.setAttribute('data-theme', theme);
 
         setPermissions();
+        lookupUser.mockReset().mockRejectedValue(new Error('User unavailable'));
         const draft = makeDraftVersion();
         stub = new TradeHttpStub({
           'GET /extensions/profiles/:id': makeProfile({ editableDraftVersion: draft }),
@@ -234,6 +237,7 @@ for (const lang of ['en', 'ar'] as const) {
               },
             },
             { provide: LanguageState, useValue: { current: signal(lang) } },
+            { provide: WorkspaceLookups, useValue: { user: lookupUser } },
           ],
         });
 
@@ -281,6 +285,47 @@ for (const lang of ['en', 'ar'] as const) {
         expect(text).toContain('ITEM_EXTRA');
         expect(text).toContain('pkg.owner_code');
         expect(text).toContain(TRANSLATIONS[lang]['extensions']['defaultStrategy']['OWNER_DERIVED']);
+      });
+
+      it('uses the signed-in user and Workspace lookup names for publishers', async () => {
+        const publisherId = '01900000-0000-7000-8000-000000000908';
+        lookupUser.mockResolvedValue({
+          id: publisherId, firstName: 'Mona', lastName: 'Saleh', email: 'mona@example.test',
+          employeeCode: null, companyId: COMPANY_ID, branchId: BRANCH_ID, departmentId: 'department',
+          teamId: null, managerId: null, jobTitle: null, status: 'ACTIVE', isTenantOwner: false,
+          seats: [], createdAt: '2026-11-23T10:00:00.000Z', updatedAt: '2026-11-23T10:00:00.000Z',
+        });
+        stub.register('GET', '/extensions/profiles/:id/versions', {
+          items: [makeDraftVersion({ publishedBy: FAKE_TENANT_ME.id }),
+            makeDraftVersion({ id: 'other-version', versionNumber: 2, publishedBy: publisherId })],
+          total: 2, page: 1, limit: 100,
+        });
+        await createPage();
+        fixture.componentRef.setInput('tab', 'versions');
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+        expect(text).toContain(`${FAKE_TENANT_ME.firstName} ${FAKE_TENANT_ME.lastName}`.trim());
+        expect(text).toContain('Mona Saleh');
+        expect(text).not.toContain(publisherId);
+        expect(lookupUser).toHaveBeenCalledExactlyOnceWith(publisherId);
+      });
+
+      it('uses the existing empty value when a publisher lookup fails', async () => {
+        const publisherId = '01900000-0000-7000-8000-000000000909';
+        stub.register('GET', '/extensions/profiles/:id/versions', {
+          items: [makeDraftVersion({ publishedBy: publisherId })], total: 1, page: 1, limit: 100,
+        });
+        await createPage();
+        fixture.componentRef.setInput('tab', 'versions');
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+        expect(text).not.toContain(publisherId);
+        expect(text).toContain(TRANSLATIONS[lang]['extensions']['profile']['versions']['none']);
+        expect(lookupUser).toHaveBeenCalledExactlyOnceWith(publisherId);
       });
 
       it('gates Validate and Publish buttons using trade.extensions.manage and trade.extensions.publish', async () => {

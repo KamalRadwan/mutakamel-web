@@ -30,7 +30,7 @@ import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { Pagination } from '../../../../shared/ui/pagination/pagination';
 import { StepFilter, type StepOption } from '../../../../shared/ui/step-filter/step-filter';
 import { ApiError, type TradeContext, tradeContext } from '../../shared/trade-api';
-import type { ScopeTarget } from '../automation-fake-actors';
+import type { ScopeTarget } from '../automation-shared/automation.model';
 import { AutomationBadge } from '../automation-shared/automation-badge/automation-badge';
 import { ScopeChip } from '../automation-shared/scope-chip/scope-chip';
 import {

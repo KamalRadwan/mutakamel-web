@@ -992,18 +992,18 @@ export class ExtensionFieldModal {
     };
   }
 
-  private newPropertyDraft(seed?: ObjectProperty): PropertyDraft {
-    const choices = seed?.allowedValues ? [...seed.allowedValues] : [];
+  private newPropertyDraft(initial?: ObjectProperty): PropertyDraft {
+    const choices = initial?.allowedValues ? [...initial.allowedValues] : [];
     return {
       id: ++nextPropId,
-      key: seed?.key ?? '',
-      scalarType: seed?.scalarType ?? 'STRING',
-      isRequired: seed?.isRequired ?? false,
-      maxLengthText: seed?.maxLength != null ? String(seed.maxLength) : '',
+      key: initial?.key ?? '',
+      scalarType: initial?.scalarType ?? 'STRING',
+      isRequired: initial?.isRequired ?? false,
+      maxLengthText: initial?.maxLength != null ? String(initial.maxLength) : '',
       decimalScaleText:
-        seed?.decimalScale != null ? String(seed.decimalScale) : String(LIMITS.decimalScale),
-      minText: seed?.minimumDecimal ?? '',
-      maxText: seed?.maximumDecimal ?? '',
+        initial?.decimalScale != null ? String(initial.decimalScale) : String(LIMITS.decimalScale),
+      minText: initial?.minimumDecimal ?? '',
+      maxText: initial?.maximumDecimal ?? '',
       choices,
       choicePool: [...choices],
     };

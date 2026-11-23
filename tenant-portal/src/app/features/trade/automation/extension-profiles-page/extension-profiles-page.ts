@@ -28,7 +28,7 @@ import { AutomationBadge } from '../automation-shared/automation-badge/automatio
 import { ScopeChip } from '../automation-shared/scope-chip/scope-chip';
 import { ExtensionProfileModal } from '../extension-profile-modal/extension-profile-modal';
 import { getProfileCounts, listProfiles } from '../extensions.api';
-import type { ScopeTarget } from '../automation-fake-actors';
+import type { ScopeTarget } from '../automation-shared/automation.model';
 import type { ExtensionProfile, ExtensionProfileDraftResult } from '../extensions.model';
 import { TARGET_CODES } from '../extensions.registry';
 import {
