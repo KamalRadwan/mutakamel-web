@@ -1,3 +1,4 @@
+import { mockDialogsForTest } from '../../../../shared/ui/modal/testing/dialog-testing';
 import { Injectable, signal } from '@angular/core';
 import { type ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
@@ -31,6 +32,8 @@ import type {
   SalesOrderDetail,
 } from '../shared/document.model';
 import { DocumentPage } from './document-page';
+
+mockDialogsForTest();
 
 const TRANSLATIONS: Record<string, Translation> = {
   en: { ...en, tradeShared: enTradeShared, td: enTradeDocuments, tdpg: enPage, tdlines: enLines },
@@ -289,7 +292,7 @@ for (const lang of ['en', 'ar'] as const) {
           'GET /quotations/qt-1': makeQuotationDetail(),
           'GET /sales-orders/so-1': makeSalesOrderDetail(),
           'GET /purchase-quotations/pq-1': makePurchaseQuotationIssued(),
-          'GET /terms/options': { PAYMENT: [], DELIVERY: [], WARRANTY: [], RETURNS: [], GENERAL: [] },
+          'GET /terms/options': { byType: { PAYMENT: [], DELIVERY: [], WARRANTY: [], RETURNS: [], GENERAL: [] } },
           'GET /quotations/customer-options': { items: [], nextCursor: null },
           'GET /quotations/contact-options': { partyType: 'ORGANIZATION', items: [], nextCursor: null },
           'GET /quotations/discount-policy': {
@@ -375,11 +378,11 @@ for (const lang of ['en', 'ar'] as const) {
         const actions = fixture.componentInstance['headerActions']().map((item) => item.action);
         expect(actions).toContain('send');
         expect(actions).toContain('deleteDraft');
-        expect(actions).not.toContain('cancel');
+        expect(fixture.componentInstance['headerActions']().find((item) => item.action === 'cancel')?.disabledReasonKey).toBe('tda.why.permission');
 
         me.set(makeMe(['trade.quotations.read']));
         fixture.detectChanges();
-        expect(fixture.componentInstance['headerActions']()).toEqual([]);
+        expect(fixture.componentInstance['headerActions']().every((item) => item.disabledReasonKey === 'tda.why.permission')).toBe(true);
 
         routeData$.next({ kind: 'purchase-quotation' });
         paramMap$.next(convertToParamMap({ id: 'pq-1' }));

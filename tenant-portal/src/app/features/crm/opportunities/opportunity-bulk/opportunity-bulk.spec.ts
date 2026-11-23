@@ -126,7 +126,7 @@ describe.each([['en', 'light'], ['en', 'dark'], ['ar', 'light'], ['ar', 'dark']]
     TestBed.configureTestingModule({ providers: [
       { provide: TenantScopeState, useValue: {
         selection: branch, branchCompanies: () => new Map([[branchId, companyId]]),
-        me: () => ({ id: ownerId, firstName: 'A', lastName: 'user' }),
+        me: () => ({ id: ownerId, email: 'a@example.test', firstName: 'A', lastName: 'user', workspace: { timezone: 'Africa/Cairo', defaultLanguage: 'en' } }),
       } },
       { provide: Notify, useValue: notify }, { provide: BulkJobsTracker, useValue: tracker },
       provideTransloco({ config: { availableLangs: ['en', 'ar'], defaultLang: lang, reRenderOnLangChange: true }, loader: BulkTranslations }),

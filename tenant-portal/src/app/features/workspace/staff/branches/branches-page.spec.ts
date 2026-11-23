@@ -1,3 +1,5 @@
+import { CoreHttp } from '../../../../core/api/core-http';
+import { GeoHttpStub } from '../../../../core/geo/testing/geo-http-testing';
 import { DOCUMENT } from '@angular/common';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
@@ -78,6 +80,7 @@ describe('Branches with Gateway reads and writes', () => {
     });
     TestBed.configureTestingModule({
       providers: [
+        { provide: CoreHttp, useClass: GeoHttpStub },
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([]),

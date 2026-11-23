@@ -12,7 +12,7 @@ import { CallLogTable } from '../../../../../shared/widgets/call-log/call-log-ta
 import { StaffPhoneApi, toCallLogTypeParam } from '../../shared/staff-phone.api';
 import { StaffUserCallLog } from '../../shared/staff-phone.model';
 import { TenantUser } from '../../shared/staff.model';
-import { staffErrorMessage } from '../../shared/staff.api';
+import { staffErrorMessage } from '../../shared/staff-errors';
 
 function mapUserCallLogRow(row: StaffUserCallLog): CallLogRow {
   const record: CallLogRow['record'] = row.sourceType === 'LEAD' && row.sourceId && row.sourceLabel

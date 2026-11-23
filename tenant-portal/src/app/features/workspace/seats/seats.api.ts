@@ -108,6 +108,12 @@ export function bindSeatPreviewApi(resolve: () => SeatPreviewApi): void {
   resolveSeatPreview = resolve;
 }
 
+export function bindSeatPreviewApiForTest(resolve: () => SeatPreviewApi): () => void {
+  const previous = resolveSeatPreview;
+  resolveSeatPreview = resolve;
+  return () => { resolveSeatPreview = previous; };
+}
+
 function seatApi(): SeatPreviewApi {
   if (!resolveSeatPreview) throw new Error('SeatPreviewApi is not bound');
   return resolveSeatPreview();

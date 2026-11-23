@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { openBulkPrintArtifact } from '../document-bulk/documents-bulk.descriptor';
+import { getBulkPrintArtifact } from './documents-bulk.fake-module';
 import { isRenderUnavailable } from '../document-print/print-dialog/print-dialog';
 import { documentGrandTotal, type PurchaseQuotation } from './document.model';
 import { fakeCreateSalesOrderFromQuotation, fakeGetDocument, fakeListDocuments } from './documents.fake';
@@ -50,7 +50,7 @@ describe('documents follow the existing backend', () => {
   });
 
   it('fails a bulk print download for a job that does not exist (404 BULK_JOB_NOT_FOUND)', async () => {
-    await expect(openBulkPrintArtifact('job-without-artifact')).rejects.toMatchObject({
+    await expect(getBulkPrintArtifact('job-without-artifact')).rejects.toMatchObject({
       status: 404,
       code: 'BULK_JOB_NOT_FOUND',
     });

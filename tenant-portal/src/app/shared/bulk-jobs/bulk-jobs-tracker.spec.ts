@@ -636,7 +636,7 @@ describe('Trade items bulk: goes through the tracker', () => {
       action: 'SET_STATUS' as const,
       context: { companyId: 'c1' },
       selection: { kind: 'IDS' as const, ids: ['a', 'b'] },
-      params: { status: 'ACTIVE' },
+      params: { status: 'ACTIVE' as const },
       idempotencyKey: 'items-key',
       tracker,
     };

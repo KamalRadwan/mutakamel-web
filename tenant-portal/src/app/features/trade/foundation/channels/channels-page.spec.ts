@@ -1,3 +1,4 @@
+import { ScopeState } from '../../../../core/scope/scope';
 import { Injectable, signal } from '@angular/core';
 import { type ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
@@ -135,7 +136,10 @@ for (const lang of ['en', 'ar'] as const) {
               },
               loader: ChannelsTranslocoLoader,
             }),
-            { provide: TenantScopeState, useValue: { me } },
+            { provide: TenantScopeState, useValue: { me, selection: signal({ companyId: 'c1', branchId: 'b1' }), branchesFor: () => ['b1'] } },
+            { provide: ScopeState, useValue: { company: signal({ id: 'c1', nameEn: 'Test company', nameAr: 'شركة الاختبار', branches: [{ id: 'b1', nameEn: 'Cairo HQ', nameAr: 'القاهرة' }, { id: 'b2', nameEn: 'Alexandria', nameAr: 'الإسكندرية' }] }),
+              branch: signal({ id: 'b1', nameEn: 'Cairo HQ', nameAr: 'القاهرة' }), companies: signal([]),
+              branches: signal([{ id: 'b1', nameEn: 'Cairo HQ', nameAr: 'القاهرة' }, { id: 'b2', nameEn: 'Alexandria', nameAr: 'الإسكندرية' }]) } },
             { provide: LanguageState, useValue: { current: signal(lang) } },
           ],
         });

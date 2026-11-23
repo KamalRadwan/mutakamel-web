@@ -59,7 +59,8 @@
     "TRADE_IMPORT_MAPPING_NOT_FOUND": "This import mapping was not found.",
     "TRADE_IMPORT_RUN_NOT_FOUND": "This import run was not found.",
     "TRADE_IMPORT_RUN_NOT_EXECUTABLE_BULK_JOB_MISSING": "This import has no background job to cancel.",
-    "BULK_JOB_ACTIVE_ACTIVE_JOB_EXISTS": "Another batch operation is already running. Try again when it finishes."
+    "BULK_JOB_ACTIVE_ACTIVE_JOB_EXISTS": "Another batch operation is already running. Try again when it finishes.",
+    "TRADE_CONTROL_TOWER_QUERY_INVALID": "Check the filter values and try again."
   },
   "common": {
     "none": "—",
@@ -190,7 +191,8 @@
       "columnPattern": "Start with a letter and use letters, digits, spaces, _, ., or - (max 100).",
       "columnDuplicate": "File column names must be unique.",
       "targetRequired": "Choose a system field.",
-      "missingRequired": "Missing required fields: {{fields}}"
+      "missingRequired": "Missing required fields: {{fields}}",
+      "lookupInvalid": "This lookup code is not valid for the selected field."
     }
   },
   "runs": {

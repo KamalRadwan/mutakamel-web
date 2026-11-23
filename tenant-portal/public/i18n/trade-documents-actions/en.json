@@ -85,7 +85,7 @@
     }
   },
   "approval": {
-    "pending": "Submitted by {{name}} on {{date}}. One approval is needed from someone other than the creator or the submitter.",
+    "pending": "Awaiting approval. One approval is needed from someone other than the creator or the submitter.",
     "approved": "Approved. You can confirm the order.",
     "rejected": "Rejected. Change the order and submit it again.",
     "rejectedWithReason": "Rejected: {{reason}}",

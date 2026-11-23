@@ -259,7 +259,11 @@
     "TRADE.CONTROL_TOWER.NOT_FOUND": "Reload the inbox because this exception no longer exists.",
     "TRADE_CONTROL_TOWER_NOT_FOUND": "Reload the inbox because this exception no longer exists.",
     "TRADE.CONTROL_TOWER.SCOPE_DENIED": "This exception is outside your current scope.",
-    "TRADE_CONTROL_TOWER_SCOPE_DENIED": "This exception is outside your current scope."
+    "TRADE_CONTROL_TOWER_SCOPE_DENIED": "This exception is outside your current scope.",
+    "GW.IDEM.MISMATCH": "The request data changed while sending; try the action again.",
+    "GW_IDEM_MISMATCH": "The request data changed while sending; try the action again.",
+    "TRADE.CONTROL_TOWER.QUERY_INVALID": "Check the filter values and try again.",
+    "TRADE_CONTROL_TOWER_QUERY_INVALID": "Check the filter values and try again."
   },
   "workerErrors": {
     "WORKER.TRADE_IMPORT.FILE_NOT_FOUND": "Upload the file again because the stored upload could not be found.",

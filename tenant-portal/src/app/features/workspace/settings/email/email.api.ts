@@ -1,6 +1,14 @@
 import { Service, computed, inject, signal } from '@angular/core';
 import { QueryClient } from '@tanstack/angular-query';
-import { z } from 'zod';
+import {
+  boolean,
+  enum as enumSchema,
+  literal,
+  number,
+  object,
+  string,
+  union,
+} from 'zod';
 import { CoreHttp } from '../../../../core/api/core-http';
 import { ApiError } from '../../../../core/api/api-errors';
 import { AuthSession } from '../../../../core/auth/auth-session';
@@ -13,36 +21,36 @@ import {
 } from './email.model';
 
 const BASE = '/api/tenant/core/v1';
-const configSchema = z.object({
-  revision: z.number().int().nonnegative(),
-  fromAddress: z.string(),
-  fromName: z.string(),
-  replyTo: z.string().nullable(),
-  senderDomain: z.string(),
-  providerDriver: z.enum(['smtp', 'ses', 'sendgrid', 'platform-shared']),
-  credentialsMode: z.enum(['TENANT_VERSIONED_REF', 'TENANT_ENCRYPTED_SMTP', 'PLATFORM_SHARED']),
-  providerCredentialsConfigured: z.boolean(),
-  providerCredentialsVersion: z.number().nullable(),
-  providerCredentialsRefFingerprint: z.string().nullable(),
-  smtpHost: z.string().nullable(),
-  smtpPort: z.union([z.literal(25), z.literal(465), z.literal(587), z.literal(2525)]).nullable(),
-  smtpSecure: z.boolean().nullable(),
-  smtpProtocol: z.enum(['smtp', 'smtps']).nullable(),
-  smtpUsername: z.string().nullable(),
-  smtpPasswordConfigured: z.boolean(),
-  feedbackProfile: z.literal('CRM_FEEDBACK_V1').nullable(),
-  dkimSelector: z.string().nullable(),
-  dkimVerified: z.boolean(),
-  verifiedAt: z.string().nullable(),
-  planDailyQuota: z.number(),
-  planRateLimitPerMin: z.number(),
-  planQuotaRevision: z.number(),
-  dailyQuota: z.number().nullable(),
-  rateLimitPerMin: z.number().nullable(),
-  effectiveDailyQuota: z.number(),
-  effectiveRateLimitPerMin: z.number(),
-  status: z.enum(['ACTIVE', 'SUSPENDED']),
-  updatedAt: z.string(),
+const configSchema = object({
+  revision: number().int().nonnegative(),
+  fromAddress: string(),
+  fromName: string(),
+  replyTo: string().nullable(),
+  senderDomain: string(),
+  providerDriver: enumSchema(['smtp', 'ses', 'sendgrid', 'platform-shared']),
+  credentialsMode: enumSchema(['TENANT_VERSIONED_REF', 'TENANT_ENCRYPTED_SMTP', 'PLATFORM_SHARED']),
+  providerCredentialsConfigured: boolean(),
+  providerCredentialsVersion: number().nullable(),
+  providerCredentialsRefFingerprint: string().nullable(),
+  smtpHost: string().nullable(),
+  smtpPort: union([literal(25), literal(465), literal(587), literal(2525)]).nullable(),
+  smtpSecure: boolean().nullable(),
+  smtpProtocol: enumSchema(['smtp', 'smtps']).nullable(),
+  smtpUsername: string().nullable(),
+  smtpPasswordConfigured: boolean(),
+  feedbackProfile: literal('CRM_FEEDBACK_V1').nullable(),
+  dkimSelector: string().nullable(),
+  dkimVerified: boolean(),
+  verifiedAt: string().nullable(),
+  planDailyQuota: number(),
+  planRateLimitPerMin: number(),
+  planQuotaRevision: number(),
+  dailyQuota: number().nullable(),
+  rateLimitPerMin: number().nullable(),
+  effectiveDailyQuota: number(),
+  effectiveRateLimitPerMin: number(),
+  status: enumSchema(['ACTIVE', 'SUSPENDED']),
+  updatedAt: string(),
 });
 
 @Service()

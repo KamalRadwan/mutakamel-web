@@ -153,7 +153,7 @@ for (const lang of ['en', 'ar'] as const) {
             config: { availableLangs: ['en', 'ar'], defaultLang: lang, reRenderOnLangChange: true, prodMode: false },
             loader: TestTranslocoLoader,
           }),
-          { provide: TenantScopeState, useValue: { me } },
+          { provide: TenantScopeState, useValue: { me, selection: signal({ companyId: 'c1', branchId: 'b1' }), branchesFor: () => ['b1'] } },
           { provide: LanguageState, useValue: { current: signal(lang) } },
         ];
         if (options.missingCompany) {

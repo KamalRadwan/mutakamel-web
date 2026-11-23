@@ -96,6 +96,7 @@ function user(owner = true, grants = permissions, tenantWide = true): TenantMe {
     firstName: 'Workspace',
     lastName: 'Owner',
     hasAvatar: false,
+    workspace: { timezone: 'UTC', defaultLanguage: 'en' },
     mfaEnabled: false,
     mfaUpdatedAt: null,
     status: 'ACTIVE',

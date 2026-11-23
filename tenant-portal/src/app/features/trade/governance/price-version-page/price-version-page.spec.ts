@@ -235,7 +235,7 @@ for (const lang of ['en', 'ar'] as const) {
             currencies: [{ code: 'EGP', name: 'EGP', symbol: 'E£', decimalPlaces: 2, isDefault: true }],
           },
           'GET /uoms': { items: [], total: 0, page: 1, limit: 100 },
-          'GET /channels': [],
+          'GET /channels': { items: [] },
           'GET /commercial-accounts': { items: [], total: 0, page: 1, limit: 20 },
         });
         dispose = bindTradeHttpForTest(stub);

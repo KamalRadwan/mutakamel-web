@@ -231,7 +231,7 @@ describe.each([['en','light'], ['en','dark'], ['ar','light'], ['ar','dark']])('L
     TestBed.configureTestingModule({ providers: [
       { provide: CoreHttp, useValue: { read: async () => [{ code: 'EGP', nameEn: 'Pound', nameAr: 'جنيه', isDefault: true, decimals: 2 }] } },
       { provide: AuthSession, useValue: { status: () => 'signed-out', me: () => null } },
-      { provide: TenantScopeState, useValue: { selection, branchCompanies: () => new Map([[branchId,companyId]]), me: () => null } },
+      { provide: TenantScopeState, useValue: { selection, branchesFor: () => [branchId], branchCompanies: () => new Map([[branchId,companyId]]), me: () => null } },
       provideRouter([{ path: 'crm/leads/new', component: LeadPage }, { path: 'crm/leads/:id', component: LeadPage }, { path: 'crm/leads', component: EmptyPage }]),
       provideTransloco({ config: { availableLangs: ['en','ar'], defaultLang: lang, reRenderOnLangChange: true,
         missingHandler: { logMissingKey: false } }, loader: Loader }),

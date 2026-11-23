@@ -35,7 +35,8 @@
   },
   "defaultStrategy": {
     "NONE": "None",
-    "LITERAL": "Fixed value"
+    "LITERAL": "Fixed value",
+    "OWNER_DERIVED": "Derived from record"
   },
   "scope": {
     "TENANT": "Tenant level",
@@ -366,6 +367,7 @@
     "TRADE.EXTENSION.DEFINITION_NOT_FOUND": "This extension profile was not found.",
     "TRADE.EXTENSION.PROFILE_CONFLICT": "This profile has no draft to check or publish. Reload the profile.",
     "TRADE.APPROVAL.MAKER_CHECKER_REQUIRED": "Another person must publish this profile: it has a required field and you created this draft or last saved its fields.",
-    "TRADE.CONCURRENCY.STALE_VERSION": "Someone else updated this profile. Reload before saving again."
+    "TRADE.CONCURRENCY.STALE_VERSION": "Someone else updated this profile. Reload before saving again.",
+    "GW.IDEM.MISMATCH": "The request data changed while sending; try the action again."
   }
 }

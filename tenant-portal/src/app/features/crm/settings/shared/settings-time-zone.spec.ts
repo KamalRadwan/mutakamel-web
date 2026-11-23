@@ -35,23 +35,20 @@ describe('settings time zone', () => {
     dispose();
   });
 
-  it('uses the CRM tenant default', async () => {
-    const expected = (await getCrmSettings()).analyticsTimeZone;
-    expect(await run()).toBe(expected);
-    expect(await run()).not.toBe(user().timeZone);
-  });
-
-  it('no zone without settings read', async () => {
-    me.update((value) => ({ ...value!, permissions: [], permissionScopes: {} }));
+  it('uses the authenticated workspace zone without reading CRM settings', async () => {
     const read = vi.spyOn(stub, 'read');
-    const delay = vi.spyOn(globalThis, 'setTimeout');
-    expect(await run()).toBeNull();
+    expect(await run()).toBe('Pacific/Auckland');
     expect(read).not.toHaveBeenCalled();
-    // Until the general API migration lands, a fake read would schedule fakeDelay instead.
-    expect(delay).not.toHaveBeenCalled();
   });
 
-  it('never guesses from the browser', async () => {
+  it('keeps the workspace zone without settings read permission', async () => {
+    me.update((value) => value ? { ...value, permissions: [], permissionScopes: {} } : null);
+    const read = vi.spyOn(stub, 'read');
+    expect(await run()).toBe('Pacific/Auckland');
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  it('never guesses from the browser when signed out', async () => {
     const browserZone = vi.spyOn(Intl.DateTimeFormat.prototype, 'resolvedOptions');
     const read = vi.spyOn(stub, 'read');
     me.set(null);
@@ -60,23 +57,18 @@ describe('settings time zone', () => {
     expect(read).not.toHaveBeenCalled();
   });
 
-  it('does not read settings for a branch-only settings grant', async () => {
-    me.update((value) => ({ ...value!, permissionScopes: {
+  it('keeps workspace timezone independent of branch-only settings grants', async () => {
+    me.update((value) => value ? { ...value, permissionScopes: {
       'crm.settings.read': { tenantWide: false, branchIds: ['branch-a'], companyIds: [] },
-    } }));
+    } } : null);
     const read = vi.spyOn(stub, 'read');
-    const delay = vi.spyOn(globalThis, 'setTimeout');
-    expect(await run()).toBeNull();
-    expect(read).not.toHaveBeenCalled();
-    expect(delay).not.toHaveBeenCalled();
-  });
-
-  it('uses the explicit CurrentUser zone only after the workspace projection lands', async () => {
-    me.update((value) => Object.assign({ ...value!, permissions: [], permissionScopes: {} }, { workspace: {} }));
-    const read = vi.spyOn(stub, 'read');
-    const delay = vi.spyOn(globalThis, 'setTimeout');
     expect(await run()).toBe('Pacific/Auckland');
     expect(read).not.toHaveBeenCalled();
-    expect(delay).not.toHaveBeenCalled();
+  });
+
+  it('retains the settings fallback when the current-user projection is unavailable', async () => {
+    user.set({ timeZone: '' });
+    const expected = (await getCrmSettings()).analyticsTimeZone;
+    expect(await run()).toBe(expected);
   });
 });

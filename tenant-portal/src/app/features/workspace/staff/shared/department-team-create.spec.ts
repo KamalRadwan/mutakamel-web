@@ -35,7 +35,7 @@ const branch = { id: branchId, companyId, name: 'Cairo', status: 'ACTIVE' };
 const otherBranch = { ...branch, id: otherBranchId, name: 'Other branch' };
 const department = { id: departmentId, branchId, code: 'DELIVERY', name: 'Delivery', status: 'ACTIVE', createdAt: date };
 const team = { id: teamId, departmentId, code: 'FIELD', name: 'Field', leadUserId: leadId, status: 'ACTIVE', createdAt: date };
-const lead = { id: leadId, branchId, status: 'ACTIVE', firstName: 'Kareem', lastName: 'Test' };
+const lead = { id: leadId, companyId, branchId, status: 'ACTIVE', firstName: 'Kareem', lastName: 'Test' };
 const grant = { tenantWide: false, companyIds: [companyId], branchIds: [branchId, otherBranchId] };
 const writeGrant = { ...grant, branchIds: [branchId] };
 

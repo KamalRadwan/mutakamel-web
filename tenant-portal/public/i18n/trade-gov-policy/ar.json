@@ -31,31 +31,48 @@
   },
   "factTypes": {
     "number": "رقم",
+    "decimal": "عشري",
     "string": "نص",
     "boolean": "نعم/لا"
   },
   "facts": {
-    "documentKind": "نوع المستند",
-    "totalAmount": "الإجمالي",
-    "subtotalAmount": "الإجمالي الفرعي",
-    "currencyCode": "العملة",
-    "accountStatus": "حالة الحساب",
-    "accountRole": "دور الحساب",
-    "customerEligible": "أهلية العميل",
-    "discountPercent": "نسبة الخصم",
-    "marginPercent": "نسبة الهامش",
-    "actorHasOverride": "للمستخدم صلاحية التجاوز",
-    "lineCount": "عدد البنود",
-    "hasPriceLock": "يوجد تثبيت سعر",
-    "channelType": "نوع القناة",
-    "branchId": "الفرع",
-    "creditExposureRatio": "نسبة التعرض الائتماني",
-    "creditBlocked": "الائتمان محظور",
-    "availableQuantity": "الكمية المتاحة",
-    "requestedQuantity": "الكمية المطلوبة",
-    "overReceiptPercent": "نسبة الاستلام الزائد",
-    "allowNegativeStock": "السماح بالمخزون السالب",
-    "reservationPriority": "أولوية الحجز"
+    "document": {
+      "kind": "نوع المستند",
+      "total": "إجمالي المستند",
+      "currency": "العملة"
+    },
+    "account": {
+      "status": "حالة الحساب",
+      "credit_limit": "حد الائتمان"
+    },
+    "customer": {
+      "eligibilitySource": "مصدر أهلية العميل",
+      "crmStatus": "حالة العميل في إدارة العلاقات",
+      "quotationEligibility": "أهلية عرض السعر"
+    },
+    "commercialAccount": {
+      "status": "حالة الحساب التجاري"
+    },
+    "inventory": {
+      "available": "الكمية المتاحة",
+      "requested": "الكمية المطلوبة",
+      "on_hand": "الكمية الفعلية",
+      "reserved": "الكمية المحجوزة",
+      "remaining": "الكمية المتبقية",
+      "shortage": "كمية العجز",
+      "over_receipt": "كمية الاستلام الزائد",
+      "operation": "عملية المخزون"
+    },
+    "pricing": {
+      "discount_percent": "نسبة الخصم",
+      "margin_percent": "نسبة الهامش"
+    },
+    "actor": {
+      "has_override": "للمستخدم صلاحية التجاوز"
+    },
+    "context": {
+      "channel_type": "نوع القناة"
+    }
   },
   "operators": {
     "EQ": "يساوي",
@@ -403,6 +420,9 @@
   "decision": {
     "title": "إيصال القرار",
     "loadErrorToast": "هذا القرار غير متاح",
+    "retry": "حاول مرة أخرى",
+    "unavailableTitle": "خدمة القرارات غير جاهزة حاليًا",
+    "unavailableText": "تعذر الوصول إلى سجل القرارات مؤقتًا. حاول مرة أخرى بعد قليل.",
     "decisionTypeLabel": "نوع القرار",
     "decisionTypeHint": "نوع السياسة أو فئة التقييم التي أصدرت هذا القرار.",
     "outcomeLabel": "النتيجة",
@@ -411,10 +431,14 @@
     "reasonCodeHint": "رمز تقني يوضح سبب هذا القرار.",
     "explanationCodeLabel": "رمز التفسير",
     "explanationCodeHint": "يبيّن هل طُبّقت قاعدة مطابقة أم النتيجة الافتراضية.",
+    "explanationLabel": "التفسير",
+    "explanationHint": "شرح نصي مرفق مع إيصال القرار.",
     "selectedValueLabel": "القيمة المختارة",
     "selectedValueHint": "القيمة التي حددتها القاعدة عندما تكون النتيجة «اختيار قيمة».",
-    "matchedRuleLabel": "القاعدة المطابقة",
-    "matchedRuleHint": "رمز أول قاعدة تحققت جميع شروطها.",
+    "matchedRulesLabel": "القواعد المطابقة",
+    "matchedRulesHint": "رموز القواعد التي تحققت شروطها عند تقييم هذا القرار.",
+    "scopeLabel": "النطاق",
+    "scopeHint": "مستوى نطاق التشغيل الذي جرى تقييم القرار ضمنه.",
     "policyVersionsLabel": "نسخ السياسة",
     "policyVersionsHint": "نسخ السياسات التي قُيّمت للوصول إلى هذا القرار.",
     "documentLabel": "المستند",

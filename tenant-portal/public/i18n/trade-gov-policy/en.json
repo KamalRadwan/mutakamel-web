@@ -31,31 +31,48 @@
   },
   "factTypes": {
     "number": "Number",
+    "decimal": "Decimal",
     "string": "Text",
     "boolean": "Yes/No"
   },
   "facts": {
-    "documentKind": "Document kind",
-    "totalAmount": "Total",
-    "subtotalAmount": "Subtotal",
-    "currencyCode": "Currency",
-    "accountStatus": "Account status",
-    "accountRole": "Account role",
-    "customerEligible": "Customer eligibility",
-    "discountPercent": "Discount percent",
-    "marginPercent": "Margin percent",
-    "actorHasOverride": "Actor has override",
-    "lineCount": "Line count",
-    "hasPriceLock": "Has price lock",
-    "channelType": "Channel type",
-    "branchId": "Branch",
-    "creditExposureRatio": "Credit exposure ratio",
-    "creditBlocked": "Credit blocked",
-    "availableQuantity": "Available quantity",
-    "requestedQuantity": "Requested quantity",
-    "overReceiptPercent": "Over-receipt percent",
-    "allowNegativeStock": "Allow negative stock",
-    "reservationPriority": "Reservation priority"
+    "document": {
+      "kind": "Document kind",
+      "total": "Document total",
+      "currency": "Currency"
+    },
+    "account": {
+      "status": "Account status",
+      "credit_limit": "Credit limit"
+    },
+    "customer": {
+      "eligibilitySource": "Customer eligibility source",
+      "crmStatus": "CRM customer status",
+      "quotationEligibility": "Quotation eligibility"
+    },
+    "commercialAccount": {
+      "status": "Commercial account status"
+    },
+    "inventory": {
+      "available": "Available quantity",
+      "requested": "Requested quantity",
+      "on_hand": "On-hand quantity",
+      "reserved": "Reserved quantity",
+      "remaining": "Remaining quantity",
+      "shortage": "Shortage quantity",
+      "over_receipt": "Over-receipt quantity",
+      "operation": "Inventory operation"
+    },
+    "pricing": {
+      "discount_percent": "Discount percent",
+      "margin_percent": "Margin percent"
+    },
+    "actor": {
+      "has_override": "Actor has override"
+    },
+    "context": {
+      "channel_type": "Channel type"
+    }
   },
   "operators": {
     "EQ": "Equals",
@@ -403,6 +420,9 @@
   "decision": {
     "title": "Decision receipt",
     "loadErrorToast": "This decision is not available",
+    "retry": "Try again",
+    "unavailableTitle": "Decision service is not ready",
+    "unavailableText": "Policy decision lookup is temporarily unavailable. Try again in a moment.",
     "decisionTypeLabel": "Decision type",
     "decisionTypeHint": "Policy kind or evaluation category that produced this decision.",
     "outcomeLabel": "Outcome",
@@ -411,10 +431,14 @@
     "reasonCodeHint": "Machine-readable reason explaining the decision.",
     "explanationCodeLabel": "Explanation code",
     "explanationCodeHint": "Whether a rule matched or the default outcome applied.",
+    "explanationLabel": "Explanation",
+    "explanationHint": "Human-readable explanation returned with the decision receipt.",
     "selectedValueLabel": "Selected value",
     "selectedValueHint": "Value chosen by the rule when the outcome is Select a value.",
-    "matchedRuleLabel": "Matched rule",
-    "matchedRuleHint": "Code of the first rule whose conditions matched.",
+    "matchedRulesLabel": "Matched rules",
+    "matchedRulesHint": "Rule codes whose conditions matched when evaluating this decision.",
+    "scopeLabel": "Scope",
+    "scopeHint": "Operating scope level at which the decision was evaluated.",
     "policyVersionsLabel": "Policy version(s)",
     "policyVersionsHint": "Policy versions evaluated to reach this decision.",
     "documentLabel": "Document",

@@ -76,7 +76,7 @@
     },
     "tooManyChanges": {
       "title": "Too many changes for one save",
-      "text": "You changed more than 5,000 rows in one save. Use \"Copy into a new draft\" with a price change instead."
+      "text": "You changed more than 4,000 rows in one save. Use \"Copy into a new draft\" with a price change instead."
     }
   },
   "toasts": {
@@ -88,7 +88,7 @@
     "testFailedDetail": "Review the problems on the Test result tab.",
     "published": "Version published.",
     "scheduled": "Version scheduled.",
-    "tooManyChanges": "More than 5,000 changes in one save. Use \"Copy into a new draft\" with a price change instead."
+    "tooManyChanges": "More than 4,000 changes in one save. Use \"Copy into a new draft\" with a price change instead."
   },
   "lines": {
     "searchPlaceholder": "Search lines by item code or name",

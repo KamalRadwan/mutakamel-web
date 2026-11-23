@@ -1,3 +1,4 @@
+import { mockDialogsForTest } from '../../../../shared/ui/modal/testing/dialog-testing';
 import { Injectable, signal } from '@angular/core';
 import { type ComponentFixture, TestBed } from '@angular/core/testing';
 import { TranslocoLoader, TranslocoService, provideTransloco, type Translation } from '@jsverse/transloco';
@@ -25,6 +26,8 @@ import type { DocumentKind } from '../shared/document.model';
 import { DocumentBulkBar } from './bulk-bar/bulk-bar';
 import { BulkParamsModal } from './bulk-params-modal/bulk-params-modal';
 import { BULK_PRINT_NOT_READY_CODE, openBulkPrintArtifact } from './documents-bulk.descriptor';
+
+mockDialogsForTest();
 
 const TRANSLATIONS: Record<string, Translation> = {
   en: { ...en, tradeShared: enTradeShared, td: enTradeDocuments, tdb: enBulk },

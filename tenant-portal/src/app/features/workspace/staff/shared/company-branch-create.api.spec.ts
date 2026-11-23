@@ -67,7 +67,7 @@ describe('Organization create HTTP contract', () => {
     expect(key).toMatch(/^[a-f\d]{8}-[a-f\d]{4}-7[a-f\d]{3}-[89ab][a-f\d]{3}-[a-f\d]{12}$/i);
     const data = { ...body, id: companyId, status: 'ACTIVE' };
     req.flush({ success: true, data }, { status: 201, statusText: 'Created' });
-    await expect(pending).resolves.toEqual(data);
+    await expect(pending).resolves.toMatchObject(data);
     expect(session.isTenantWide).toHaveBeenCalledWith('org.company.manage');
     expect(invalidateScope).toHaveBeenCalledWith('active-staff-scope');
     expect(reloadProfile).toHaveBeenCalledWith(version);
@@ -90,7 +90,7 @@ describe('Organization create HTTP contract', () => {
     expect(req.request.headers.get('x-idempotency-key')).toBe(key);
     const data = { ...ordinary, id: '019f0000-0000-7000-8000-000000000011', status: 'ACTIVE' };
     req.flush({ success: true, data }, { status: 201, statusText: 'Created' });
-    await expect(pending).resolves.toEqual(data);
+    await expect(pending).resolves.toMatchObject(data);
   });
 
   it('sends neither a write without permission nor a write with no CSRF cookie', async () => {

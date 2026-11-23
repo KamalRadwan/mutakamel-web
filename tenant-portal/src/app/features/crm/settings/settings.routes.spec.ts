@@ -1,3 +1,6 @@
+import { RealtimeClient } from '../../../core/realtime/realtime-client';
+import { NotificationsFeed } from '../../../core/realtime/notifications-feed';
+import { CrmEvents } from '../../../core/realtime/crm-events';
 import { ApplicationInitStatus, Component, EnvironmentInjector, signal } from '@angular/core';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
@@ -187,6 +190,9 @@ describe('app config', () => {
       { provide: LanguageState, useValue: { current: () => 'en' } },
       { provide: ThemeState, useValue: {} }, { provide: ViewScale, useValue: {} },
       { provide: TabLeader, useValue: { start: () => undefined } },
+      { provide: RealtimeClient, useValue: {} },
+      { provide: NotificationsFeed, useValue: {} },
+      { provide: CrmEvents, useValue: { bind: () => undefined } },
       { provide: TitleStrategy, useValue: { updateTitle: () => undefined } },
     ] });
     try {

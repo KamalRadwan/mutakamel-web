@@ -266,20 +266,12 @@ for (const lang of ['en', 'ar'] as const)
         document.documentElement.removeAttribute('lang');
       });
 
-      it('empty calendar uses the CAL-8 zone default', async () => {
-        await render();
-        expect(page.timeZone()).toBe('');
-        await page.publish();
-        await paint();
-        expect(write).not.toHaveBeenCalled();
-        expect(fixture.nativeElement.textContent).toContain(texts.validation.timeZoneRequired);
-        const zone = fixture.debugElement.query(By.directive(WeekEditor))
-          .componentInstance as WeekEditor;
-        expect(zone.zoneError()).toBe(texts.validation.timeZoneRequired);
-        fixture.destroy();
-        Object.assign(me()!, { workspace: {} });
+      it('empty calendar uses the authenticated workspace zone', async () => {
         await render();
         expect(page.timeZone()).toBe('Pacific/Auckland');
+        await page.publish();
+        await paint();
+        expect(write).toHaveBeenCalled();
       });
 
       it('published calendar keeps its zone', async () => {
@@ -516,7 +508,7 @@ for (const lang of ['en', 'ar'] as const)
         fixture.destroy();
         grants();
         await render();
-        expect(page.yearOptions().map((option) => option.value)).toEqual([2025, 2026, 2027, 2028]);
+        expect(page.yearOptions().map((option) => option.value)).toEqual([2026, 2027, 2028, 2029]);
       });
 
       it('dirty switch asks to discard', async () => {

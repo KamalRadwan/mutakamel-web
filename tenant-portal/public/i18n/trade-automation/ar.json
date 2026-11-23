@@ -259,7 +259,11 @@
     "TRADE.CONTROL_TOWER.NOT_FOUND": "أعد تحميل صندوق الوارد لأن هذا الاستثناء لم يعد موجودًا.",
     "TRADE_CONTROL_TOWER_NOT_FOUND": "أعد تحميل صندوق الوارد لأن هذا الاستثناء لم يعد موجودًا.",
     "TRADE.CONTROL_TOWER.SCOPE_DENIED": "هذا الاستثناء خارج نطاقك الحالي.",
-    "TRADE_CONTROL_TOWER_SCOPE_DENIED": "هذا الاستثناء خارج نطاقك الحالي."
+    "TRADE_CONTROL_TOWER_SCOPE_DENIED": "هذا الاستثناء خارج نطاقك الحالي.",
+    "GW.IDEM.MISMATCH": "تغيّرت بيانات الطلب أثناء الإرسال؛ فأعد تنفيذ الإجراء.",
+    "GW_IDEM_MISMATCH": "تغيّرت بيانات الطلب أثناء الإرسال؛ فأعد تنفيذ الإجراء.",
+    "TRADE.CONTROL_TOWER.QUERY_INVALID": "تحقق من قيم التصفية وحاول مرة أخرى.",
+    "TRADE_CONTROL_TOWER_QUERY_INVALID": "تحقق من قيم التصفية وحاول مرة أخرى."
   },
   "workerErrors": {
     "WORKER.TRADE_IMPORT.FILE_NOT_FOUND": "أعد رفع الملف لأن الملف المحفوظ لم يعد متاحًا للمعالجة.",

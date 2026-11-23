@@ -42,13 +42,13 @@ export class PricingPanel {
   readonly reasonRequired = computed<boolean>(() => {
     const current = this.intent();
     if (current.mode !== 'DISCOUNT') return false;
-    if (!this.policy()?.limit.reasonRequired) return false;
+    if (!this.policy()?.limit?.reasonRequired) return false;
     if (!current.reasonCode?.trim()) return true;
     return this.reasonRequiresNote() && !current.reasonNote?.trim();
   });
 
   protected readonly canApplyDiscount = computed(() => Boolean(this.policy()?.canApply));
-  protected readonly maxPercent = computed(() => this.policy()?.limit.maxPercent ?? null);
+  protected readonly maxPercent = computed(() => this.policy()?.limit?.maxPercent ?? null);
   protected readonly maxPercentText = computed(() => {
     const max = this.maxPercent();
     return max === null ? null : formatPercentCap(max);
@@ -56,7 +56,7 @@ export class PricingPanel {
   protected readonly effectiveScope = computed<DiscountScope>(() => this.intent().scope ?? 'LINE');
   protected readonly effectiveType = computed<DiscountType>(() => this.intent().type ?? 'PERCENT');
   protected readonly showReasonField = computed(
-    () => this.intent().mode === 'DISCOUNT' && Boolean(this.policy()?.limit.reasonRequired),
+    () => this.intent().mode === 'DISCOUNT' && Boolean(this.policy()?.limit?.reasonRequired),
   );
 
   private readonly discountReasons = signal<ReasonCode[]>([]);

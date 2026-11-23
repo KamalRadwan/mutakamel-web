@@ -91,6 +91,7 @@ describe('Organization API tree', () => {
   function signIn(permissionScopes: TenantMe['permissionScopes'] = readScopes, id = 'actor'): void {
     me.set({
       id, email: 'actor@example.test', firstName: 'Staff', lastName: 'Reader', hasAvatar: false,
+      workspace: { timezone: 'UTC', defaultLanguage: 'en' },
       isTenantOwner: false, mfaEnabled: false, mfaUpdatedAt: null, status: 'ACTIVE',
       accessibleCompanies: ['c1', 'c2', 'c3', 'c4', 'inactive'],
       accessibleBranches: ['b1', 'b2'],

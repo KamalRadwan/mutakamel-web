@@ -106,6 +106,8 @@
     "liveSince": "سارٍ منذ {{date}}",
     "replacedRange": "مستبدلة · {{range}}",
     "datesCardLabel": "جدول السريان",
+    "contentHidden": "لا يظهر محتوى المسودة والنسخة المختبرة إلا للمستخدمين الذين لديهم صلاحية الإدارة أو التحقق.",
+    "reload": "إعادة التحميل",
     "discardTitle": "تجاهل النسخة الجديدة؟",
     "discardText": "ستُفقد تعديلاتك على نسخة ملف التعريف الجديدة.",
     "discardConfirm": "تجاهل",
@@ -231,7 +233,7 @@
       "codeHint": "معرّف فريد بأحرف إنجليزية كبيرة مثل QUOTATION_MINIMUM_INPUTS.",
       "codePlaceholder": "MINIMUM_INPUTS",
       "codeRequired": "أدخل رمز الحالة.",
-      "codeInvalid": "ابدأ بحرف إنجليزي كبير متبوعًا بأحرف إنجليزية كبيرة أو أرقام أو شرطات سفلية أو نقاط أو شرطات.",
+      "codeInvalid": "استخدم من حرفين إلى 64 حرفًا إنجليزيًا كبيرًا أو رقمًا أو شرطة سفلية، تبدأ بحرف إنجليزي كبير.",
       "codeDuplicate": "توجد حالة بهذا الرمز بالفعل.",
       "inputFieldsLabel": "الحقول المدخلة",
       "inputFieldsHint": "اختر الحقول المقدمة في سيناريو التحقق هذا.",
@@ -263,10 +265,36 @@
     "scheduled": "تمت جدولة النسخة {{n}}."
   },
   "errors": {
-    "generic": "حدث خطأ ما، فحاول مرة أخرى."
+    "generic": "حدث خطأ ما، فحاول مرة أخرى.",
+    "publicationUnavailableTitle": "خدمة ملفات تعريف المستندات غير جاهزة",
+    "publicationUnavailableText": "نشر ملفات التعريف غير متاح مؤقتًا. حاول مرة أخرى بعد قليل.",
+    "confirmationModeUnsupported": "التأكيد الفوري (SYNC) فقط هو المدعوم حاليًا.",
+    "effectiveOverlap": "تتداخل تواريخ السريان مع نسخة منشورة أو مجدولة أخرى.",
+    "compatibilityChanged": "تغيّر ملف التعريف هذا؛ راجعه وأعد النشر.",
+    "activePointerStaleTitle": "تغيّرت النسخة الفعّالة لملف التعريف",
+    "activePointerStaleText": "نُشرت نسخة أخرى منذ فتح هذه الصفحة. أعد تحميل أحدث نسخة وراجعها قبل تأكيد النشر مجددًا.",
+    "activePointerStaleConfirm": "إعادة التحميل والمراجعة",
+    "activePointerStaleDismiss": "إلغاء"
   },
   "registry": {
     "fields": {
+      "PARTY": "العميل",
+      "SUPPLIER": "المورد",
+      "CONTACT": "جهة الاتصال",
+      "CURRENCY": "العملة",
+      "VALID_UNTIL": "صالح حتى",
+      "LINES": "البنود",
+      "TERMS": "الشروط",
+      "FULFILLMENT_NODE": "نقطة التنفيذ",
+      "HOLD_REASON": "سبب التعليق",
+      "RECEIVING_NODE": "نقطة الاستلام",
+      "EXPECTED_DATE": "تاريخ الاستلام المتوقع",
+      "GRAND_TOTAL": "الإجمالي",
+      "DOCUMENT_NUMBER": "رقم المستند",
+      "LIFECYCLE_STATUS": "حالة دورة الحياة",
+      "APPROVAL_STATUS": "حالة الاعتماد",
+      "FULFILLMENT_STATUS": "حالة التنفيذ",
+      "BILLING_STATUS": "حالة الفوترة",
       "customerAccountId": "العميل",
       "supplierAccountId": "المورد",
       "contactPartyId": "جهة الاتصال",
@@ -287,10 +315,14 @@
     },
     "components": {
       "HEADER": "الرأس",
+      "PARTY_SUMMARY": "ملخص الطرف",
       "PARTIES": "الأطراف",
       "LINE_ITEMS": "البنود",
       "TOTALS": "الإجماليات",
       "TERMS": "الشروط",
+      "APPROVAL": "الاعتماد",
+      "FULFILLMENT": "التنفيذ",
+      "NOTES": "الملاحظات",
       "DELIVERY": "التسليم",
       "ATTACHMENTS": "المرفقات",
       "AUDIT_HISTORY": "سجل التدقيق"
@@ -301,6 +333,7 @@
         "hint": "يحدّد المخوّلين بتسجيل قبول عرض السعر.",
         "note": "يقتصر القبول على المستخدمين المخوّلين داخليًا فقط.",
         "values": {
+          "INTERNAL_AUTHORIZED": "المخوّلون داخليًا فقط",
           "INTERNAL_AUTHORIZED_ONLY": "المخوّلون داخليًا فقط"
         }
       },
@@ -317,7 +350,8 @@
         "hint": "يحدّد آلية تأكيد أوامر البيع عند الإرسال.",
         "note": "انتظار التأكيد غير مدعوم بعد.",
         "values": {
-          "SYNC": "فوري"
+          "SYNC": "فوري",
+          "ASYNC": "بانتظار التأكيد"
         }
       },
       "reservationRequired": {
@@ -340,6 +374,8 @@
         "label": "الإرسال",
         "hint": "يتحكم في إرسال أوامر الشراء المعتمدة فورًا أو عبر قائمة الانتظار.",
         "values": {
+          "SYNC": "فوري",
+          "ASYNC": "في قائمة الانتظار",
           "IMMEDIATE": "فوري",
           "QUEUED": "في قائمة الانتظار"
         }

@@ -115,6 +115,7 @@
     "emptyTitle": "No dashboard yet.",
     "createDashboard": "Create dashboard",
     "forbiddenTitle": "Trade analytics is not part of your subscription.",
+    "forbiddenPermissionTitle": "You do not have permission to view Trade dashboards.",
     "loadFailedText": "An error occurred while loading the dashboard. Try again.",
     "emptyDashboard": "This dashboard has no widgets yet."
   },

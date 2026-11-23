@@ -147,6 +147,7 @@
     "label": "ترقيم صفحات الاستثناءات"
   },
   "states": {
+    "notReadyTitle": "غير متاح مؤقتًا",
     "loadFailed": "تعذّر تحميل استثناءات برج المراقبة.",
     "notFound": "لم يعد هذا الاستثناء موجودًا.",
     "emptyOpen": "لا يوجد ما يحتاج إلى انتباه.",
@@ -169,7 +170,7 @@
     "hints": {
       "source": "السجل الذي أنشأ هذا الاستثناء. استخدم الرابط لفتحه.",
       "status": "الحالة الحالية لمعالجة الاستثناء.",
-      "problem": "رمز الخطأ الآمن الذي أبلغ عنه النظام، معروضًا بصياغة مفهومة.",
+      "problem": "رمز الخطأ التقني الآمن الذي أبلغ عنه النظام.",
       "created": "وقت إنشاء النظام لهذا الاستثناء أول مرة.",
       "correlationId": "المعرّف الذي يربط هذا الاستثناء بسجلاته. اذكره عند طلب الدعم.",
       "attempts": "عدد محاولات التسليم قبل إنشاء الاستثناء."
@@ -261,6 +262,11 @@
     "TRADE_CONTROL_TOWER_RESOLUTION_INVALID_category_not_resolvable": "طريقة الحل هذه لا تناسب فئة الاستثناء.",
     "TRADE_CONTROL_TOWER_RESOLUTION_INVALID_source_still_scheduled": "ما زالت نسخة المصدر مجدولة؛ ففعّلها أو غيّرها أولًا.",
     "TRADE_CONTROL_TOWER_RESOLUTION_INVALID_evidence_invalid": "راجع الأدلة: مفتاح آمن واحد على الأقل ضمن حدود الحجم، ويتطلب قبول النتيجة معرّف keptArtifactId صالحًا.",
-    "TRADE_CONTROL_TOWER_SCOPE_DENIED_branch_not_accessible": "هذا الفرع غير متاح في هذه الشركة؛ فقد يكون غير نشط أو محذوفًا، أو ليست لديك صلاحية الوصول إليه. اختر فرعًا آخر."
+    "TRADE_CONTROL_TOWER_SCOPE_DENIED_branch_not_accessible": "هذا الفرع غير متاح في هذه الشركة؛ فقد يكون غير نشط أو محذوفًا، أو ليست لديك صلاحية الوصول إليه. اختر فرعًا آخر.",
+    "TRADE_CONTROL_TOWER_PROJECTION_UNAVAILABLE": "عرض برج المراقبة غير متاح مؤقتًا؛ حاول مرة أخرى بعد قليل.",
+    "TRADE_CONTROL_TOWER_TARGET_STALE": "تغيّر السجل المصدر؛ أعد التحميل لمراجعة أحدث حالة للاستثناء.",
+    "TRADE_CONTROL_TOWER_OWNER_UNAVAILABLE": "الوحدة المالكة غير متاحة مؤقتًا؛ حاول مرة أخرى بعد قليل.",
+    "TRADE_CONTROL_TOWER_OWNER_RESULT_REJECTED": "رفضت الوحدة المالكة نتيجة هذا الحل.",
+    "TRADE_CONTROL_TOWER_QUERY_INVALID": "مجموعة عوامل التصفية المختارة غير صالحة؛ عدّل عوامل التصفية وحاول مجددًا."
   }
 }

@@ -256,7 +256,7 @@ for (const lang of ['en', 'ar'] as const) {
 
         stub = new TradeHttpStub({
           'GET /sales-orders/so-1': makeSalesOrderDetail(),
-          'GET /terms/options': { PAYMENT: [], DELIVERY: [], WARRANTY: [], RETURNS: [], GENERAL: [] },
+          'GET /terms/options': { byType: { PAYMENT: [], DELIVERY: [], WARRANTY: [], RETURNS: [], GENERAL: [] } },
           'GET /quotations/customer-options': {
             items: [
               {

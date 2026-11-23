@@ -59,7 +59,8 @@
     "TRADE_IMPORT_MAPPING_NOT_FOUND": "لم يُعثر على تعيين الاستيراد هذا.",
     "TRADE_IMPORT_RUN_NOT_FOUND": "لم يُعثر على عملية الاستيراد هذه.",
     "TRADE_IMPORT_RUN_NOT_EXECUTABLE_BULK_JOB_MISSING": "لا توجد مهمة في الخلفية لهذه العملية لإلغائها.",
-    "BULK_JOB_ACTIVE_ACTIVE_JOB_EXISTS": "توجد عملية مجمّعة أخرى قيد التنفيذ. حاول مرة أخرى بعد انتهائها."
+    "BULK_JOB_ACTIVE_ACTIVE_JOB_EXISTS": "توجد عملية مجمّعة أخرى قيد التنفيذ. حاول مرة أخرى بعد انتهائها.",
+    "TRADE_CONTROL_TOWER_QUERY_INVALID": "تحقق من قيم التصفية وحاول مرة أخرى."
   },
   "common": {
     "none": "—",
@@ -190,7 +191,8 @@
       "columnPattern": "يبدأ بحرف إنجليزي ويستخدم أحرفاً أو أرقاماً أو مسافات أو _ أو . أو - (بحد أقصى 100).",
       "columnDuplicate": "يجب أن تكون أسماء الأعمدة في الملف فريدة.",
       "targetRequired": "اختر حقل النظام.",
-      "missingRequired": "الحقول المطلوبة الناقصة: {{fields}}"
+      "missingRequired": "الحقول المطلوبة الناقصة: {{fields}}",
+      "lookupInvalid": "رمز المرجع هذا غير صالح للحقل المحدد."
     }
   },
   "runs": {

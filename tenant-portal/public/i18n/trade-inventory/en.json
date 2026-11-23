@@ -97,6 +97,7 @@
     "TRADE_IDEMPOTENCY_KEY_MISSING": "Request key missing. Try again.",
     "TRADE_IDEMPOTENCY_MISMATCH": "This request was already sent with different values.",
     "TRADE_INVENTORY_NODE_CONFLICT": "A node with this code already exists.",
+    "TRADE_INVENTORY_NODE_INVALID": "This node is inactive or not valid for the selected branch.",
     "TRADE_INVENTORY_NODE_IN_USE": "This node has reserved stock and cannot be changed that way.",
     "TRADE_INVENTORY_NODE_NOT_FOUND": "This node is not available in the current branch.",
     "TRADE_INVENTORY_SCOPE_INVALID": "Choose at least one valid branch for this node.",
@@ -126,6 +127,7 @@
       "NON_EXACT_RESULT": "This quantity does not convert exactly to the base unit."
     },
     "TRADE_INVENTORY_UOM_CONVERSION_UNAVAILABLE": "This unit has no published conversion to the base unit.",
+    "TRADE_INVENTORY_INSUFFICIENT_AVAILABILITY": "Available stock is not enough for this quantity.",
     "TRADE_INVENTORY_TRACKING_REQUIRED": "Lot or serial tracking details are missing or do not match the quantity.",
     "TRADE_INVENTORY_SERIAL_CONFLICT": "One of these serial numbers already exists.",
     "TRADE_INVENTORY_SERIAL_NOT_FOUND": "Serial number not found.",
@@ -146,6 +148,7 @@
     "TRADE_INVENTORY_PERIOD_CODE_TAKEN": "Another inventory period already uses this code.",
     "TRADE_INVENTORY_SCOPE_NOT_FOUND": "This record was not found in the current company.",
     "TRADE_INVENTORY_ITEM_NOT_STOCK_TRACKED": "This item is not active or does not track stock.",
+    "TRADE_INVENTORY_ITEM_TRACKING_CONFLICT": "Item tracking settings do not match the provided lot or serial details.",
     "TRADE_INVENTORY_TRACKING_UNSUPPORTED": "This item does not use lot or serial tracking of this kind."
   }
 }

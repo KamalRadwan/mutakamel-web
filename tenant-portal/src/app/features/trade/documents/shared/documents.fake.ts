@@ -42,7 +42,7 @@ import type {
   PrintLocale,
   PrintTemplateOption,
   PurchaseOrder,
-  PurchaseOrderDetail,
+  PurchaseOrderDetail as PurchaseOrderResponse,
   PurchaseOrderLine,
   PurchaseQuotation,
   PurchaseQuotationDetail,
@@ -70,6 +70,9 @@ import type {
   TotalsSnapshot,
 } from './document.model';
 import { documentGrandTotal, TERMS_NOTES_MAX_LENGTH } from './document.model';
+
+// Submission metadata belongs to the legacy fixture, not the API response.
+type PurchaseOrderDetail = PurchaseOrderResponse & { submittedBy?: string | null; submittedAt?: string | null };
 
 export const FAKE_CURRENT_USER_ID = FAKE_USER.email;
 
@@ -4534,11 +4537,11 @@ function recordRemovedClientLineIds(
 
 interface SourceLockedLine {
   clientLineId: string;
-  itemId?: string;
+  itemId?: string | null;
   itemCompanyProfileId: string;
   uomId: string;
   orderedQuantity: Dec;
-  discountTotal?: Dec;
+  discountTotal?: Dec | null;
 }
 
 /** Backend assertSourceOrderLines: same lines, item, unit, quantity and discount as the source copy, else 422. */
@@ -4552,7 +4555,7 @@ function assertSourceLinesUnchanged(
     const source = byId.get(line.clientLineId);
     if (!source) return true;
     const sameItem =
-      source.itemId !== undefined
+      source.itemId != null
         ? source.itemId === line.itemId
         : source.itemCompanyProfileId === fakeItemProfileId(line.itemId);
     return (
@@ -4605,7 +4608,7 @@ export async function fakeReplaceOrderLines<K extends 'sales-order' | 'purchase-
           orig.uomId !== line.uomId ||
           cmp(orig.orderedQuantity, line.quantity) !== 0 ||
           (line.unitPrice !== undefined && cmp(orig.unitPrice, line.unitPrice) !== 0) ||
-          cmp(orig.discountTotal, line.financial.discountTotal) !== 0
+          cmp(orig.discountTotal ?? '0', line.financial.discountTotal) !== 0
         ) {
           throw new ApiError(422, 'TRADE.SALES_ORDER.SOURCE_LINES_LOCKED');
         }

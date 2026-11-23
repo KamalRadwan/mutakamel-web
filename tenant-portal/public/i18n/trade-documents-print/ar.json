@@ -1,5 +1,7 @@
 {
   "title": "طباعة {{kind}}",
+  "forbiddenTitle": "الوصول مرفوض",
+  "forbiddenText": "ليس لديك إذن لطباعة هذا المستند.",
   "template": "القالب",
   "templateHint": "يُستخدم القالب الافتراضي المخصّص ما لم تختر قالبًا آخر.",
   "language": "اللغة",
@@ -22,5 +24,19 @@
   "lang": {
     "en-US": "الإنجليزية",
     "ar-EG": "العربية"
+  },
+  "errors": {
+    "TRADE.QUOTE.PDF_NOT_FOUND": "لم يُعثر على مهمة طباعة عرض السعر.",
+    "TRADE.QUOTE.PDF_BUNDLE_UNAVAILABLE": "تعذّر تجهيز بيانات ملف PDF لعرض السعر. أعد المحاولة بعد قليل.",
+    "TRADE.QUOTE.PDF_ARTIFACT_UNAVAILABLE": "ملف PDF المكتمل لعرض السعر غير متاح مؤقتًا. أعد المحاولة بعد قليل.",
+    "TRADE.QUOTE.PDF_TEMPLATE_CHANGED": "تغيّر قالب الطباعة المختار قبل اكتمال التجهيز. أعد المحاولة.",
+    "TRADE.QUOTE.PDF_TEMPLATE_PIN_STALE": "إصدار القالب المثبت قديم. اختر قالبًا وأعد المحاولة.",
+    "TRADE.QUOTE.PDF_INPUT_EXPIRED": "انتهت صلاحية طلب طباعة PDF قبل اكتمال التجهيز. أعد المحاولة.",
+    "TRADE.QUOTE.PDF_RESULT_CONFLICT": "حل طلب طباعة أحدث محل هذه المهمة. أعد المحاولة.",
+    "TRADE.BUSINESS_DOCUMENT.PDF_NOT_FOUND": "لم يُعثر على مهمة طباعة المستند.",
+    "TRADE.BUSINESS_DOCUMENT.PDF_TEMPLATE_CHANGED": "تغيّر قالب الطباعة المختار قبل اكتمال التجهيز. أعد المحاولة.",
+    "TRADE.BUSINESS_DOCUMENT.PDF_INPUT_EXPIRED": "انتهت صلاحية طلب طباعة PDF قبل اكتمال التجهيز. أعد المحاولة.",
+    "TRADE.BUSINESS_DOCUMENT.PDF_RESULT_CONFLICT": "حل طلب طباعة أحدث محل هذه المهمة. أعد المحاولة.",
+    "TRADE.CATALOG.ITEM_IMAGE_PRINT_BUDGET_EXCEEDED": "تتجاوز صور الأصناف في هذا المستند الحد الأقصى المسموح به للطباعة."
   }
 }

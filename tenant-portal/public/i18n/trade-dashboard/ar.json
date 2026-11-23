@@ -115,6 +115,7 @@
     "emptyTitle": "لا توجد لوحة بعد.",
     "createDashboard": "إنشاء لوحة",
     "forbiddenTitle": "تحليلات التجارة غير مشمولة في اشتراكك.",
+    "forbiddenPermissionTitle": "ليست لديك صلاحية عرض لوحات التجارة.",
     "loadFailedText": "حدث خطأ أثناء تحميل اللوحة، فحاول مرة أخرى.",
     "emptyDashboard": "لا تحتوي هذه اللوحة على عناصر بعد."
   },

@@ -106,6 +106,8 @@
     "liveSince": "live since {{date}}",
     "replacedRange": "replaced · {{range}}",
     "datesCardLabel": "Effective schedule",
+    "contentHidden": "Draft and tested profile content is visible only to users with manage or validate permissions.",
+    "reload": "Reload",
     "discardTitle": "Discard new version?",
     "discardText": "Your edits to this new profile version will be lost.",
     "discardConfirm": "Discard",
@@ -231,7 +233,7 @@
       "codeHint": "Unique uppercase identifier such as QUOTATION_MINIMUM_INPUTS.",
       "codePlaceholder": "MINIMUM_INPUTS",
       "codeRequired": "Enter a case code.",
-      "codeInvalid": "Start with an uppercase letter followed by uppercase letters, digits, underscores, dots, or hyphens.",
+      "codeInvalid": "Use 2 to 64 uppercase letters, digits, or underscores, starting with an uppercase letter.",
       "codeDuplicate": "A case with this code already exists.",
       "inputFieldsLabel": "Input fields",
       "inputFieldsHint": "Select the fields provided in this validation scenario.",
@@ -263,10 +265,36 @@
     "scheduled": "Version {{n}} scheduled."
   },
   "errors": {
-    "generic": "Something went wrong. Try again."
+    "generic": "Something went wrong. Try again.",
+    "publicationUnavailableTitle": "Document profile service is not ready",
+    "publicationUnavailableText": "Profile publication is temporarily unavailable. Try again shortly.",
+    "confirmationModeUnsupported": "Only immediate (SYNC) confirmation is supported.",
+    "effectiveOverlap": "Effective dates overlap another published or scheduled version.",
+    "compatibilityChanged": "This profile changed; review and publish again.",
+    "activePointerStaleTitle": "Active profile version changed",
+    "activePointerStaleText": "Another publish moved the active profile version since you opened it. Reload the latest version and confirm before publishing again.",
+    "activePointerStaleConfirm": "Reload & review",
+    "activePointerStaleDismiss": "Cancel"
   },
   "registry": {
     "fields": {
+      "PARTY": "Customer",
+      "SUPPLIER": "Supplier",
+      "CONTACT": "Contact",
+      "CURRENCY": "Currency",
+      "VALID_UNTIL": "Valid until",
+      "LINES": "Lines",
+      "TERMS": "Terms",
+      "FULFILLMENT_NODE": "Fulfilment node",
+      "HOLD_REASON": "Hold reason",
+      "RECEIVING_NODE": "Receiving node",
+      "EXPECTED_DATE": "Expected receipt date",
+      "GRAND_TOTAL": "Grand total",
+      "DOCUMENT_NUMBER": "Document number",
+      "LIFECYCLE_STATUS": "Lifecycle status",
+      "APPROVAL_STATUS": "Approval status",
+      "FULFILLMENT_STATUS": "Fulfilment status",
+      "BILLING_STATUS": "Billing status",
       "customerAccountId": "Customer",
       "supplierAccountId": "Supplier",
       "contactPartyId": "Contact",
@@ -287,10 +315,14 @@
     },
     "components": {
       "HEADER": "Header",
+      "PARTY_SUMMARY": "Party summary",
       "PARTIES": "Parties",
       "LINE_ITEMS": "Line items",
       "TOTALS": "Totals",
       "TERMS": "Terms",
+      "APPROVAL": "Approval",
+      "FULFILLMENT": "Fulfilment",
+      "NOTES": "Notes",
       "DELIVERY": "Delivery",
       "ATTACHMENTS": "Attachments",
       "AUDIT_HISTORY": "Audit history"
@@ -301,6 +333,7 @@
         "hint": "Determines who is permitted to record quotation acceptance.",
         "note": "Only internal authorized users can accept quotations.",
         "values": {
+          "INTERNAL_AUTHORIZED": "Internal authorized only",
           "INTERNAL_AUTHORIZED_ONLY": "Internal authorized only"
         }
       },
@@ -317,7 +350,8 @@
         "hint": "Defines how sales orders are confirmed upon submission.",
         "note": "Waiting confirmation is not supported yet.",
         "values": {
-          "SYNC": "Immediate"
+          "SYNC": "Immediate",
+          "ASYNC": "Waiting confirmation"
         }
       },
       "reservationRequired": {
@@ -340,6 +374,8 @@
         "label": "Dispatch",
         "hint": "Control whether approved purchase orders dispatch immediately or via queue.",
         "values": {
+          "SYNC": "Immediate",
+          "ASYNC": "Queued",
           "IMMEDIATE": "Immediate",
           "QUEUED": "Queued"
         }

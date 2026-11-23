@@ -17,7 +17,8 @@
     "INVENTORY_RECEIPT": "إيصال استلام",
     "INVENTORY_RECEIPT_LINE": "بند استلام",
     "INVENTORY_DELIVERY": "إذن تسليم",
-    "INVENTORY_DELIVERY_LINE": "بند تسليم"
+    "INVENTORY_DELIVERY_LINE": "بند تسليم",
+    "unknown": "سجل مخزون"
   },
   "explanations": {
     "WITHIN_TOLERANCE": "الكمية المستلمة ضمن سماحية الاستلام الزائد المضبوطة.",

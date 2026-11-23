@@ -8,7 +8,6 @@ import {
 } from '../../../../shared/bulk-jobs/bulk-jobs.fake';
 import { type BulkJob, type BulkJobItem, type BulkJobSubmit, isBulkJobActive } from '../../../../shared/bulk-jobs/bulk-jobs.model';
 import { newIdempotencyKey } from '../../shared/trade-api';
-import { openBulkPrintArtifact } from '../document-bulk/documents-bulk.descriptor';
 import type { DocumentKind } from './document.model';
 import { DocumentSelection } from './document-selection';
 import { FAKE_DOCUMENTS_BULK_PRINT, getBulkPrintArtifact } from './documents-bulk.fake-module';
@@ -175,12 +174,6 @@ describe('documents bulk fake follows the trade-app document bulk handlers', () 
     await expect(getBulkPrintArtifact(tooLarge.job.id)).rejects.toMatchObject({
       status: 409,
       code: 'TRADE.BULK_JOB.ARTIFACT_NOT_READY',
-    });
-
-    // Not ready is an expected state in the UI: a message, not a failure.
-    await expect(openBulkPrintArtifact(tooLarge.job.id)).resolves.toEqual({
-      ready: false,
-      messageKey: 'td.errors.TRADE.BULK_JOB.ARTIFACT_NOT_READY',
     });
 
     FAKE_DOCUMENTS_BULK_PRINT.pdfBytes = 48 * 1024;

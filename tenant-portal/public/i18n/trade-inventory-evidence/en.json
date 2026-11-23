@@ -17,7 +17,8 @@
     "INVENTORY_RECEIPT": "Receipt",
     "INVENTORY_RECEIPT_LINE": "Receipt line",
     "INVENTORY_DELIVERY": "Delivery",
-    "INVENTORY_DELIVERY_LINE": "Delivery line"
+    "INVENTORY_DELIVERY_LINE": "Delivery line",
+    "unknown": "Inventory record"
   },
   "explanations": {
     "WITHIN_TOLERANCE": "Received quantity is within the configured over-receipt tolerance.",

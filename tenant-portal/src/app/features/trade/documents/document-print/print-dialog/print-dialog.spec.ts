@@ -1,3 +1,4 @@
+import { LanguageState } from '../../../../../core/i18n/language';
 import { Component, Injectable, signal, viewChild } from '@angular/core';
 import { type ComponentFixture, TestBed } from '@angular/core/testing';
 import { TranslocoLoader, TranslocoService, provideTransloco, type Translation } from '@jsverse/transloco';
@@ -131,6 +132,7 @@ for (const lang of ['en', 'ar'] as const) {
           ],
         });
         TestBed.inject(TranslocoService).setActiveLang(lang);
+        TestBed.inject(LanguageState).current.set(lang);
 
         fixture = TestBed.createComponent(Host);
         fixture.detectChanges();
@@ -228,6 +230,7 @@ for (const lang of ['en', 'ar'] as const) {
         fixture.componentInstance.kind.set('quotation');
         fixture.componentInstance.documentId.set('qt-1');
         fixture.componentInstance.source.set({ revisionId: 'rev-1' });
+        fixture.detectChanges();
         await dialog.loadTemplates();
         dialog.selectChoice('built-in');
 

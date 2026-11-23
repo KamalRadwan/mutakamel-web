@@ -1,26 +1,38 @@
 import { InjectionToken } from '@angular/core';
-import { z } from 'zod';
+import {
+  type ZodType,
+  array,
+  boolean,
+  discriminatedUnion,
+  enum as enumSchema,
+  type infer as Infer,
+  iso,
+  literal,
+  null as nullSchema,
+  number,
+  record,
+  strictObject,
+  string,
+  union,
+} from 'zod';
 
 // RT10: realtime-app/packages/contracts/src/{constants,handshake,socket,primitives}.ts.
 // Kept local because dependency manifests belong to infra-link-bulk-2.
-const uuid = z
-  .string()
+const uuid = string()
   .regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
-const uuid7 = z
-  .string()
+const uuid7 = string()
   .regex(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
-const date = z.iso.datetime();
-const integer = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
+const date = iso.datetime();
+const integer = number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 const printable = (max: number) =>
-  z
-    .string()
+  string()
     .min(1)
     .max(max)
     .regex(/^[^\u0000-\u001f\u007f-\u009f]+$/u);
 export const notificationCursorSchema = printable(512);
-const safeType = z.string().regex(/^[a-z][a-z0-9_.-]{0,127}$/);
-const scope = z.enum(['CRM_LEADS', 'PRESENCE', 'NOTIFICATIONS', 'ALL']);
-export type RealtimeScope = z.infer<typeof scope>;
+const safeType = string().regex(/^[a-z][a-z0-9_.-]{0,127}$/);
+const scope = enumSchema(['CRM_LEADS', 'PRESENCE', 'NOTIFICATIONS', 'ALL']);
+export type RealtimeScope = Infer<typeof scope>;
 const tuple = {
   presenceGeneration: uuid,
   logicalSessionId: uuid,
@@ -28,17 +40,17 @@ const tuple = {
   stateVersion: integer,
 };
 const envelope = {
-  contractVersion: z.literal(1),
+  contractVersion: literal(1),
   eventId: uuid,
   occurredAt: date,
   correlationId: uuid,
 };
-const event = <T extends z.ZodType>(payload: T) => z.strictObject({ ...envelope, payload });
-const presenceEvent = <T extends z.ZodType>(payload: T) =>
-  z.strictObject({ ...envelope, ...tuple, payload });
+const event = <T extends ZodType>(payload: T) => strictObject({ ...envelope, payload });
+const presenceEvent = <T extends ZodType>(payload: T) =>
+  strictObject({ ...envelope, ...tuple, payload });
 
-export const realtimeProtocolErrorSchema = z.strictObject({
-  code: z.enum([
+export const realtimeProtocolErrorSchema = strictObject({
+  code: enumSchema([
     'REALTIME.AUTH.REQUIRED',
     'REALTIME.AUTH.TOKEN_EXPIRED',
     'REALTIME.AUTH.NOT_AUTHORIZED',
@@ -55,13 +67,13 @@ export const realtimeProtocolErrorSchema = z.strictObject({
     'REALTIME.RECOVERY.RESYNC_REQUIRED',
     'REALTIME.INTERNAL.ERROR',
   ]),
-  message: z.string().min(1).max(256),
-  retryable: z.boolean(),
-  retryAfterMs: z.number().int().min(0).max(60_000).nullable(),
+  message: string().min(1).max(256),
+  retryable: boolean(),
+  retryAfterMs: number().int().min(0).max(60_000).nullable(),
 });
-export const realtimeAdmissionErrorSchema = z.strictObject({
-  contractVersion: z.literal(1),
-  code: z.enum([
+export const realtimeAdmissionErrorSchema = strictObject({
+  contractVersion: literal(1),
+  code: enumSchema([
     'REALTIME.HANDSHAKE.INVALID',
     'REALTIME.AUTH.MISSING_TOKEN',
     'REALTIME.AUTH.TOKEN_IN_URL',
@@ -78,10 +90,10 @@ export const realtimeAdmissionErrorSchema = z.strictObject({
     'REALTIME.DEPENDENCY.SERVER_NOT_READY',
     'REALTIME.LIMIT.RATE_LIMITED',
   ]),
-  message: z.string().min(1).max(256),
-  retryable: z.boolean(),
+  message: string().min(1).max(256),
+  retryable: boolean(),
   correlationId: uuid7,
-  retryAfterMs: z.number().int().min(0).max(60_000).nullable(),
+  retryAfterMs: number().int().min(0).max(60_000).nullable(),
 });
 /** socketError() currently exposes this smaller data object on connect_error. */
 export const realtimeGatewayAdmissionSchema = realtimeAdmissionErrorSchema.pick({
@@ -90,11 +102,10 @@ export const realtimeGatewayAdmissionSchema = realtimeAdmissionErrorSchema.pick(
   retryAfterMs: true,
 });
 export const realtimeGatewayActivationErrorSchema = realtimeGatewayAdmissionSchema.extend({
-  message: z.string().min(1).max(256),
+  message: string().min(1).max(256),
 });
 
-const opaqueId = z
-  .string()
+const opaqueId = string()
   .min(16)
   .max(128)
   .refine((value) => {
@@ -103,16 +114,15 @@ const opaqueId = z
     }
     return /^[A-Za-z0-9_-]+$/.test(value);
   });
-export const realtimeHandshakeSchema = z.strictObject({
-  contractVersion: z.literal(1),
+export const realtimeHandshakeSchema = strictObject({
+  contractVersion: literal(1),
   deviceId: opaqueId,
   clientInstanceId: opaqueId,
-  platform: z.literal('web'),
+  platform: literal('web'),
   appVersion: printable(64),
   tabId: opaqueId.optional(),
   lastNotificationCursor: notificationCursorSchema.optional(),
-  locale: z
-    .string()
+  locale: string()
     .min(2)
     .max(35)
     .refine((value) => {
@@ -123,8 +133,7 @@ export const realtimeHandshakeSchema = z.strictObject({
       }
     })
     .optional(),
-  timezone: z
-    .string()
+  timezone: string()
     .min(1)
     .max(128)
     .refine((value) => {
@@ -137,7 +146,7 @@ export const realtimeHandshakeSchema = z.strictObject({
     })
     .optional(),
 });
-export type RealtimeHandshake = z.infer<typeof realtimeHandshakeSchema>;
+export type RealtimeHandshake = Infer<typeof realtimeHandshakeSchema>;
 
 const route = printable(1_024).refine((value) => {
   const path = value.split(/[?#]/u, 1)[0] ?? '';
@@ -152,15 +161,13 @@ const route = printable(1_024).refine((value) => {
   );
 });
 const text = (points: number, bytes: number) =>
-  z
-    .string()
+  string()
     .min(1)
     .refine(
       (value) =>
         Array.from(value).length <= points && new TextEncoder().encode(value).length <= bytes,
     );
-const notificationCreated = z
-  .strictObject({
+const notificationCreated = strictObject({
     notificationId: uuid,
     recipientId: uuid,
     deliveryEventId: uuid7,
@@ -168,16 +175,15 @@ const notificationCreated = z
     type: safeType,
     title: text(180, 720),
     body: text(4_000, 16_384),
-    priority: z.enum(['P0_CRITICAL', 'P1_HIGH', 'P2_NORMAL', 'P3_LOW']),
-    entity: z.strictObject({ type: safeType, id: uuid }).nullable(),
-    action: z.strictObject({ route }).nullable(),
+    priority: enumSchema(['P0_CRITICAL', 'P1_HIGH', 'P2_NORMAL', 'P3_LOW']),
+    entity: strictObject({ type: safeType, id: uuid }).nullable(),
+    action: strictObject({ route }).nullable(),
     createdAt: date,
     expiresAt: date.nullable(),
-    silent: z.boolean(),
-    metadata: z
-      .record(
-        z.string().regex(/^[A-Za-z][A-Za-z0-9_.-]{0,63}$/u),
-        z.union([z.string().max(512), z.number().finite().safe(), z.boolean(), z.null()]),
+    silent: boolean(),
+    metadata: record(
+        string().regex(/^[A-Za-z][A-Za-z0-9_.-]{0,63}$/u),
+        union([string().max(512), number().finite().safe(), boolean(), nullSchema()]),
       )
       .refine((value) => Object.keys(value).length <= 16),
   })
@@ -187,41 +193,40 @@ const notificationCreated = z
   );
 const presence = {
   userId: uuid,
-  connectivity: z.enum(['ONLINE', 'OFFLINE']),
-  activity: z.enum(['ACTIVE', 'IDLE', 'AWAY']),
-  availability: z.enum(['AVAILABLE', 'BUSY', 'DO_NOT_DISTURB', 'INVISIBLE']),
+  connectivity: enumSchema(['ONLINE', 'OFFLINE']),
+  activity: enumSchema(['ACTIVE', 'IDLE', 'AWAY']),
+  availability: enumSchema(['AVAILABLE', 'BUSY', 'DO_NOT_DISTURB', 'INVISIBLE']),
   availabilityUntil: date.nullable(),
   changedAt: date,
 };
 
 export const realtimeServerSchemas = {
   'session.ready.v1': presenceEvent(
-    z.strictObject({
-      recovered: z.boolean(),
-      recoveryComplete: z.boolean(),
-      capabilities: z.strictObject({
-        crmLeads: z.strictObject({ receive: z.boolean() }),
-        notifications: z.strictObject({ receive: z.boolean() }),
-        presence: z.strictObject({
-          publishSelf: z.boolean(),
-          watchMode: z.enum(['NONE', 'SELF', 'SCOPED']),
+    strictObject({
+      recovered: boolean(),
+      recoveryComplete: boolean(),
+      capabilities: strictObject({
+        crmLeads: strictObject({ receive: boolean() }),
+        notifications: strictObject({ receive: boolean() }),
+        presence: strictObject({
+          publishSelf: boolean(),
+          watchMode: enumSchema(['NONE', 'SELF', 'SCOPED']),
         }),
       }),
-      grantedCapabilities: z
-        .array(z.enum(['CRM_LEADS', 'NOTIFICATIONS', 'PRESENCE_SELF', 'PRESENCE_WATCH']))
+      grantedCapabilities: array(enumSchema(['CRM_LEADS', 'NOTIFICATIONS', 'PRESENCE_SELF', 'PRESENCE_WATCH']))
         .max(4)
         .refine((values) => new Set(values).size === values.length),
-      notificationResyncRequired: z.boolean(),
-      lastNotificationCursorAccepted: z.boolean(),
+      notificationResyncRequired: boolean(),
+      lastNotificationCursorAccepted: boolean(),
     }),
   ),
   'notification.created.v1': event(notificationCreated),
   'notification.updated.v1': event(
-    z.strictObject({
+    strictObject({
       notificationId: uuid,
       recipientId: uuid,
-      change: z.enum(['READ', 'ACKNOWLEDGED', 'DISMISSED']),
-      state: z.strictObject({
+      change: enumSchema(['READ', 'ACKNOWLEDGED', 'DISMISSED']),
+      state: strictObject({
         readAt: date.nullable(),
         acknowledgedAt: date.nullable(),
         dismissedAt: date.nullable(),
@@ -231,41 +236,39 @@ export const realtimeServerSchemas = {
     }),
   ),
   'notification.unread-count.changed.v1': event(
-    z.strictObject({ unreadCount: integer, unreadRevision: integer, changedAt: date }),
+    strictObject({ unreadCount: integer, unreadRevision: integer, changedAt: date }),
   ),
   'crm.leads.changed.v1': event(
-    z.strictObject({
+    strictObject({
       tenantId: uuid,
       branchId: uuid,
       leadId: uuid,
-      revision: z
-        .string()
+      revision: string()
         .max(19)
         .regex(/^[1-9][0-9]{0,18}(?![\s\S])/u)
         .refine((value) => value.length < 19 || value <= '9223372036854775807'),
-      changeKind: z.enum(['CREATED', 'UPDATED', 'STAGE_CHANGED', 'CONVERTED', 'DELETED']),
+      changeKind: enumSchema(['CREATED', 'UPDATED', 'STAGE_CHANGED', 'CONVERTED', 'DELETED']),
     }),
   ),
   'crm.leads.scope-resync.v1': event(
-    z.strictObject({ scope: z.literal('CRM_LEADS'), reason: z.literal('SCOPE_CHANGED') }),
+    strictObject({ scope: literal('CRM_LEADS'), reason: literal('SCOPE_CHANGED') }),
   ),
-  'presence.changed.v1': presenceEvent(z.strictObject(presence)),
-  'presence.watch.snapshot.v1': z.strictObject({
+  'presence.changed.v1': presenceEvent(strictObject(presence)),
+  'presence.watch.snapshot.v1': strictObject({
     ...envelope,
     presenceGeneration: uuid,
-    payload: z
-      .strictObject({
+    payload: strictObject({
         requestId: uuid7,
-        items: z.array(z.strictObject({ ...presence, ...tuple })).max(250),
+        items: array(strictObject({ ...presence, ...tuple })).max(250),
         chunkIndex: integer,
-        chunkCount: z.number().int().min(1).max(250),
+        chunkCount: number().int().min(1).max(250),
       })
       .refine((value) => value.chunkIndex < value.chunkCount),
   }),
   'realtime.sync.required.v1': event(
-    z.strictObject({
+    strictObject({
       scope,
-      reason: z.enum([
+      reason: enumSchema([
         'RECOVERY_INCOMPLETE',
         'PRESENCE_GENERATION_CHANGED',
         'PRESENCE_STATE_GAP',
@@ -276,10 +279,10 @@ export const realtimeServerSchemas = {
       lastCommittedNotificationCursor: notificationCursorSchema.nullable(),
     }),
   ),
-  'system.access-expiring.v1': event(z.strictObject({ expiresAt: date })),
+  'system.access-expiring.v1': event(strictObject({ expiresAt: date })),
   'system.access-revoked.v1': event(
-    z.strictObject({
-      reason: z.enum([
+    strictObject({
+      reason: enumSchema([
         'TOKEN_EXPIRED',
         'SESSION_INVALIDATED',
         'ACCESS_REVOKED',
@@ -289,8 +292,8 @@ export const realtimeServerSchemas = {
     }),
   ),
   'system.tenant-unavailable.v1': event(
-    z.strictObject({
-      reason: z.enum([
+    strictObject({
+      reason: enumSchema([
         'TENANT_SUSPENDED',
         'TENANT_DELETED',
         'TENANT_MOVED',
@@ -299,20 +302,20 @@ export const realtimeServerSchemas = {
     }),
   ),
   'system.connection-replaced.v1': event(
-    z.strictObject({ reason: z.literal('CLIENT_INSTANCE_REPLACED') }),
+    strictObject({ reason: literal('CLIENT_INSTANCE_REPLACED') }),
   ),
   'system.server-draining.v1': event(
-    z.strictObject({ retryAfterMs: z.number().int().min(0).max(60_000) }),
+    strictObject({ retryAfterMs: number().int().min(0).max(60_000) }),
   ),
   // The current gateway's activation catch also embeds its strict admission error
   // projection here (gateway.ts:217-227). Handle that real shape without retrying
   // a terminal admission failure as an unstructured transport error.
   'realtime.error.v1': event(
-    z.union([realtimeProtocolErrorSchema, realtimeGatewayActivationErrorSchema]),
+    union([realtimeProtocolErrorSchema, realtimeGatewayActivationErrorSchema]),
   ),
 } as const;
 export type RealtimeEventName = keyof typeof realtimeServerSchemas;
-export type RealtimeEventData<N extends RealtimeEventName> = z.infer<
+export type RealtimeEventData<N extends RealtimeEventName> = Infer<
   (typeof realtimeServerSchemas)[N]
 >;
 export type RealtimeEvent = {
@@ -346,46 +349,45 @@ export function parseRealtimeEvent<N extends RealtimeEventName>(
 }
 
 const commandEnvelope = {
-  contractVersion: z.literal(1),
+  contractVersion: literal(1),
   requestId: uuid7,
   clientSentAt: date.optional(),
 };
 export const realtimeCommandSchemas = {
-  'notification.received.v1': z.strictObject({
+  'notification.received.v1': strictObject({
     ...commandEnvelope,
-    payload: z.strictObject({
+    payload: strictObject({
       notificationId: uuid,
       recipientId: uuid,
       deliveryEventId: uuid7,
       cursor: notificationCursorSchema,
     }),
   }),
-  'realtime.sync.request.v1': z.strictObject({
+  'realtime.sync.request.v1': strictObject({
     ...commandEnvelope,
-    payload: z.strictObject({
+    payload: strictObject({
       scope,
       lastNotificationCursor: notificationCursorSchema.nullable().optional(),
     }),
   }),
 } as const;
 export type RealtimeCommandName = keyof typeof realtimeCommandSchemas;
-export type RealtimeCommand<N extends RealtimeCommandName> = z.infer<
+export type RealtimeCommand<N extends RealtimeCommandName> = Infer<
   (typeof realtimeCommandSchemas)[N]
 >;
-const ackBase = { contractVersion: z.literal(1), requestId: uuid7, serverTime: date };
+const ackBase = { contractVersion: literal(1), requestId: uuid7, serverTime: date };
 const ackData = {
-  'notification.received.v1': z.strictObject({ accepted: z.literal(true) }),
-  'realtime.sync.request.v1': z.strictObject({
-    snapshotScheduled: z.boolean(),
-    restResyncRequired: z.boolean(),
+  'notification.received.v1': strictObject({ accepted: literal(true) }),
+  'realtime.sync.request.v1': strictObject({
+    snapshotScheduled: boolean(),
+    restResyncRequired: boolean(),
   }),
 };
 export function parseRealtimeAck(name: RealtimeCommandName, input: unknown) {
   assertRealtimeBounds(input, 8_192);
-  return z
-    .discriminatedUnion('ok', [
-      z.strictObject({ ...ackBase, ok: z.literal(true), data: ackData[name] }),
-      z.strictObject({ ...ackBase, ok: z.literal(false), error: realtimeProtocolErrorSchema }),
+  return discriminatedUnion('ok', [
+      strictObject({ ...ackBase, ok: literal(true), data: ackData[name] }),
+      strictObject({ ...ackBase, ok: literal(false), error: realtimeProtocolErrorSchema }),
     ])
     .parse(input);
 }

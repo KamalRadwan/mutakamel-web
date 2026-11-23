@@ -167,7 +167,7 @@ for (const language of ['en', 'ar'] as const)
               },
               loader: AccountsTranslocoLoader,
             }),
-            { provide: TenantScopeState, useValue: { me } },
+            { provide: TenantScopeState, useValue: { me, selection: signal({ companyId: 'c1', branchId: 'b1' }), branchesFor: () => ['b1'] } },
             { provide: LanguageState, useValue: { current: signal(language) } },
             {
               provide: BulkJobsTracker,

@@ -23,7 +23,7 @@ const date = '2026-01-01T00:00:00Z';
 const company = { id: 'c1', code: 'C', name: 'Core company', status: 'ACTIVE' };
 const branch = { id: 'b1', companyId: company.id, code: 'B', name: 'Core branch', status: 'ACTIVE' };
 const department = { id: 'd1', branchId: branch.id, code: 'D', name: 'Core department', status: 'ACTIVE' };
-const lead = { id: '019f0000-0000-7000-8000-000000000014', branchId: branch.id, status: 'ACTIVE',
+const lead = { id: '019f0000-0000-7000-8000-000000000014', companyId: company.id, branchId: branch.id, status: 'ACTIVE',
   firstName: 'Core', lastName: 'Lead', jobTitle: null };
 const team: Team = { id: '019f0000-0000-7000-8000-000000000015', departmentId: department.id,
   code: 'TEAM', name: 'Core team', leadUserId: lead.id, status: 'ACTIVE', createdAt: date, updatedAt: date };

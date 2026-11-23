@@ -197,7 +197,7 @@ for (const language of ['en', 'ar'] as const)
               loader: ItemsTranslocoLoader,
             }),
             { provide: Notify, useValue: notify },
-            { provide: TenantScopeState, useValue: { me, selection } },
+            { provide: TenantScopeState, useValue: { me, selection, branchesFor: () => ['b1'] } },
             { provide: LanguageState, useValue: { current: signal(language) } },
           ],
         });

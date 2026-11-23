@@ -27,6 +27,7 @@ const BASE = '/api/tenant/core/v1';
 const UUID_V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const me: TenantMe = {
   id: 'user', email: 'ada@example.com', firstName: 'Ada', lastName: 'Lovelace', hasAvatar: true,
+  workspace: { timezone: 'UTC', defaultLanguage: 'en' },
   isTenantOwner: false, mfaEnabled: false, mfaUpdatedAt: null, status: 'ACTIVE',
   accessibleBranches: [], accessibleCompanies: [], accessibleBranchCompanies: [], permissions: [], seats: [],
   permissionScopes: {}, teamMemberships: [], featureEntitlements: {},

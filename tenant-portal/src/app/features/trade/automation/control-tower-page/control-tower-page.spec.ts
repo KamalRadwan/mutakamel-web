@@ -333,7 +333,7 @@ for (const lang of ['en', 'ar'] as const) {
         await flushPage();
 
         const dropdowns = fixture.debugElement.queryAll(By.directive(Dropdown));
-        expect(dropdowns.length).toBe(4);
+        expect(dropdowns.length).toBe(5);
 
         stub.reset();
         fixture.componentRef.setInput('branch', BRANCH_ID_1);

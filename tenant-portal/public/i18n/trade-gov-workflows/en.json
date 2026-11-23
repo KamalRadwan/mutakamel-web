@@ -12,13 +12,13 @@
       "name": "Sales order lifecycle",
       "desc": "Controls state transitions on sales orders."
     },
-    "PRICE_CHANGE": {
-      "name": "Price change approval",
-      "desc": "Controls approval steps for price book changes."
+    "PRICE_PUBLICATION": {
+      "name": "Price publication approval",
+      "desc": "Controls approval steps before publishing price books."
     },
-    "CREDIT_OVERRIDE": {
-      "name": "Credit override approval",
-      "desc": "Controls approval steps for credit limit overrides."
+    "CONFIGURATION_PUBLICATION": {
+      "name": "Configuration publication approval",
+      "desc": "Controls approval steps before publishing workspace configurations."
     }
   },
   "actions": {

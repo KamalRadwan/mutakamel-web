@@ -14,6 +14,8 @@
   "stillPreparing": "Still preparing. You can close this window; try again later.",
   "ready": "The PDF is ready",
   "failed": "The PDF could not be prepared.",
+  "forbiddenTitle": "Access denied",
+  "forbiddenText": "You do not have permission to print this document.",
   "notEligible": "This document cannot be printed in its current state.",
   "chooseTemplate": "Choose a template.",
   "printing": "Printing",
@@ -22,5 +24,19 @@
   "lang": {
     "en-US": "English",
     "ar-EG": "العربية"
+  },
+  "errors": {
+    "TRADE.QUOTE.PDF_NOT_FOUND": "The quotation PDF job was not found.",
+    "TRADE.QUOTE.PDF_BUNDLE_UNAVAILABLE": "The quotation PDF input could not be prepared. Try again shortly.",
+    "TRADE.QUOTE.PDF_ARTIFACT_UNAVAILABLE": "The completed quotation PDF is temporarily unavailable. Try again shortly.",
+    "TRADE.QUOTE.PDF_TEMPLATE_CHANGED": "The selected print template changed before rendering completed. Try again.",
+    "TRADE.QUOTE.PDF_TEMPLATE_PIN_STALE": "The pinned template version is out of date. Choose a template and try again.",
+    "TRADE.QUOTE.PDF_INPUT_EXPIRED": "The PDF request expired before rendering finished. Try again.",
+    "TRADE.QUOTE.PDF_RESULT_CONFLICT": "A newer print request replaced this job. Try printing again.",
+    "TRADE.BUSINESS_DOCUMENT.PDF_NOT_FOUND": "The document PDF job was not found.",
+    "TRADE.BUSINESS_DOCUMENT.PDF_TEMPLATE_CHANGED": "The selected print template changed before rendering completed. Try again.",
+    "TRADE.BUSINESS_DOCUMENT.PDF_INPUT_EXPIRED": "The PDF request expired before rendering finished. Try again.",
+    "TRADE.BUSINESS_DOCUMENT.PDF_RESULT_CONFLICT": "A newer print request replaced this job. Try printing again.",
+    "TRADE.CATALOG.ITEM_IMAGE_PRINT_BUDGET_EXCEEDED": "The item images on this document exceed the print size budget."
   }
 }

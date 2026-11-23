@@ -295,6 +295,8 @@ function resolveQuotation(q: QuotationDetail, ctx: ResolveActionsContext): Resol
     case 'EXPIRED':
     case 'CANCELLED':
       return [];
+    default:
+      return [];
   }
 }
 
@@ -387,6 +389,8 @@ function resolveSalesOrder(so: SalesOrderDetail, ctx: ResolveActionsContext): Re
 
     case 'CANCELLED':
       return [];
+    default:
+      return [];
   }
 }
 
@@ -396,9 +400,7 @@ function resolvePurchaseOrder(po: PurchaseOrderDetail, ctx: ResolveActionsContex
   switch (po.lifecycleStatus) {
     case 'DRAFT': {
       if (po.approvalStatus === 'PENDING') {
-        const isSubmitter = po.submittedBy !== null && ctx.currentUserId === po.submittedBy;
-        const isMakerOrSubmitter = ctx.currentUserId === po.createdBy || isSubmitter;
-        const makerReason = isMakerOrSubmitter ? 'tda.why.makerChecker' : null;
+        const makerReason = ctx.currentUserId === po.createdBy ? 'tda.why.makerChecker' : null;
         const actions: ResolvedAction[] = [
           build({
             action: 'approve',
@@ -414,14 +416,8 @@ function resolvePurchaseOrder(po: PurchaseOrderDetail, ctx: ResolveActionsContex
             stateDisabledReasonKey: makerReason,
           }),
         ];
-        if (isSubmitter) {
-          actions.push(
-            build({
-              action: 'withdraw',
-              placement: 'bar',
-            }),
-          );
-        }
+        // The API omits the submitter; the server checks withdrawal and maker-checker authority.
+        actions.push(build({ action: 'withdraw', placement: 'bar' }));
         actions.push(
           build({
             action: 'cancel',
@@ -534,6 +530,8 @@ function resolvePurchaseOrder(po: PurchaseOrderDetail, ctx: ResolveActionsContex
 
     case 'CANCELLED':
       return [];
+    default:
+      return [];
   }
 }
 
@@ -591,6 +589,8 @@ function resolvePurchaseQuotation(pq: PurchaseQuotationDetail, ctx: ResolveActio
       ];
 
     case 'CANCELLED':
+      return [];
+    default:
       return [];
   }
 }

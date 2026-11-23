@@ -1,22 +1,31 @@
-import { z } from 'zod';
+import {
+  array,
+  boolean,
+  type infer as Infer,
+  iso,
+  number,
+  object,
+  string,
+  unknown,
+} from 'zod';
 import type { RealtimeFailure } from './realtime-client.model';
 
 // Core notifications.service.ts / notification.types.ts. Other runtime settings are not consumed here.
-export const notificationFeedConfigSchema = z.object({
-  enabled: z.boolean(),
-  inAppEnabled: z.boolean(),
-  realtimeEnabled: z.boolean(),
-  pollIntervalMs: z.number().finite(),
+export const notificationFeedConfigSchema = object({
+  enabled: boolean(),
+  inAppEnabled: boolean(),
+  realtimeEnabled: boolean(),
+  pollIntervalMs: number().finite(),
 });
-export type NotificationsFeedConfig = z.infer<typeof notificationFeedConfigSchema>;
+export type NotificationsFeedConfig = Infer<typeof notificationFeedConfigSchema>;
 
-export const notificationFeedSnapshotSchema = z.object({
-  items: z.array(z.unknown()).max(1),
-  unreadCount: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
-  unreadRevision: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
-  unreadChangedAt: z.iso.datetime(),
-  nextCursor: z.string().max(2048).nullable(),
-  hasNext: z.boolean(),
+export const notificationFeedSnapshotSchema = object({
+  items: array(unknown()).max(1),
+  unreadCount: number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+  unreadRevision: number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+  unreadChangedAt: iso.datetime(),
+  nextCursor: string().max(2048).nullable(),
+  hasNext: boolean(),
 });
 
 export interface NotificationsFeedState {

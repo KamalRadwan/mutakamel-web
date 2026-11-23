@@ -130,7 +130,9 @@
     "BULK_SELECTION_TOO_LARGE": "عدد العناصر المحددة كبير جدًا، فضيّق التحديد إلى {{max}} أو أقل.",
     "BULK_JOB_PARAMS_INVALID": "إعدادات الدفعة غير صالحة.",
     "BULK_JOB_MODULE_UNKNOWN": "هذه العملية الجماعية غير مدعومة.",
-    "generic": "حدث خطأ ما."
+    "generic": "حدث خطأ ما.",
+    "BULK_JOBS_UNAVAILABLE": "العمليات المجمّعة غير متاحة لهذا التطبيق.",
+    "TRADE.CONCURRENCY.STALE_VERSION": "تغيّرت العملية. أعد تحميل التقرير قبل المحاولة مجددًا."
   },
   "notify": {
     "title": "انتهت العملية الجماعية",

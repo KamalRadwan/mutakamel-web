@@ -29,6 +29,7 @@ function user(owner = false, tenantWide = true): TenantMe {
     firstName: 'Test',
     lastName: 'User',
     hasAvatar: false,
+    workspace: { timezone: 'UTC', defaultLanguage: 'en' },
     isTenantOwner: owner,
     mfaEnabled: false,
     mfaUpdatedAt: null,
@@ -289,7 +290,7 @@ describe('BrandingPage', () => {
     });
     await render();
     expect(page['baseline']()?.appName).toBe('Delta');
-    expect(page['draft']()).toMatchObject({ appName: 'Unsaved name', primaryColor: 'ff0000' });
+    expect(page['draft']()).toMatchObject({ appName: 'Unsaved name', primaryColor: '#FF0000' });
     expect(
       host.querySelector<HTMLImageElement>('app-branding-asset-card img')?.getAttribute('src'),
     ).toBe('/logo?v=2');

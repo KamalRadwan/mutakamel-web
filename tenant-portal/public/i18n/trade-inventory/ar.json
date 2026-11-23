@@ -97,6 +97,7 @@
     "TRADE_IDEMPOTENCY_KEY_MISSING": "مفتاح الطلب مفقود، فحاول مرة أخرى.",
     "TRADE_IDEMPOTENCY_MISMATCH": "أُرسل هذا الطلب من قبل بقيم مختلفة.",
     "TRADE_INVENTORY_NODE_CONFLICT": "يوجد موقع بهذا الرمز بالفعل.",
+    "TRADE_INVENTORY_NODE_INVALID": "هذا الموقع غير نشط أو غير صالح للفرع المحدد.",
     "TRADE_INVENTORY_NODE_IN_USE": "يحتوي هذا الموقع على مخزون محجوز ولا يمكن تعديله بهذه الطريقة.",
     "TRADE_INVENTORY_NODE_NOT_FOUND": "هذا الموقع غير متاح في الفرع الحالي.",
     "TRADE_INVENTORY_SCOPE_INVALID": "اختر فرعًا صالحًا واحدًا على الأقل لهذا الموقع.",
@@ -126,6 +127,7 @@
       "NON_EXACT_RESULT": "لا تتحوّل هذه الكمية إلى وحدة الأساس تحويلًا دقيقًا."
     },
     "TRADE_INVENTORY_UOM_CONVERSION_UNAVAILABLE": "لا يوجد تحويل منشور من هذه الوحدة إلى وحدة الأساس.",
+    "TRADE_INVENTORY_INSUFFICIENT_AVAILABILITY": "الرصيد المتاح غير كافٍ لهذه الكمية.",
     "TRADE_INVENTORY_TRACKING_REQUIRED": "بيانات تتبع الدفعة أو الأرقام التسلسلية ناقصة أو لا تطابق الكمية.",
     "TRADE_INVENTORY_SERIAL_CONFLICT": "أحد هذه الأرقام التسلسلية موجود مسبقًا.",
     "TRADE_INVENTORY_SERIAL_NOT_FOUND": "الرقم التسلسلي غير موجود.",
@@ -146,6 +148,7 @@
     "TRADE_INVENTORY_PERIOD_CODE_TAKEN": "توجد فترة مخزون أخرى تستخدم هذا الرمز.",
     "TRADE_INVENTORY_SCOPE_NOT_FOUND": "لم يُعثر على هذا السجل في الشركة الحالية.",
     "TRADE_INVENTORY_ITEM_NOT_STOCK_TRACKED": "هذا الصنف غير نشط أو لا يتتبّع المخزون.",
+    "TRADE_INVENTORY_ITEM_TRACKING_CONFLICT": "لا تتطابق إعدادات تتبّع الصنف مع بيانات التشغيلة أو الأرقام التسلسلية المقدّمة.",
     "TRADE_INVENTORY_TRACKING_UNSUPPORTED": "لا يستخدم هذا الصنف هذا النوع من تتبّع الدفعات أو الأرقام التسلسلية."
   }
 }

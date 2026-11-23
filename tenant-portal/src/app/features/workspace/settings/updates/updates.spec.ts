@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../../../core/api/api-errors';
 import { newIdempotencyKey } from '../../../../core/api/idempotency';
-import { applyUpdates, getOperation, listUpdates } from './updates.api';
+import { fakeApplyUpdates as applyUpdates, fakeGetOperation as getOperation, fakeListUpdates as listUpdates } from './updates.fake';
 import {
   FAKE_UPDATES_FAIL_NEXT,
   FAKE_UPDATES_OPERATION_OUTCOME,

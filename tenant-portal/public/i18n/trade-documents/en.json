@@ -39,7 +39,8 @@
     "PENDING": "Pending approval",
     "APPROVED": "Approved",
     "REJECTED": "Rejected",
-    "WITHDRAWN": "Withdrawn"
+    "WITHDRAWN": "Withdrawn",
+    "EXPIRED": "Expired"
   },
   "hold": {
     "NONE": "Not on hold",
@@ -71,7 +72,8 @@
     "edit": "Edit",
     "new": "New",
     "loadFailed": "This page could not be loaded.",
-    "empty": "Nothing here yet."
+    "empty": "Nothing here yet.",
+    "unknownStatus": "Unknown"
   },
   "errors": {
     "generic": "Something went wrong. Try again.",

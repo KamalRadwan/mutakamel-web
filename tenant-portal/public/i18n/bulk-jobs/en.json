@@ -106,7 +106,9 @@
     "BULK_SELECTION_TOO_LARGE": "Too many items are selected. Narrow the selection to {{max}} or fewer.",
     "BULK_JOB_PARAMS_INVALID": "The batch settings are not valid.",
     "BULK_JOB_MODULE_UNKNOWN": "This batch operation is not supported.",
-    "generic": "Something went wrong."
+    "generic": "Something went wrong.",
+    "BULK_JOBS_UNAVAILABLE": "Batch operations are unavailable for this app.",
+    "TRADE.CONCURRENCY.STALE_VERSION": "The batch changed. Reload its report before trying again."
   },
   "notify": {
     "title": "Batch operation finished",

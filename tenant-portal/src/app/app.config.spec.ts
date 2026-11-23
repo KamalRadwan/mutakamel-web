@@ -1,7 +1,7 @@
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { ApplicationInitStatus, inject } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { io } from 'socket.io-client';
+import { Socket } from 'socket.io-client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { appConfig } from './app.config';
 import { AuthSession } from './core/auth/auth-session';
@@ -16,15 +16,16 @@ import { ViewScale } from './core/view/view-scale';
 import { crmQueries } from './features/crm/shared/crm-http';
 import { BULK_JOB_MODULES } from './shared/bulk-jobs/bulk-job-modules';
 
-vi.mock('socket.io-client', () => ({ io: vi.fn() }));
-vi.mock('./app.routes', () => ({ routes: [] }));
 
 describe('app infrastructure registration', () => {
   const started: string[] = [];
   const bindCrm = vi.fn();
+  const connect = vi.fn(function (this: Socket) { return this; });
+
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.spyOn(Socket.prototype, 'connect').mockImplementation(connect);
     started.length = 0;
     TestBed.configureTestingModule({
       providers: [
@@ -62,7 +63,7 @@ describe('app infrastructure registration', () => {
     TestBed.inject(RealtimeClient);
     TestBed.inject(NotificationsFeed);
     expect(started).toEqual(['leader', 'realtime', 'notifications']);
-    expect(io).not.toHaveBeenCalled();
+    expect(connect).not.toHaveBeenCalled();
     TestBed.inject(HttpTestingController).expectNone(() => true);
   });
 
@@ -85,9 +86,14 @@ describe('app infrastructure registration', () => {
         clientInstanceId: 'instance-identifier-0001',
       },
     };
-    factory(options);
-    // No URL, query token or alternate origin is added at this boundary.
-    expect(io).toHaveBeenCalledExactlyOnceWith(options);
+    const socket = factory(options);
+    expect(socket).toBeInstanceOf(Socket);
+    if (!(socket instanceof Socket)) throw new Error('Socket.IO factory returned an unexpected socket');
+    expect(socket.auth).toEqual(options.auth);
+    const { auth: _auth, ...managerOptions } = options;
+    expect(socket.io.opts).toMatchObject(managerOptions);
+    expect(connect).not.toHaveBeenCalled();
+    socket.disconnect();
   });
 
   it('retains Core, CRM, Trade and automation descriptors without registering Accounting', () => {

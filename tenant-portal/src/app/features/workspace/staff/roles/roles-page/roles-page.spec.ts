@@ -43,6 +43,7 @@ const created: RoleDetail = {
   permissionMode: 'GLOBAL',
   branchProfileCount: 0,
   permissionCount: 0,
+  holderCount: 0,
   permissionIds: [],
   createdAt: '2026-11-22T00:00:00Z',
   updatedAt: '2026-11-22T00:00:00Z',

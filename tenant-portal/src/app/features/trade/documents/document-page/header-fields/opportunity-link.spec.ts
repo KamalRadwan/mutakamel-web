@@ -188,7 +188,7 @@ for (const lang of ['en', 'ar'] as const) {
         me.set(makeMe(['trade.quotations.read', 'trade.quotations.update', 'trade.sales_orders.read']));
 
         tradeStub = new TradeHttpStub({
-          'GET /terms/options': { PAYMENT: [], DELIVERY: [], WARRANTY: [], RETURNS: [], GENERAL: [] },
+          'GET /terms/options': { byType: { PAYMENT: [], DELIVERY: [], WARRANTY: [], RETURNS: [], GENERAL: [] } },
           'GET /quotations/customer-options': { items: [], nextCursor: null },
           'GET /quotations/contact-options': { partyType: 'ORGANIZATION', items: [], nextCursor: null },
           'GET /quotations/discount-policy': {

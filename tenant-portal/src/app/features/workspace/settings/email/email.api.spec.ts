@@ -47,6 +47,7 @@ const user: TenantMe = {
   firstName: 'Manager',
   lastName: 'User',
   hasAvatar: false,
+  workspace: { timezone: 'UTC', defaultLanguage: 'en' },
   isTenantOwner: true,
   mfaEnabled: false,
   mfaUpdatedAt: null,

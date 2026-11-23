@@ -26,6 +26,7 @@ const role: RoleDetail = {
   description: 'Old description',
   permissionMode: 'GLOBAL',
   permissionCount: 0,
+  holderCount: 0,
   permissionIds: [],
   branchProfileCount: 0,
   isSystem: false,

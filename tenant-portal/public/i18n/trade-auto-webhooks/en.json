@@ -110,6 +110,7 @@
       "INVALID_PORT": "Port must be 443 or 8443",
       "SECRET_QUERY_KEY": "Remove secret-like words from the query",
       "SECRET_IN_QUERY": "Remove secret-like words from the query",
+      "SECRET_QUERY_FORBIDDEN": "Remove secret-like words from the query",
       "INVALID_URL": "Enter a valid URL"
     },
     "footer": {

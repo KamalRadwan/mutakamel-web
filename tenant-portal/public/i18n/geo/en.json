@@ -53,6 +53,16 @@
     "GEO_NAME_TOO_LONG": "Up to 120 characters.",
     "GEO_PARENT_NOT_FOUND": "The parent area no longer exists. Reload and try again.",
     "GEO_PLACE_CREATE_FORBIDDEN": "You do not have permission to add places.",
-    "generic": "Something went wrong. Try again."
+    "generic": "Something went wrong. Try again.",
+    "GEO_STATE_LOOKUP_UNAVAILABLE": "State lookup is unavailable. Select a country and choose the state from its list.",
+    "GEO_DISTRICT_LOOKUP_UNAVAILABLE": "District lookup is unavailable. Select a city and choose the district from its list.",
+    "GEO_PICKER_LIMIT_REACHED": "Too many matching places. Narrow your search or load the next page.",
+    "GEO_CITY_NAME_TAKEN": "This city name already exists in this state.",
+    "GEO_DISTRICT_NAME_TAKEN": "This district or village name already exists in this city.",
+    "GEO_PARENT_INACTIVE": "The parent area is inactive. Choose an active area.",
+    "GEO_COUNTRY_NOT_FOUND": "The country is no longer available. Reload the list.",
+    "GEO_STATE_NOT_FOUND": "The state is no longer available. Reload the list.",
+    "GEO_CITY_NOT_FOUND": "The city is no longer available. Reload the list.",
+    "GEO_DISTRICT_NOT_FOUND": "The district is no longer available. Reload the list."
   }
 }

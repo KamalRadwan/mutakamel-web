@@ -174,8 +174,6 @@ function makePurchaseOrder(overrides: Partial<PurchaseOrderDetail> = {}): Purcha
     totalsSnapshot: null,
     sourcePurchaseQuotationId: null,
     createdBy: 'usr-creator',
-    submittedBy: null,
-    submittedAt: null,
     lines: [],
     approvalReady: false,
     delivery: null,
@@ -488,11 +486,10 @@ describe('document-actions resolver', () => {
       const po = makePurchaseOrder({
         approvalStatus: 'PENDING',
         createdBy: 'usr-creator',
-        submittedBy: 'usr-submitter',
       });
       const actions = resolveActions('purchase-order', po, ctx({ currentUserId: 'usr-approver' }));
       assertInvariants(actions);
-      expect(actions.map((a) => a.action)).toEqual(['approve', 'poReject', 'cancel']);
+      expect(actions.map((a) => a.action)).toEqual(['approve', 'poReject', 'withdraw', 'cancel']);
 
       const approve = findAction(actions, 'approve');
       expect(approve.primary).toBe(true);
@@ -504,31 +501,29 @@ describe('document-actions resolver', () => {
       expect(reject.disabledReasonKey).toBeNull();
     });
 
-    it('DRAFT + PENDING enforces maker-checker when currentUserId is the creator (no withdraw)', () => {
+    it('DRAFT + PENDING enforces maker-checker for the known creator', () => {
       const po = makePurchaseOrder({
         approvalStatus: 'PENDING',
         createdBy: 'usr-creator',
-        submittedBy: 'usr-submitter',
       });
       const actions = resolveActions('purchase-order', po, ctx({ currentUserId: 'usr-creator' }));
       assertInvariants(actions);
-      expect(actions.map((a) => a.action)).toEqual(['approve', 'poReject', 'cancel']);
+      expect(actions.map((a) => a.action)).toEqual(['approve', 'poReject', 'withdraw', 'cancel']);
       expect(findAction(actions, 'approve').disabledReasonKey).toBe('tda.why.makerChecker');
       expect(findAction(actions, 'poReject').disabledReasonKey).toBe('tda.why.makerChecker');
     });
 
-    it('DRAFT + PENDING shows enabled withdraw and maker-checker disabled approve/poReject for the submitter', () => {
+    it('DRAFT + PENDING leaves unknown submitter authority to the server', () => {
       const po = makePurchaseOrder({
         approvalStatus: 'PENDING',
         createdBy: 'usr-creator',
-        submittedBy: 'usr-submitter',
       });
       const actions = resolveActions('purchase-order', po, ctx({ currentUserId: 'usr-submitter' }));
       assertInvariants(actions);
       expect(actions.map((a) => a.action)).toEqual(['approve', 'poReject', 'withdraw', 'cancel']);
 
-      expect(findAction(actions, 'approve').disabledReasonKey).toBe('tda.why.makerChecker');
-      expect(findAction(actions, 'poReject').disabledReasonKey).toBe('tda.why.makerChecker');
+      expect(findAction(actions, 'approve').disabledReasonKey).toBeNull();
+      expect(findAction(actions, 'poReject').disabledReasonKey).toBeNull();
       expect(findAction(actions, 'withdraw').disabledReasonKey).toBeNull();
       expect(findAction(actions, 'withdraw').placement).toBe('bar');
     });

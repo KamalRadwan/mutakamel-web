@@ -1,3 +1,6 @@
+import { TestBed } from '@angular/core/testing';
+import { bindSeatPreviewApiForTest, SeatPreviewApi } from '../../seats/seats.api';
+import { fakeListSeatHolders } from '../../seats/seats.fake';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../../../core/api/api-errors';
 import type { Me } from '../../staff/shared/staff.model';
@@ -51,7 +54,10 @@ function scopedActor(scopes: Me['permissionScopes']): Me {
 const HOMES_SELECTION = '0195a000-0000-7000-8000-000000000201';
 
 describe('addon seats fake (Core application-access contract)', () => {
+  let restoreSeats: () => void;
   beforeEach(() => {
+    TestBed.configureTestingModule({ providers: [{ provide: SeatPreviewApi, useValue: { listSeatHolders: fakeListSeatHolders } }] });
+    restoreSeats = bindSeatPreviewApiForTest(() => TestBed.inject(SeatPreviewApi));
     vi.useFakeTimers();
     setFakeActorOverride(null);
     resetStaffFake();
@@ -59,6 +65,7 @@ describe('addon seats fake (Core application-access contract)', () => {
   });
 
   afterEach(() => {
+    restoreSeats();
     vi.useRealTimers();
     setFakeActorOverride(null);
   });

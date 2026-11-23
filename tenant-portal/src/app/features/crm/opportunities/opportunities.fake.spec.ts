@@ -1,3 +1,4 @@
+import { TenantScopeState } from '../../../core/scope/tenant-scope';
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { AuthSession } from '../../../core/auth/auth-session';
@@ -461,7 +462,7 @@ describe('api wrappers and error keys', () => {
   it('listOwners is refused with 403 for a branch without a grant (assignable-owners: scopedAccess.resolve throws first)', async () => {
     const branchId = '00000000-0000-7000-8000-00000000beef';
     const companyId = '019f0000-0000-7000-8000-000000000010';
-    TestBed.configureTestingModule({ providers: [{ provide: AuthSession, useValue: {
+    TestBed.configureTestingModule({ providers: [{ provide: TenantScopeState, useValue: { selection: () => ({ companyId, branchId }), branchCompanies: () => new Map([[branchId, companyId]]) } }, { provide: AuthSession, useValue: {
       status: () => 'signed-in',
       me: () => ({ ...FAKE_TENANT_ME, accessibleCompanies: [companyId], accessibleBranches: [branchId],
         accessibleBranchCompanies: [{ branchId, companyId }] }),
@@ -553,7 +554,7 @@ describe('backend contract alignment', () => {
     expect(wire.opportunities.bulk.createActivity).not.toBeNull();
     const companyId = '019f0000-0000-7000-8000-000000000010';
     const branchId = '019f0000-0000-7000-8000-000000000011';
-    TestBed.configureTestingModule({ providers: [{ provide: AuthSession, useValue: {
+    TestBed.configureTestingModule({ providers: [{ provide: TenantScopeState, useValue: { selection: () => ({ companyId, branchId }), branchCompanies: () => new Map([[branchId, companyId]]) } }, { provide: AuthSession, useValue: {
       status: () => 'signed-in', me: () => ({ ...FAKE_TENANT_ME, accessibleCompanies: [companyId],
         accessibleBranches: [branchId], accessibleBranchCompanies: [{ branchId, companyId }] }),
     } }] });

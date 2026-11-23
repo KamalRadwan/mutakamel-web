@@ -1,3 +1,5 @@
+import { CoreHttp } from '../../../core/api/core-http';
+import { GeoHttpStub } from '../../../core/geo/testing/geo-http-testing';
 import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { TRANSLOCO_LOADER, provideTransloco } from '@jsverse/transloco';
@@ -5,8 +7,7 @@ import { delay, of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AddressFields, AddressValue, EMPTY_ADDRESS } from './address-fields';
 
-// The geo API is backed by an in-memory fake with a 300 ms delay, so these specs run on fake timers
-// against the real fake data (Egypt, Cairo, Maadi, Degla, ...).
+// The real geo adapter receives deterministic HTTP payloads for these picker interactions.
 const EGYPT = 'geo-eg';
 const CAIRO = 'geo-eg-c';
 const MAADI = 'geo-city-maadi';
@@ -44,6 +45,7 @@ afterEach(() => {
 async function setup(init?: (host: Host) => void) {
   TestBed.configureTestingModule({
     providers: [
+      { provide: CoreHttp, useClass: GeoHttpStub },
       provideTransloco({ config: { availableLangs: ['ar', 'en'], defaultLang: 'en', prodMode: true } }),
       { provide: TRANSLOCO_LOADER, useValue: { getTranslation: () => of({}).pipe(delay(0)) } },
     ],

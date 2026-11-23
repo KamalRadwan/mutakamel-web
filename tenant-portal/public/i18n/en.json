@@ -324,5 +324,51 @@
     "swatches": "Preset colours",
     "noColor": "No colour",
     "invalid": "Enter a valid colour"
+  },
+  "realtime": {
+    "connection": {
+      "connecting": "Connecting to live updates…",
+      "connected": "Live updates are connected.",
+      "stale": "Live updates are delayed. Refreshing the latest data.",
+      "failed": "Live updates could not reconnect.",
+      "unavailable": "Live updates are unavailable."
+    },
+    "retry": "Retry connection",
+    "errors": {
+      "REALTIME.AUTH.ACCESS_REVOKED": "Your access has ended.",
+      "REALTIME.AUTH.AUDIENCE_NOT_ALLOWED": "This session cannot use live updates.",
+      "REALTIME.AUTH.IDENTITY_INACTIVE": "This account is inactive.",
+      "REALTIME.AUTH.INVALID_TOKEN": "Your session could not be verified.",
+      "REALTIME.AUTH.MISSING_TOKEN": "Sign in to receive live updates.",
+      "REALTIME.AUTH.NOT_ALLOWED": "Live updates are not allowed for this account.",
+      "REALTIME.AUTH.NOT_AUTHORIZED": "You do not have permission for these updates.",
+      "REALTIME.AUTH.ORIGIN_NOT_ALLOWED": "Live updates are not allowed from this site.",
+      "REALTIME.AUTH.REQUIRED": "Sign in to receive live updates.",
+      "REALTIME.AUTH.SESSION_INVALIDATED": "Your session has ended. Sign in again.",
+      "REALTIME.AUTH.TENANT_HOST_MISMATCH": "This workspace address could not be verified.",
+      "REALTIME.AUTH.TENANT_INACTIVE": "Live updates are unavailable for this workspace.",
+      "REALTIME.AUTH.TOKEN_EXPIRED": "Your session needs to be renewed.",
+      "REALTIME.AUTH.TOKEN_IN_URL": "The live connection authentication was rejected.",
+      "REALTIME.CLIENT.ACK_FAILED": "Receipt could not be confirmed. Refreshing notifications.",
+      "REALTIME.CLIENT.ACK_TIMEOUT": "Receipt confirmation timed out.",
+      "REALTIME.CLIENT.BACKPRESSURE": "Too many updates arrived. Refreshing the latest data.",
+      "REALTIME.CLIENT.DISCONNECTED": "The live connection was interrupted.",
+      "REALTIME.CLIENT.REPLACED": "Another connection replaced this live connection.",
+      "REALTIME.CLIENT.TIMEOUT": "The live connection timed out.",
+      "REALTIME.CLIENT.UNAVAILABLE": "Live updates are unavailable in this session.",
+      "REALTIME.DEPENDENCY.ADMISSION_UNAVAILABLE": "The live update service is temporarily unavailable.",
+      "REALTIME.DEPENDENCY.SERVER_NOT_READY": "The live update service is not ready.",
+      "REALTIME.HANDSHAKE.INVALID": "The live connection settings could not be verified.",
+      "REALTIME.INTERNAL.ERROR": "The live update service encountered an error.",
+      "REALTIME.LIMIT.RATE_LIMITED": "Too many requests. Try again shortly.",
+      "REALTIME.LIMIT.TOO_MANY_CONNECTIONS": "Too many live connections are open.",
+      "REALTIME.LIMIT.TOO_MANY_SUBSCRIPTIONS": "Too many live update subscriptions are active.",
+      "REALTIME.PROTOCOL.IDEMPOTENCY_CONFLICT": "The update request could not be safely repeated.",
+      "REALTIME.PROTOCOL.INVALID_PAYLOAD": "An update could not be verified. Refreshing the latest data.",
+      "REALTIME.PROTOCOL.PAYLOAD_TOO_LARGE": "An update exceeded the allowed size.",
+      "REALTIME.PROTOCOL.STALE_STATE": "Update state is outdated. Refresh the latest data.",
+      "REALTIME.PROTOCOL.UNSUPPORTED_VERSION": "This live update version is unsupported.",
+      "REALTIME.RECOVERY.RESYNC_REQUIRED": "Refresh the latest data to restore live updates."
+    }
   }
 }

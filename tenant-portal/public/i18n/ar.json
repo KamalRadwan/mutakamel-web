@@ -324,5 +324,51 @@
     "swatches": "ألوان جاهزة",
     "noColor": "بلا لون",
     "invalid": "أدخل لونًا صالحًا"
+  },
+  "realtime": {
+    "connection": {
+      "connecting": "جارٍ الاتصال بالتحديثات الفورية…",
+      "connected": "تم الاتصال بالتحديثات الفورية.",
+      "stale": "التحديثات الفورية متأخرة. جارٍ تحديث البيانات.",
+      "failed": "تعذّر استعادة الاتصال بالتحديثات الفورية.",
+      "unavailable": "التحديثات الفورية غير متاحة."
+    },
+    "retry": "إعادة محاولة الاتصال",
+    "errors": {
+      "REALTIME.AUTH.ACCESS_REVOKED": "انتهى تصريح وصولك.",
+      "REALTIME.AUTH.AUDIENCE_NOT_ALLOWED": "لا يمكن لهذه الجلسة استخدام التحديثات الفورية.",
+      "REALTIME.AUTH.IDENTITY_INACTIVE": "هذا الحساب غير نشط.",
+      "REALTIME.AUTH.INVALID_TOKEN": "تعذّر التحقق من جلستك.",
+      "REALTIME.AUTH.MISSING_TOKEN": "سجّل الدخول لتلقّي التحديثات الفورية.",
+      "REALTIME.AUTH.NOT_ALLOWED": "التحديثات الفورية غير مسموح بها لهذا الحساب.",
+      "REALTIME.AUTH.NOT_AUTHORIZED": "ليس لديك إذن لتلقّي هذه التحديثات.",
+      "REALTIME.AUTH.ORIGIN_NOT_ALLOWED": "التحديثات الفورية غير مسموح بها من هذا الموقع.",
+      "REALTIME.AUTH.REQUIRED": "سجّل الدخول لتلقّي التحديثات الفورية.",
+      "REALTIME.AUTH.SESSION_INVALIDATED": "انتهت جلستك. سجّل الدخول مجددًا.",
+      "REALTIME.AUTH.TENANT_HOST_MISMATCH": "تعذّر التحقق من عنوان مساحة العمل.",
+      "REALTIME.AUTH.TENANT_INACTIVE": "التحديثات الفورية غير متاحة لمساحة العمل هذه.",
+      "REALTIME.AUTH.TOKEN_EXPIRED": "يلزم تجديد جلستك.",
+      "REALTIME.AUTH.TOKEN_IN_URL": "رُفضت مصادقة الاتصال الفوري.",
+      "REALTIME.CLIENT.ACK_FAILED": "تعذّر تأكيد الاستلام. جارٍ تحديث الإشعارات.",
+      "REALTIME.CLIENT.ACK_TIMEOUT": "انتهت مهلة تأكيد الاستلام.",
+      "REALTIME.CLIENT.BACKPRESSURE": "وردت تحديثات كثيرة. جارٍ تحديث البيانات.",
+      "REALTIME.CLIENT.DISCONNECTED": "انقطع الاتصال الفوري.",
+      "REALTIME.CLIENT.REPLACED": "حلّ اتصال آخر محل هذا الاتصال الفوري.",
+      "REALTIME.CLIENT.TIMEOUT": "انتهت مهلة الاتصال الفوري.",
+      "REALTIME.CLIENT.UNAVAILABLE": "التحديثات الفورية غير متاحة في هذه الجلسة.",
+      "REALTIME.DEPENDENCY.ADMISSION_UNAVAILABLE": "خدمة التحديثات الفورية غير متاحة مؤقتًا.",
+      "REALTIME.DEPENDENCY.SERVER_NOT_READY": "خدمة التحديثات الفورية غير جاهزة.",
+      "REALTIME.HANDSHAKE.INVALID": "تعذّر التحقق من إعدادات الاتصال الفوري.",
+      "REALTIME.INTERNAL.ERROR": "حدث خطأ في خدمة التحديثات الفورية.",
+      "REALTIME.LIMIT.RATE_LIMITED": "الطلبات كثيرة جدًا. حاول مجددًا بعد قليل.",
+      "REALTIME.LIMIT.TOO_MANY_CONNECTIONS": "عدد الاتصالات الفورية المفتوحة كبير جدًا.",
+      "REALTIME.LIMIT.TOO_MANY_SUBSCRIPTIONS": "عدد اشتراكات التحديثات الفورية النشطة كبير جدًا.",
+      "REALTIME.PROTOCOL.IDEMPOTENCY_CONFLICT": "تعذّر تكرار طلب التحديث بأمان.",
+      "REALTIME.PROTOCOL.INVALID_PAYLOAD": "تعذّر التحقق من أحد التحديثات. جارٍ تحديث البيانات.",
+      "REALTIME.PROTOCOL.PAYLOAD_TOO_LARGE": "تجاوز أحد التحديثات الحجم المسموح به.",
+      "REALTIME.PROTOCOL.STALE_STATE": "حالة التحديث قديمة. حدّث البيانات.",
+      "REALTIME.PROTOCOL.UNSUPPORTED_VERSION": "إصدار التحديثات الفورية هذا غير مدعوم.",
+      "REALTIME.RECOVERY.RESYNC_REQUIRED": "حدّث البيانات لاستعادة التحديثات الفورية."
+    }
   }
 }

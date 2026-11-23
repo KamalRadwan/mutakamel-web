@@ -1,4 +1,4 @@
-import { Component, computed, inject, input } from '@angular/core';
+import { Component, computed, input } from '@angular/core';
 import { TranslocoPipe, provideTranslocoScope } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
@@ -8,9 +8,6 @@ import {
   tablerClock,
   tablerInfoCircle,
 } from '@ng-icons/tabler-icons';
-import { CurrentUser } from '../../../../../core/auth/current-user';
-import { LanguageState } from '../../../../../core/i18n/language';
-import { formatDate } from '../../../shared/trade-format';
 import type { PurchaseOrderDetail } from '../../shared/document.model';
 
 interface ApprovalLineView {
@@ -36,11 +33,7 @@ interface ApprovalLineView {
   host: { class: 'block min-w-0' },
 })
 export class ApprovalLine {
-  private readonly lang = inject(LanguageState).current;
-  private readonly currentUser = inject(CurrentUser);
-
   readonly order = input.required<PurchaseOrderDetail>();
-  readonly submitterName = input<string | null>(null);
   readonly rejectionReason = input<string | null>(null);
 
   protected readonly view = computed<ApprovalLineView | null>((): ApprovalLineView | null => {
@@ -50,19 +43,12 @@ export class ApprovalLine {
     }
 
     switch (po.approvalStatus) {
-      case 'PENDING': {
-        const user = this.currentUser.user();
-        const resolvedName =
-          this.submitterName()?.trim() ||
-          (po.submittedBy && po.submittedBy === user.email ? user.displayName : po.submittedBy) ||
-          '—';
-        const resolvedDate = po.submittedAt ? formatDate(po.submittedAt, this.lang()) : '—';
+      case 'PENDING':
         return {
           icon: 'tablerClock',
           key: 'tda.approval.pending',
-          params: { name: resolvedName, date: resolvedDate },
+          params: {},
         };
-      }
 
       case 'APPROVED':
         return {

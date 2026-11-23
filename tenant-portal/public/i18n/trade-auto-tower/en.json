@@ -147,6 +147,7 @@
     "label": "Exceptions pagination"
   },
   "states": {
+    "notReadyTitle": "Temporarily unavailable",
     "loadFailed": "Could not load control tower exceptions.",
     "notFound": "This exception no longer exists.",
     "emptyOpen": "Nothing needs attention.",
@@ -169,7 +170,7 @@
     "hints": {
       "source": "The record that raised this exception. Use the link to open it.",
       "status": "Where the exception stands now in its handling.",
-      "problem": "The safe error code reported by the system, shown in plain words.",
+      "problem": "The safe technical error code reported by the system.",
       "created": "When the system first raised this exception.",
       "correlationId": "The identifier that links this exception to its logs. Quote it when asking for support.",
       "attempts": "How many delivery attempts were made before the exception was raised."
@@ -261,6 +262,11 @@
     "TRADE_CONTROL_TOWER_RESOLUTION_INVALID_category_not_resolvable": "This resolution does not fit the exception category.",
     "TRADE_CONTROL_TOWER_RESOLUTION_INVALID_source_still_scheduled": "The source version is still scheduled; activate or change it first.",
     "TRADE_CONTROL_TOWER_RESOLUTION_INVALID_evidence_invalid": "Check the evidence: at least one safe key within the size limits. Accepting a result needs a valid keptArtifactId.",
-    "TRADE_CONTROL_TOWER_SCOPE_DENIED_branch_not_accessible": "This branch is not available in this company. It may be inactive or deleted, or you may not have access to it. Choose another branch."
+    "TRADE_CONTROL_TOWER_SCOPE_DENIED_branch_not_accessible": "This branch is not available in this company. It may be inactive or deleted, or you may not have access to it. Choose another branch.",
+    "TRADE_CONTROL_TOWER_PROJECTION_UNAVAILABLE": "The control tower view is temporarily unavailable. Try again shortly.",
+    "TRADE_CONTROL_TOWER_TARGET_STALE": "The underlying source changed. Reload to review the latest exception state.",
+    "TRADE_CONTROL_TOWER_OWNER_UNAVAILABLE": "The owner module is temporarily unavailable. Try again shortly.",
+    "TRADE_CONTROL_TOWER_OWNER_RESULT_REJECTED": "The owner module rejected this resolution result.",
+    "TRADE_CONTROL_TOWER_QUERY_INVALID": "The selected filter combination is not valid. Adjust the filters and try again."
   }
 }

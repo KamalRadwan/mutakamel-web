@@ -232,7 +232,7 @@ for (const lang of ['en', 'ar'] as const) {
         await flushModal();
 
         const el = fixture.nativeElement as HTMLElement;
-        const problemInput = el.querySelector<HTMLInputElement>('input[value="TRADE.OWNER.TRANSPORT_TIMEOUT"]');
+        const problemInput = el.querySelector<HTMLInputElement>('input[id$="-problem"]');
         expect(problemInput).not.toBeNull();
         expect(el.textContent).toContain('UPSTREAM_TIMEOUT');
         expect(el.textContent).not.toContain('Retry');

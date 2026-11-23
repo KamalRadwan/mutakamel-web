@@ -47,5 +47,10 @@
   "empty": {
     "title": "No {{kind}} yet",
     "filtered": "No matching documents found"
+  },
+  "errors": {
+    "forbiddenTitle": "Access denied",
+    "forbiddenText": "You do not have permission to view these documents.",
+    "backHome": "Back to home"
   }
 }

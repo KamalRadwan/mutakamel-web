@@ -133,5 +133,11 @@
         "CANCEL": "{{n}} purchase quotations cancelled"
       }
     }
+  },
+  "errors": {
+    "BULK_JOB_NOT_FOUND": "The batch job could not be found.",
+    "TRADE.BULK_JOB.SUBMIT": "The batch operation could not be started. Try again.",
+    "TRADE.BULK_JOB.RETRY": "The batch operation could not be retried. Try again.",
+    "TRADE.BULK_JOB.ARTIFACT_NOT_READY": "The ZIP file is not ready yet. Try again shortly. A ZIP file larger than 25 MB cannot be prepared."
   }
 }

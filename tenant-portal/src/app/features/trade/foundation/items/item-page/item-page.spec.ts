@@ -367,7 +367,7 @@ describe('ItemPage (TradeHttpStub)', () => {
           loader: AsyncFileLoader,
         }),
         { provide: Notify, useValue: notify },
-        { provide: TenantScopeState, useValue: { me, selection } },
+        { provide: TenantScopeState, useValue: { me, selection, branchesFor: () => ['b1'] } },
         { provide: LanguageState, useValue: { current: signal<'en' | 'ar'>('en') } },
       ],
     });

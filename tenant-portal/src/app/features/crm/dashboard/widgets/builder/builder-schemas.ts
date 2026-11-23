@@ -1,4 +1,7 @@
-import { z } from 'zod';
+import {
+  type RefinementCtx,
+  unknown,
+} from 'zod';
 import type {
   Catalog,
   CatalogMetric,
@@ -93,7 +96,7 @@ function encodeIssue(code: string, params?: Record<string, unknown>): string {
 }
 
 function addIssue(
-  ctx: z.RefinementCtx,
+  ctx: RefinementCtx,
   path: (string | number)[],
   code: string,
   params?: Record<string, unknown>,
@@ -259,7 +262,7 @@ function findVisualization(
 }
 
 function createDataSchema() {
-  return z.unknown().superRefine((val, ctx) => {
+  return unknown().superRefine((val, ctx) => {
     const draft = val as BuilderDraft;
     if (!draft.source || !(BUILDER_SOURCES as readonly string[]).includes(draft.source)) {
       addIssue(ctx, ['source'], 'required');
@@ -268,7 +271,7 @@ function createDataSchema() {
 }
 
 function createMetricsSchema(catalog: Catalog | null) {
-  return z.unknown().superRefine((val, ctx) => {
+  return unknown().superRefine((val, ctx) => {
     const draft = val as BuilderDraft;
     const series = draft.querySpec?.series ?? [];
     const viz = findVisualization(catalog, draft.visualizationType);
@@ -396,7 +399,7 @@ function createMetricsSchema(catalog: Catalog | null) {
 }
 
 function createScopeSchema() {
-  return z.unknown().superRefine((val, ctx) => {
+  return unknown().superRefine((val, ctx) => {
     const draft = val as BuilderDraft;
     const filters = draft.querySpec?.filters;
     const preset = filters?.datePreset;
@@ -466,7 +469,7 @@ function createScopeSchema() {
 }
 
 function createCompareSchema(catalog: Catalog | null) {
-  return z.unknown().superRefine((val, ctx) => {
+  return unknown().superRefine((val, ctx) => {
     const draft = val as BuilderDraft;
     const comparison = draft.querySpec?.comparison;
     const type = comparison?.type ?? 'NONE';
@@ -551,7 +554,7 @@ function createCompareSchema(catalog: Catalog | null) {
 }
 
 function createPresentationSchema(catalog: Catalog | null) {
-  return z.unknown().superRefine((val, ctx) => {
+  return unknown().superRefine((val, ctx) => {
     const draft = val as BuilderDraft;
     const vizKey = draft.visualizationType;
 
@@ -656,7 +659,7 @@ function createPresentationSchema(catalog: Catalog | null) {
 }
 
 function createReviewSchema() {
-  return z.unknown().superRefine((val, ctx) => {
+  return unknown().superRefine((val, ctx) => {
     const draft = val as BuilderDraft;
     if ((draft.changeSummary ?? '').length > 500) {
       addIssue(ctx, ['changeSummary'], 'tooLong', { max: 500 });

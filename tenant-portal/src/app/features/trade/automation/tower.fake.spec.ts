@@ -420,7 +420,7 @@ describe('tower.api (TradeHttp wire contract & envelope unwrap)', () => {
     };
     const listPending = listExceptions(C1, { status: ['OPEN', 'ACKNOWLEDGED'], branchId: BRANCH_ID });
     const listReq = http.expectOne(
-      `${base}/control-tower/exceptions?branchId=${BRANCH_ID}&status=OPEN%2CACKNOWLEDGED`,
+      `${base}/control-tower/exceptions?branchId=${BRANCH_ID}&status=OPEN,ACKNOWLEDGED`,
     );
     expect(listReq.request.headers.get('x-mutakamel-company-id')).toBe(COMPANY_ID);
     expect(listReq.request.headers.get('x-mutakamel-branch-id')).toBeNull();
@@ -454,17 +454,15 @@ describe('tower.api (TradeHttp wire contract & envelope unwrap)', () => {
     await expect(resolvePending).resolves.toEqual(resolvedPayload);
   });
 
-  it('maps wrapped backend errors into Trade ApiError with details and correlationId', async () => {
+  it('maps service errors into Trade ApiError with details and correlationId', async () => {
     const key = newIdempotencyKey();
     const pending = resolve(EXC_ID, OWNER_INPUT, 2, key, C1);
     const req = http.expectOne(`${base}/control-tower/exceptions/${EXC_ID}/resolve`);
     req.flush(
       {
         success: false,
-        error: {
-          code: 'TRADE.CONTROL_TOWER.TARGET_STALE',
-          details: { sourceVersion: ['changed'] },
-        },
+        errorCode: 'TRADE.CONTROL_TOWER.TARGET_STALE',
+        details: { sourceVersion: ['changed'] },
         correlationId: 'corr-stale',
       },
       { status: 409, statusText: 'Conflict' },

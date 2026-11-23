@@ -468,7 +468,7 @@ describe('trade-dashboard.api (TradeHttpStub)', () => {
         },
       );
       expect(res).toEqual(runResult);
-      expect(stub.recordedWrites()[0].key).toBeUndefined();
+      expect(stub.recordedWrites()[0].key).toMatch(/^[0-9a-f-]{14}7[0-9a-f-]{21}$/i);
       expect(stub.recordedWrites()[0]).toMatchObject({
         method: 'POST',
         path: `/dashboards/${DASH_ID}/run`,
