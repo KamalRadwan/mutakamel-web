@@ -307,6 +307,22 @@ export interface GovernedTargetOption {
   targetValue: string;
 }
 
+/** GET /targets row, before narrowing to the widget binding supported by dashboard-catalog.ts. */
+export interface GovernedTargetRecord {
+  id: string;
+  branchId: string | null;
+  subjectType: 'USER' | 'TEAM' | 'BRANCH' | 'TEAM_SET';
+  subjectId: string | null;
+  subjectName: string | null;
+  metricKey: string;
+  currencyCode: string | null;
+  periodGrain: 'MONTH' | 'QUARTER' | 'YEAR';
+  periodStart: string;
+  unit: 'MONEY' | 'COUNT' | 'PERCENT';
+  targetValue: string;
+  approvalState: 'DRAFT' | 'SUBMITTED' | 'APPROVED';
+}
+
 export interface WidgetTabCounts {
   mine: number;
   shared: number;

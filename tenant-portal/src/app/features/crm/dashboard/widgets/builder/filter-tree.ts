@@ -1,4 +1,3 @@
-import { FAKE_PEOPLE } from '../../../../../shared/widgets/dashboard/fake/fake-org';
 import type { QueryField, Operator, Condition, Group, Query, Value } from '../../../../../shared/query-builder/query.model';
 import type { FilterGroup as WireFilterGroup, FilterLeaf as WireFilterLeaf, FilterOperator as WireFilterOperator } from '../../../../../shared/widgets/dashboard/analytics.model';
 
@@ -31,30 +30,8 @@ export interface FilterFieldDef {
   options?: readonly FilterFieldOptionDef[];
 }
 
-export const FAKE_LEAD_SOURCES: readonly FilterFieldOptionDef[] = [
-  { value: 'website', labelEn: 'Website', labelAr: 'الموقع الإلكتروني' },
-  { value: 'referral', labelEn: 'Referral', labelAr: 'إحالة' },
-  { value: 'social', labelEn: 'Social media', labelAr: 'منصات التواصل' },
-  { value: 'campaign', labelEn: 'Campaign', labelAr: 'حملة تسويقية' },
-  { value: 'direct', labelEn: 'Direct', labelAr: 'مباشر' },
-];
+export type FilterDomains = Readonly<Record<string, readonly FilterFieldOptionDef[]>>;
 
-export const FAKE_OPPORTUNITY_STAGES: readonly FilterFieldOptionDef[] = [
-  { value: 'qualification', labelEn: 'Qualification', labelAr: 'التأهيل' },
-  { value: 'proposal', labelEn: 'Proposal', labelAr: 'عرض السعر' },
-  { value: 'negotiation', labelEn: 'Negotiation', labelAr: 'التفاوض' },
-  { value: 'contract', labelEn: 'Contract', labelAr: 'التعاقد' },
-  { value: 'won', labelEn: 'Won', labelAr: 'رابحة' },
-  { value: 'lost', labelEn: 'Lost', labelAr: 'خاسرة' },
-];
-
-const OWNER_OPTIONS: readonly FilterFieldOptionDef[] = FAKE_PEOPLE.map((p) => ({
-  value: p.id,
-  labelEn: p.name,
-  labelAr: p.nameAr,
-}));
-
-// Phase 5: replace with the registered field catalogue
 export const FILTER_FIELDS: Record<FilterTreeRecordType, readonly FilterFieldDef[]> = {
   leads: [
     {
@@ -65,12 +42,7 @@ export const FILTER_FIELDS: Record<FilterTreeRecordType, readonly FilterFieldDef
       hintEn: 'Filter by lead lifecycle status.',
       hintAr: 'التصفية حسب حالة العميل المحتمل.',
       kind: 'enum',
-      options: [
-        { value: 'OPEN', labelEn: 'Open', labelAr: 'مفتوح' },
-        { value: 'QUALIFIED', labelEn: 'Qualified', labelAr: 'مؤهل' },
-        { value: 'CONVERTED', labelEn: 'Converted', labelAr: 'محوّل' },
-        { value: 'LOST', labelEn: 'Lost', labelAr: 'مفقود' },
-      ],
+      options: [],
     },
     {
       id: 'leads.rating',
@@ -91,7 +63,7 @@ export const FILTER_FIELDS: Record<FilterTreeRecordType, readonly FilterFieldDef
       hintEn: 'Filter by acquisition source.',
       hintAr: 'التصفية حسب مصدر الاستحواذ.',
       kind: 'enum',
-      options: FAKE_LEAD_SOURCES,
+      options: [],
     },
     {
       id: 'leads.ownerUserId',
@@ -101,7 +73,7 @@ export const FILTER_FIELDS: Record<FilterTreeRecordType, readonly FilterFieldDef
       hintEn: 'Filter by assigned salesperson.',
       hintAr: 'التصفية حسب مسؤول المبيعات المعين.',
       kind: 'enum',
-      options: OWNER_OPTIONS,
+      options: [],
     },
     {
       id: 'leads.createdAt',
@@ -123,7 +95,7 @@ export const FILTER_FIELDS: Record<FilterTreeRecordType, readonly FilterFieldDef
       hintEn: 'Filter by current opportunity stage.',
       hintAr: 'التصفية حسب المرحلة الحالية للفرصة.',
       kind: 'enum',
-      options: FAKE_OPPORTUNITY_STAGES,
+      options: [],
     },
     {
       id: 'opportunities.estimatedValue',
@@ -143,7 +115,7 @@ export const FILTER_FIELDS: Record<FilterTreeRecordType, readonly FilterFieldDef
       hintEn: 'Filter by assigned salesperson.',
       hintAr: 'التصفية حسب مسؤول المبيعات المعين.',
       kind: 'enum',
-      options: OWNER_OPTIONS,
+      options: [],
     },
     {
       id: 'opportunities.expectedCloseDate',
@@ -199,7 +171,7 @@ export function isKnownFilterField(fieldId: string, recordType?: FilterTreeRecor
   );
 }
 
-export function filterFieldsFor(recordType: FilterTreeRecordType, lang: 'ar' | 'en'): QueryField[] {
+export function filterFieldsFor(recordType: FilterTreeRecordType, lang: 'ar' | 'en', domains: FilterDomains = {}): QueryField[] {
   return FILTER_FIELDS[recordType].map((def) => ({
     id: def.id,
     label: lang === 'ar' ? def.labelAr : def.labelEn,
@@ -211,7 +183,7 @@ export function filterFieldsFor(recordType: FilterTreeRecordType, lang: 'ar' | '
     ...(def.max !== undefined ? { max: def.max } : {}),
     ...(def.options
       ? {
-          options: def.options.map((opt) => ({
+          options: (domains[def.id] ?? def.options).map((opt) => ({
             value: opt.value,
             label: lang === 'ar' ? opt.labelAr : opt.labelEn,
           })),

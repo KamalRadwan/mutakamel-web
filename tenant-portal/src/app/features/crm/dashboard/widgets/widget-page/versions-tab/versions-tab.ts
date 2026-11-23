@@ -16,6 +16,7 @@ import { FullState } from '../../../../../../shared/ui/full-state/full-state';
 import { ApiError, errorCodeOf } from '../../../../../../shared/widgets/dashboard/analytics-api';
 import { getCatalog } from '../../../../../../shared/widgets/dashboard/analytics.api';
 import type { Catalog } from '../../../../../../shared/widgets/dashboard/analytics.model';
+import { OrgApi } from '../../../../../../shared/widgets/dashboard/org.api';
 import { errorKey } from '../../../../../../shared/widgets/dashboard/panel-state';
 import {
   type BranchOption,
@@ -61,6 +62,7 @@ function normalizeProvenance(code: string): string {
 })
 export class VersionsTab {
   private readonly notify = inject(Notify);
+  private readonly org = inject(OrgApi);
   private readonly router = inject(Router);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
@@ -453,7 +455,7 @@ export class VersionsTab {
 
   private async loadBranchesOnce(): Promise<void> {
     try {
-      this.branches.set(await listGrantedBranches());
+      this.branches.set(await listGrantedBranches(this.org));
     } catch {
       // Optional enrichment for branch names; raw ids serve as fallback.
     }

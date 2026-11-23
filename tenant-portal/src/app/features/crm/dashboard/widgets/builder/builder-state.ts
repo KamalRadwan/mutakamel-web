@@ -1,4 +1,4 @@
-import { DestroyRef, Injectable, computed, effect, inject, signal, type Signal, type WritableSignal } from '@angular/core';
+import { DestroyRef, Injectable, computed, effect, inject, Injector, runInInjectionContext, signal, type Signal, type WritableSignal } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
 import { LanguageState } from '../../../../../core/i18n/language';
 import { Notify } from '../../../../../core/notify/notify';
@@ -31,6 +31,7 @@ import {
   getWidget,
   listGrantedBranches,
   listPipelineOptions,
+  loadFilterDomains,
   previewWidget,
   saveDraft as saveWidgetDraft,
 } from '../widgets.api';
@@ -50,7 +51,9 @@ import {
   type StepId,
   type ValidationIssue,
 } from './builder-schemas';
-import { filterTreeMetricKeys, filterTreeSupported } from './filter-tree';
+import { filterTreeMetricKeys, filterTreeSupported, type FilterDomains } from './filter-tree';
+import { OrgApi, type OrgTeam } from '../../../../../shared/widgets/dashboard/org.api';
+import { listActiveCoreCurrencyCodes } from '../../../../../shared/lookups/core-currencies';
 
 export {
   STEP_ORDER,
@@ -202,9 +205,15 @@ function mapCodeToTarget(code: string): { step: StepId; field: string } | null {
 @Injectable()
 export class BuilderState {
   private readonly transloco = inject(TranslocoService);
+  private readonly org = inject(OrgApi);
+  private readonly injector = inject(Injector);
   private readonly notify = inject(Notify);
   private readonly language = inject(LanguageState).current;
   private readonly destroyRef = inject(DestroyRef);
+
+  readonly teams = signal<readonly OrgTeam[]>([]);
+  readonly currencies = signal<readonly string[]>([]);
+  readonly filterDomains = signal<FilterDomains>({});
 
   private readonly _catalog = signal<Catalog | null>(null);
   private readonly _branches = signal<readonly BranchOption[]>([]);
@@ -398,12 +407,20 @@ export class BuilderState {
       const catalog = this._catalog() ?? (await getWidgetCatalog());
       if (seq !== this.loadSeq) return;
       this._catalog.set(catalog);
-      if (this._branches().length === 0 || this._pipelines().length === 0) {
-        const [branches, pipelines] = await Promise.all([listGrantedBranches(), listPipelineOptions()]);
-        if (seq !== this.loadSeq) return;
-        this._branches.set(branches);
-        this._pipelines.set(pipelines);
-      }
+      const [branches, pipelines, teams, currencies, domains] = await Promise.all([
+        listGrantedBranches(this.org),
+        can('crm.pipelines.read') || can('crm.opportunities.read') ? listPipelineOptions() : Promise.resolve([]),
+        this.org.listTeams(),
+        can('currencies.currency.read')
+          ? runInInjectionContext(this.injector, listActiveCoreCurrencyCodes) : Promise.resolve([]),
+        loadFilterDomains(this.org),
+      ]);
+      if (seq !== this.loadSeq) return;
+      this._branches.set(branches);
+      this._pipelines.set(pipelines);
+      this.teams.set(teams);
+      this.currencies.set(currencies);
+      this.filterDomains.set(domains);
 
       if (!widgetId) {
         const empty = createEmptyDraft();

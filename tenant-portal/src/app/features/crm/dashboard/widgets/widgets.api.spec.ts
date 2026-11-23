@@ -3,6 +3,9 @@ import { ApiError, newIdempotencyKey } from '../../../../shared/widgets/dashboar
 import { bindAnalyticsPermissions } from '../../../../shared/widgets/dashboard/analytics-permissions';
 import { ANALYTICS_PERMISSIONS_FIXTURE } from '../../../../shared/widgets/dashboard/analytics-permissions.fixture';
 import { FAKE_PEOPLE } from '../../../../shared/widgets/dashboard/fake/fake-org';
+import type { GovernedTargetRecord } from './widgets.model';
+import { OrgApi } from '../../../../shared/widgets/dashboard/org.api';
+import { TestBed } from '@angular/core/testing';
 import { detailIssues } from '../shared/api-error-details';
 import { WIDGET_STORE } from '../shared/widget-store.fake';
 import { bindCrmHttpForTest, crmQueries } from '../../shared/crm-http';
@@ -11,6 +14,12 @@ import { widgetDetail, widgetDraft, widgetImpact } from './builder/builder-test-
 import { compareFixture, transferFixture } from './widget-page/governance-test-support';
 import {
   cloneWidget,
+  deleteWidget,
+  getWidgetTabCounts,
+  getWidgetUsageCounts,
+  listGovernedTargets,
+  listGrantedBranches,
+  listPipelineOptions,
   compareVersions,
   getDraft,
   getWidget,
@@ -213,5 +222,82 @@ describe('widget lifecycle, transfer and clone (backend shapes)', () => {
     expect(stub.recordedWrites().at(-1)).toMatchObject({ method: 'POST', path: `/widgets/${widget.summary.id}/clone`, body: {} });
     expect(state.draft?.name.endsWith(' Copy')).toBe(true);
     expect(state.draft?.internalNotes).toBeNull();
+  });
+});
+
+
+describe('live widget integration', () => {
+  const branchId = '019a9d10-0000-7000-8000-000000000101';
+  const metricKey = 'crm.opportunities.won_value';
+  const target = (changes: Partial<GovernedTargetRecord> = {}): GovernedTargetRecord => ({
+    id: 'target-1', branchId, subjectType: 'BRANCH', subjectId: branchId, subjectName: null,
+    metricKey, currencyCode: 'EGP', periodGrain: 'MONTH', periodStart: '2026-11-01',
+    unit: 'MONEY', targetValue: '12500.50', approvalState: 'APPROVED', ...changes,
+  });
+
+  it('deletes a server widget absent from the local store and preserves 204', async () => {
+    await expect(deleteWidget('server/id')).resolves.toBeUndefined();
+    expect(stub.recordedWrites()).toEqual([expect.objectContaining({
+      method: 'DELETE', path: '/widgets/server%2Fid', body: undefined,
+    })]);
+  });
+
+  it.each(['CRM_WIDGET_LIFECYCLE_FORBIDDEN', 'CRM_WIDGET_LIFECYCLE_INVALID', 'CRM_WIDGET_NOT_FOUND'])
+    ('propagates delete failure %s without replay', async (code) => {
+      failure(422, code);
+      await expect(deleteWidget('server-id')).rejects.toMatchObject({ code });
+      expect(stub.recordedWrites()).toHaveLength(1);
+    });
+
+  it('never reuses a failed delete action key', async () => {
+    failure(503, 'GW.UPSTREAM.UNAVAILABLE');
+    await expect(deleteWidget('server-id')).rejects.toMatchObject({ status: 503 });
+    await deleteWidget('server-id');
+    const keys = stub.recordedWrites().map((write) => write.options.key);
+    expect(new Set(keys).size).toBe(2);
+  });
+
+  it('loads every target page with the selected branch and narrows the binding explicitly', async () => {
+    const read = vi.spyOn(stub, 'read');
+    read.mockResolvedValueOnce({ items: [target(), target({ id: 'set', subjectType: 'TEAM_SET', branchId: null, subjectId: null }),
+      target({ id: 'count', unit: 'COUNT', currencyCode: null }), target({ id: 'rate', unit: 'PERCENT', currencyCode: null }),
+      target({ id: 'draft', approvalState: 'DRAFT' })], hasNext: true });
+    read.mockResolvedValueOnce({ items: [target({ id: 'target-2', subjectName: 'Sales' })], hasNext: false });
+    const items = await listGovernedTargets(metricKey, 'MONTH', branchId);
+    expect(items.map((item) => item.id)).toEqual(['target-1', 'target-2']);
+    expect(items[0]).toMatchObject({ subjectName: branchId, targetValue: '12500.50' });
+    expect(read.mock.calls.map((call) => call[1])).toEqual([1, 2].map((page) => ({
+      branchId, metricKey, periodGrain: 'MONTH', approvalState: 'APPROVED', page, limit: 100,
+    })));
+  });
+
+  it('does not request targets without a selected branch', async () => {
+    await expect(listGovernedTargets(metricKey, 'MONTH', '')).resolves.toEqual([]);
+    expect(stub.recordedReads()).toEqual([]);
+  });
+
+  it.each([403, 422, 503])('propagates target %s failures without substituting rows', async (status) => {
+    vi.spyOn(stub, 'read').mockRejectedValueOnce(new ApiError(status, 'CRM_TARGET_SOURCE_NOT_READY'));
+    await expect(listGovernedTargets(metricKey, 'MONTH', branchId)).rejects.toMatchObject({ status });
+  });
+
+  it('uses actual pipeline IDs and bilingual names', async () => {
+    fixtures['/pipelines'] = [{ id: 'pipeline-from-server', code: 'NEW', nameEn: 'New sales', nameAr: 'مبيعات جديدة' }];
+    await expect(listPipelineOptions()).resolves.toEqual(fixtures['/pipelines']);
+  });
+
+  it('delegates branches to the authorized organization directory', async () => {
+    const rows = [{ id: branchId, companyId: 'company', name: { en: 'Branch', ar: 'الفرع' } }];
+    TestBed.configureTestingModule({});
+    const org = TestBed.inject(OrgApi);
+    vi.spyOn(org, 'listGrantedBranches').mockResolvedValue(rows);
+    await expect(listGrantedBranches(org)).resolves.toEqual(rows);
+    TestBed.resetTestingModule();
+  });
+
+  it('keeps both unavailable aggregate contracts isolated without requests or fabricated counts', async () => {
+    await expect(getWidgetTabCounts({})).rejects.toMatchObject({ code: 'CRM_ANALYTICS_SOURCE_UNAVAILABLE' });
+    await expect(getWidgetUsageCounts(['server-id'])).rejects.toMatchObject({ code: 'CRM_ANALYTICS_SOURCE_UNAVAILABLE' });
+    expect(stub.recordedReads()).toEqual([]);
   });
 });

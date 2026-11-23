@@ -7,7 +7,7 @@ import type {
   DatePreset,
   DashboardFilters,
 } from '../../../../../../shared/widgets/dashboard/analytics.model';
-import { FAKE_NOW } from '../../../../../../shared/widgets/dashboard/analytics-api';
+import { analyticsNow } from '../../../../../../shared/widgets/dashboard/analytics-api';
 import { Checkbox } from '../../../../../../shared/ui/checkbox/checkbox';
 import { DateRange, type DateRangeValue } from '../../../../../../shared/ui/date-range/date-range';
 import { Dropdown, type DropdownOption } from '../../../../../../shared/ui/dropdown/dropdown';
@@ -29,8 +29,6 @@ import {
 } from '../filter-tree';
 import { selectScopeTranslation } from '../../../../../../shared/widgets/dashboard/scope-translation';
 
-const CURRENCY_CODES = ['EGP', 'USD', 'SAR', 'AED'] as const;
-
 @Component({
   selector: 'app-step-scope',
   imports: [TranslocoPipe, Field, Dropdown, DateRange, Segmented, Checkbox, QueryBuilder],
@@ -45,7 +43,7 @@ export class StepScope {
   private readonly builderScope = toSignal(selectScopeTranslation(this.transloco, 'crm-widget-builder', 'builder'));
   private readonly analyticsScope = toSignal(this.transloco.selectTranslation('analytics'));
 
-  protected readonly fakeNow = FAKE_NOW;
+  protected readonly fakeNow = analyticsNow();
   protected readonly branches = this.state.branches;
 
   protected readonly errors = computed(() => this.state.errors().scope ?? {});
@@ -148,7 +146,7 @@ export class StepScope {
       { value: '', label: this.transloco.translate('builder.scope.allPipelines') },
       ...this.state.pipelines().map((p) => ({
         value: p.id,
-        label: this.transloco.translate(`builder.scope.pipelines.${p.key}`),
+        label: this.language() === 'ar' ? p.nameAr : p.nameEn,
       })),
     ];
   });
@@ -158,7 +156,7 @@ export class StepScope {
     this.builderScope();
     return [
       { value: '', label: this.transloco.translate('builder.scope.allCurrencies') },
-      ...CURRENCY_CODES.map((code) => ({ value: code, label: code })),
+      ...this.state.currencies().map((code) => ({ value: code, label: code })),
     ];
   });
 
@@ -176,7 +174,7 @@ export class StepScope {
       delete next.dateFrom;
       delete next.dateTo;
     } else if (!next.dateFrom || !next.dateTo) {
-      const today = FAKE_NOW.slice(0, 10);
+      const today = analyticsNow().slice(0, 10);
       next.dateFrom = `${today.slice(0, 8)}01`;
       next.dateTo = today;
     }
@@ -283,7 +281,7 @@ export class StepScope {
   protected readonly filterFields = computed<QueryField[]>(() => {
     const rt = this.filterRecordType();
     if (!rt) return [];
-    return filterFieldsFor(rt, this.language());
+    return filterFieldsFor(rt, this.language(), this.state.filterDomains());
   });
 
   protected readonly appliedFilterQuery = computed<Query>(() =>

@@ -19,8 +19,7 @@ import type {
   DatePreset,
   QuerySpec,
 } from '../../../../../../shared/widgets/dashboard/analytics.model';
-import { FAKE_NOW, errorCodeOf } from '../../../../../../shared/widgets/dashboard/analytics-api';
-import { FAKE_TEAMS } from '../../../../../../shared/widgets/dashboard/fake/fake-org';
+import { analyticsNow, errorCodeOf } from '../../../../../../shared/widgets/dashboard/analytics-api';
 import { errorKey } from '../../../../../../shared/widgets/dashboard/panel-state';
 import { listGovernedTargets } from '../../widgets.api';
 import type { GovernedTargetOption } from '../../widgets.model';
@@ -95,7 +94,7 @@ export class StepCompare {
   private readonly builder2Scope = toSignal(selectScopeTranslation(this.transloco, 'crm-widget-builder-2', 'builder2'));
   private readonly analyticsScope = toSignal(this.transloco.selectTranslation('analytics'));
 
-  protected readonly fakeNow = FAKE_NOW;
+  protected readonly fakeNow = analyticsNow();
   protected readonly governedTargets = signal<readonly GovernedTargetOption[]>([]);
   protected readonly targetsLoading = signal(false);
   protected readonly targetText = signal('');
@@ -217,7 +216,7 @@ export class StepCompare {
 
   protected readonly teamOptions = computed<DropdownOption<string>[]>(() => {
     const lang = this.language();
-    return FAKE_TEAMS.map((team) => ({
+    return this.state.teams().map((team) => ({
       value: team.id,
       label: lang === 'ar' ? team.name.ar : team.name.en,
     }));
@@ -232,7 +231,8 @@ export class StepCompare {
     return [{ datePreset: 'CURRENT_MONTH' }, { datePreset: 'LAST_MONTH' }];
   });
 
-  protected readonly canAddDataset = computed(() => this.datasets().length < 3);
+  protected readonly canAddDataset = computed(() => this.datasets().length < 3
+    && (this.currentBasis() !== 'TEAM' || this.state.teams().some((team) => !this.datasets().some((d) => d.teamId === team.id))));
 
   protected readonly presetOptions = computed<DropdownOption<DatePreset>[]>(() => {
     this.i18n();
@@ -382,8 +382,10 @@ export class StepCompare {
       const type = this.comparisonType();
       const metricKey = this.primaryMetric()?.key ?? '';
       const grain = this.governedPeriodGrain();
+      const query = this.state.draft().querySpec;
+      const branchId = query.filters?.branchId || query.comparison?.governedTarget?.branchId || '';
 
-      if (type !== 'GOVERNED_TARGET' || !metricKey) {
+      if (type !== 'GOVERNED_TARGET' || !metricKey || !branchId) {
         this.targetFetchSeq++;
         untracked(() => {
           this.governedTargets.set([]);
@@ -393,9 +395,13 @@ export class StepCompare {
       }
 
       const seq = ++this.targetFetchSeq;
-      untracked(() => this.targetsLoading.set(true));
+      untracked(() => {
+        this.governedTargets.set([]);
+        this.selectedGovernedId.set(null);
+        this.targetsLoading.set(true);
+      });
 
-      void listGovernedTargets(metricKey, grain)
+      void listGovernedTargets(metricKey, grain, branchId)
         .then((items) => {
           if (seq !== this.targetFetchSeq) return;
           this.governedTargets.set(items);
@@ -503,10 +509,10 @@ export class StepCompare {
 
   protected onDatasetTeamChange(index: number, teamId: string): void {
     const lang = this.language();
-    const picked = FAKE_TEAMS.find((t) => t.id === teamId);
+    const picked = this.state.teams().find((t) => t.id === teamId);
     const updated = this.datasets().map((d, i) => {
       if (i !== index) return { ...d };
-      const prevTeam = FAKE_TEAMS.find((t) => t.id === d.teamId);
+      const prevTeam = this.state.teams().find((t) => t.id === d.teamId);
       const prevAutoLabel = prevTeam ? (lang === 'ar' ? prevTeam.name.ar : prevTeam.name.en) : '';
       const currentLabel = (d.label ?? '').trim();
       const shouldUpdateLabel = !currentLabel || currentLabel === prevAutoLabel || (prevTeam && (currentLabel === prevTeam.name.en || currentLabel === prevTeam.name.ar));
@@ -621,7 +627,8 @@ export class StepCompare {
       const lang = this.language();
       const used = new Set(current.map((d) => d.teamId).filter(Boolean));
       const candidate =
-        FAKE_TEAMS.find((t) => !used.has(t.id)) ?? FAKE_TEAMS[current.length % FAKE_TEAMS.length];
+        this.state.teams().find((t) => !used.has(t.id));
+      if (!candidate) return;
       newEntry = {
         teamId: candidate.id,
         label: lang === 'ar' ? candidate.name.ar : candidate.name.en,
@@ -639,7 +646,7 @@ export class StepCompare {
 
   private defaultTeamDatasets(): DatasetEntry[] {
     const lang = this.language();
-    return FAKE_TEAMS.slice(0, 2).map((t) => ({
+    return this.state.teams().slice(0, 2).map((t) => ({
       teamId: t.id,
       label: lang === 'ar' ? t.name.ar : t.name.en,
     }));

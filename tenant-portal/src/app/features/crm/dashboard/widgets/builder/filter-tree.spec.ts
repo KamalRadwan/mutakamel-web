@@ -1,8 +1,16 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { loadFilterDomains } from '../widgets.api';
+import { TestBed } from '@angular/core/testing';
+import { OrgApi } from '../../../../../shared/widgets/dashboard/org.api';
+import { bindAnalyticsPermissions } from '../../../../../shared/widgets/dashboard/analytics-permissions';
+import { bindCrmHttpForTest, crmQueries } from '../../../shared/crm-http';
+import { CrmHttpStub } from '../../../shared/testing/crm-http-testing';
+import { ApiError } from '../../../../../core/api/api-errors';
 import type { Condition, Group, Operator, Query } from '../../../../../shared/query-builder/query.model';
 import type { FilterGroup, FilterLeaf } from '../../../../../shared/widgets/dashboard/analytics.model';
 import {
   filterTreeDepth,
+  filterFieldsFor,
   filterTreeMetricKeys,
   filterTreeRecordType,
   filterTreeSupported,
@@ -191,5 +199,79 @@ describe('filter-tree record type and support', () => {
       { metricKey: 'crm.opportunities.value', calculation: { operandMetricKey: 'crm.opportunities.stage_flow.in' } },
     ]);
     expect(filterTreeSupported(stageFlow)).toBe(false);
+  });
+});
+
+
+describe('filter domains', () => {
+  it('contains no seeded people, acquisition sources or opportunity stages', () => {
+    for (const record of ['leads', 'opportunities'] as const) {
+      const fields = filterFieldsFor(record, 'en');
+      for (const field of fields.filter((item) => item.kind === 'enum')) {
+        expect(field.options).toEqual([]);
+      }
+    }
+  });
+
+  it('uses server UUIDs and bilingual labels while keeping domains isolated', () => {
+    const domains = {
+      'leads.sourceId': [{ value: 'source-uuid', labelEn: 'Exhibition', labelAr: 'معرض' }],
+      'leads.ownerUserId': [{ value: 'user-uuid', labelEn: 'Owner', labelAr: 'المسؤول' }],
+      'opportunities.stageId': [{ value: 'stage-uuid', labelEn: 'Review', labelAr: 'مراجعة' }],
+    };
+    expect(filterFieldsFor('leads', 'ar', domains).find((f) => f.id === 'leads.sourceId')?.options)
+      .toEqual([{ value: 'source-uuid', label: 'معرض' }]);
+    expect(filterFieldsFor('opportunities', 'en', domains).find((f) => f.id === 'opportunities.stageId')?.options)
+      .toEqual([{ value: 'stage-uuid', label: 'Review' }]);
+    expect(filterFieldsFor('leads', 'en').find((f) => f.id === 'leads.sourceId')?.options).toEqual([]);
+  });
+});
+
+
+describe('live filter domain loading', () => {
+  let org: OrgApi;
+  let dispose: () => void;
+  let stub: CrmHttpStub;
+  beforeEach(() => {
+    TestBed.configureTestingModule({});
+    org = TestBed.inject(OrgApi);
+    bindAnalyticsPermissions(() => ['users.user.read', 'crm.acquisition_sources.read', 'crm.pipelines.manage']);
+    stub = new CrmHttpStub({
+      '/static-data': { enumOptions: { leadStatuses: [{ value: 'OPEN', label: { en: 'Open', ar: 'مفتوح' } }] } },
+      '/acquisition-sources': [
+        { id: 'source', nameEn: 'Fair', nameAr: 'معرض', isActive: true },
+        { id: 'old-source', nameEn: 'Old', nameAr: 'قديم', isActive: false },
+      ],
+      '/opportunity-stages': [
+        { id: 'stage', nameEn: 'Review', nameAr: 'مراجعة', isActive: true },
+        { id: 'old-stage', nameEn: 'Old', nameAr: 'قديم', isActive: false },
+      ],
+    });
+    dispose = bindCrmHttpForTest(stub);
+    vi.spyOn(org, 'listUsers').mockResolvedValue([{ id: 'user', name: 'Owner', nameAr: 'Owner',
+      email: 'owner@example.test', teamId: 'team', branchId: 'branch' }]);
+  });
+  afterEach(() => { crmQueries().clear(); dispose(); vi.restoreAllMocks(); TestBed.resetTestingModule(); bindAnalyticsPermissions(() => []); });
+
+  it('loads people, active sources, active stages and status options from their real contracts', async () => {
+    const domains = await loadFilterDomains(org);
+    expect(domains['leads.sourceId']).toEqual([{ value: 'source', labelEn: 'Fair', labelAr: 'معرض' }]);
+    expect(domains['opportunities.stageId']).toEqual([{ value: 'stage', labelEn: 'Review', labelAr: 'مراجعة' }]);
+    expect(domains['leads.ownerUserId']?.map((o) => o.value)).toEqual(['user']);
+    expect(domains['leads.status']?.map((o) => o.value)).toEqual(['OPEN']);
+  });
+
+  it('propagates lookup failure instead of returning a substitute domain', async () => {
+    vi.spyOn(stub, 'read').mockRejectedValueOnce(new ApiError(503, 'GW.UPSTREAM.UNAVAILABLE'));
+    await expect(loadFilterDomains(org)).rejects.toMatchObject({ status: 503 });
+  });
+
+  it('does not request directories or catalogues without their read permission', async () => {
+    bindAnalyticsPermissions(() => []);
+    const domains = await loadFilterDomains(org);
+    expect(org.listUsers).not.toHaveBeenCalled();
+    expect(stub.recordedReads().map((read) => read.path)).toEqual(['/static-data']);
+    expect(domains['leads.sourceId']).toEqual([]);
+    expect(domains['opportunities.stageId']).toEqual([]);
   });
 });

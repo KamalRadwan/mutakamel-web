@@ -1,18 +1,16 @@
 import {
   ApiError,
   type CursorPage,
-  fakeDelay,
+  type FlatPage,
 } from '../../../../shared/widgets/dashboard/analytics-api';
+import { can } from '../../../../shared/widgets/dashboard/analytics-permissions';
+import type { FilterDomains } from './builder/filter-tree';
 import type { SharePreview } from '../../../../shared/widgets/dashboard/analytics.model';
-import { can, scopeLevels } from '../../../../shared/widgets/dashboard/analytics-permissions';
-import { listOwnerOptions as listAnalyticsOwnerOptions } from '../../../../shared/widgets/dashboard/org.api';
+import { OrgApi, listPipelineOptions as listOrgPipelines, listOwnerOptions as listAnalyticsOwnerOptions } from '../../../../shared/widgets/dashboard/org.api';
 import { crmHttp, crmQueries } from '../../shared/crm-http';
 import { isRetryableWriteError } from '../../../../core/api/api-errors';
 import { newIdempotencyKey } from '../../../../core/api/idempotency';
 import type { CoreQuery, CoreWriteMethod } from '../../../../core/api/core-http';
-import { FAKE_BRANCHES, FAKE_ME, FAKE_PEOPLE } from '../../../../shared/widgets/dashboard/fake/fake-org';
-import { WIDGET_STORE, type StoredWidget } from '../shared/widget-store.fake';
-import { deleteUsage, ensureUsageFor, fakeGovernedTargets, getUsageSummaryCounts, personName, personTeamId } from './widgets.fake';
 import type {
   ApplyLifecycleBody,
   ApplyLifecycleResult,
@@ -20,6 +18,7 @@ import type {
   DisplaySpec,
   DraftState,
   GovernedTargetOption,
+  GovernedTargetRecord,
   LifecycleImpact,
   LifecycleImpactBody,
   PanelOutcome,
@@ -42,90 +41,10 @@ import type {
   WidgetDetail,
   WidgetExecution,
   WidgetListQuery,
-  WidgetSourceResource,
   WidgetSummary,
   WidgetTabCounts,
   WidgetVersionsPage,
 } from './widgets.model';
-
-function findStoredWidget(id: string): StoredWidget {
-  const widget = WIDGET_STORE.find((item) => item.summary.id === id);
-  if (!widget || !isVisibleToViewer(widget)) {
-    throw new ApiError(404, 'CRM_WIDGET_NOT_FOUND');
-  }
-  return widget;
-}
-
-function isVisibleToViewer(widget: StoredWidget): boolean {
-  const s = widget.summary;
-  if (s.status === 'PUBLISHED') return true;
-  if (s.ownerUserId === FAKE_ME.id) return true;
-  if (s.isShared) return true;
-  const myTeamId = personTeamId(FAKE_ME.id);
-  return widget.shares.some(
-    (share) =>
-      (share.subjectType === 'USER' && share.subjectId === FAKE_ME.id) ||
-      (share.subjectType === 'TEAM' && myTeamId !== null && share.subjectId === myTeamId),
-  );
-}
-
-function isSharedWithViewer(widget: StoredWidget): boolean {
-  const s = widget.summary;
-  if (s.ownerUserId === FAKE_ME.id) return false;
-  const myTeamId = personTeamId(FAKE_ME.id);
-  const directGrant = widget.shares.some(
-    (share) =>
-      (share.subjectType === 'USER' && share.subjectId === FAKE_ME.id) ||
-      (share.subjectType === 'TEAM' && myTeamId !== null && share.subjectId === myTeamId),
-  );
-  return directGrant || s.isShared;
-}
-
-function localizedSummary(summary: WidgetSummary): WidgetSummary {
-  return {
-    ...summary,
-    ownerName: personName(summary.ownerUserId, summary.ownerName),
-  };
-}
-
-function compareNewest(a: WidgetSummary, b: WidgetSummary): number {
-  const byUpdate = b.updatedAt.localeCompare(a.updatedAt);
-  if (byUpdate !== 0) return byUpdate;
-  const byCreate = b.createdAt.localeCompare(a.createdAt);
-  if (byCreate !== 0) return byCreate;
-  return b.id.localeCompare(a.id);
-}
-
-function filterWidgetsList(
-  q: Pick<WidgetListQuery, 'search' | 'access' | 'status' | 'source' | 'ownerUserId'>,
-): WidgetSummary[] {
-  const search = q.search?.trim() ?? '';
-  if (search.length > 120) {
-    throw new ApiError(400, 'CRM_VALIDATION_FAILED', { search: ['max_length'] });
-  }
-  const searchLower = search.toLowerCase();
-  const myTeamId = personTeamId(FAKE_ME.id);
-
-  return WIDGET_STORE.filter((widget) => {
-    if (!isVisibleToViewer(widget)) return false;
-    const s = widget.summary;
-
-    if (q.access === 'OWNED' && s.ownerUserId !== FAKE_ME.id) return false;
-    if (q.access === 'SHARED' && !isSharedWithViewer(widget)) return false;
-    if (q.access === 'TEAM' && (!myTeamId || personTeamId(s.ownerUserId) !== myTeamId)) return false;
-
-    if (q.status && s.status !== q.status) return false;
-    if (q.source && !s.sourceResources.includes(q.source as WidgetSourceResource)) return false;
-    if (q.ownerUserId && s.ownerUserId !== q.ownerUserId) return false;
-
-    if (searchLower && !s.name.toLowerCase().includes(searchLower)) {
-      return false;
-    }
-    return true;
-  })
-    .map((widget) => localizedSummary(widget.summary))
-    .sort(compareNewest);
-}
 
 // GET {B}/widgets?access=&status=&source=&ownerUserId=&search=&cursor=&limit=  -> { items, nextCursor } (cursor = last id, limit 1..100, default 50)
 export async function listWidgets(q: WidgetListQuery): Promise<CursorPage<WidgetSummary>> {
@@ -137,35 +56,15 @@ export async function listWidgets(q: WidgetListQuery): Promise<CursorPage<Widget
   });
 }
 
-// FAKE-ONLY, no backend route. Kept for API compatibility; the live library shows no tab counts.
+// No aggregate count endpoints exist. The live library omits these controls.
 export async function getWidgetTabCounts(
-  q: Pick<WidgetListQuery, 'search' | 'source' | 'ownerUserId' | 'status'>,
+  _q: Pick<WidgetListQuery, 'search' | 'source' | 'ownerUserId' | 'status'>,
 ): Promise<WidgetTabCounts> {
-  await fakeDelay(120);
-  if (!can('crm.widgets.read')) {
-    throw new ApiError(403, 'CRM_PERMISSION_DENIED');
-  }
-  const base = {
-    ...(q.search ? { search: q.search } : {}),
-    ...(q.source ? { source: q.source } : {}),
-    ...(q.ownerUserId ? { ownerUserId: q.ownerUserId } : {}),
-  };
-  return {
-    mine: filterWidgetsList({ ...base, access: 'OWNED', ...(q.status ? { status: q.status } : {}) }).length,
-    shared: filterWidgetsList({ ...base, access: 'SHARED', ...(q.status ? { status: q.status } : {}) }).length,
-    published: filterWidgetsList({ ...base, status: 'PUBLISHED' }).length,
-  };
+  throw new ApiError(501, 'CRM_ANALYTICS_SOURCE_UNAVAILABLE');
 }
 
-// FAKE-ONLY, no backend route. Kept for API compatibility; the live library shows no usage pills.
-export async function getWidgetUsageCounts(ids: readonly string[]): Promise<Record<string, number>> {
-  await fakeDelay(80);
-  const counts: Record<string, number> = {};
-  for (const id of ids) {
-    const widget = WIDGET_STORE.find((item) => item.summary.id === id);
-    counts[id] = widget ? getUsageSummaryCounts(widget).dashboardCount : 0;
-  }
-  return counts;
+export async function getWidgetUsageCounts(_ids: readonly string[]): Promise<Record<string, number>> {
+  throw new ApiError(501, 'CRM_ANALYTICS_SOURCE_UNAVAILABLE');
 }
 
 // GET {B}/widgets/owner-options
@@ -344,24 +243,8 @@ export async function applyLifecycle(id: string, body: ApplyLifecycleBody): Prom
 
 // DELETE {B}/widgets/:id  204
 export async function deleteWidget(id: string): Promise<void> {
-  await fakeDelay();
-  const widget = findStoredWidget(id);
-  if (!can('crm.widgets.delete') || widget.summary.accessLevel !== 'OWNER') {
-    throw new ApiError(403, 'CRM_WIDGET_LIFECYCLE_FORBIDDEN');
-  }
-  const placements = ensureUsageFor(widget);
-  if (
-    (widget.summary.status !== 'DRAFT' && widget.summary.status !== 'ARCHIVED') ||
-    placements.length > 0
-  ) {
-    throw new ApiError(422, 'CRM_WIDGET_LIFECYCLE_INVALID');
-  }
-
-  const idx = WIDGET_STORE.findIndex((item) => item.summary.id === id);
-  if (idx !== -1) {
-    WIDGET_STORE.splice(idx, 1);
-  }
-  deleteUsage(id);
+  // DELETE is non-idempotent: a new action key, with no retained retry/replay state.
+  await writeWidget<void>('DELETE', `/widgets/${encodeURIComponent(id)}`, undefined, newIdempotencyKey());
 }
 
 // POST {B}/widgets/:id/clone  201 (header x-idempotency-key: gateway-enforced)
@@ -437,16 +320,31 @@ export async function revokeWidgetShare(
     undefined, undefined, { ifMatch: loadedWidgetShareEtag(id, shareId), query: { reason } });
 }
 
-// GET {B}/targets?metricKey=&periodGrain=&approvalState=APPROVED
+/** The widget binding currently accepts single-subject MONEY targets only (dashboard-catalog.ts). */
 export async function listGovernedTargets(
   metricKey: string,
   periodGrain: 'MONTH' | 'QUARTER' | 'YEAR',
+  branchId: string,
 ): Promise<GovernedTargetOption[]> {
-  await fakeDelay();
-  if (!can('crm.targets.read')) {
-    throw new ApiError(403, 'CRM_PERMISSION_DENIED');
+  if (!branchId) return [];
+  const items: GovernedTargetOption[] = [];
+  for (let page = 1; ; page++) {
+    const query = { branchId, metricKey, periodGrain, approvalState: 'APPROVED', page, limit: 100 };
+    const result = await crmQueries().fetchQuery({
+      queryKey: ['crm-analytics', 'widget-governed-targets', query],
+      queryFn: () => crmHttp().read<FlatPage<GovernedTargetRecord>>('/targets', query),
+    });
+    for (const row of result.items) {
+      if (row.approvalState !== 'APPROVED' || row.metricKey !== metricKey || row.periodGrain !== periodGrain
+        || row.branchId !== branchId || !row.subjectId || row.subjectType === 'TEAM_SET'
+        || row.unit !== 'MONEY' || !row.currencyCode || !/^[A-Z]{3}$/.test(row.currencyCode)) continue;
+      items.push({ id: row.id, branchId: row.branchId, subjectType: row.subjectType,
+        subjectId: row.subjectId, subjectName: row.subjectName ?? row.subjectId,
+        currencyCode: row.currencyCode, periodGrain: row.periodGrain, periodStart: row.periodStart,
+        unit: row.unit, targetValue: row.targetValue });
+    }
+    if (!result.hasNext) return items;
   }
-  return structuredClone(fakeGovernedTargets(metricKey, periodGrain));
 }
 
 export interface BranchOption {
@@ -456,29 +354,16 @@ export interface BranchOption {
 
 export interface PipelineOption {
   id: string;
-  key: 'standard' | 'corporate' | 'renewals';
+  nameEn: string;
+  nameAr: string;
 }
 
-// TODO(Phase 5): GET {B}/org/branches limited to the caller's branch grants. The fake mirrors that
-// rule: callers with company-wide scope see every branch, everyone else only their own.
-export async function listGrantedBranches(): Promise<BranchOption[]> {
-  await fakeDelay(60);
-  if (!can('crm.widgets.read')) {
-    throw new ApiError(403, 'CRM_PERMISSION_DENIED');
-  }
-  const allBranches = scopeLevels().includes('all');
-  const ownBranchId = FAKE_PEOPLE.find((p) => p.id === FAKE_ME.id)?.branchId ?? null;
-  return structuredClone(FAKE_BRANCHES.filter((b) => allBranches || b.id === ownBranchId));
+export async function listGrantedBranches(org: OrgApi): Promise<readonly BranchOption[]> {
+  return org.listGrantedBranches();
 }
 
-// TODO(Phase 5): replace with the CRM pipelines endpoint; these ids are fake-only.
 export async function listPipelineOptions(): Promise<PipelineOption[]> {
-  await fakeDelay(60);
-  return [
-    { id: '01934b10-0000-7000-8000-000000000401', key: 'standard' },
-    { id: '01934b10-0000-7000-8000-000000000402', key: 'corporate' },
-    { id: '01934b10-0000-7000-8000-000000000403', key: 'renewals' },
-  ];
+  return listOrgPipelines();
 }
 
 // GET {B}/widgets/:id/shares/preview?subjectType=USER|TEAM&subjectId=
@@ -494,9 +379,38 @@ export async function previewWidgetShare(
   });
 }
 
-// TODO(Phase 5): fake-only synchronous lookup. The live share list must return the sharer's display name.
-export function userDisplayName(userId: string, lang: 'ar' | 'en'): string | null {
-  const person = FAKE_PEOPLE.find((item) => item.id === userId);
-  if (!person) return null;
-  return lang === 'ar' ? person.nameAr : person.name;
+
+/** Directory and catalogue reads stay at the widget API boundary. */
+export async function loadFilterDomains(org: OrgApi): Promise<FilterDomains> {
+  type DomainRow = { id: string; nameEn: string; nameAr: string; isActive: boolean };
+  type StatusOption = { value: string; label: { en: string; ar: string } };
+  const [people, sources, stages, staticData] = await Promise.all([
+    can('users.user.read') ? org.listUsers() : Promise.resolve([]),
+    can('crm.acquisition_sources.read') ? crmQueries().fetchQuery({
+      queryKey: ['crm-analytics', 'widget-domains', 'sources'],
+      queryFn: () => crmHttp().read<DomainRow[]>('/acquisition-sources'),
+    }) : Promise.resolve([]),
+    can('crm.pipelines.manage') ? crmQueries().fetchQuery({
+      queryKey: ['crm-analytics', 'widget-domains', 'stages'],
+      queryFn: () => crmHttp().read<DomainRow[]>('/opportunity-stages'),
+    }) : Promise.resolve([]),
+    crmQueries().fetchQuery({
+      queryKey: ['crm-analytics', 'widget-domains', 'static-data'],
+      queryFn: () => crmHttp().read<{ enumOptions: Record<string, StatusOption[]> }>('/static-data'),
+    }),
+  ]);
+  const owners = people.map((person) => ({ value: person.id, labelEn: person.name, labelAr: person.nameAr }));
+  return {
+    'leads.status': (staticData.enumOptions?.['leadStatuses'] ?? []).map((opt) => ({
+      value: opt.value, labelEn: opt.label.en, labelAr: opt.label.ar,
+    })),
+    'leads.sourceId': sources.filter((source) => source.isActive).map((source) => ({
+      value: source.id, labelEn: source.nameEn, labelAr: source.nameAr,
+    })),
+    'leads.ownerUserId': owners,
+    'opportunities.ownerUserId': owners,
+    'opportunities.stageId': stages.filter((stage) => stage.isActive).map((stage) => ({
+      value: stage.id, labelEn: stage.nameEn, labelAr: stage.nameAr,
+    })),
+  };
 }
