@@ -52,6 +52,7 @@ export class EvidenceEditor {
   readonly value = model<Record<string, string>>({});
   readonly disabled = input(false);
   readonly showErrors = input(false);
+  readonly error = input<string | null>(null);
   readonly required = input(true);
   readonly idPrefix = input('');
 
@@ -116,6 +117,7 @@ export class EvidenceEditor {
 
   protected readonly sectionError = computed<string | null>(() => {
     this.i18n();
+    if (this.error()) return this.error();
     const list = this.rows();
     if (list.length > TOWER_EVIDENCE_LIMITS.maxKeys) {
       return this.transloco.translate('tower.evidence.errors.maxRows');

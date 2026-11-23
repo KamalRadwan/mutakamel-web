@@ -38,14 +38,20 @@ function translateKeyIfPresent(transloco: TranslocoService, key: string): string
   return text && text !== key ? text : null;
 }
 
-export function translateTowerProblem(
-  transloco: TranslocoService,
+export function formatTowerSafeErrorCode(
   code: string | null | undefined,
   noneLabel = '—',
 ): string {
   if (!code || !code.trim()) return noneLabel;
-  const normalized = code.trim().replaceAll('.', '_');
-  return translateKeyIfPresent(transloco, `tower.problems.${normalized}`) ?? code.trim();
+  return code.trim();
+}
+
+export function translateTowerProblem(
+  _transloco: TranslocoService,
+  code: string | null | undefined,
+  noneLabel = '—',
+): string {
+  return formatTowerSafeErrorCode(code, noneLabel);
 }
 
 export function translateTowerError(transloco: TranslocoService, error: unknown): string {

@@ -30,6 +30,22 @@
         <div class="h-table-row rounded-10 bg-neutral-soft"></div>
       </div>
     </div>
+  } @else if (isForbidden()) {
+    <ui-full-state
+      kind="forbidden"
+      [title]="'errors.forbidden.title' | transloco"
+      [text]="'errors.forbidden.text' | transloco"
+      [actionLabel]="'tower.common.close' | transloco"
+      (action)="requestClose()"
+    />
+  } @else if (notReadyMessage(); as notReadyMsg) {
+    <ui-full-state
+      kind="provisioning"
+      [title]="'tower.states.notReadyTitle' | transloco"
+      [text]="notReadyMsg"
+      [actionLabel]="'tower.common.retry' | transloco"
+      (action)="retryLoad()"
+    />
   } @else if (notFound()) {
     <div class="flex flex-col items-center justify-center gap-8 p-16 text-center">
       <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
@@ -101,6 +117,7 @@
           <input
             [id]="uid + '-problem'"
             type="text"
+            dir="ltr"
             readonly
             [value]="problemText(current.safeErrorCode)"
             [title]="problemText(current.safeErrorCode)"
@@ -223,7 +240,7 @@
                     class="flex min-w-0 items-center border-s border-border px-10 text-text-muted"
                     [title]="problemText(attempt.lastErrorCode)"
                   >
-                    <span class="truncate">{{ problemText(attempt.lastErrorCode) }}</span>
+                    <bdi dir="ltr" class="truncate">{{ problemText(attempt.lastErrorCode) }}</bdi>
                   </span>
                 </div>
               }
@@ -280,6 +297,7 @@
             [idPrefix]="uid + '-reason'"
             [disabled]="submitting()"
             [showErrors]="submitted()"
+            [error]="serverErrors().reason ?? null"
             [(value)]="reasonValue"
           />
 
@@ -293,6 +311,7 @@
             [idPrefix]="uid + '-evidence'"
             [disabled]="submitting()"
             [showErrors]="submitted()"
+            [error]="serverErrors().evidence ?? null"
             [(value)]="evidence"
           />
         </section>
@@ -366,7 +385,7 @@
   #conflictDialog
   class="contents"
   [title]="'automation.conflict.title' | transloco"
-  [text]="'automation.conflict.text' | transloco"
+  [text]="conflictMessage() ?? ('automation.conflict.text' | transloco)"
   [reloadLabel]="'automation.conflict.reload' | transloco"
   [keepLabel]="'automation.conflict.keep' | transloco"
   (reload)="onConflictReload()"

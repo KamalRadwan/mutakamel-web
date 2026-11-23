@@ -1,6 +1,7 @@
 import {
   Component,
   ElementRef,
+  Injector,
   computed,
   effect,
   inject,
@@ -8,7 +9,6 @@ import {
   resource,
   signal,
   untracked,
-  viewChild,
 } from '@angular/core';
 import { translationEvents } from '../../../../core/i18n/translation-events';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -18,17 +18,15 @@ import {
   tablerAlertTriangle,
   tablerCircleCheck,
   tablerInbox,
-  tablerMinus,
   tablerRefresh,
   tablerSearch,
 } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../core/i18n/language';
 import { ScopeState } from '../../../../core/scope/scope';
-import { BulkJobsTracker } from '../../../../shared/bulk-jobs/bulk-jobs-tracker';
 import { Button } from '../../../../shared/ui/button/button';
-import { Checkbox } from '../../../../shared/ui/checkbox/checkbox';
 import { Dropdown, type DropdownOption } from '../../../../shared/ui/dropdown/dropdown';
 import { Field } from '../../../../shared/ui/field/field';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { Pagination } from '../../../../shared/ui/pagination/pagination';
 import { StepFilter, type StepOption } from '../../../../shared/ui/step-filter/step-filter';
 import { ApiError, type TradeContext, tradeContext } from '../../shared/trade-api';
@@ -37,38 +35,41 @@ import { AutomationBadge } from '../automation-shared/automation-badge/automatio
 import { ScopeChip } from '../automation-shared/scope-chip/scope-chip';
 import {
   formatTowerDateTime,
-  isTowerRowSelectable,
+  formatTowerSafeErrorCode,
   resolveTowerSourceLink,
   towerSourceLabel,
   translateTowerError,
-  translateTowerProblem,
 } from '../tower.util';
 import { ExceptionModal } from '../exception-modal/exception-modal';
-import { TowerBulkBar } from '../tower-bulk-bar/tower-bulk-bar';
 import { getCounts, listExceptions } from '../tower.api';
 import {
   TOWER_CATEGORIES,
   type TowerCardCounts,
   type TowerCategory,
   type TowerException,
-  type TowerResolutionCode,
   type TowerScopeFilter,
   type TowerSelectionQuery,
   type TowerSeverity,
   type TowerSort,
   type TowerSourceRoute,
   type TowerStatus,
-  allowedCodesFor,
-  isResolvableStatus,
-  resolutionCodesFor,
   toTowerCardCounts,
 } from '../tower.model';
-
-const CAN = { resolve: true }; // later from the session
+import {
+  TOWER_PERMISSIONS,
+  contextForException,
+  hasTowerGrantForContext,
+  hasTowerReadGrant,
+  isTowerFilterScopeError,
+  isTowerForbiddenError,
+  isTowerNotReadyError,
+  isTowerQueryInvalidError,
+} from './tower-access';
 
 type TowerStepStatus = 'OPEN' | 'ACTION_PENDING' | 'RESOLVED' | 'QUARANTINED';
 type SeverityFilter = '' | 'HIGH' | 'CRITICAL';
 type CategoryFilter = '' | TowerCategory;
+type FilterFieldKey = 'severity' | 'category' | 'branch' | 'sort';
 
 /** Each step sends a comma list of backend statuses. */
 const STEP_STATUSES: Readonly<Record<TowerStepStatus, TowerStatus[]>> = {
@@ -143,37 +144,19 @@ function ratioPercent(value: number, total: number): number {
   return Math.max(4, Math.min(100, Math.round((value / total) * 100)));
 }
 
-function intersectResolutionCodes(
-  rows: Iterable<TowerException>,
-): readonly TowerResolutionCode[] {
-  let common: TowerResolutionCode[] | null = null;
-  for (const row of rows) {
-    const allowed = allowedCodesFor(row);
-    if (common === null) {
-      common = [...allowed];
-    } else {
-      const allowedSet = new Set<TowerResolutionCode>(allowed);
-      common = common.filter((code) => allowedSet.has(code));
-    }
-    if (common.length === 0) return [];
-  }
-  return common ?? [];
-}
-
 @Component({
   selector: 'app-control-tower-page',
   imports: [
     NgIcon,
     TranslocoPipe,
     Button,
-    Checkbox,
     Dropdown,
     Field,
+    FullState,
     Pagination,
     StepFilter,
     AutomationBadge,
     ScopeChip,
-    TowerBulkBar,
     ExceptionModal,
   ],
   providers: [
@@ -187,7 +170,6 @@ function intersectResolutionCodes(
       tablerAlertTriangle,
       tablerCircleCheck,
       tablerInbox,
-      tablerMinus,
       tablerRefresh,
       tablerSearch,
     }),
@@ -199,15 +181,13 @@ export class ControlTowerPage {
   private static nextId = 0;
   protected readonly uid = `control-tower-${++ControlTowerPage.nextId}`;
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly scopeState = inject(ScopeState);
-  private readonly tracker = inject(BulkJobsTracker);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   protected readonly lang = inject(LanguageState).current;
-
-  private readonly headerCheckboxEl = viewChild('pageCb', { read: ElementRef<HTMLElement> });
 
   readonly statusParam = input<string | undefined>(undefined, { alias: 'status' });
   readonly severityParam = input<string | undefined>(undefined, { alias: 'severity' });
@@ -218,27 +198,16 @@ export class ControlTowerPage {
   readonly scopeParam = input<string | undefined>(undefined, { alias: 'scope' });
   readonly branchParam = input<string | undefined>(undefined, { alias: 'branch' });
   readonly sortParam = input<string | undefined>(undefined, { alias: 'sort' });
-  /** Bulk job report deep link (backend reportRoute: /trade/automation/control-tower?job=<id>). */
-  readonly jobParam = input<string | undefined>(undefined, { alias: 'job' });
 
-  protected readonly canResolve = CAN.resolve;
   protected readonly pageSizes = [...PAGE_SIZES];
   protected readonly skeletonRows = [1, 2, 3, 4, 5];
-  protected readonly gridCols = computed(() =>
-    this.canResolve ? 'grid-cols-auto-tower-row-select' : 'grid-cols-auto-tower-row',
-  );
+  protected readonly gridCols = 'grid-cols-auto-tower-row';
+
+  protected readonly forbidden = signal(false);
+  protected readonly canRead = computed(() => hasTowerReadGrant(this.injector));
 
   private readonly refreshTick = signal(0);
-  private readonly selectionMode = signal<'ids' | 'query'>('ids');
-  private readonly selectedById = signal<ReadonlyMap<string, TowerException>>(new Map());
-  private readonly excludedIds = signal<ReadonlySet<string>>(new Set());
-  private readonly queryTotal = signal(0);
-
-  private lastShiftKey = false;
-  private lastClickedId: string | null = null;
-  private lastFilterKey = '';
-  private lastCompanyId: string | null = null;
-  private readonly refreshedJobIds = new Set<string>();
+  private readonly openedRowContext = signal<{ id: string; ctx: TradeContext } | null>(null);
 
   protected readonly statusFilter = computed<TowerStepStatus>(() =>
     parseStepStatus(this.statusParam()),
@@ -264,11 +233,25 @@ export class ControlTowerPage {
 
   protected readonly sortFilter = computed<TowerSort>(() => parseSort(this.sortParam()));
 
+  private readonly availableBranches = computed(() => {
+    const direct = this.scopeState.branches().filter((b) => b.nameEn || b.nameAr);
+    if (direct.length > 0) return direct;
+    return this.scopeState.company().branches.filter((b) => b.nameEn || b.nameAr);
+  });
+
+  protected readonly showBranchFilter = computed(
+    () => this.scopeTarget() === 'COMPANY' && this.availableBranches().length > 0,
+  );
+
   /** Branch filter: company context only, and only a branch of the context company. */
   protected readonly branchFilter = computed<string>(() => {
     if (this.scopeTarget() !== 'COMPANY') return '';
     const raw = this.branchParam()?.trim() ?? '';
-    return this.scopeState.branches().some((b) => b.id === raw) ? raw : '';
+    if (!raw) return '';
+    const known =
+      this.availableBranches().some((b) => b.id === raw) ||
+      this.scopeState.company().branches.some((b) => b.id === raw);
+    return known ? raw : '';
   });
 
   /** Company context shows the company and all its branches unless one branch is picked. */
@@ -292,30 +275,113 @@ export class ControlTowerPage {
   });
 
   private readonly countsResource = resource({
-    params: () => ({
-      ctx: this.context(),
-      scope: this.scopeFilter(),
-      tick: this.refreshTick(),
-    }),
-    loader: ({ params }) => getCounts(params.ctx, params.scope),
+    params: () => {
+      if (!this.canRead() || this.forbidden()) return undefined;
+      return {
+        ctx: this.context(),
+        scope: this.scopeFilter(),
+        tick: this.refreshTick(),
+      };
+    },
+    loader: async ({ params }) => {
+      try {
+        return await getCounts(params.ctx, params.scope);
+      } catch (error) {
+        if (isTowerForbiddenError(error)) {
+          this.forbidden.set(true);
+        }
+        throw error;
+      }
+    },
   });
 
   private readonly listResource = resource({
-    params: () => ({
-      ctx: this.context(),
-      query: this.filterQuery(),
-      page: this.page(),
-      limit: Math.min(100, this.pageSize()),
-      tick: this.refreshTick(),
-    }),
-    loader: ({ params }) =>
-      listExceptions(params.ctx, { ...params.query, page: params.page, limit: params.limit }),
+    params: () => {
+      if (!this.canRead() || this.forbidden()) return undefined;
+      return {
+        ctx: this.context(),
+        query: this.filterQuery(),
+        page: this.page(),
+        limit: Math.min(100, this.pageSize()),
+        tick: this.refreshTick(),
+      };
+    },
+    loader: async ({ params }) => {
+      try {
+        return await listExceptions(params.ctx, {
+          ...params.query,
+          page: params.page,
+          limit: params.limit,
+        });
+      } catch (error) {
+        if (isTowerForbiddenError(error)) {
+          this.forbidden.set(true);
+        }
+        throw error;
+      }
+    },
   });
+
+  protected readonly isForbidden = computed(
+    () =>
+      !this.canRead() ||
+      this.forbidden() ||
+      isTowerForbiddenError(this.listResource.error()) ||
+      isTowerForbiddenError(this.countsResource.error()),
+  );
+
+  protected readonly items = computed<TowerException[]>(() =>
+    this.listResource.hasValue() ? this.listResource.value().items : [],
+  );
+  protected readonly total = computed(() =>
+    this.listResource.hasValue() ? this.listResource.value().total : 0,
+  );
+  protected readonly asOf = computed<string | null>(() =>
+    this.listResource.hasValue() ? this.listResource.value().asOf : null,
+  );
+
+  protected readonly selectedExceptionContext = computed<TradeContext>(() => {
+    const activeId = this.selectedExceptionId();
+    if (activeId) {
+      const opened = this.openedRowContext();
+      if (opened && opened.id === activeId) return opened.ctx;
+      const found = this.items().find((row) => row.id === activeId);
+      if (found) return contextForException(found);
+    }
+    const base = this.context();
+    const branchId = this.branchFilter();
+    if (base.companyId && !base.branchId && branchId) {
+      return { companyId: base.companyId, branchId };
+    }
+    return base;
+  });
+
+  protected readonly canResolve = computed(
+    () =>
+      !this.isForbidden() &&
+      hasTowerGrantForContext(
+        this.injector,
+        TOWER_PERMISSIONS.resolve,
+        this.selectedExceptionContext(),
+      ),
+  );
 
   protected readonly counts = computed<TowerCardCounts | null>(() =>
     this.countsResource.hasValue() ? toTowerCardCounts(this.countsResource.value()) : null,
   );
-  protected readonly countsFailed = computed(() => !!this.countsResource.error());
+  protected readonly notReadyError = computed(() => {
+    const err = this.listResource.error();
+    return isTowerNotReadyError(err) ? err : null;
+  });
+  protected readonly countsNotReady = computed(() =>
+    isTowerNotReadyError(this.countsResource.error()),
+  );
+  protected readonly countsFailed = computed(
+    () =>
+      !!this.countsResource.error() &&
+      !this.isForbidden() &&
+      !(this.notReadyError() && this.countsNotReady()),
+  );
   protected readonly countsLoading = computed(
     () => this.countsResource.isLoading() && !this.countsResource.hasValue(),
   );
@@ -326,22 +392,70 @@ export class ControlTowerPage {
   protected readonly refreshing = computed(
     () => this.listResource.isLoading() || this.countsResource.isLoading(),
   );
-  protected readonly failed = computed(() => !!this.listResource.error());
-  /** A scope denial (branch filter or branch rows outside the company scope) says why; anything else is generic. */
+  protected readonly failed = computed(
+    () => !!this.listResource.error() && !this.isForbidden() && !this.notReadyError(),
+  );
+
+  protected readonly notReadyText = computed(() => {
+    this.i18n();
+    const error = this.notReadyError();
+    return error ? translateTowerError(this.transloco, error) : '';
+  });
+
+  protected readonly countsFailedText = computed(() => {
+    this.i18n();
+    const error = this.countsResource.error();
+    if (
+      isTowerNotReadyError(error) ||
+      isTowerFilterScopeError(error) ||
+      isTowerQueryInvalidError(error)
+    ) {
+      return translateTowerError(this.transloco, error);
+    }
+    return this.transloco.translate('tower.states.countsFailed');
+  });
+
   protected readonly loadFailedText = computed(() => {
     this.i18n();
     const error = this.listResource.error();
-    return error instanceof ApiError && error.code === 'TRADE.CONTROL_TOWER.SCOPE_DENIED'
-      ? translateTowerError(this.transloco, error)
-      : this.transloco.translate('tower.states.loadFailed');
+    if (isTowerFilterScopeError(error) || isTowerQueryInvalidError(error)) {
+      return translateTowerError(this.transloco, error);
+    }
+    return this.transloco.translate('tower.states.loadFailed');
   });
 
-  protected readonly items = computed<TowerException[]>(() =>
-    this.listResource.hasValue() ? this.listResource.value().items : [],
-  );
-  protected readonly total = computed(() =>
-    this.listResource.hasValue() ? this.listResource.value().total : 0,
-  );
+  protected readonly filterErrors = computed<Partial<Record<FilterFieldKey, string>>>(() => {
+    this.i18n();
+    const error = this.listResource.error() ?? this.countsResource.error();
+    if (!error || this.isForbidden()) return {};
+
+    if (isTowerFilterScopeError(error)) {
+      return this.showBranchFilter() ? { branch: translateTowerError(this.transloco, error) } : {};
+    }
+
+    const isQueryErr =
+      isTowerQueryInvalidError(error) ||
+      (error instanceof ApiError && error.code === 'TRADE.VALIDATION_FAILED');
+    if (!isQueryErr) return {};
+
+    const message = translateTowerError(this.transloco, error);
+    const details = error instanceof ApiError ? error.details : undefined;
+    const mapped: Partial<Record<FilterFieldKey, string>> = {};
+    if (details?.['severity']) mapped.severity = message;
+    if (details?.['category']) mapped.category = message;
+    if (details?.['branchId'] && this.showBranchFilter()) mapped.branch = message;
+    if (details?.['sort']) mapped.sort = message;
+
+    if (Object.keys(mapped).length === 0 && isTowerQueryInvalidError(error)) {
+      if (this.branchFilter() && this.showBranchFilter()) mapped.branch = message;
+      else if (this.categoryFilter()) mapped.category = message;
+      else if (this.severityFilter()) mapped.severity = message;
+      else if (this.sortFilter() !== 'createdAt') mapped.sort = message;
+      else mapped.severity = message;
+    }
+
+    return mapped;
+  });
 
   protected readonly hasSecondaryFilters = computed(
     () => this.severityFilter() !== '' || this.categoryFilter() !== '' || this.branchFilter() !== '',
@@ -444,89 +558,16 @@ export class ControlTowerPage {
     ];
   });
 
-  protected readonly showBranchFilter = computed(
-    () => this.scopeTarget() === 'COMPANY' && this.scopeState.branches().length > 0,
-  );
-
   protected readonly branchOptions = computed<DropdownOption<string>[]>(() => {
     this.i18n();
     const ar = this.lang() === 'ar';
     return [
       { value: '', label: this.transloco.translate('tower.filters.allBranches') },
-      ...this.scopeState.branches().map((b) => ({ value: b.id, label: ar ? b.nameAr : b.nameEn })),
+      ...this.availableBranches().map((b) => ({
+        value: b.id,
+        label: (ar ? b.nameAr : b.nameEn) || b.nameEn || b.nameAr,
+      })),
     ];
-  });
-
-  protected readonly selectablePageRows = computed<TowerException[]>(() =>
-    this.items().filter((row) => isTowerRowSelectable(row)),
-  );
-
-  protected readonly pageState = computed<'none' | 'some' | 'all'>(() => {
-    const selectable = this.selectablePageRows();
-    if (selectable.length === 0) return 'none';
-    let selected = 0;
-    for (const row of selectable) {
-      if (this.isSelected(row.id)) selected++;
-    }
-    if (selected === 0) return 'none';
-    if (selected === selectable.length) return 'all';
-    return 'some';
-  });
-
-  protected readonly selectionModeValue = computed(() => this.selectionMode());
-
-  protected readonly selectionCount = computed(() => {
-    if (this.selectionMode() === 'query') {
-      return Math.max(0, this.queryTotal() - this.excludedIds().size);
-    }
-    return this.selectedById().size;
-  });
-
-  protected readonly selectedIds = computed<string[]>(() =>
-    Array.from(this.selectedById().keys()),
-  );
-
-  protected readonly excludedIdsList = computed<string[]>(() =>
-    Array.from(this.excludedIds()),
-  );
-
-  protected readonly hiddenSelectedCount = computed(() => {
-    if (this.selectionMode() === 'query' || this.loading()) return 0;
-    const visible = new Set(this.items().map((row) => row.id));
-    let hidden = 0;
-    for (const id of this.selectedById().keys()) {
-      if (!visible.has(id)) hidden++;
-    }
-    return hidden;
-  });
-
-  private readonly canSelectAllShape = computed(
-    () =>
-      this.selectionMode() === 'ids' &&
-      this.statusFilter() !== 'RESOLVED' &&
-      this.statusFilter() !== 'QUARANTINED' &&
-      this.selectablePageRows().length > 0 &&
-      this.pageState() === 'all' &&
-      this.total() > this.items().length,
-  );
-
-  // "Select all matching" needs one category, so every matching row shares the same resolution codes.
-  // That also keeps the count honest: a category with codes has no unselectable rows.
-  protected readonly canOfferSelectAll = computed(() => {
-    const category = this.categoryFilter();
-    return this.canSelectAllShape() && category !== '' && resolutionCodesFor(category).length > 0;
-  });
-
-  protected readonly selectAllNeedsCategory = computed(
-    () => this.canSelectAllShape() && this.categoryFilter() === '',
-  );
-
-  protected readonly bulkAllowedCodes = computed<readonly TowerResolutionCode[]>(() => {
-    if (this.selectionMode() === 'query') {
-      const category = this.categoryFilter();
-      return category ? resolutionCodesFor(category) : [];
-    }
-    return intersectResolutionCodes(this.selectedById().values());
   });
 
   constructor() {
@@ -537,67 +578,6 @@ export class ControlTowerPage {
         prevPage = next;
         this.host.nativeElement.closest('main')?.scrollTo({ top: 0 });
       }
-    });
-
-    effect(() => {
-      const state = this.pageState();
-      const inputEl = this.headerCheckboxEl()?.nativeElement.querySelector(
-        'input[type="checkbox"]',
-      ) as HTMLInputElement | null;
-      if (inputEl) {
-        inputEl.indeterminate = state === 'some';
-      }
-    });
-
-    effect(() => {
-      const companyId = this.scopeState.company()?.id ?? '';
-      const q = this.filterQuery();
-      const key = JSON.stringify({ q, ctx: this.context() });
-
-      untracked(() => {
-        if (this.lastCompanyId !== null && this.lastCompanyId !== companyId) {
-          this.clearSelection();
-        }
-        this.lastCompanyId = companyId;
-
-        if (this.lastFilterKey !== '' && this.lastFilterKey !== key) {
-          if (this.selectionMode() === 'query') {
-            this.clearSelection();
-          }
-        }
-        this.lastFilterKey = key;
-      });
-    });
-
-    // ?job=<id> (from the bulk job notification) opens that job's report, then leaves the URL clean.
-    effect(() => {
-      const jobId = this.jobParam()?.trim();
-      if (!jobId) return;
-      untracked(() => {
-        this.tracker.openReport('trading', jobId);
-        void this.router.navigate([], {
-          relativeTo: this.route,
-          queryParams: { job: null },
-          queryParamsHandling: 'merge',
-          replaceUrl: true,
-        });
-      });
-    });
-
-    const initialFinished = this.tracker.finished();
-    if (initialFinished) {
-      this.refreshedJobIds.add(initialFinished.id);
-    }
-
-    effect(() => {
-      const finished = this.tracker.finished();
-      if (!finished || finished.module !== 'trading.control-tower-exceptions') return;
-      if (this.refreshedJobIds.has(finished.id)) return;
-      this.refreshedJobIds.add(finished.id);
-      untracked(() => {
-        this.clearSelection();
-        this.reload();
-      });
     });
 
     effect(() => {
@@ -613,7 +593,16 @@ export class ControlTowerPage {
     });
   }
 
+  protected goHome(): void {
+    void this.router.navigateByUrl('/workspace/home');
+  }
+
+  protected onForbidden(): void {
+    this.forbidden.set(true);
+  }
+
   protected reload(): void {
+    if (this.isForbidden()) return;
     this.refreshTick.update((n) => n + 1);
   }
 
@@ -708,6 +697,7 @@ export class ControlTowerPage {
   }
 
   protected openException(row: TowerException): void {
+    this.openedRowContext.set({ id: row.id, ctx: contextForException(row) });
     void this.router.navigate([], {
       relativeTo: this.route,
       queryParams: { id: row.id },
@@ -716,6 +706,7 @@ export class ControlTowerPage {
   }
 
   protected onModalClosed(): void {
+    this.openedRowContext.set(null);
     void this.router.navigate([], {
       relativeTo: this.route,
       queryParams: { id: null },
@@ -723,27 +714,15 @@ export class ControlTowerPage {
     });
   }
 
-  protected onExceptionResolved(updated: TowerException): void {
-    if (this.selectedById().has(updated.id)) {
-      this.selectedById.update((map) => {
-        const next = new Map(map);
-        next.delete(updated.id);
-        return next;
-      });
-    }
+  protected onExceptionResolved(_updated: TowerException): void {
     this.reload();
   }
 
   protected onRowKeydown(event: KeyboardEvent, row: TowerException): void {
     if (event.target !== event.currentTarget) return;
-    if (event.key === 'Enter') {
+    if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       this.openException(row);
-      return;
-    }
-    if ((event.key === ' ' || event.code === 'Space') && this.canResolve && isTowerRowSelectable(row)) {
-      event.preventDefault();
-      this.applyRowSelection(row, event.shiftKey);
     }
   }
 
@@ -773,157 +752,10 @@ export class ControlTowerPage {
 
   protected problemText(code: string | null | undefined): string {
     this.i18n();
-    return translateTowerProblem(
-      this.transloco,
-      code,
-      this.transloco.translate('tower.common.none'),
-    );
+    return formatTowerSafeErrorCode(code, this.transloco.translate('tower.common.none'));
   }
 
   protected formatDateTime(iso: string | null | undefined): string {
     return formatTowerDateTime(iso, this.lang(), this.transloco.translate('tower.common.none'));
-  }
-
-  protected isRowSelectable(row: TowerException): boolean {
-    return isTowerRowSelectable(row);
-  }
-
-  protected unselectableReason(row: TowerException): string {
-    this.i18n();
-    if (row.status === 'QUARANTINED') {
-      return this.transloco.translate('tower.table.unselectableQuarantined');
-    }
-    if (!isResolvableStatus(row.status)) {
-      return this.transloco.translate('tower.table.unselectableResolved');
-    }
-    return this.transloco.translate('tower.table.unselectableCategory');
-  }
-
-  protected isSelected(id: string): boolean {
-    if (this.selectionMode() === 'query') {
-      return !this.excludedIds().has(id);
-    }
-    return this.selectedById().has(id);
-  }
-
-  protected togglePage(cb?: Checkbox): void {
-    const selectable = this.selectablePageRows();
-    if (!this.canResolve || selectable.length === 0) {
-      cb?.checked.set(false);
-      return;
-    }
-    const select = this.pageState() !== 'all';
-    this.setRowsSelection(selectable, select);
-    cb?.checked.set(this.pageState() === 'all');
-  }
-
-  protected onRowCheckboxClick(event: MouseEvent): void {
-    this.lastShiftKey = event.shiftKey;
-    event.stopPropagation();
-  }
-
-  protected onRowCheckedChange(row: TowerException, cb?: Checkbox): void {
-    const shift = this.lastShiftKey;
-    this.lastShiftKey = false;
-    this.applyRowSelection(row, shift);
-    cb?.checked.set(this.isSelected(row.id));
-  }
-
-  protected onSelectCellClick(event: MouseEvent, row: TowerException, cb?: Checkbox): void {
-    event.stopPropagation();
-    if (!this.canResolve || !isTowerRowSelectable(row)) return;
-    this.applyRowSelection(row, event.shiftKey);
-    cb?.checked.set(this.isSelected(row.id));
-  }
-
-  protected selectAllMatching(): void {
-    if (this.total() <= 0 || !this.canOfferSelectAll()) return;
-    this.selectionMode.set('query');
-    this.selectedById.set(new Map());
-    this.excludedIds.set(new Set());
-    this.queryTotal.set(this.total());
-  }
-
-  protected selectOnlyPage(): void {
-    const next = new Map<string, TowerException>();
-    for (const row of this.selectablePageRows()) {
-      next.set(row.id, row);
-    }
-    this.selectionMode.set('ids');
-    this.excludedIds.set(new Set());
-    this.queryTotal.set(0);
-    this.selectedById.set(next);
-  }
-
-  protected clearSelection(): void {
-    this.selectionMode.set('ids');
-    this.selectedById.set(new Map());
-    this.excludedIds.set(new Set());
-    this.queryTotal.set(0);
-    this.lastClickedId = null;
-  }
-
-  protected onBulkSubmitted(event: { immediateRefresh: boolean }): void {
-    this.clearSelection();
-    if (event.immediateRefresh) {
-      this.reload();
-    }
-  }
-
-  private applyRowSelection(row: TowerException, shiftKey: boolean): void {
-    if (!this.canResolve || !isTowerRowSelectable(row)) return;
-    const selectable = this.selectablePageRows();
-
-    if (shiftKey && this.lastClickedId) {
-      const startIndex = selectable.findIndex((item) => item.id === this.lastClickedId);
-      const endIndex = selectable.findIndex((item) => item.id === row.id);
-      if (startIndex !== -1 && endIndex !== -1) {
-        const from = Math.min(startIndex, endIndex);
-        const to = Math.max(startIndex, endIndex);
-        this.setRowsSelection(selectable.slice(from, to + 1), true);
-        this.lastClickedId = row.id;
-        return;
-      }
-    }
-
-    if (this.selectionMode() === 'query') {
-      this.excludedIds.update((set) => {
-        const next = new Set(set);
-        if (next.has(row.id)) next.delete(row.id);
-        else next.add(row.id);
-        return next;
-      });
-    } else {
-      this.selectedById.update((map) => {
-        const next = new Map(map);
-        if (next.has(row.id)) next.delete(row.id);
-        else next.set(row.id, row);
-        return next;
-      });
-    }
-    this.lastClickedId = row.id;
-  }
-
-  private setRowsSelection(rows: readonly TowerException[], selected: boolean): void {
-    if (this.selectionMode() === 'query') {
-      this.excludedIds.update((set) => {
-        const next = new Set(set);
-        for (const row of rows) {
-          if (selected) next.delete(row.id);
-          else next.add(row.id);
-        }
-        return next;
-      });
-      return;
-    }
-
-    this.selectedById.update((map) => {
-      const next = new Map(map);
-      for (const row of rows) {
-        if (selected) next.set(row.id, row);
-        else next.delete(row.id);
-      }
-      return next;
-    });
   }
 }

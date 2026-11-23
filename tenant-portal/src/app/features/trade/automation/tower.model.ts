@@ -1,6 +1,8 @@
 // Control tower contract, aligned with trade-app src/modules/control-tower (dto/control-tower.dto.ts,
 // control-tower-query.ts, control-tower-sources.ts, control-tower.service.ts, bulk handler).
 
+import type { Page } from '../shared/trade-foundation.model';
+
 export const TOWER_STATUSES = [
   'OPEN',
   'ACKNOWLEDGED',
@@ -112,8 +114,14 @@ export interface TowerException {
   attempts?: TowerAttempt[];
   /** Detail only; list rows derive it with `allowedCodesFor`. */
   allowedResolutionCodes?: readonly TowerResolutionCode[];
+  /** Present on detail responses (and list envelope). */
+  asOf?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface TowerExceptionPage extends Page<TowerException> {
+  asOf: string;
 }
 
 /** Backend counts response: every enum bucket is present, zeros included. resolvedToday is UTC. */

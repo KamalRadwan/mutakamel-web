@@ -31,23 +31,31 @@ import { Button } from '../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { Dropdown, type DropdownOption } from '../../../../shared/ui/dropdown/dropdown';
 import { Field } from '../../../../shared/ui/field/field';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { Modal } from '../../../../shared/ui/modal/modal';
 import {
   TradeReasonPicker,
   type ReasonPickerValue,
 } from '../../shared/pickers/reason-picker/reason-picker';
-import { ApiError, errorCodeOf, newIdempotencyKey } from '../../shared/trade-api';
+import { ApiError, type TradeContext, errorCodeOf, newIdempotencyKey } from '../../shared/trade-api';
 import { listReasons } from '../../shared/trade-foundation.api';
 import type { ReasonCode } from '../../shared/trade-foundation.model';
 import { AutomationBadge } from '../automation-shared/automation-badge/automation-badge';
 import { ConflictDialog } from '../automation-shared/conflict-dialog/conflict-dialog';
+import {
+  contextForException,
+  isIdempotencyMismatch,
+  isTowerForbiddenError,
+  isTowerNotReadyError,
+  isTowerTargetStaleError,
+} from '../control-tower-page/tower-access';
 import { EvidenceEditor } from '../evidence-editor/evidence-editor';
 import {
   formatTowerDateTime,
+  formatTowerSafeErrorCode,
   resolveTowerSourceLink,
   towerSourceLabel,
   translateTowerError,
-  translateTowerProblem,
 } from '../tower.util';
 import { getException, resolve } from '../tower.api';
 import {
@@ -77,6 +85,7 @@ function initialEvidenceFor(ex: TowerException): Record<string, string> {
     ConfirmDialog,
     Dropdown,
     Field,
+    FullState,
     Modal,
     TradeReasonPicker,
     AutomationBadge,
@@ -116,15 +125,21 @@ export class ExceptionModal {
   protected readonly uid = `tower-exception-modal-${++ExceptionModal.nextSeq}`;
 
   readonly exceptionId = input.required<string>();
+  readonly context = input<TradeContext>({});
   readonly canResolve = input(true);
 
   readonly closed = output<void>();
   readonly resolved = output<TowerException>();
+  readonly refreshed = output<void>();
+  readonly forbidden = output<void>();
 
   protected readonly detail = signal<TowerException | null>(null);
   protected readonly loading = signal(true);
   protected readonly loadFailed = signal(false);
   protected readonly notFound = signal(false);
+  protected readonly isForbidden = signal(false);
+  protected readonly notReadyMessage = signal<string | null>(null);
+  protected readonly conflictMessage = signal<string | null>(null);
   protected readonly submitting = signal(false);
   protected readonly copiedCorrelation = signal(false);
 
@@ -135,6 +150,7 @@ export class ExceptionModal {
   protected readonly reasonValue = signal<ReasonPickerValue>({ reasonCodeId: null, note: '' });
   protected readonly evidence = signal<Record<string, string>>({});
   protected readonly submitted = signal(false);
+  protected readonly serverErrors = signal<Partial<Record<'resolutionCode' | 'reason' | 'evidence', string>>>({});
 
   private initialResolution: TowerResolutionCode | null = null;
   private initialEvidenceJson = '{}';
@@ -144,6 +160,7 @@ export class ExceptionModal {
   private copyTimer: ReturnType<typeof setTimeout> | null = null;
   private pendingIdemKey: string | null = null;
   private lastPayloadSignature = '';
+  private readonly rejectedPayloadSignatures = new Set<string>();
 
   protected readonly modalTitle = computed(() => {
     this.i18n();
@@ -160,7 +177,9 @@ export class ExceptionModal {
 
   protected readonly showResolveSection = computed(() => {
     const current = this.detail();
-    if (!current || !this.canResolve()) return false;
+    if (!current || !this.canResolve() || this.isForbidden() || this.notReadyMessage() !== null) {
+      return false;
+    }
     if (!isResolvableStatus(current.status)) return false;
     return allowedCodesFor(current).length > 0;
   });
@@ -177,6 +196,7 @@ export class ExceptionModal {
 
   protected readonly resolutionError = computed<string | null>(() => {
     this.i18n();
+    if (this.serverErrors().resolutionCode) return this.serverErrors().resolutionCode!;
     if (!this.submitted() || !this.showResolveSection()) return null;
     return this.resolutionCode() ? null : this.transloco.translate('tradeShared.common.required');
   });
@@ -198,6 +218,12 @@ export class ExceptionModal {
   );
 
   constructor() {
+    effect(() => {
+      this.resolutionCode();
+      this.reasonValue();
+      this.evidence();
+      this.serverErrors.set({});
+    });
     this.destroyRef.onDestroy(() => {
       this.destroyed = true;
       if (this.copyTimer !== null) {
@@ -217,7 +243,13 @@ export class ExceptionModal {
       });
     });
 
-    void this.loadReasonsList();
+    effect(() => {
+      if (this.canResolve() && !this.reasonsLoaded()) {
+        untracked(() => {
+          void this.loadReasonsList();
+        });
+      }
+    });
   }
 
   protected sourceLabelText(ex: TowerException): string {
@@ -248,11 +280,7 @@ export class ExceptionModal {
 
   protected problemText(code: string | null | undefined): string {
     this.i18n();
-    return translateTowerProblem(
-      this.transloco,
-      code,
-      this.transloco.translate('tower.common.none'),
-    );
+    return formatTowerSafeErrorCode(code, this.transloco.translate('tower.common.none'));
   }
 
   protected formatDateTime(iso: string | null | undefined): string {
@@ -373,6 +401,7 @@ export class ExceptionModal {
     if (!reasonCode) return;
     const note = this.reasonValue().note.trim() || null;
     const evidencePayload = { ...this.evidence() };
+    const ctx = contextForException(current);
 
     const signature = JSON.stringify({
       id: current.id,
@@ -382,23 +411,26 @@ export class ExceptionModal {
       note,
       evidencePayload,
     });
+    if (this.rejectedPayloadSignatures.has(signature)) return;
     if (!this.pendingIdemKey || signature !== this.lastPayloadSignature) {
       this.pendingIdemKey = newIdempotencyKey();
       this.lastPayloadSignature = signature;
     }
 
     this.submitting.set(true);
+    this.serverErrors.set({});
     try {
       const updated = await resolve(
         current.id,
         {
           resolutionCode: resCode,
           reasonCode,
-          note,
+          ...(note ? { note } : {}),
           evidence: evidencePayload,
         },
         current.version,
         this.pendingIdemKey,
+        ctx,
       );
       if (this.destroyed) return;
 
@@ -412,15 +444,59 @@ export class ExceptionModal {
     } catch (error) {
       if (this.destroyed) return;
       const code = errorCodeOf(error);
+      if (isIdempotencyMismatch(code)) {
+        this.rejectedPayloadSignatures.add(signature);
+        this.pendingIdemKey = null;
+        this.lastPayloadSignature = '';
+      }
+
+      if (isTowerForbiddenError(error)) {
+        this.isForbidden.set(true);
+        this.forbidden.emit();
+        return;
+      }
+
+      if (isTowerNotReadyError(error)) {
+        this.notReadyMessage.set(translateTowerError(this.transloco, error));
+        return;
+      }
+
+      if (isTowerTargetStaleError(error)) {
+        this.conflictMessage.set(translateTowerError(this.transloco, error));
+        this.conflictDialog().open();
+        void this.refetchForConflict(current.id, ctx);
+        this.refreshed.emit();
+        return;
+      }
+
       if (
         error instanceof ApiError &&
         error.status === 409 &&
         code === 'TRADE.CONCURRENCY.STALE_VERSION'
       ) {
+        this.conflictMessage.set(null);
         this.conflictDialog().open();
         return;
       }
 
+      if (error instanceof ApiError && (error.status === 400 || error.status === 422)) {
+        const details = error.details;
+        const message = (keys: string[]): string | undefined => {
+          const messages = keys.flatMap((key) => details?.[key] ?? []);
+          return messages.length ? messages.join(' ') : undefined;
+        };
+        const errors = {
+          resolutionCode: message(['resolutionCode']),
+          reason: message(['reasonCode', 'note']),
+          evidence: message(Object.keys(details ?? {}).filter(
+            (key) => key === 'evidence' || key.startsWith('evidence.'),
+          )),
+        };
+        if (Object.values(errors).some(Boolean)) {
+          this.serverErrors.set(errors);
+          return;
+        }
+      }
       this.notify.error(translateTowerError(this.transloco, error));
       if (error instanceof ApiError && code === 'TRADE.CONTROL_TOWER.RESOLUTION_CONFLICT') {
         void this.loadException(current.id);
@@ -436,9 +512,11 @@ export class ExceptionModal {
   }
 
   protected async onConflictKeep(): Promise<void> {
-    const id = this.detail()?.id ?? this.exceptionId();
+    const current = this.detail();
+    const id = current?.id ?? this.exceptionId();
+    const ctx = current ? contextForException(current) : this.context();
     try {
-      const fresh = await getException(id);
+      const fresh = await getException(id, ctx);
       if (this.destroyed) return;
       this.detail.set(fresh);
       this.pendingIdemKey = null;
@@ -451,8 +529,31 @@ export class ExceptionModal {
         this.resolved.emit(fresh);
       }
     } catch (error) {
-      if (!this.destroyed) {
-        this.notify.error(translateTowerError(this.transloco, error));
+      if (this.destroyed) return;
+      if (isTowerForbiddenError(error)) {
+        this.isForbidden.set(true);
+        this.forbidden.emit();
+        return;
+      }
+      this.notify.error(translateTowerError(this.transloco, error));
+    }
+  }
+
+  private async refetchForConflict(id: string, ctx: TradeContext): Promise<void> {
+    try {
+      const fresh = await getException(id, ctx);
+      if (this.destroyed) return;
+      this.detail.set(fresh);
+      this.pendingIdemKey = null;
+      this.lastPayloadSignature = '';
+      if (!isResolvableStatus(fresh.status)) {
+        this.resetFormFor(fresh);
+        this.resolved.emit(fresh);
+      }
+    } catch (error) {
+      if (!this.destroyed && isTowerForbiddenError(error)) {
+        this.isForbidden.set(true);
+        this.forbidden.emit();
       }
     }
   }
@@ -462,9 +563,12 @@ export class ExceptionModal {
     this.loading.set(true);
     this.loadFailed.set(false);
     this.notFound.set(false);
+    this.isForbidden.set(false);
+    this.notReadyMessage.set(null);
+    this.conflictMessage.set(null);
 
     try {
-      const loaded = await getException(id);
+      const loaded = await getException(id, this.context());
       if (seq !== this.loadSeq || this.destroyed) return;
       this.detail.set(loaded);
       this.resetFormFor(loaded);
@@ -472,7 +576,12 @@ export class ExceptionModal {
     } catch (error) {
       if (seq !== this.loadSeq || this.destroyed) return;
       this.loading.set(false);
-      if (error instanceof ApiError && error.status === 404) {
+      if (isTowerForbiddenError(error)) {
+        this.isForbidden.set(true);
+        this.forbidden.emit();
+      } else if (isTowerNotReadyError(error)) {
+        this.notReadyMessage.set(translateTowerError(this.transloco, error));
+      } else if (error instanceof ApiError && error.status === 404) {
         this.notFound.set(true);
       } else {
         this.loadFailed.set(true);
@@ -482,7 +591,7 @@ export class ExceptionModal {
 
   private async loadReasonsList(): Promise<void> {
     try {
-      const list = await listReasons(RESOLVE_REASON_KIND);
+      const list = await listReasons(RESOLVE_REASON_KIND, undefined, this.context());
       if (!this.destroyed) {
         this.reasons.set(list);
         this.reasonsLoaded.set(true);
