@@ -23,7 +23,9 @@ import { SettingsFrame } from '../../../../../shared/ui/settings-frame/settings-
 import { SettingsNotice } from '../../../../../shared/ui/settings-notice/settings-notice';
 import { ApplyDialog } from '../apply-dialog/apply-dialog';
 import { OperationStatusDialog } from '../operation-status-dialog/operation-status-dialog';
-import { applyUpdates, getOperation, listUpdates } from '../updates.api';
+import { UpdatesApi } from '../updates.api';
+import { AuthSession } from '../../../../../core/auth/auth-session';
+import { hasTenantWidePermission } from '../../../../../core/auth/tenant-wide-permission';
 import {
   badgeClassForTone,
   buildSnapshot,
@@ -52,9 +54,6 @@ import {
   UpdatesQuery,
 } from '../updates.model';
 import { UpdatesTable } from '../updates-table/updates-table';
-
-const CAN_READ = true;   // later: workspace.read TENANT-WIDE (company/branch grants do not count)
-const CAN_MANAGE = true; // later: workspace.manage tenant-wide and the session may mutate
 
 const MAX_POLL_ATTEMPTS = 12;
 const POLL_INTERVAL_MS = 5_000;
@@ -106,6 +105,8 @@ export class UpdatesPage {
   private static nextId = 0;
   protected readonly uid = `updates-page-${++UpdatesPage.nextId}`;
 
+  private readonly api = inject(UpdatesApi);
+  private readonly session = inject(AuthSession);
   private readonly document = inject(DOCUMENT);
   private readonly destroyRef = inject(DestroyRef);
   private readonly notify = inject(Notify);
@@ -122,8 +123,11 @@ export class UpdatesPage {
 
   // Permission state
   protected readonly permissionDenied = signal(false);
-  protected readonly canRead = computed(() => CAN_READ && !this.permissionDenied());
-  protected readonly canManage = computed(() => CAN_MANAGE && this.canRead());
+  protected readonly canRead = computed(() =>
+    this.session.status() === 'signed-in' && this.session.me()?.status === 'ACTIVE' &&
+    hasTenantWidePermission(this.session.me(), 'workspace.read') && !this.permissionDenied());
+  protected readonly canManage = computed(() => this.canRead() &&
+    this.session.renewal() === 'ok' && hasTenantWidePermission(this.session.me(), 'workspace.manage'));
 
   // Query state
   protected readonly searchInput = signal('');
@@ -213,7 +217,7 @@ export class UpdatesPage {
 
   private readonly listResource = resource({
     params: () => this.queryParams(),
-    loader: async ({ params }) => listUpdates(params),
+    loader: async ({ params }) => this.api.listUpdates(params),
   });
 
   private readonly lastResult = signal<UpdatesPageResult | null>(null);
@@ -570,7 +574,7 @@ export class UpdatesPage {
 
     this.submittingApply.set(true);
     try {
-      const res = await applyUpdates(
+      const res = await this.api.applyUpdates(
         { selections: toApplySelections(current.snapshot) },
         current.key,
       );
@@ -589,7 +593,7 @@ export class UpdatesPage {
     }
     this.submittingApply.set(true);
     try {
-      const res = await applyUpdates(
+      const res = await this.api.applyUpdates(
         { selections: toApplySelections(current.snapshot) },
         current.key,
       );
@@ -607,7 +611,7 @@ export class UpdatesPage {
 
     this.reconciling.set(true);
     try {
-      const res = await applyUpdates(
+      const res = await this.api.applyUpdates(
         { selections: toApplySelections(rec.snapshot) },
         rec.key,
       );
@@ -763,7 +767,7 @@ export class UpdatesPage {
     const seq = ++this.opFetchSeq;
     this.operationLoading.set(true);
     try {
-      const detail = await getOperation(operationId);
+      const detail = await this.api.getOperation(operationId);
       if (seq !== this.opFetchSeq || this.trackedOperationId() !== operationId) return;
 
       if (detail.id !== operationId) {

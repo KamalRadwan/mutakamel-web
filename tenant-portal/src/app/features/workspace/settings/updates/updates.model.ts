@@ -142,6 +142,15 @@ export interface ApplyUpdatesResponse {
   operation: TenantOperationDetail; // HTTP 202
 }
 
+/** Backend operation projection; additional server fields are intentionally unused. */
+export interface OperationDetailResponse extends Omit<TenantOperationDetail, 'safeError' | 'steps'> {
+  safeError: { code: string | null; message: string | null } | null;
+  steps: (Omit<OperationStep, 'componentKey' | 'safeError'> & {
+    componentKey: string | null;
+    safeError: { code: string | null; message: string | null } | null;
+  })[];
+}
+
 /**
  * NEEDS_BACKUP_OR_MAINTENANCE: Core (tenant-provisioning-plan.service.ts) refuses a self-service
  * update whose release requires a backup or a maintenance window with 422

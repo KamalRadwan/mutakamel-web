@@ -1,5 +1,6 @@
 import { ApiError } from '../../../../core/api/api-errors';
-import { fakeApplyUpdates, fakeGetOperation, fakeListUpdates } from './updates.fake';
+import { inject, Service } from '@angular/core';
+import { CoreHttp } from '../../../../core/api/core-http';
 import {
   ApplyUpdatesBody,
   ApplyUpdatesResponse,
@@ -7,6 +8,7 @@ import {
   TenantOperationDetail,
   UpdatesPageResult,
   UpdatesQuery,
+  OperationDetailResponse,
 } from './updates.model';
 
 function assertValidUpdatesPage(result: unknown): UpdatesPageResult {
@@ -82,22 +84,66 @@ function assertValidOperationDetail(result: unknown): TenantOperationDetail {
 }
 
 // GET  /api/v1/core/tenant/provisioning/updates [workspace.read tenant-wide]
-export async function listUpdates(query: UpdatesQuery): Promise<UpdatesPageResult> {
-  const res = await fakeListUpdates(query);
-  return assertValidUpdatesPage(res);
+@Service()
+export class UpdatesApi {
+  private readonly http = inject(CoreHttp);
+
+  async listUpdates(query: UpdatesQuery): Promise<UpdatesPageResult> {
+    const res = await this.http.readPage<TenantAvailableUpdate>(UPDATES_PATH, { ...query });
+    return assertValidUpdatesPage(res);
+  }
+
+  async applyUpdates(body: ApplyUpdatesBody, idempotencyKey: string): Promise<ApplyUpdatesResponse> {
+    const res = await this.http.write<{ replayed: boolean; operation: OperationDetailResponse }>(
+      'POST', `${UPDATES_PATH}/apply`, body, { key: idempotencyKey },
+    );
+    const result = assertValidApplyResponse(res.data);
+    return { replayed: result.replayed, operation: adaptOperation(res.data.operation) };
+  }
+
+  async getOperation(operationId: string): Promise<TenantOperationDetail> {
+    const res = await this.http.read<OperationDetailResponse>(
+      `${PROVISIONING_PATH}/operations/${encodeURIComponent(operationId)}`,
+    );
+    return adaptOperation(res);
+  }
+}
+
+const PROVISIONING_PATH = '/api/v1/core/tenant/provisioning';
+const UPDATES_PATH = `${PROVISIONING_PATH}/updates`;
+
+/** Project nullable backend evidence into the existing display model. */
+function adaptOperation(response: OperationDetailResponse): TenantOperationDetail {
+  assertValidOperationDetail(response);
+  return {
+    ...response,
+    safeError: response.safeError ? {
+      code: response.safeError.code ?? '', message: response.safeError.message ?? '',
+    } : null,
+    steps: response.steps.map((step) => ({
+      ...step,
+      componentKey: step.componentKey ?? '',
+      safeError: step.safeError ? {
+        code: step.safeError.code ?? '', message: step.safeError.message ?? '',
+      } : null,
+    })),
+  };
+}
+
+// Compatibility exports for existing consumers; screens inject UpdatesApi.
+export function listUpdates(query: UpdatesQuery): Promise<UpdatesPageResult> {
+  return inject(UpdatesApi).listUpdates(query);
 }
 
 // POST /api/v1/core/tenant/provisioning/updates/apply [workspace.manage tenant-wide] (x-idempotency-key) -> 202
-export async function applyUpdates(
+export function applyUpdates(
   body: ApplyUpdatesBody,
   idempotencyKey: string,
 ): Promise<ApplyUpdatesResponse> {
-  const res = await fakeApplyUpdates(body, idempotencyKey);
-  return assertValidApplyResponse(res);
+  return inject(UpdatesApi).applyUpdates(body, idempotencyKey);
 }
 
 // GET  /api/v1/core/tenant/provisioning/operations/:operationId [workspace.read tenant-wide]
-export async function getOperation(operationId: string): Promise<TenantOperationDetail> {
-  const res = await fakeGetOperation(operationId);
-  return assertValidOperationDetail(res);
+export function getOperation(operationId: string): Promise<TenantOperationDetail> {
+  return inject(UpdatesApi).getOperation(operationId);
 }
