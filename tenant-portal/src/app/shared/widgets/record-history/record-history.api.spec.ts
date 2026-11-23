@@ -3,6 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { TenantScopeState } from '../../../core/scope/tenant-scope';
+import { ApiError } from '../../../core/api/api-errors';
 import { RecordHistoryApi } from './record-history.api';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { AuditEvent, AuditHistoryGroup } from '../../../features/workspace/operations/audit-log/audit-log.api';
@@ -14,6 +15,7 @@ import {
   relatedPartyIdsFor,
 } from './record-history.api';
 import { HistoryItem } from './record-history.model';
+import { fakeListRecordHistory } from './record-history.fake';
 
 const V7 = (n: number) => `0192b7ea-7c4f-7a7d-9c9f-${String(n).padStart(12, '0')}`;
 
@@ -83,10 +85,6 @@ describe('record-history.api over the audit-log wrappers', () => {
     expect(mapped.diff).toEqual([{ field: 'status', before: 'PROSPECT', after: 'INACTIVE' }]);
   });
 
-  it('routes a Lead to the record history route and returns its seeded events (the fake accepts lead-* ids)', async () => {
-    const page = await listRecordHistory('Lead', 'lead-001', []);
-    expect(page.items.length).toBeGreaterThan(0);
-  });
 });
 
 describe('RecordHistoryApi', () => {
@@ -97,6 +95,16 @@ describe('RecordHistoryApi', () => {
     api = TestBed.inject(RecordHistoryApi); http = TestBed.inject(HttpTestingController);
   });
   afterEach(() => http.verify());
+  it.each([
+    { name: 'API compatibility export', list: listRecordHistory },
+    { name: 'legacy compatibility alias', list: fakeListRecordHistory },
+  ])('delegates $name to the real injected service', async ({ list }) => {
+    const pending = TestBed.runInInjectionContext(() => list('Lead', V7(1), [], { limit: 1 }));
+    const request = http.expectOne((r) => r.url.endsWith(`/records/CRM/LEAD/${V7(1)}/history`));
+    expect(request.request.params.get('limit')).toBe('1');
+    request.flush({ success: true, data: { items: [], nextCursor: null } });
+    await expect(pending).resolves.toEqual({ items: [], nextCursor: null });
+  });
   it('entity history unwraps the page', async () => {
     const pending = api.listRecordHistory('Party', V7(1), []);
     http.expectOne((r) => r.url === `/api/tenant/core/v1/audit/entities/Party/${V7(1)}`).flush({ success: true, data: { items: [], nextCursor: 'cursor-1' } });
@@ -113,13 +121,69 @@ describe('RecordHistoryApi', () => {
     const related = api.listRecordHistory('CustomerProfile', V7(1), [V7(2), V7(3)], { category: 'contact' });
     const relatedRequest = http.expectOne((r) => r.url.endsWith(`/entities/CustomerProfile/${V7(1)}`));
     expect(relatedRequest.request.params.get('relatedPartyIds')).toBe(`${V7(2)},${V7(3)}`);
-    relatedRequest.flush({ success: true, data: { items: [], nextCursor: null } });
-    await related;
+    expect(relatedRequest.request.params.get('historyCategory')).toBe('contact');
+    const contact = item({ id: 'contact', subjectKind: 'contact', diff: [
+      { field: 'phone', before: 'old', after: 'new', subjectId: V7(2), subjectLabel: 'Contact' },
+    ] });
+    relatedRequest.flush({ success: true, data: { items: [contact], nextCursor: 'related-next' } });
+    await expect(related).resolves.toEqual({ items: [contact], nextCursor: 'related-next' });
   });
-});
 
-describe('record-history api', () => {
-  it('CRM plain export stays available', async () => {
-    await expect(listRecordHistory('Lead', 'lead-001', [], { limit: 1 })).resolves.toMatchObject({ items: expect.any(Array) });
+  it('maps flat events and applies categories locally without sending a grouped filter', async () => {
+    const pending = api.listRecordHistory('Opportunity', V7(1), ['invalid'], { category: 'details', limit: 10 });
+    const request = http.expectOne((r) => r.url.endsWith(`/entities/Opportunity/${V7(1)}`));
+    expect(request.request.params.get('limit')).toBe('10');
+    expect(request.request.params.has('relatedPartyIds')).toBe(false);
+    expect(request.request.params.has('historyCategory')).toBe(false);
+    const event = {
+      id: 'event', action: 'UPDATE', entityType: 'OpportunityEntity', entityId: V7(1),
+      entityLabel: 'Opportunity', createdAt: '2026-11-20T10:00:00.000Z',
+      actorLabel: null, actorType: 'USER', outcome: 'SUCCESS', reason: null,
+      diff: [{ field: 'status', before: 'OPEN', after: 'WON' }, { field: 'version', before: 1, after: 2 }],
+      before: null, after: null,
+    };
+    request.flush({ success: true, data: { items: [event, { ...event, id: 'note', entityType: 'Note' }], nextCursor: 'flat-next' } });
+    await expect(pending).resolves.toEqual({ items: [item({
+      id: 'event', subjectId: V7(1), referenceLabel: 'Opportunity',
+      diff: [{ field: 'status', before: 'OPEN', after: 'WON' }],
+    })], nextCursor: 'flat-next' });
+  });
+
+  it('preserves the cursor when a local category removes every row', async () => {
+    const pending = api.listRecordHistory('Lead', V7(1), [], { category: 'note' });
+    const request = http.expectOne((r) => r.url.endsWith(`/records/CRM/LEAD/${V7(1)}/history`));
+    expect(request.request.params.has('historyCategory')).toBe(false);
+    request.flush({ success: true, data: { items: [item({})], nextCursor: 'next' } });
+    await expect(pending).resolves.toEqual({ items: [], nextCursor: 'next' });
+  });
+
+  for (const [status, code] of [
+    [400, 'AUDIT_QUERY_INVALID'], [403, 'MISSING_REQUIRED_PERMISSIONS'],
+    [404, 'ACTIVITY_NOT_FOUND'], [503, 'ACTIVITY_TARGET_UNAVAILABLE'],
+  ] as const) {
+    it(`passes ${code} through the shared API error handling`, async () => {
+      const pending = api.listRecordHistory('Lead', V7(1), []);
+      const rejected = expect(pending).rejects.toMatchObject({
+        status, code, correlationId: 'history-request',
+      });
+      http.expectOne((r) => r.url.endsWith(`/records/CRM/LEAD/${V7(1)}/history`))
+        .flush({ success: false, errorCode: code, correlationId: 'history-request' }, { status, statusText: 'Error' });
+      await rejected;
+    });
+  }
+
+  it('propagates network errors without returning fabricated history', async () => {
+    const pending = api.listRecordHistory('Party', V7(1), [V7(2)]);
+    const rejected = expect(pending).rejects.toBeInstanceOf(ApiError);
+    const code = expect(pending).rejects.toMatchObject({ status: 0, code: 'NETWORK_ERROR' });
+    http.expectOne((r) => r.url.endsWith(`/entities/Party/${V7(1)}`)).error(new ProgressEvent('error'));
+    await Promise.all([rejected, code]);
+  });
+
+  it('rejects a malformed success envelope', async () => {
+    const pending = api.listRecordHistory('Party', V7(1), []);
+    const rejected = expect(pending).rejects.toMatchObject({ status: 502, code: 'COMMON.GENERIC.INTERNAL_ERROR' });
+    http.expectOne((r) => r.url.endsWith(`/entities/Party/${V7(1)}`)).flush({ items: [], nextCursor: null });
+    await rejected;
   });
 });

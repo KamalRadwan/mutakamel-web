@@ -12,7 +12,6 @@ import {
   computeEventDiff,
   AuditLogApi,
 } from '../../../features/workspace/operations/audit-log/audit-log.api';
-import { fakeListEntityAuditEvents, fakeListRelatedEntityHistory, fakeListRecordHistory as fakeListAuditRecordHistory } from '../../../features/workspace/operations/audit-log/audit-log.fake';
 import { HistoryItem, HistoryPage, HistorySubjectKind, ListRecordHistoryOptions } from './record-history.model';
 
 const UUID_V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -149,16 +148,15 @@ async function readHistory(
   return keepPage(page.items.map(historyItemFromEvent), page.nextCursor, flatPlan);
 }
 
-// FAKE-ONLY for features/crm/leads/lead-page/lead-history-tab/lead-history.api.ts (unused; controller item)
+/**
+ * Compatibility export for the unused legacy adapters. Requires an Angular injection
+ * context; active widgets inject RecordHistoryApi directly. Uses the same real transport.
+ */
 export function listRecordHistory(
   entityType: string,
   entityId: string,
   partyIds: readonly string[],
   options: ListRecordHistoryOptions = {},
 ): Promise<HistoryPage> {
-  return readHistory({
-      listRecordHistory: fakeListAuditRecordHistory,
-      listRelatedEntityHistory: fakeListRelatedEntityHistory,
-      listEntityAuditEvents: fakeListEntityAuditEvents,
-  }, entityType, entityId, partyIds, options);
+  return inject(RecordHistoryApi).listRecordHistory(entityType, entityId, partyIds, options);
 }
