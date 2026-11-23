@@ -1,11 +1,11 @@
-import { signal } from '@angular/core';
+import { inject, signal } from '@angular/core';
 import {
-  TemplatePdfJobArtifact,
-  TemplatePdfJobDto,
-  TemplatePdfJobFailure,
-  TemplatePdfPreviewAcceptedDto,
-  getPreviewJob,
-  getPreviewJobArtifact,
+  TemplateApiError,
+  TemplatesApi,
+  type TemplatePdfJobArtifact,
+  type TemplatePdfJobDto,
+  type TemplatePdfJobFailure,
+  type TemplatePdfPreviewAcceptedDto,
 } from '../templates.api';
 import { errorDetailsOf } from '../template-page/template-page.service';
 
@@ -25,6 +25,11 @@ export type PdfPollerStatus =
   | 'FAILED'
   | 'SLOW'
   | 'EXPIRED';
+
+export interface PdfJobTransport {
+  getPreviewJob(jobId: string): Promise<TemplatePdfJobDto>;
+  getPreviewJobArtifact(jobId: string): Promise<Blob>;
+}
 
 export interface PdfJobCallbacks {
   onCompleted: (job: TemplatePdfJobDto, blob: Blob) => void;
@@ -62,6 +67,8 @@ export class PdfJobPoller {
   private runSeq = 0;
   private windowStartedAt = 0;
   private callbacks: PdfJobCallbacks | null = null;
+
+  constructor(private readonly api: PdfJobTransport = inject(TemplatesApi)) {}
 
   start(accepted: TemplatePdfPreviewAcceptedDto, callbacks: PdfJobCallbacks): void {
     this.stop();
@@ -139,8 +146,13 @@ export class PdfJobPoller {
     if (seq !== this.runSeq) return;
 
     try {
-      const job = await getPreviewJob(jobId);
+      const job = await this.api.getPreviewJob(jobId);
       if (seq !== this.runSeq) return;
+      if (!job || typeof job !== 'object' || typeof job.status !== 'string') {
+        this._status.set('FAILED');
+        this.callbacks?.onError?.(new TemplateApiError(502, 'COMMON.GENERIC.INTERNAL_ERROR'));
+        return;
+      }
 
       this._attemptCount.set(job.attemptCount);
       this._createdAt.set(job.createdAt);
@@ -153,20 +165,25 @@ export class PdfJobPoller {
       }
 
       if (job.status === 'FAILED') {
-        this._failure.set(job.failure);
+        this._failure.set(job.failure ?? null);
         this._status.set('FAILED');
         this.callbacks?.onFailed?.(job);
         return;
       }
 
-      if (!job.artifact) {
+      if (
+        job.status !== 'COMPLETED' ||
+        !job.artifact ||
+        typeof job.artifact.downloadUrl !== 'string' ||
+        typeof job.artifact.pageCount !== 'number'
+      ) {
         this._status.set('FAILED');
-        this.callbacks?.onError?.(new Error('PDF artifact missing'));
+        this.callbacks?.onError?.(new TemplateApiError(502, 'COMMON.GENERIC.INTERNAL_ERROR'));
         return;
       }
 
       try {
-        const blob = await getPreviewJobArtifact(jobId);
+        const blob = await this.api.getPreviewJobArtifact(jobId);
         if (seq !== this.runSeq) return;
         this._artifact.set(job.artifact);
         this._expiresAt.set(job.artifact.downloadUrlExpiresAt || job.expiresAt);

@@ -29,6 +29,7 @@ import {
   tablerSearch,
   tablerShieldCheck,
 } from '@ng-icons/tabler-icons';
+import { ApiError, errorCodeOf, errorMessage, isRetryableWriteError } from '../../../../../core/api/api-errors';
 import { LanguageState } from '../../../../../core/i18n/language';
 import { Notify } from '../../../../../core/notify/notify';
 import { Button } from '../../../../../shared/ui/button/button';
@@ -45,26 +46,28 @@ import {
   buildPreviewCacheKey,
 } from '../../preview/preview-cache';
 import {
-  TemplateDefinitionDetail,
-  TemplateDocumentV1,
-  TemplatePdfJobDto,
-  TemplatePdfOutputProfile,
-  TemplatePreviewSource,
-  TemplateSyntheticFixture,
-  TemplateVersionItem,
-  getDataSourceSchema,
-  getDraft,
-  getTemplate,
-  getVersion,
-  listVersions,
+  TemplateApiError,
+  TemplatesApi,
   newTemplateIdempotencyKey,
-  previewEmail,
-  previewHtml,
-  previewPdf,
+  type TemplateDefinitionDetail,
+  type TemplateDocumentV1,
+  type TemplateEmailPreviewResponseDto,
+  type TemplateHtmlPreviewResponseDto,
+  type TemplatePdfJobDto,
+  type TemplatePdfOutputProfile,
+  type TemplatePdfPreviewRequestDto,
+  type TemplatePreviewSource,
+  type TemplateSyntheticFixture,
+  type TemplateVersionItem,
 } from '../../templates.api';
 import { TemplatePageService, errorDetailsOf } from '../template-page.service';
 
 type ZoomSetting = 'FIT' | '0.5' | '0.75' | '1' | '1.25' | '1.5';
+
+type PreviewDisabledCause =
+  | { kind: 'capability'; reason: string | null }
+  | { kind: 'emptyFixtures' }
+  | { kind: 'noSource' };
 
 type PreviewStageError =
   | { kind: 'forbidden' }
@@ -82,7 +85,11 @@ const MM_TO_PX = 96 / 25.4;
   selector: 'app-preview-tab',
   imports: [NgIcon, TranslocoPipe, Button, Dropdown, Field, Segmented, HtmlFrame, PdfFrame],
   providers: [
-    provideTranslocoScope('templates', { scope: 'templates-preview', alias: 'tplPreview' }),
+    provideTranslocoScope(
+      'templates',
+      { scope: 'templates-page', alias: 'templatesPage' },
+      { scope: 'templates-preview', alias: 'tplPreview' },
+    ),
     provideIcons({
       tablerAlertTriangle,
       tablerChevronLeft,
@@ -114,13 +121,14 @@ export class PreviewTab implements AfterViewInit {
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly notify = inject(Notify);
+  private readonly templatesApi = inject(TemplatesApi);
   protected readonly language = inject(LanguageState).current;
   protected readonly pageService = inject(TemplatePageService);
 
   private readonly stageRef = viewChild<ElementRef<HTMLElement>>('stageEl');
 
   private readonly cache = new PreviewCache();
-  protected readonly poller = new PdfJobPoller();
+  protected readonly poller = new PdfJobPoller(this.templatesApi);
 
   private readonly stageWidthPx = signal(960);
 
@@ -143,6 +151,8 @@ export class PreviewTab implements AfterViewInit {
 
   private readonly initialized = signal(false);
   private loadedTemplateId: string | null = null;
+  private loadedPreviewCapState: TemplateDefinitionDetail['capabilities']['preview']['state'] | null = null;
+  private disabledCause: PreviewDisabledCause | null = null;
   private lastTriggeredDraftRev: number | null = null;
   private initSeq = 0;
   private runSeq = 0;
@@ -366,9 +376,10 @@ export class PreviewTab implements AfterViewInit {
     return this.isDraftDirty() ? this.transloco.translate('tplPreview.source.saveFirst') : '';
   });
 
-  protected readonly templateDir = computed<'ltr' | 'rtl'>(() =>
-    this.definition()?.resolvedDirection === 'RTL' ? 'rtl' : 'ltr',
-  );
+  protected readonly templateDir = computed<'ltr' | 'rtl'>(() => {
+    const dir = this.selectedVersionItem()?.direction ?? this.definition()?.resolvedDirection;
+    return dir === 'RTL' ? 'rtl' : 'ltr';
+  });
 
   protected readonly statusBadge = computed<{
     labelKey: string;
@@ -484,9 +495,26 @@ export class PreviewTab implements AfterViewInit {
     effect(() => {
       const def = this.definition();
       if (!def) return;
-      if (def.templateId !== this.loadedTemplateId) {
+      const capState = def.capabilities.preview.state;
+      if (
+        def.templateId !== this.loadedTemplateId ||
+        (!this.initialized() && capState !== this.loadedPreviewCapState && capState === 'ENABLED')
+      ) {
         this.loadedTemplateId = def.templateId;
+        this.loadedPreviewCapState = capState;
         void this.initForTemplate(def);
+      }
+    });
+
+    effect(() => {
+      this.i18n();
+      this.language();
+      const current = this.stageError();
+      if (current?.kind === 'previewDisabled' && this.disabledCause) {
+        const nextText = this.resolvePreviewDisabledText(this.disabledCause);
+        if (nextText !== current.reasonText) {
+          this.stageError.set({ kind: 'previewDisabled', reasonText: nextText });
+        }
       }
     });
 
@@ -498,7 +526,7 @@ export class PreviewTab implements AfterViewInit {
       const source = this.selectedSource();
       if (dirty) {
         if (source === 'DRAFT' && !this.activeResult() && !this.stageError()) {
-          this.stageError.set({ kind: 'saveFirst' });
+          this.setStageError({ kind: 'saveFirst' });
         }
         return;
       }
@@ -557,7 +585,7 @@ export class PreviewTab implements AfterViewInit {
       const current = this.activeResult();
       if (current?.kind === 'EMAIL') {
         this.loadingPreview.set(false);
-        this.stageError.set(null);
+        this.setStageError(null);
         return;
       }
     }
@@ -611,11 +639,11 @@ export class PreviewTab implements AfterViewInit {
       pollerStatus === 'FAILED' ||
       pollerStatus === 'EXPIRED';
     if (this.format() === 'PDF' && this.poller.jobId() && !isTerminal) {
-      this.stageError.set(null);
+      this.setStageError(null);
       this.poller.resume();
       return;
     }
-    void this.triggerPreview(false, { reuseIdempotencyKey: true });
+    void this.triggerPreview(false);
   }
 
   protected openOverview(): void {
@@ -683,8 +711,11 @@ export class PreviewTab implements AfterViewInit {
     this.clearExpiryTimer();
     this.initialized.set(false);
     this.loadingInit.set(true);
-    this.stageError.set(null);
+    this.setStageError(null);
     this.activeResult.set(null);
+    this.fixtures.set([]);
+    this.publishedVersions.set([]);
+    this.selectedFixtureKey.set('');
     this.versionDocs.set({});
     this.loadingVersionIds.clear();
     this.poller.reset();
@@ -698,12 +729,25 @@ export class PreviewTab implements AfterViewInit {
     this.emailWidth.set(600);
     this.zoomSetting.set('FIT');
 
+    if (def.capabilities.preview.state === 'HIDDEN') {
+      this.selectedSource.set('');
+      this.setStageError({ kind: 'forbidden' });
+      this.loadingInit.set(false);
+      return;
+    }
+    if (def.capabilities.preview.state === 'DISABLED') {
+      this.selectedSource.set('');
+      this.setPreviewDisabled({ kind: 'capability', reason: def.capabilities.preview.reason });
+      this.loadingInit.set(false);
+      return;
+    }
+
     try {
-      const schemaVersion = (def.dataSourceSchemaVersion === 2 ? 2 : 1) as 1 | 2;
+      const schemaVersion: 1 | 2 = def.dataSourceSchemaVersion === 2 ? 2 : 1;
       const companyId = def.scope.type === 'COMPANY' ? def.scope.companyId : undefined;
 
       const [schema, versions] = await Promise.all([
-        getDataSourceSchema(def.dataSourceKey, {
+        this.templatesApi.getDataSourceSchema(def.dataSourceKey, {
           scopeType: def.scope.type,
           companyId,
           schemaVersion,
@@ -711,6 +755,9 @@ export class PreviewTab implements AfterViewInit {
         this.fetchAllPublishedVersions(def.templateId),
       ]);
       if (seq !== this.initSeq) return;
+      if (!schema || !Array.isArray(schema.syntheticFixtures)) {
+        throw new TemplateApiError(502, 'COMMON.GENERIC.INTERNAL_ERROR');
+      }
 
       this.fixtures.set(schema.syntheticFixtures);
       this.publishedVersions.set(versions);
@@ -727,17 +774,20 @@ export class PreviewTab implements AfterViewInit {
         } else {
           this.selectedSource.set('');
           this.initialized.set(true);
-          this.stageError.set({
-            kind: 'previewDisabled',
-            reasonText: this.transloco.translate('tplPreview.state.previewDisabled'),
-          });
+          this.setPreviewDisabled({ kind: 'noSource' });
           return;
         }
       } else {
         this.selectedSource.set('DRAFT');
       }
+
       this.lastTriggeredDraftRev = this.draftRevision();
       this.initialized.set(true);
+
+      if (!defaultFixture) {
+        this.setPreviewDisabled({ kind: 'emptyFixtures' });
+        return;
+      }
 
       await this.triggerPreview(false);
     } catch (error) {
@@ -753,15 +803,26 @@ export class PreviewTab implements AfterViewInit {
   private async fetchAllPublishedVersions(templateId: string): Promise<TemplateVersionItem[]> {
     const items: TemplateVersionItem[] = [];
     let cursor: string | null = null;
+    let recoveredCursor = false;
     for (let guard = 0; guard < 10; guard++) {
-      const page = await listVersions(templateId, {
-        lifecycleStatus: 'PUBLISHED',
-        cursor,
-        limit: 100,
-      });
-      items.push(...page.items);
-      if (!page.pageInfo.hasNextPage || !page.pageInfo.nextCursor) break;
-      cursor = page.pageInfo.nextCursor;
+      try {
+        const page = await this.templatesApi.listVersions(templateId, {
+          lifecycleStatus: 'PUBLISHED',
+          cursor,
+          limit: 100,
+        });
+        items.push(...page.items);
+        if (!page.pageInfo.hasNextPage || !page.pageInfo.nextCursor) break;
+        cursor = page.pageInfo.nextCursor;
+      } catch (error) {
+        if (cursor !== null && !recoveredCursor && errorCodeOf(error) === 'CORE.TEMPLATE.CURSOR.INVALID') {
+          recoveredCursor = true;
+          items.length = 0;
+          cursor = null;
+          continue;
+        }
+        throw error;
+      }
     }
     return items;
   }
@@ -779,7 +840,7 @@ export class PreviewTab implements AfterViewInit {
 
   private async triggerPreview(
     forceRefresh: boolean,
-    options: { reuseIdempotencyKey?: boolean; staleRetried?: boolean } = {},
+    options: { staleRetried?: boolean } = {},
   ): Promise<void> {
     const def = this.definition();
     if (!def) return;
@@ -789,7 +850,7 @@ export class PreviewTab implements AfterViewInit {
       this.clearExpiryTimer();
       this.poller.stop();
       this.activeResult.set(null);
-      this.stageError.set({ kind: 'forbidden' });
+      this.setStageError({ kind: 'forbidden' });
       return;
     }
     if (def.capabilities.preview.state === 'DISABLED') {
@@ -797,16 +858,7 @@ export class PreviewTab implements AfterViewInit {
       this.clearExpiryTimer();
       this.poller.stop();
       this.activeResult.set(null);
-      const reason = def.capabilities.preview.reason;
-      const reasonKey = reason ? `templatesPage.header.capabilities.${reason}` : '';
-      const translated = reasonKey ? this.transloco.translate(reasonKey) : '';
-      this.stageError.set({
-        kind: 'previewDisabled',
-        reasonText:
-          translated && translated !== reasonKey
-            ? translated
-            : this.transloco.translate('tplPreview.state.previewDisabled'),
-      });
+      this.setPreviewDisabled({ kind: 'capability', reason: def.capabilities.preview.reason });
       return;
     }
 
@@ -844,7 +896,7 @@ export class PreviewTab implements AfterViewInit {
             this.poller.reset();
             this.pdfSubmitting.set(false);
             this.loadingPreview.set(false);
-            this.stageError.set(null);
+            this.setStageError(null);
             this.activeResult.set(cached);
             this.pdfPage.set(1);
             this.scheduleExpiryTimer(cached, cacheKey, seq);
@@ -854,7 +906,7 @@ export class PreviewTab implements AfterViewInit {
           this.poller.reset();
           this.pdfSubmitting.set(false);
           this.loadingPreview.set(false);
-          this.stageError.set(null);
+          this.setStageError(null);
           this.activeResult.set(cached);
           return;
         }
@@ -865,7 +917,7 @@ export class PreviewTab implements AfterViewInit {
         this.pdfSubmitting.set(false);
         this.loadingPreview.set(false);
         if (!this.activeResult()) {
-          this.stageError.set({ kind: 'saveFirst' });
+          this.setStageError({ kind: 'saveFirst' });
         }
         return;
       }
@@ -877,7 +929,7 @@ export class PreviewTab implements AfterViewInit {
       return;
     }
 
-    this.stageError.set(null);
+    this.setStageError(null);
     this.pdfPage.set(1);
 
     const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
@@ -887,7 +939,6 @@ export class PreviewTab implements AfterViewInit {
     if (fmt === 'PDF') {
       this.loadingPreview.set(false);
       await this.runPdfPreview(def, source, fixtureKey, locale, timeZone, cacheKey, seq, {
-        forceNewKey: forceRefresh || !options.reuseIdempotencyKey,
         staleRetried: options.staleRetried ?? false,
       });
       return;
@@ -897,7 +948,7 @@ export class PreviewTab implements AfterViewInit {
     this.loadingPreview.set(true);
     try {
       if (fmt === 'HTML') {
-        const res = await previewHtml(def.templateId, {
+        const raw = await this.templatesApi.previewHtml(def.templateId, {
           source,
           fixtureKey,
           locale,
@@ -905,6 +956,7 @@ export class PreviewTab implements AfterViewInit {
           viewport: 'DESKTOP',
         });
         if (seq !== this.runSeq) return;
+        const res = this.validateHtmlPreview(raw);
         const entry: CachedPreviewResult = {
           kind: 'HTML',
           response: res,
@@ -914,7 +966,7 @@ export class PreviewTab implements AfterViewInit {
         this.activeResult.set(entry);
         this.notifyPreviewWarnings(res.warnings.length);
       } else {
-        const res = await previewEmail(def.templateId, {
+        const raw = await this.templatesApi.previewEmail(def.templateId, {
           source,
           fixtureKey,
           locale,
@@ -922,6 +974,7 @@ export class PreviewTab implements AfterViewInit {
           viewport: this.emailWidth() === 320 ? 'MOBILE' : 'DESKTOP',
         });
         if (seq !== this.runSeq) return;
+        const res = this.validateEmailPreview(raw);
         const entry: CachedPreviewResult = {
           kind: 'EMAIL',
           response: res,
@@ -949,33 +1002,34 @@ export class PreviewTab implements AfterViewInit {
     timeZone: string,
     cacheKey: string,
     seq: number,
-    opts: { forceNewKey: boolean; staleRetried: boolean },
+    opts: { staleRetried: boolean },
   ): Promise<void> {
-    const intentKey = `${cacheKey}`;
-    if (opts.forceNewKey || !this.pendingPdfIntent || this.pendingPdfIntent.intentKey !== intentKey) {
+    const outputProfile: TemplatePdfOutputProfile =
+      def.outputChannel === 'EMAIL' ? 'EMAIL_PRINT_PROJECTION' : 'DOCUMENT_PRINT';
+    const requestBody: TemplatePdfPreviewRequestDto = {
+      source,
+      dataSource: { kind: 'SYNTHETIC', fixtureKey },
+      outputProfile,
+      locale,
+      timeZone,
+    };
+    const intentKey = JSON.stringify([def.templateId, requestBody]);
+    if (!this.pendingPdfIntent || this.pendingPdfIntent.intentKey !== intentKey) {
       this.pendingPdfIntent = {
         intentKey,
         idempotencyKey: newTemplateIdempotencyKey(),
       };
     }
 
-    const outputProfile: TemplatePdfOutputProfile =
-      def.outputChannel === 'EMAIL' ? 'EMAIL_PRINT_PROJECTION' : 'DOCUMENT_PRINT';
-
     this.pdfSubmitting.set(true);
     try {
-      const accepted = await previewPdf(
+      const result = await this.templatesApi.previewPdf(
         def.templateId,
-        {
-          source,
-          dataSource: { kind: 'SYNTHETIC', fixtureKey },
-          outputProfile,
-          locale,
-          timeZone,
-        },
+        requestBody,
         this.pendingPdfIntent.idempotencyKey,
       );
       if (seq !== this.runSeq) return;
+      const accepted = result.data;
       this.pendingPdfIntent = null;
       this.pdfSubmitting.set(false);
 
@@ -1023,71 +1077,71 @@ export class PreviewTab implements AfterViewInit {
     const { status, code, correlationId } = errorDetailsOf(error);
     const short = code?.replace(/^CORE\.TEMPLATE\./, '') ?? '';
 
-    if (status === 409 && short === 'PREVIEW.SOURCE_STALE') {
+    if (!this.shouldRetainPdfIntent(error)) {
       this.pendingPdfIntent = null;
+    }
+
+    if (status === 409 && short === 'PREVIEW.SOURCE_STALE') {
       this.notify.warning(this.transloco.translate('tplPreview.toast.stale'));
       if (!staleRetried) {
-        void this.reloadDraftAndRerun(seq);
+        void this.reloadSourceAndRerun(seq);
       }
       return;
     }
 
-    if (status === 422 && short === 'VALIDATION.FAILED') {
-      this.pendingPdfIntent = null;
+    if (short === 'DEFINITION.ARCHIVED') {
       this.activeResult.set(null);
-      this.stageError.set({ kind: 'validation' });
+      this.setPreviewDisabled({ kind: 'capability', reason: 'ARCHIVED' });
+      return;
+    }
+
+    if (status === 422 && short === 'VALIDATION.FAILED') {
+      this.activeResult.set(null);
+      this.setStageError({ kind: 'validation' });
       return;
     }
 
     if (status === 422 && short === 'COMPILER.FAILED') {
-      this.pendingPdfIntent = null;
       this.activeResult.set(null);
-      this.stageError.set({ kind: 'compiler' });
+      this.setStageError({ kind: 'compiler' });
       return;
     }
 
     if (status === 422 && short === 'PREVIEW.OUTPUT_LIMIT') {
-      this.pendingPdfIntent = null;
       this.notify.error(this.transloco.translate('tplPreview.toast.tooLarge'));
       return;
     }
 
     if (status === 422 && (short === 'PAGE.MISSING' || short === 'LAYOUT.OUT_OF_BOUNDS')) {
-      this.pendingPdfIntent = null;
       this.notify.error(this.transloco.translate('tplPreview.toast.outOfPage'));
       return;
     }
 
     if (status === 422 && short === 'LAYOUT.INCOMPATIBLE') {
-      this.pendingPdfIntent = null;
       this.notify.error(this.transloco.translate('tplPreview.toast.incompatible'));
       return;
     }
 
     if (status === 429 && short === 'PREVIEW.TOO_MANY_ACTIVE') {
-      this.pendingPdfIntent = null;
       this.notify.warning(this.transloco.translate('tplPreview.toast.tooMany'));
       return;
     }
 
     if (status === 410 || short === 'PREVIEW.ARTIFACT_EXPIRED' || short === 'PREVIEW.EXPIRED') {
-      this.pendingPdfIntent = null;
       this.activeResult.set(null);
       this.poller.markExpired();
       return;
     }
 
     if (status === 403 || short === 'PERMISSION.DENIED' || short === 'FEATURE.DISABLED') {
-      this.pendingPdfIntent = null;
       this.activeResult.set(null);
-      this.stageError.set({ kind: 'forbidden' });
+      this.setStageError({ kind: 'forbidden' });
       return;
     }
 
     if (status === 404 || short === 'NOT_FOUND') {
-      this.pendingPdfIntent = null;
       this.activeResult.set(null);
-      this.stageError.set({ kind: 'notFound' });
+      this.setStageError({ kind: 'notFound' });
       return;
     }
 
@@ -1102,33 +1156,55 @@ export class PreviewTab implements AfterViewInit {
     ) {
       // Keep pendingPdfIntent so "Try again" retries with the same idempotency key.
       this.activeResult.set(null);
-      this.stageError.set({ kind: 'unavailable', correlationId });
+      this.setStageError({ kind: 'unavailable', correlationId });
       return;
     }
 
-    this.notify.error(this.pageService.translateError(this.transloco, error));
+    this.notify.error(this.translateError(error));
   }
 
-  private async reloadDraftAndRerun(expectedSeq: number): Promise<void> {
+  private async reloadSourceAndRerun(expectedSeq: number): Promise<void> {
     const def = this.definition();
     if (!def) return;
     try {
-      const [freshDef, freshDraft] = await Promise.all([
-        getTemplate(def.templateId),
-        getDraft(def.templateId),
-      ]);
-      if (expectedSeq !== this.runSeq) return;
-      this.pageService.syncFromDefinition(freshDef, this.pageService.overviewDirty());
-      if (!this.pageService.dirty()) {
-        this.pageService.syncExternalDraft(freshDraft);
+      if (this.isDraftSelected() && !this.pageService.draftAccessForbidden()) {
+        const [freshDef, freshDraft] = await Promise.all([
+          this.templatesApi.getTemplate(def.templateId),
+          this.templatesApi.getDraft(def.templateId),
+        ]);
+        if (expectedSeq !== this.runSeq || this.definition()?.templateId !== def.templateId) return;
+        this.pageService.syncFromDefinition(freshDef, this.pageService.overviewDirty());
+        if (!this.pageService.dirty()) {
+          this.pageService.syncExternalDraft(freshDraft);
+        } else {
+          this.pageService.setDraft(freshDraft);
+        }
+        this.lastTriggeredDraftRev = freshDraft.revision;
       } else {
-        this.pageService.setDraft(freshDraft);
+        const [freshDef, versions] = await Promise.all([
+          this.templatesApi.getTemplate(def.templateId),
+          this.fetchAllPublishedVersions(def.templateId),
+        ]);
+        if (expectedSeq !== this.runSeq || this.definition()?.templateId !== def.templateId) return;
+        this.pageService.syncFromDefinition(freshDef, this.pageService.overviewDirty());
+        this.publishedVersions.set(versions);
+        const currentSelected = this.selectedSource();
+        const stillPublished = versions.some((v) => `VERSION:${v.templateVersionId}` === currentSelected);
+        if (!stillPublished) {
+          if (versions.length > 0) {
+            this.selectedSource.set(`VERSION:${versions[0].templateVersionId}`);
+          } else {
+            this.selectedSource.set('');
+            this.activeResult.set(null);
+            this.setPreviewDisabled({ kind: 'noSource' });
+            return;
+          }
+        }
       }
-      this.lastTriggeredDraftRev = freshDraft.revision;
       await this.triggerPreview(true, { staleRetried: true });
     } catch (error) {
-      if (expectedSeq !== this.runSeq) return;
-      this.notify.error(this.pageService.translateError(this.transloco, error));
+      if (expectedSeq !== this.runSeq || this.definition()?.templateId !== def.templateId) return;
+      this.handlePreviewError(error, expectedSeq, true);
     }
   }
 
@@ -1136,10 +1212,13 @@ export class PreviewTab implements AfterViewInit {
     if (this.versionDocs()[versionId] || this.loadingVersionIds.has(versionId)) return;
     this.loadingVersionIds.add(versionId);
     const expectedInitSeq = this.initSeq;
-    void getVersion(templateId, versionId)
+    void this.templatesApi
+      .getVersion(templateId, versionId)
       .then((ver) => {
         if (expectedInitSeq !== this.initSeq || this.loadedTemplateId !== templateId) return;
-        this.versionDocs.update((map) => ({ ...map, [versionId]: ver.editorDocument }));
+        if (ver?.editorDocument) {
+          this.versionDocs.update((map) => ({ ...map, [versionId]: ver.editorDocument }));
+        }
       })
       .catch(() => {
         // Fallback to definition layoutMode when version detail fetch fails.
@@ -1147,6 +1226,92 @@ export class PreviewTab implements AfterViewInit {
       .finally(() => {
         this.loadingVersionIds.delete(versionId);
       });
+  }
+
+  private setStageError(err: PreviewStageError | null): void {
+    this.disabledCause = null;
+    this.stageError.set(err);
+  }
+
+  private setPreviewDisabled(cause: PreviewDisabledCause): void {
+    this.disabledCause = cause;
+    this.stageError.set({
+      kind: 'previewDisabled',
+      reasonText: this.resolvePreviewDisabledText(cause),
+    });
+  }
+
+  private resolvePreviewDisabledText(cause: PreviewDisabledCause): string {
+    if (cause.kind === 'emptyFixtures') {
+      return this.transloco.translate('tplPreview.fixture.empty');
+    }
+    if (cause.kind === 'capability' && cause.reason) {
+      const reasonKey = `templatesPage.header.capabilities.${cause.reason}`;
+      const translated = this.transloco.translate(reasonKey);
+      if (translated && translated !== reasonKey) {
+        return translated;
+      }
+    }
+    return this.transloco.translate('tplPreview.state.previewDisabled');
+  }
+
+  private shouldRetainPdfIntent(error: unknown): boolean {
+    if (isRetryableWriteError(error)) return true;
+    if (error instanceof ApiError && error.status === 401) return true;
+    const { status, code } = errorDetailsOf(error);
+    const short = code?.replace(/^CORE\.TEMPLATE\./, '') ?? '';
+    return (
+      status === 503 ||
+      short === 'PDF.ARTIFACT_INTEGRITY_FAILED' ||
+      short === 'DEPENDENCY.UNAVAILABLE' ||
+      short === 'PREVIEW.BUNDLE_UNAVAILABLE' ||
+      short === 'PREVIEW.BUNDLE_INTEGRITY_FAILED' ||
+      short === 'PREVIEW.AUTHORITY_UNAVAILABLE'
+    );
+  }
+
+  private validateHtmlPreview(raw: TemplateHtmlPreviewResponseDto): TemplateHtmlPreviewResponseDto {
+    if (!raw || typeof raw !== 'object' || typeof raw.html !== 'string') {
+      throw new TemplateApiError(502, 'COMMON.GENERIC.INTERNAL_ERROR');
+    }
+    return {
+      ...raw,
+      warnings: Array.isArray(raw.warnings) ? raw.warnings : [],
+    };
+  }
+
+  private validateEmailPreview(raw: TemplateEmailPreviewResponseDto): TemplateEmailPreviewResponseDto {
+    if (
+      !raw ||
+      typeof raw !== 'object' ||
+      typeof raw.html !== 'string' ||
+      typeof raw.subject !== 'string' ||
+      typeof raw.text !== 'string'
+    ) {
+      throw new TemplateApiError(502, 'COMMON.GENERIC.INTERNAL_ERROR');
+    }
+    return {
+      ...raw,
+      preheader: raw.preheader ?? null,
+      warnings: Array.isArray(raw.warnings) ? raw.warnings : [],
+    };
+  }
+
+  private translateError(error: unknown): string {
+    const { code } = errorDetailsOf(error);
+    if (code) {
+      const tplKey = `templates.errors.${code}`;
+      const tplTranslated = this.transloco.translate(tplKey);
+      if (tplTranslated && tplTranslated !== tplKey) {
+        return tplTranslated;
+      }
+      const pageKey = `templatesPage.errors.${code}`;
+      const pageTranslated = this.transloco.translate(pageKey);
+      if (pageTranslated && pageTranslated !== pageKey) {
+        return pageTranslated;
+      }
+    }
+    return errorMessage(error, 'templates', this.transloco);
   }
 
   private clearExpiryTimer(): void {
