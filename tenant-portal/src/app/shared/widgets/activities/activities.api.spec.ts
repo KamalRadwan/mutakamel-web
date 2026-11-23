@@ -196,4 +196,55 @@ describe('ActivitiesApi', () => {
     req.flush({ success: true, data: summary });
     await expect(result).resolves.toEqual(summary);
   });
+
+  it('does not retry an ambiguous create and allows the caller to reuse its command key', async () => {
+    const key = '019ab14a-0000-7000-8000-000000000001';
+    const first = api.createActivity(body, key);
+    const rejection = expect(first).rejects.toMatchObject({ status: 0, code: 'NETWORK_ERROR' });
+    const failed = request('/activities');
+    expect(failed.request.headers.get('x-idempotency-key')).toBe(key);
+    failed.error(new ProgressEvent('error'));
+    await rejection;
+    http.expectNone((req) => req.method === 'POST');
+
+    const retry = api.createActivity(body, key);
+    const replay = request('/activities');
+    expect(replay.request.headers.get('x-idempotency-key')).toBe(key);
+    expect(replay.request.body).toEqual(body);
+    replay.flush({ success: true, data: activity }, { headers: { 'Idempotency-Replayed': 'true' } });
+    await expect(retry).resolves.toEqual(activity);
+    http.expectNone((req) => req.method === 'POST');
+  });
+
+  it.each([
+    [400, 'CORE_VALIDATION_FAILED'], [401, 'COMMON.GENERIC.UNAUTHORIZED'],
+    [403, 'MISSING_REQUIRED_PERMISSIONS'], [404, 'ACTIVITY_NOT_FOUND'],
+    [409, 'ACTIVITY_VERSION_CONFLICT'], [409, 'ACTIVITY_TERMINAL'],
+    [409, 'ACTIVITY_IDEMPOTENCY_IN_FLIGHT'], [422, 'ACTIVITY_IDEMPOTENCY_MISMATCH'],
+    [428, 'ACTIVITY_VERSION_REQUIRED'], [500, 'COMMON.GENERIC.INTERNAL_ERROR'],
+    [503, 'ACCESS_POLICY_UNAVAILABLE'], [503, 'ACTIVITY_TARGET_RESOLVER_UNAVAILABLE'],
+  ])('preserves command failure %s / %s without retry or fabricated success', async (status, errorCode) => {
+    const result = api.updateActivity('activity-1', 3, { subject: 'Changed' });
+    const details = { subject: ['Rejected by the service'] };
+    const rejection = expect(result).rejects.toMatchObject({
+      status, code: errorCode, details, correlationId: 'command-reference',
+    });
+    request('/activities/activity-1').flush({ errorCode, details, correlationId: 'command-reference' }, {
+      status, statusText: 'Error',
+    });
+    await rejection;
+    http.expectNone((req) => req.method !== 'GET');
+  });
+
+  it('preserves lifecycle command throttling and sends no automatic retry', async () => {
+    const result = api.completeActivity('activity-1', 3, 'Done');
+    const rejection = expect(result).rejects.toMatchObject({
+      status: 429, code: 'GW.RATE.LIMIT_EXCEEDED', details: { retryAfterSeconds: ['12'] },
+    });
+    request('/activities/activity-1/complete').flush({ code: 'GW.RATE.LIMIT_EXCEEDED' }, {
+      status: 429, statusText: 'Limited', headers: { 'Retry-After': '12' },
+    });
+    await rejection;
+    http.expectNone((req) => req.method !== 'GET');
+  });
 });
