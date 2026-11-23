@@ -84,7 +84,8 @@ export class LeadSelection extends RecordSelection<string> {
         .map((id) => this.rowsById.get(id))
         .filter((row): row is SelectedRow => !!row);
     }
-    const { items, truncated } = await selectLeads(all.body as LeadSearchBody, SELECTION_LIMIT);
+    const body = { ...all.body as LeadSearchBody, sort: all.sort };
+    const { items, truncated } = await selectLeads(body, SELECTION_LIMIT);
     if (truncated) {
       throw new ApiError(422, 'LEAD_SELECTION_TOO_LARGE');
     }

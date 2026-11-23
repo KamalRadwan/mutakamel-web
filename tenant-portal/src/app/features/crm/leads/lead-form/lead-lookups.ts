@@ -1,3 +1,6 @@
+import { readLeadFieldDefinitions } from '../lead-page/lead-record.api';
+import { listLeadStages as readStages } from '../../settings/lead-stages/lead-stages.api';
+import { listLeadSources as readSources } from '../../settings/lead-sources/lead-sources.api';
 import { Injectable, computed, resource, signal } from '@angular/core';
 import { ApiError } from '../../settings/shared/settings-api';
 import { listTags } from '../../settings/tags/tags.api';
@@ -7,9 +10,6 @@ import {
   listBranchOwners,
   listLeadBranches,
   listLeadCurrencies,
-  listLeadCustomFields,
-  listLeadSources,
-  listLeadStages,
 } from '../leads.api';
 import {
   BranchOption,
@@ -56,12 +56,10 @@ export class LeadLookups {
     loader: () => loadList(listLeadBranches),
   });
 
-  private readonly stagesResource = resource({
-    loader: () => loadList(listLeadStages),
-  });
+  private readonly stagesResource = resource({ loader: () => loadNullable(readStages) });
 
   private readonly sourcesResource = resource({
-    loader: () => loadNullable(listLeadSources),
+    loader: () => loadNullable(readSources),
   });
 
   private readonly tagsResource = resource({
@@ -73,7 +71,7 @@ export class LeadLookups {
   });
 
   private readonly customFieldsResource = resource({
-    loader: () => loadNullable(listLeadCustomFields),
+    loader: () => readLeadFieldDefinitions(),
   });
 
   private readonly capabilitiesResource = resource({
@@ -92,8 +90,12 @@ export class LeadLookups {
   );
 
   readonly allStages = computed<LeadStage[]>(() =>
-    this.stagesResource.hasValue() ? this.stagesResource.value() : [],
+    this.stagesResource.hasValue() ? this.stagesResource.value() ?? [] : [],
   );
+  readonly stagesDenied = computed(() => this.stagesResource.hasValue() && this.stagesResource.value() === null);
+  readonly saveBlocked = computed(() => this.stagesResource.isLoading() || this.customFieldsResource.isLoading()
+    || this.stagesDenied() || !!this.stagesResource.error() || !!this.customFieldsResource.error()
+    || this.customFields() === null);
 
   readonly stages = computed<LeadStage[]>(() =>
     this.allStages().filter((stage) => stage.isActive && stage.flag !== 'DISQUALIFIED' && stage.flag !== 'CONVERTED'),

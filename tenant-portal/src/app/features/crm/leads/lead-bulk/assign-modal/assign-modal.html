@@ -14,11 +14,21 @@
   (cancel)="closeOwnerMenu()"
   (closed)="onModalClosed()"
 >
+  @if (loadError(); as failure) {
+    <ui-full-state
+      [kind]="failure.kind"
+      [title]="failure.message"
+      [text]="failure.correlationId ? ('leadBulk.reference' | transloco: { id: failure.correlationId }) : ''"
+      [actionLabel]="'leadBulk.retry' | transloco"
+      (action)="retryLoad()"
+    />
+  } @else {
+    <fieldset class="contents" [disabled]="submitKey.blocked()">
   <ui-field
     size="bare"
     [label]="'leadBulk.assign.owner' | transloco"
     [for]="uid + '-owner'"
-    [hint]="'leadBulk.assign.ownerHint' | transloco"
+    [hint]="(ownersForbidden() ? 'leadBulk.catalogueUnavailable' : 'leadBulk.assign.ownerHint') | transloco"
     [required]="true"
     [error]="ownerFieldError()"
   >
@@ -141,4 +151,6 @@
   <p class="text-12 leading-18 text-text-muted">
     {{ 'leadBulk.assign.preview' | transloco: previewParams() }}
   </p>
+    </fieldset>
+  }
 </app-bulk-run-modal>

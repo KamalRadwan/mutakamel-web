@@ -1,25 +1,28 @@
-import { Component, computed, inject, input, linkedSignal, output, resource, signal, viewChild } from '@angular/core';
+import { Component, effect, computed, inject, input, linkedSignal, output, resource, signal, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../core/i18n/translation-events';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
 import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { ApiError } from '../../settings/shared/settings-api';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
+import { ConflictDialog } from '../../../../shared/ui/conflict-dialog/conflict-dialog';
+import { Button } from '../../../../shared/ui/button/button';
+import { leadErrorState, leadWriteState } from '../lead-list';
 import { RecordBoard } from '../../shared/record/board/record-board';
 import { BoardLabels, BoardLane, BoardMoveEvent } from '../../shared/record/board/record-board.model';
 import { LeadCard } from '../lead-card/lead-card';
 import { LeadDisqualify } from '../lead-disqualify/lead-disqualify';
 import { LeadSearchBody } from '../lead-search/lead-search.compile';
-import { deleteLead, loadBoard, loadStagePage, moveLead, updateLead } from '../leads.api';
+import { deleteLead, loadBoard, loadStagePage, moveLead, searchLeads, updateLead } from '../leads.api';
 import {
   BoardLane as LeadBoardLane,
   CardColor,
   DueBucket,
-  LeadMoveError,
+  LeadsCapabilities,
   LeadNavContext,
   LeadRow,
   LeadStage,
-  canMove,
   dueCounts,
   nameIn,
 } from '../leads.model';
@@ -35,7 +38,7 @@ const COLLAPSED_KEY = 'crm.leads.board.collapsed';
 
 @Component({
   selector: 'app-lead-board',
-  imports: [TranslocoPipe, ConfirmDialog, LeadCard, LeadDisqualify, RecordBoard],
+  imports: [TranslocoPipe, ConfirmDialog, ConflictDialog, FullState, Button, LeadCard, LeadDisqualify, RecordBoard],
   templateUrl: './lead-board.html',
   host: { class: 'flex shrink-0 flex-col' },
 })
@@ -49,17 +52,22 @@ export class LeadBoard {
   protected readonly language = inject(LanguageState).current;
 
   readonly body = input.required<LeadSearchBody>();
+  readonly capabilities = input<LeadsCapabilities | null>(null);
+  readonly writeBlocked = output<void>();
   readonly create = output<string>();
   readonly view = output<LeadRow>();
   readonly activities = output<LeadRow>();
+  readonly countsChanged = output<void>();
 
   private lastLanes: LeadBoardLane[] | undefined;
+  private lastBranch = '';
   private readonly board = resource({
-    params: () => this.body(),
+    params: () => this.body().branchId ? this.body() : undefined,
     loader: async ({ params }) => {
+      if (this.lastBranch !== params.branchId) { this.lastLanes = undefined; this.lastBranch = params.branchId; }
       try {
         const { stages } = await loadBoard(params);
-        this.lastLanes = stages;
+        if (params.branchId === this.body().branchId) this.lastLanes = stages;
         return stages;
       } catch (error) {
         if (error instanceof ApiError && error.status === 400) {
@@ -71,19 +79,25 @@ export class LeadBoard {
     },
   });
 
-  protected readonly lanes = linkedSignal<LeadBoardLane[] | undefined, LeadBoardLane[]>({
-    source: () => this.board.value(),
-    computation: (value, previous) => value ?? previous?.value ?? [],
+  protected readonly lanes = linkedSignal({
+    source: () => ({ value: this.board.value(), branchId: this.body().branchId }),
+    computation: ({ value, branchId }, previous): LeadBoardLane[] => value
+      ?? (previous?.source.branchId === branchId ? previous.value : []),
   });
+  protected readonly writes = leadWriteState(this.capabilities, () => this.refresh(),
+    async (id) => (await searchLeads({ branchId: this.body().branchId, filterTree: { field: 'id', operator: 'eq', value: id } }, 1, 1)).items[0],
+    (row) => this.patchItem(row));
   protected readonly stages = computed(() => this.lanes().map((lane) => lane.stage));
   protected readonly openCards = signal<Record<string, string>>({});
   protected readonly loadingMore = signal<string | null>(null);
+  protected readonly laneErrors = signal<Record<string, boolean>>({});
   protected readonly deletingName = signal('');
   protected readonly loading = this.board.isLoading;
   protected readonly failed = computed(() => !!this.board.error());
+  protected readonly errorState = computed(() => leadErrorState(this.transloco, this.board.error()));
   protected readonly collapseStorageKey = COLLAPSED_KEY;
   protected readonly leadId = (lead: LeadRow) => lead.id;
-  protected readonly canDragLead = (lead: LeadRow) => canMove(lead);
+  protected readonly canDragLead = (lead: LeadRow) => this.writes.canUpdate(lead);
 
   protected readonly boardLanes = computed<BoardLane<LeadRow>[]>(() => {
     this.i18n();
@@ -102,7 +116,7 @@ export class LeadBoard {
         items: lane.items,
         hasNext: lane.hasNext,
         loading: loadingStageId === lane.stage.id,
-        canCreate: true,
+        canCreate: false,
         dropRule,
         ...(dropRule === 'deny'
           ? { denyReason: this.transloco.translate('leads.move.convertRequired', { stage: label }) }
@@ -126,6 +140,10 @@ export class LeadBoard {
       allShown: this.transloco.translate('leads.board.allShown'),
     };
   });
+
+  constructor() {
+    effect(() => { if (this.writes.readOnly()) this.writeBlocked.emit(); });
+  }
 
   refresh(): void {
     this.board.reload();
@@ -216,6 +234,8 @@ export class LeadBoard {
   }
 
   protected async loadMore(lane: LeadBoardLane) {
+    if (this.loadingMore()) return;
+    this.laneErrors.update((errors) => ({ ...errors, [lane.stage.id]: false }));
     this.loadingMore.set(lane.stage.id);
     try {
       const next = await loadStagePage(lane.stage.id, this.body(), lane.page + 1);
@@ -223,6 +243,11 @@ export class LeadBoard {
         lanes.map((item) => (item.stage.id === lane.stage.id ? { ...next, items: [...item.items, ...next.items] } : item)),
       );
     } catch (error) {
+      if (error instanceof ApiError && error.code === 'LEAD_STAGE_NOT_FOUND') {
+        this.refresh();
+        return;
+      }
+      this.laneErrors.update((errors) => ({ ...errors, [lane.stage.id]: true }));
       const key = error instanceof ApiError && error.status === 400 ? 'leads.search.invalid' : 'leads.loadFailed';
       this.notify.error(this.transloco.translate(key));
     } finally {
@@ -231,6 +256,7 @@ export class LeadBoard {
   }
 
   async rate(lead: LeadRow, rating: number) {
+    if (!this.writes.canUpdate(lead)) return;
     const before = this.lanes();
     this.lanes.update((lanes) =>
       lanes.map((lane) => ({
@@ -246,13 +272,15 @@ export class LeadBoard {
           items: lane.items.map((item) => (item.id === lead.id ? saved : item)),
         })),
       );
-    } catch {
+      this.countsChanged.emit();
+    } catch (error) {
       this.lanes.set(before);
-      this.notify.error(this.transloco.translate('leads.rate.failed'));
+      await this.writes.failure(error, 'leads.rate.failed', { lead, changes: { rating } });
     }
   }
 
   async recolor(lead: LeadRow, cardColor: CardColor | null) {
+    if (!this.writes.canUpdate(lead)) return;
     const before = this.lanes();
     this.lanes.update((lanes) =>
       lanes.map((lane) => ({
@@ -268,13 +296,14 @@ export class LeadBoard {
           items: lane.items.map((item) => (item.id === lead.id ? saved : item)),
         })),
       );
-    } catch {
+    } catch (error) {
       this.lanes.set(before);
-      this.notify.error(this.transloco.translate('leads.color.failed'));
+      await this.writes.failure(error, 'leads.color.failed', { lead, changes: { cardColor } });
     }
   }
 
   async remove(lead: LeadRow) {
+    if (!this.writes.canDelete(lead)) return;
     this.deletingName.set(lead.displayName);
     if (!(await this.confirmDialog().open())) return;
     const before = this.lanes();
@@ -287,10 +316,11 @@ export class LeadBoard {
     );
     try {
       await deleteLead(lead.id);
+      this.countsChanged.emit();
       this.notify.success(this.transloco.translate('leads.delete.done'));
-    } catch {
+    } catch (error) {
       this.lanes.set(before);
-      this.notify.error(this.transloco.translate('leads.delete.failed'));
+      await this.writes.failure(error, 'leads.delete.failed');
     }
   }
 
@@ -310,6 +340,10 @@ export class LeadBoard {
       return;
     }
     const lead = from.items.find((item) => item.id === leadId)!;
+    if (!this.writes.canUpdate(lead)) {
+      this.recordBoard().revert(leadId);
+      return;
+    }
     if (to.stage.flag === 'DISQUALIFIED') {
       await this.disqualify(lead, to.stage, stage);
       return;
@@ -326,13 +360,13 @@ export class LeadBoard {
 
     try {
       const saved = await moveLead(leadId, toStageId);
+      this.countsChanged.emit();
       this.lanes.update((lanes) => lanes.map((lane) => ({ ...lane, items: lane.items.map((item) => (item.id === leadId ? saved : item)) })));
       this.notify.success(this.transloco.translate('leads.move.done', { stage }));
     } catch (error) {
       this.lanes.set(before);
       this.recordBoard().revert(leadId);
-      const code = error instanceof LeadMoveError ? error.code : null;
-      this.notify.error(this.transloco.translate(code ? 'leads.move.errors.' + code : 'leads.move.failed', { stage }));
+      await this.writes.failure(error, 'leads.move.failed');
     }
   }
 
@@ -345,12 +379,12 @@ export class LeadBoard {
     try {
       const saved = await this.disqualifyDialog().open(lead, to);
       if (saved) {
+        this.countsChanged.emit();
         this.patchItem(saved);
         this.notify.success(this.transloco.translate('leads.move.done', { stage }));
       }
     } catch (error) {
-      const code = error instanceof LeadMoveError ? error.code : null;
-      this.notify.error(this.transloco.translate(code ? 'leads.move.errors.' + code : 'leads.move.failed', { stage }));
+      await this.writes.failure(error, 'leads.move.failed');
     }
   }
 }

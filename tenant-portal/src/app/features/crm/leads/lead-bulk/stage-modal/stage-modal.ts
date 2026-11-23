@@ -20,11 +20,12 @@ import { Notify } from '../../../../../core/notify/notify';
 import { BulkJobsTracker } from '../../../../../shared/bulk-jobs/bulk-jobs-tracker';
 import { BulkJobSelection, BulkJobSubmit } from '../../../../../shared/bulk-jobs/bulk-jobs.model';
 import { Dropdown, DropdownOption } from '../../../../../shared/ui/dropdown/dropdown';
+import { FullState } from '../../../../../shared/ui/full-state/full-state';
 import { Field } from '../../../../../shared/ui/field/field';
 import { rectInPage, viewport } from '../../../../../shared/ui/overlay/zoom';
 import { BulkRunModal } from '../../../shared/record/bulk/bulk-run-modal/bulk-run-modal';
 import { ApiError, errorCodeOf } from '../../../settings/shared/settings-api';
-import { LeadBulkSubmitKey, leadBulkErrorParams, selectionBranchMismatch } from '../lead-bulk-submit';
+import { LeadBulkSubmitKey, leadBulkErrorMessage, leadBulkLoadError, leadBulkPrecheck, leadBulkValidationFields } from '../lead-bulk-submit';
 import { listLeadStages } from '../../leads.api';
 import { LeadStage, nameIn } from '../../leads.model';
 import { listDisqualificationReasons } from '../lead-bulk.api';
@@ -47,7 +48,7 @@ interface MenuPlace {
 
 @Component({
   selector: 'app-bulk-stage-modal',
-  imports: [NgIcon, TranslocoPipe, BulkRunModal, Dropdown, Field],
+  imports: [FullState, NgIcon, TranslocoPipe, BulkRunModal, Dropdown, Field],
   providers: [
     provideTranslocoScope('leads', { scope: 'record-related', alias: 'recordRelated' }, { scope: 'lead-bulk-actions', alias: 'leadBulk' }),
     provideIcons({ tablerArrowsExchange, tablerChevronDown, tablerCheck }),
@@ -82,13 +83,17 @@ export class BulkStageModal {
   protected readonly rows = signal<SelectedRow[]>([]);
   protected readonly resolving = signal(false);
   protected readonly submitting = signal(false);
+  protected readonly loadError = signal<ReturnType<typeof leadBulkLoadError> | null>(null);
   protected readonly fallbackStages = signal<LeadStage[]>([]);
   protected readonly reasons = signal<DisqualificationReason[]>([]);
   protected readonly reasonsLoading = signal(false);
+  protected readonly reasonsForbidden = signal(false);
+  protected readonly stagesForbidden = signal(false);
+  protected readonly serverStageError = signal<string | null>(null);
   protected readonly selectedStageId = signal('');
   protected readonly selectedReasonId = signal('');
   protected readonly serverReasonError = signal<string | null>(null);
-  private readonly submitKey = new LeadBulkSubmitKey();
+  protected readonly submitKey = new LeadBulkSubmitKey();
   protected readonly stageMenuOpen = signal(false);
   protected readonly stageMenuPlaced = signal(false);
   protected readonly stageMenuPlace = signal<MenuPlace>({ top: 0, start: 0, width: 0, maxHeight: null });
@@ -147,11 +152,11 @@ export class BulkStageModal {
   });
 
   protected readonly canSubmit = computed(() => {
-    if (this.submitting() || this.resolving() || !this.selectedStage() || this.actionableRows().length === 0) {
+    if (this.loadError() || this.submitKey.blocked() || this.stagesForbidden() || this.submitting() || this.resolving() || !this.selectedStage() || this.actionableRows().length === 0) {
       return false;
     }
     if (this.isDisqualified()) {
-      return !this.reasonsLoading() && !!this.selectedReasonId();
+      return !this.reasonsLoading() && this.reasons().some((reason) => reason.id === this.selectedReasonId());
     }
     return true;
   });
@@ -205,6 +210,7 @@ export class BulkStageModal {
 
   protected selectStage(stageId: string): void {
     this.selectedStageId.set(stageId);
+    this.serverStageError.set(null);
     this.serverReasonError.set(null);
     this.closeStageMenu();
     this.stageTrigger()?.nativeElement.focus();
@@ -275,6 +281,14 @@ export class BulkStageModal {
     this.serverReasonError.set(null);
   }
 
+  protected async retryLoad(): Promise<void> {
+    const seq = ++this.openSeq;
+    this.loadError.set(null);
+    this.resolving.set(true);
+    await Promise.all([this.ensureStages(seq), this.loadReasons(seq), this.resolveRows(seq, this.selection?.count() ? undefined : this.rows())]);
+    if (seq === this.openSeq) this.resolving.set(false);
+  }
+
   protected async submit(): Promise<void> {
     if (!this.canSubmit()) return;
     const stage = this.selectedStage();
@@ -284,6 +298,11 @@ export class BulkStageModal {
       this.selection && this.selection.count() > 0
         ? this.selection.snapshot()
         : { kind: 'IDS', ids: this.rows().map((row) => row.id) };
+    const precheck = leadBulkPrecheck(selection, this.branchId());
+    if (precheck) {
+      this.notify.error(this.transloco.translate(`leadBulk.codes.${precheck}`));
+      return;
+    }
     const body: BulkJobSubmit = {
       module: 'crm.leads',
       action: 'MOVE_STAGE',
@@ -300,7 +319,8 @@ export class BulkStageModal {
       this.close();
       this.submitted.emit(res.jobId);
     } catch (error) {
-      this.handleSubmitError(error, selectionBranchMismatch(selection, this.branchId()));
+      this.submitKey.failed(error);
+      this.handleSubmitError(error);
     } finally {
       this.submitting.set(false);
     }
@@ -308,11 +328,13 @@ export class BulkStageModal {
 
   private async initOpen(rows?: SelectedRow[]): Promise<void> {
     const seq = ++this.openSeq;
+    this.loadError.set(null);
     this.submitKey.reset();
     this.closeStageMenu();
     this.submitting.set(false);
     this.serverReasonError.set(null);
     this.rows.set(rows ?? []);
+    this.serverStageError.set(null);
     this.selectedStageId.set(this.selectableStages()[0]?.id ?? '');
     this.selectedReasonId.set('');
     this.modal().open();
@@ -321,6 +343,7 @@ export class BulkStageModal {
   }
 
   private async ensureStages(seq: number): Promise<void> {
+    this.stagesForbidden.set(false);
     if (this.stages().length > 0) {
       if (!this.selectedStageId()) {
         this.selectedStageId.set(this.selectableStages()[0]?.id ?? '');
@@ -334,20 +357,25 @@ export class BulkStageModal {
       if (!this.selectedStageId()) {
         this.selectedStageId.set(this.selectableStages()[0]?.id ?? '');
       }
-    } catch {
-      // Keep empty list if fallback stage fetch fails.
+    } catch (error) {
+      if (seq !== this.openSeq) return;
+      if (error instanceof ApiError && error.status === 403) this.stagesForbidden.set(true);
+      else this.loadError.set(leadBulkLoadError(this.transloco, error));
     }
   }
 
   private async loadReasons(seq: number): Promise<void> {
     this.reasonsLoading.set(true);
+    this.reasonsForbidden.set(false);
     try {
       const list = await listDisqualificationReasons();
       if (seq !== this.openSeq) return;
       this.reasons.set(list);
       this.selectedReasonId.set(list[0]?.id ?? '');
-    } catch {
+    } catch (error) {
       if (seq !== this.openSeq) return;
+      if (error instanceof ApiError && error.status === 403) this.reasonsForbidden.set(true);
+      else this.loadError.set(leadBulkLoadError(this.transloco, error));
       this.reasons.set([]);
     } finally {
       if (seq === this.openSeq) {
@@ -374,8 +402,7 @@ export class BulkStageModal {
       this.rows.set(resolved);
     } catch (error) {
       if (seq !== this.openSeq) return;
-      this.showResolveError(error);
-      this.close();
+      this.loadError.set(leadBulkLoadError(this.transloco, error));
     } finally {
       if (seq === this.openSeq) {
         this.resolving.set(false);
@@ -383,36 +410,26 @@ export class BulkStageModal {
     }
   }
 
-  private handleSubmitError(error: unknown, branchMismatch: boolean): void {
+  private handleSubmitError(error: unknown): void {
     const code = errorCodeOf(error);
     if (code === 'BULK_JOB_ACTIVE') return;
-    if (code === 'CRM_REASON_REQUIRED') {
-      this.serverReasonError.set(this.translateCode(code));
+    this.closeStageMenu();
+    const fields = leadBulkValidationFields(error);
+    if (fields.includes('reasonId') || fields.includes('stageId')) {
+      (fields.includes('reasonId') ? this.serverReasonError : this.serverStageError).set(this.transloco.translate('leadBulk.invalidValue'));
       return;
     }
-    if (code === 'CRM_SCOPED_PERMISSION_DENIED' && branchMismatch) {
-      this.notify.error(this.transloco.translate('leadBulk.codes.BRANCH_SCOPE_MISMATCH'));
+    if (code === 'CRM_REASON_REQUIRED') {
+      this.serverReasonError.set(this.translateCode(code));
       return;
     }
     this.notify.error(this.translateCode(code, error));
   }
 
   private translateCode(code: string | null, error?: unknown): string {
-    if (code) {
-      for (const prefix of ['leadBulk.codes.', 'bulkJobs.codes.']) {
-        const key = `${prefix}${code}`;
-        const translated = this.transloco.translate(key, leadBulkErrorParams(error));
-        if (translated !== key) return translated;
-      }
-    }
-    return this.transloco.translate('leadBulk.codes.generic');
+    return leadBulkErrorMessage(this.transloco, error ?? (code ? new ApiError(422, code) : null));
   }
 
-  private showResolveError(error: unknown): void {
-    this.i18n();
-    const code = error instanceof ApiError ? error.code : errorCodeOf(error);
-    this.notify.error(this.translateCode(code, error));
-  }
 
   private initialMenuPlace(trigger: HTMLElement): MenuPlace {
     const rect = rectInPage(trigger);

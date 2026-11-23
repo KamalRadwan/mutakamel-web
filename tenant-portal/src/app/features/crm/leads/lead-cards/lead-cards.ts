@@ -1,6 +1,8 @@
 import { Component, ElementRef, computed, effect, inject, input, linkedSignal, model, output, signal, untracked, viewChild } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
+import { ConflictDialog } from '../../../../shared/ui/conflict-dialog/conflict-dialog';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { Pagination } from '../../../../shared/ui/pagination/pagination';
 import { DEFAULT_LIST_PAGE_SIZE, createListPageSize } from '../../shared/record/list/page-size';
 import { listPageSizes } from '../lead-bulk/lead-bulk.api';
@@ -9,11 +11,11 @@ import { LeadCard } from '../lead-card/lead-card';
 import { LeadDisqualify } from '../lead-disqualify/lead-disqualify';
 import { leadList } from '../lead-list';
 import { LeadSearchBody } from '../lead-search/lead-search.compile';
-import { LeadNavContext, LeadRow, LeadStage } from '../leads.model';
+import { LeadNavContext, LeadRow, LeadStage, LeadsCapabilities } from '../leads.model';
 
 @Component({
   selector: 'app-lead-cards',
-  imports: [TranslocoPipe, ConfirmDialog, Pagination, LeadCard, LeadDisqualify],
+  imports: [TranslocoPipe, ConfirmDialog, ConflictDialog, FullState, Pagination, LeadCard, LeadDisqualify],
   templateUrl: './lead-cards.html',
   host: { class: 'flex flex-1 shrink-0 flex-col gap-8' },
 })
@@ -23,6 +25,8 @@ export class LeadCards {
   private readonly disqualifyDialog = viewChild(LeadDisqualify);
 
   readonly body = input.required<LeadSearchBody>();
+  readonly capabilities = input<LeadsCapabilities | null>(null);
+  readonly writeBlocked = output<void>();
   readonly stages = input.required<LeadStage[]>();
   readonly stage = input('all');
   readonly page = model(1);
@@ -55,6 +59,7 @@ export class LeadCards {
     (nextPage) => this.page.set(nextPage),
     () => this.countsChanged.emit(),
     this.disqualifyDialog,
+    this.capabilities,
   );
 
   private readonly patches = linkedSignal({
@@ -103,6 +108,7 @@ export class LeadCards {
   protected readonly deletingName = signal('');
 
   constructor() {
+    effect(() => { if (this.list.writes.readOnly()) this.writeBlocked.emit(); });
     let lastPage = this.page();
     effect(() => {
       const current = this.page();

@@ -14,11 +14,22 @@
   (cancel)="closeStageMenu()"
   (closed)="onModalClosed()"
 >
+  @if (loadError(); as failure) {
+    <ui-full-state
+      [kind]="failure.kind"
+      [title]="failure.message"
+      [text]="failure.correlationId ? ('leadBulk.reference' | transloco: { id: failure.correlationId }) : ''"
+      [actionLabel]="'leadBulk.retry' | transloco"
+      (action)="retryLoad()"
+    />
+  } @else {
+    <fieldset class="contents" [disabled]="submitKey.blocked()">
   <ui-field
     size="bare"
     [label]="'leadBulk.stage.stage' | transloco"
     [for]="uid + '-stage'"
-    [hint]="'leadBulk.stage.stageHint' | transloco"
+    [hint]="(stagesForbidden() ? 'leadBulk.catalogueUnavailable' : 'leadBulk.stage.stageHint') | transloco"
+    [error]="serverStageError()"
     [required]="true"
   >
     <div class="relative inline-flex w-full">
@@ -36,7 +47,7 @@
         [attr.aria-expanded]="stageMenuOpen()"
         [attr.aria-label]="'leadBulk.stage.stage' | transloco"
         [attr.aria-describedby]="uid + '-stage-hint'"
-        [disabled]="selectableStages().length === 0"
+        [disabled]="stagesForbidden() || selectableStages().length === 0"
         (click)="toggleStageMenu()"
       >
         <span class="flex min-w-0 items-center gap-6">
@@ -109,7 +120,7 @@
       size="bare"
       [label]="'leadBulk.stage.reason' | transloco"
       [for]="uid + '-reason'"
-      [hint]="'leadBulk.stage.reasonHint' | transloco"
+      [hint]="(reasonsForbidden() ? 'leadBulk.catalogueUnavailable' : 'leadBulk.stage.reasonHint') | transloco"
       [required]="true"
       [error]="serverReasonError()"
     >
@@ -134,4 +145,6 @@
   <p class="text-12 leading-18 text-text-muted">
     {{ 'leadBulk.stage.preview' | transloco: previewParams() }}
   </p>
+    </fieldset>
+  }
 </app-bulk-run-modal>

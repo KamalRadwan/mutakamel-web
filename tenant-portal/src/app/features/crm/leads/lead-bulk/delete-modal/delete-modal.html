@@ -16,6 +16,16 @@
   (submit)="submit()"
   (closed)="onModalClosed()"
 >
+  @if (loadError(); as failure) {
+    <ui-full-state
+      [kind]="failure.kind"
+      [title]="failure.message"
+      [text]="failure.correlationId ? ('leadBulk.reference' | transloco: { id: failure.correlationId }) : ''"
+      [actionLabel]="'leadBulk.retry' | transloco"
+      (action)="retryLoad()"
+    />
+  } @else {
+    <fieldset class="contents" [disabled]="submitKey.blocked()">
   <p class="text-12 leading-18 text-text">
     {{ 'leadBulk.delete.text' | transloco: { n: rows().length } }}
   </p>
@@ -31,6 +41,7 @@
     [label]="'leadBulk.delete.reason' | transloco"
     [for]="uid + '-reason'"
     [hint]="'leadBulk.delete.reasonHint' | transloco"
+    [error]="reasonError()"
     [count]="reasonLength()"
     [max]="maxReasonLength"
   >
@@ -43,4 +54,6 @@
       (input)="onReasonInput($event)"
     ></textarea>
   </ui-field>
+    </fieldset>
+  }
 </app-bulk-run-modal>

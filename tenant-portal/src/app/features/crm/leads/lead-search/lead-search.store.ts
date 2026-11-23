@@ -1,4 +1,4 @@
-import { DestroyRef, Injectable, WritableSignal, inject, signal } from '@angular/core';
+import { DestroyRef, Injectable, WritableSignal, inject, signal, resource } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   ActivatedRoute,
@@ -18,6 +18,8 @@ import { RecordSearchStore } from '../../shared/record/search/record-search-stor
 import { defaultLeadQuery, emptyLeadQuery, facetsToQuery, queryToFacets } from './lead-search.chips';
 import { LeadSearchBody, compileLeadQuery } from './lead-search.compile';
 import { leadSearchFields } from './lead-search.fields';
+import { settingsTimeZone } from '../../settings/shared/settings-time-zone';
+import { runInCrm } from '../../shared/crm-runtime';
 
 export const PARTY_FACET_FIELD = 'partyId';
 
@@ -73,6 +75,8 @@ export class LeadSearchStore extends RecordSearchStore<LeadSearchInitContext, Le
     const loadedOwners = signal<FieldOption[]>([]);
     const partyFilter = signal<PartyFilter | null>(readPartyFilter(route?.snapshot.queryParamMap));
     const branchId = signal('');
+    const zone = resource({ params: () => branchId() || undefined,
+      loader: () => runInCrm(() => settingsTimeZone()).catch(() => null) });
 
     super({
       fields: (ctx, { language, t }) =>
@@ -81,6 +85,7 @@ export class LeadSearchStore extends RecordSearchStore<LeadSearchInitContext, Le
           ownerOptions: loadedOwners(),
           language,
           t,
+          timeZone: zone.value() ?? null,
         }),
       compile: (query, _ctx, { currentUserId, timeZone }) => {
         const compiled = compileLeadQuery(query, {
@@ -132,7 +137,7 @@ export class LeadSearchStore extends RecordSearchStore<LeadSearchInitContext, Le
       },
       rejectedKeyPrefix: 'leadSearch.rejected.',
       currentUserId: () => currentUser?.userId() ?? '',
-      timeZone: () => currentUser?.timeZone() ?? '',
+      timeZone: () => zone.value() ?? 'UTC',
       initialCtx: {
         stages: [],
         sources: [],
@@ -195,6 +200,7 @@ export class LeadSearchStore extends RecordSearchStore<LeadSearchInitContext, Le
   }
 
   override init(ctx: LeadSearchInitContext): void {
+    if (ctx.branchId !== undefined && ctx.branchId !== this.branchId()) this.loadedOwners.set([]);
     if (ctx.branchId !== undefined) this.branchId.set(ctx.branchId.trim());
     const seq = ++this.ownersLoadSeq;
     const cacheOwners = (list: FieldOption[]) => {

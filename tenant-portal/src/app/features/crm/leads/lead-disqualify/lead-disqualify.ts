@@ -1,4 +1,4 @@
-import { Component, ElementRef, Injector, afterNextRender, computed, inject, signal, viewChild } from '@angular/core';
+import { Component, ElementRef, Injector, afterNextRender, computed, inject, output, signal, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../core/i18n/translation-events';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { provideIcons } from '@ng-icons/core';
@@ -8,9 +8,12 @@ import { Button } from '../../../../shared/ui/button/button';
 import { Dropdown, DropdownOption } from '../../../../shared/ui/dropdown/dropdown';
 import { Field } from '../../../../shared/ui/field/field';
 import { Modal } from '../../../../shared/ui/modal/modal';
-import { listDisqualificationReasons } from '../lead-bulk/lead-bulk.api';
+import { listReasons } from '../../settings/reasons/reasons.api';
+import { ApiError } from '../../settings/shared/settings-api';
+import { leadErrorState } from '../lead-list';
+import { Notify } from '../../../../core/notify/notify';
 import { moveLead } from '../leads.api';
-import { LeadDetail, LeadMoveError, LeadStage, MoveErrorCode, nameIn } from '../leads.model';
+import { LeadDetail, LeadStage, MoveErrorCode, nameIn } from '../leads.model';
 
 interface Reason {
   id: string;
@@ -30,7 +33,7 @@ interface Request {
 const REASON_ERRORS: readonly MoveErrorCode[] = ['CRM_REASON_REQUIRED', 'CRM_REASON_UNAVAILABLE', 'CRM_REASON_KIND_MISMATCH'];
 
 export function reasonErrorCode(error: unknown): MoveErrorCode | null {
-  return error instanceof LeadMoveError && REASON_ERRORS.includes(error.code) ? error.code : null;
+  return error instanceof ApiError && REASON_ERRORS.includes(error.code as MoveErrorCode) ? error.code as MoveErrorCode : null;
 }
 
 /**
@@ -45,10 +48,13 @@ export function reasonErrorCode(error: unknown): MoveErrorCode | null {
   host: { class: 'contents' },
 })
 export class LeadDisqualify {
+  readonly writeBlocked = output<void>();
+  protected readonly readOnly = signal(false);
   private static nextId = 0;
   protected readonly reasonId = `lead-disqualify-${++LeadDisqualify.nextId}-reason`;
 
   private readonly transloco = inject(TranslocoService);
+  private readonly notify = inject(Notify);
   private readonly i18n = translationEvents(this.transloco);
   private readonly language = inject(LanguageState).current;
   private readonly modal = viewChild.required(Modal);
@@ -60,6 +66,7 @@ export class LeadDisqualify {
   protected readonly request = signal<Request | null>(null);
   protected readonly reasons = signal<Reason[]>([]);
   protected readonly reasonsLoading = signal(false);
+  protected readonly reasonsUnavailable = signal(false);
   protected readonly selectedReasonId = signal('');
   protected readonly submitting = signal(false);
   protected readonly errorCode = signal<MoveErrorCode | null>(null);
@@ -106,6 +113,7 @@ export class LeadDisqualify {
       this.selectedReasonId.set('');
       this.errorCode.set(null);
       this.submitting.set(false);
+      this.readOnly.set(false);
       this.modal().open();
       this.focusStart().nativeElement.focus();
       this.focusReasonPending = true;
@@ -120,7 +128,7 @@ export class LeadDisqualify {
 
   protected async confirm(): Promise<void> {
     const req = this.request();
-    if (!req || this.submitting() || this.reasonsLoading()) return;
+    if (!req || this.readOnly() || this.submitting() || this.reasonsLoading() || this.reasonsUnavailable() || this.noReasons()) return;
     const reasonId = this.selectedReasonId();
     if (!reasonId) {
       this.errorCode.set('CRM_REASON_REQUIRED');
@@ -134,7 +142,13 @@ export class LeadDisqualify {
     } catch (error) {
       const code = reasonErrorCode(error);
       if (!code) {
-        this.finish(req, () => req.reject(error));
+        if (error instanceof ApiError && (error.status === 404 || error.code === 'LEAD_ALREADY_CONVERTED')) {
+          this.finish(req, () => req.reject(error));
+          return;
+        }
+        const mapped = leadErrorState(this.transloco, error);
+        if (mapped.readOnly) { this.readOnly.set(true); this.writeBlocked.emit(); }
+        this.notify.error(error instanceof ApiError && error.status === 401 ? this.transloco.translate('leads.notSaved') : mapped.message);
         return;
       }
       if (this.request() !== req) return;
@@ -171,11 +185,13 @@ export class LeadDisqualify {
   private async loadReasons(): Promise<void> {
     const seq = ++this.loadSeq;
     this.reasonsLoading.set(true);
+    this.reasonsUnavailable.set(false);
+    this.reasons.set([]);
     try {
-      const list = await listDisqualificationReasons();
-      if (seq === this.loadSeq) this.reasons.set(list);
+      const list = await listReasons({ kind: 'DISQUALIFICATION', active: 'true' });
+      if (seq === this.loadSeq) this.reasons.set(list.items);
     } catch {
-      if (seq === this.loadSeq) this.reasons.set([]);
+      if (seq === this.loadSeq) this.reasonsUnavailable.set(true);
     } finally {
       if (seq === this.loadSeq) {
         this.reasonsLoading.set(false);

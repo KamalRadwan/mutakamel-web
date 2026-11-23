@@ -46,26 +46,20 @@ export class BulkMenu {
     const explicit = this.canUpdate();
     if (explicit !== null) return explicit;
     const caps = this.capabilities();
-    return caps ? caps.update !== null : true;
+    return !!caps && caps.update !== null;
   });
 
   private readonly allowDelete = computed(() => {
     const explicit = this.canDelete();
     if (explicit !== null) return explicit;
     const caps = this.capabilities();
-    return caps ? caps.delete !== null : true;
+    return !!caps && caps.delete !== null;
   });
 
   private readonly allowActivity = computed(() => {
     const explicit = this.canCreateActivity();
     if (explicit !== null) return explicit;
-    const caps = this.capabilities() as
-      (LeadCapabilities & { activity?: unknown; createActivity?: unknown }) | null;
-    if (!caps) return true;
-    if ('activity' in caps) return caps.activity !== null && caps.activity !== false;
-    if ('createActivity' in caps)
-      return caps.createActivity !== null && caps.createActivity !== false;
-    return caps.update !== null || caps.create !== null;
+    return false;
   });
 
   protected readonly actions = computed<RecordBulkAction[]>(() => {

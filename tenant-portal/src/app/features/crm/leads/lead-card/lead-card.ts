@@ -49,6 +49,8 @@ export class LeadCard {
   readonly lead = input.required<LeadRow>();
   readonly stages = input.required<LeadStage[]>();
   readonly detailed = input(false);
+  readonly editable = input(false);
+  readonly deletable = input(false);
   readonly expanded = model(false);
   readonly moveTo = output<string>();
   readonly rate = output<number>();
@@ -71,7 +73,7 @@ export class LeadCard {
   protected readonly cardTypeTile = computed(() => (this.isCorporate() ? 'bg-icon-navy' : 'bg-icon-blue'));
   protected readonly cardOwner = computed<RecordCardOwner | null>(() => {
     const name = ownerName(this.lead());
-    return name ? { name, avatarUrl: null } : null;
+    return name ? { name, avatarUrl: this.lead().owner?.avatarUrl ?? null } : null;
   });
   protected readonly stage = computed(() => this.stages().find((stage) => stage.id === this.lead().stageId));
   protected readonly stageName = computed(() => (this.stage() ? nameIn(this.stage()!, this.language()) : ''));
@@ -85,7 +87,7 @@ export class LeadCard {
 
   protected readonly actions = computed(() => {
     this.i18n();
-    return leadActions(this.lead(), this.stages(), this.language(), (key, params) => this.transloco.translate(key, params));
+    return leadActions(this.lead(), this.stages(), this.language(), (key, params) => this.transloco.translate(key, params), this.editable(), this.deletable());
   });
 
   protected act(selection: ActionSelection) {
@@ -118,6 +120,8 @@ export function leadActions(
   stages: LeadStage[],
   language: string,
   translate: (key: string, params?: Record<string, string>) => string,
+  editable = false,
+  deletable = false,
 ): ActionItem[] {
   const swatches: ActionSwatch[] = [
     ...COLOR_KEYS.map((color) => ({
@@ -180,5 +184,6 @@ export function leadActions(
     danger: true,
   });
 
-  return items;
+  return items.filter((item) => item.id === 'open' || item.id === 'edit'
+    || (item.id === 'delete' ? deletable && canMove(lead) : editable && canMove(lead)));
 }

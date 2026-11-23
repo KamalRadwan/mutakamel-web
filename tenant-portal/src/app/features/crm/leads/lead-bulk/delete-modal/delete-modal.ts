@@ -5,10 +5,11 @@ import { tablerTrash } from '@ng-icons/tabler-icons';
 import { Notify } from '../../../../../core/notify/notify';
 import { BulkJobsTracker } from '../../../../../shared/bulk-jobs/bulk-jobs-tracker';
 import { BulkJobSelection, BulkJobSubmit } from '../../../../../shared/bulk-jobs/bulk-jobs.model';
+import { FullState } from '../../../../../shared/ui/full-state/full-state';
 import { Field } from '../../../../../shared/ui/field/field';
 import { BulkRunModal } from '../../../shared/record/bulk/bulk-run-modal/bulk-run-modal';
 import { ApiError, errorCodeOf } from '../../../settings/shared/settings-api';
-import { LeadBulkSubmitKey, leadBulkErrorParams, selectionBranchMismatch } from '../lead-bulk-submit';
+import { LeadBulkSubmitKey, leadBulkErrorMessage, leadBulkLoadError, leadBulkPrecheck, leadBulkValidationFields } from '../lead-bulk-submit';
 import { DELETE_TYPED_CONFIRM_FROM, SelectedRow } from '../lead-bulk.model';
 import { LeadSelection } from '../lead-selection';
 
@@ -16,7 +17,7 @@ const MAX_REASON_LENGTH = 1000;
 
 @Component({
   selector: 'app-bulk-delete-modal',
-  imports: [TranslocoPipe, BulkRunModal, Field],
+  imports: [FullState, TranslocoPipe, BulkRunModal, Field],
   providers: [
     provideTranslocoScope('leads', { scope: 'record-related', alias: 'recordRelated' }, { scope: 'lead-bulk-actions', alias: 'leadBulk' }),
     provideIcons({ tablerTrash }),
@@ -42,8 +43,10 @@ export class BulkDeleteModal {
   protected readonly rows = signal<SelectedRow[]>([]);
   protected readonly resolving = signal(false);
   protected readonly submitting = signal(false);
+  protected readonly loadError = signal<ReturnType<typeof leadBulkLoadError> | null>(null);
   protected readonly reason = signal('');
-  private readonly submitKey = new LeadBulkSubmitKey();
+  protected readonly reasonError = signal<string | null>(null);
+  protected readonly submitKey = new LeadBulkSubmitKey();
 
   private openSeq = 0;
 
@@ -59,6 +62,8 @@ export class BulkDeleteModal {
 
   protected readonly canSubmit = computed(
     () =>
+      !this.loadError() &&
+      !this.submitKey.blocked() &&
       !this.submitting() &&
       !this.resolving() &&
       this.rows().length > 0 &&
@@ -71,6 +76,7 @@ export class BulkDeleteModal {
 
   protected onReasonInput(event: Event): void {
     this.reason.set((event.target as HTMLTextAreaElement).value);
+    this.reasonError.set(null);
   }
 
   protected close(): void {
@@ -83,6 +89,19 @@ export class BulkDeleteModal {
     this.submitting.set(false);
   }
 
+  protected async retryLoad(): Promise<void> {
+    const seq = ++this.openSeq;
+    this.loadError.set(null);
+    this.resolving.set(true);
+    try {
+      const rows = this.selection?.count() ? await this.selection.resolve() : this.rows();
+      if (seq === this.openSeq) this.rows.set(rows);
+    } catch (error) {
+      if (seq === this.openSeq) this.loadError.set(leadBulkLoadError(this.transloco, error));
+    }
+    if (seq === this.openSeq) this.resolving.set(false);
+  }
+
   protected async submit(): Promise<void> {
     if (!this.canSubmit()) return;
     const cleanReason = this.reason().trim() || null;
@@ -90,6 +109,11 @@ export class BulkDeleteModal {
       this.selection && this.selection.count() > 0
         ? this.selection.snapshot()
         : { kind: 'IDS', ids: this.rows().map((row) => row.id) };
+    const precheck = leadBulkPrecheck(selection, this.branchId());
+    if (precheck) {
+      this.notify.error(this.transloco.translate(`leadBulk.codes.${precheck}`));
+      return;
+    }
     const body: BulkJobSubmit = {
       module: 'crm.leads',
       action: 'DELETE',
@@ -105,7 +129,8 @@ export class BulkDeleteModal {
       this.close();
       this.submitted.emit(res.jobId);
     } catch (error) {
-      this.handleSubmitError(error, selectionBranchMismatch(selection, this.branchId()));
+      this.submitKey.failed(error);
+      this.handleSubmitError(error);
     } finally {
       this.submitting.set(false);
     }
@@ -113,8 +138,10 @@ export class BulkDeleteModal {
 
   private async initOpen(rows?: SelectedRow[]): Promise<void> {
     const seq = ++this.openSeq;
+    this.loadError.set(null);
     this.submitKey.reset();
     this.reason.set('');
+    this.reasonError.set(null);
     this.submitting.set(false);
     this.rows.set(rows ?? []);
     this.modal().open();
@@ -136,8 +163,7 @@ export class BulkDeleteModal {
       this.rows.set(resolved);
     } catch (error) {
       if (seq !== this.openSeq) return;
-      this.showResolveError(error);
-      this.close();
+      this.loadError.set(leadBulkLoadError(this.transloco, error));
     } finally {
       if (seq === this.openSeq) {
         this.resolving.set(false);
@@ -145,29 +171,18 @@ export class BulkDeleteModal {
     }
   }
 
-  private handleSubmitError(error: unknown, branchMismatch: boolean): void {
+  private handleSubmitError(error: unknown): void {
     const code = errorCodeOf(error);
     if (code === 'BULK_JOB_ACTIVE') return;
-    if (code === 'CRM_SCOPED_PERMISSION_DENIED' && branchMismatch) {
-      this.notify.error(this.transloco.translate('leadBulk.codes.BRANCH_SCOPE_MISMATCH'));
+    if (leadBulkValidationFields(error).includes('reason')) {
+      this.reasonError.set(this.transloco.translate('leadBulk.invalidValue'));
       return;
     }
     this.notify.error(this.translateCode(code, error));
   }
 
   private translateCode(code: string | null, error?: unknown): string {
-    if (code) {
-      for (const prefix of ['leadBulk.codes.', 'bulkJobs.codes.']) {
-        const key = `${prefix}${code}`;
-        const translated = this.transloco.translate(key, leadBulkErrorParams(error));
-        if (translated !== key) return translated;
-      }
-    }
-    return this.transloco.translate('leadBulk.codes.generic');
+    return leadBulkErrorMessage(this.transloco, error ?? (code ? new ApiError(422, code) : null));
   }
 
-  private showResolveError(error: unknown): void {
-    const code = error instanceof ApiError ? error.code : errorCodeOf(error);
-    this.notify.error(this.translateCode(code, error));
-  }
 }

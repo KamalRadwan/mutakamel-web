@@ -1,5 +1,7 @@
 @if (list.failed()) {
-  <p class="p-16 text-center text-12 text-danger-text" role="alert">{{ 'leads.loadFailed' | transloco }}</p>
+  <ui-full-state [kind]="list.errorState().kind" [title]="'leads.loadFailed' | transloco"
+    [text]="list.errorState().message + (list.errorState().correlationId ? ' · ' + list.errorState().correlationId : '')"
+    [actionLabel]="'leads.retry' | transloco" (action)="list.reload()" />
 } @else if (list.loading()) {
   <div class="grid grid-cols-kanban-cards gap-8" aria-busy="true">
     @for (item of skeletonCards; track item) {
@@ -33,6 +35,8 @@
         [lead]="lead"
         [stages]="stages()"
         [detailed]="true"
+        [editable]="list.writes.canUpdate(lead)"
+        [deletable]="list.writes.canDelete(lead)"
         (moveTo)="list.move(lead, $event)"
         (rate)="list.rate(lead, $event)"
         (recolor)="list.recolor(lead, $event)"
@@ -65,4 +69,5 @@
   [cancelLabel]="'common.cancel' | transloco"
 />
 
-<app-lead-disqualify />
+<app-lead-disqualify (writeBlocked)="list.writes.readOnly.set(true)" />
+<ui-conflict-dialog [(open)]="list.writes.conflictOpen" (reload)="list.writes.reloadConflict()" (keepEditing)="list.writes.keepConflict()" />

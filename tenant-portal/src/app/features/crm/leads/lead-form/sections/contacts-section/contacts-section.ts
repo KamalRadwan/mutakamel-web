@@ -2,7 +2,6 @@ import { Component, computed, inject, input, model, viewChild } from '@angular/c
 import { translationEvents } from '../../../../../../core/i18n/translation-events';
 import { TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { GeoCountry } from '../../../../../../core/geo/geo.model';
-import { toAsciiDigits, phoneDigits } from '../../../../../../shared/ui/phone-input/phone';
 import { RecordLayout } from '../../../../../../shared/ui/record-layout/record-layout';
 import { PhoneActionSource } from '../../../../../../shared/widgets/phone-actions/phone-actions';
 import { RecordContacts } from '../../../../shared/record/contacts/record-contacts';
@@ -12,142 +11,17 @@ import {
   ContactErrors,
   ContactLimits,
 } from '../../../../shared/record/record-contact';
-import { errorCodeOf } from '../../../../settings/shared/settings-api';
 import { listCompanyContacts } from '../../../leads.api';
-import { validationPaths } from '../../../leads.model';
 import {
   ContactDraft,
-  CreateLeadContactBody,
   DraftErrors,
   LEAD_LIMITS,
   LeadDraft,
   validateDraft,
 } from '../../lead-draft';
 
-const PHONE_CHARS_RE = /^[+\d\s().-]+$/;
-
 function cloneContact(contact: ContactDraft): ContactDraft {
   return { ...contact, phones: [...contact.phones] };
-}
-
-function cleanPhoneValues(phones: readonly string[]): string[] {
-  return phones.map((p) => p.trim()).filter((p) => p.length > 0);
-}
-
-function findInvalidPhoneIndex(phones: readonly string[]): number {
-  for (let i = 0; i < phones.length; i++) {
-    const trimmed = phones[i].trim();
-    if (!trimmed) continue;
-    const ascii = toAsciiDigits(trimmed);
-    if (trimmed.length > LEAD_LIMITS.phoneMax || !PHONE_CHARS_RE.test(ascii) || phoneDigits(ascii) < 5) {
-      return i;
-    }
-  }
-  return 0;
-}
-
-function findTooLongPhoneIndex(phones: readonly string[]): number {
-  const idx = phones.findIndex((p) => p.trim().length > LEAD_LIMITS.phoneMax);
-  return idx >= 0 ? idx : 0;
-}
-
-export function toPatchContactsBody(
-  contacts: readonly ContactDraft[],
-  isExistingCompany: boolean,
-): CreateLeadContactBody[] {
-  return contacts.map((contact) => {
-    const honorific = contact.honorificTitle.trim();
-    const job = contact.jobTitle.trim();
-    const phones = cleanPhoneValues(contact.phones);
-    const email = contact.email.trim();
-
-    if (contact.contactPartyId) {
-      const body: CreateLeadContactBody = {
-        contactPartyId: contact.contactPartyId,
-        isPrimary: contact.isPrimary,
-        honorificTitle: honorific || null,
-        jobTitle: job || null,
-        phones,
-        email,
-      };
-      if (!isExistingCompany) {
-        body.firstName = contact.firstName.trim();
-        body.lastName = contact.lastName.trim();
-      }
-      return body;
-    }
-
-    const body: CreateLeadContactBody = {
-      firstName: contact.firstName.trim(),
-      isPrimary: contact.isPrimary,
-    };
-    if (honorific) body.honorificTitle = honorific;
-    const last = contact.lastName.trim();
-    if (last) body.lastName = last;
-    if (job) body.jobTitle = job;
-    if (phones.length > 0) body.phones = phones;
-    if (email) body.email = email;
-    return body;
-  });
-}
-
-export function mapContactsPatchErrors(
-  error: unknown,
-  contacts: readonly ContactDraft[],
-  editIndex?: number,
-): DraftErrors {
-  const code = errorCodeOf(error);
-  const idx = editIndex !== undefined && editIndex >= 0 ? editIndex : 0;
-  const contact = contacts[idx];
-  const errors: DraftErrors = {};
-
-  if (code === 'LEAD_CONTACT_NAME_REQUIRED' || code?.endsWith('.LEAD_CONTACT_NAME_REQUIRED')) {
-    const missingIdx =
-      editIndex !== undefined
-        ? idx
-        : Math.max(
-            0,
-            contacts.findIndex((c) => !c.firstName.trim()),
-          );
-    errors[`contacts.${missingIdx}.firstName`] = 'required';
-  } else if (code === 'LEAD_PHONE_INVALID' || code?.endsWith('.LEAD_PHONE_INVALID')) {
-    const pIdx = contact ? findInvalidPhoneIndex(contact.phones) : 0;
-    errors[`contacts.${idx}.phones.${pIdx}`] = 'phoneInvalid';
-  } else if (code === 'PARTY_DUPLICATE_CONTACT_METHOD' && contact) {
-    const phones = cleanPhoneValues(contact.phones);
-    const hasEmail = !!contact.email.trim();
-    if (hasEmail && phones.length === 0) {
-      errors[`contacts.${idx}.email`] = 'leadForm.server.PARTY_DUPLICATE_CONTACT_METHOD';
-    } else if (!hasEmail && phones.length === 1) {
-      const pIdx = contact.phones.findIndex((p) => p.trim().length > 0);
-      errors[`contacts.${idx}.phones.${pIdx >= 0 ? pIdx : 0}`] = 'leadForm.server.PARTY_DUPLICATE_CONTACT_METHOD';
-    }
-  } else if (code === 'PARTY_CONTACT_LIMIT_EXCEEDED') {
-    errors['contacts'] = 'contactsMax';
-  } else if (code === 'PARTY_DUPLICATE_CONTACT') {
-    errors['contacts'] = 'leadForm.server.PARTY_DUPLICATE_CONTACT_METHOD';
-  } else if (code === 'LEAD_CONTACT_PRIMARY_INVALID') {
-    errors['contacts'] = 'primaryOne';
-  } else if (code === 'LEAD_CONTACT_REQUIRED') {
-    errors['contacts'] = 'contactsMin';
-  } else if (code === 'CRM_VALIDATION_FAILED') {
-    for (const path of validationPaths(error)) {
-      const match = /^contacts\.(\d+)\.(\w+)/.exec(path);
-      if (!match) continue;
-      const at = Number(match[1]);
-      const field = match[2];
-      if (field === 'honorificTitle' || field === 'jobTitle' || field === 'firstName' || field === 'lastName') {
-        errors[`contacts.${at}.${field}`] = 'tooLong';
-      } else if (field === 'email') {
-        errors[`contacts.${at}.email`] = 'emailInvalid';
-      } else if (field === 'phones') {
-        const target = contacts[at];
-        errors[`contacts.${at}.phones.${target ? findTooLongPhoneIndex(target.phones) : 0}`] = 'tooLong';
-      }
-    }
-  }
-
-  return errors;
 }
 
 const LEAD_CONTACT_LIMITS: ContactLimits = {

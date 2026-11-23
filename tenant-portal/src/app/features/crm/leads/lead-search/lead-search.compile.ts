@@ -28,7 +28,7 @@ export interface CompileLeadContext {
 
 const TEXT_SEARCH_FIELDS = new Set<LeadSearchField>(['lead', 'customer', 'email', 'phone']);
 const ROOT_FIELD_IDS = new Set(['lead', 'customer', 'email', 'phone', 'tag', 'overdue']);
-const DATE_WIRE_FIELDS = new Set(['createdAt', 'updatedAt', 'convertedAt', 'qualifiedAt', 'disqualifiedAt']);
+const DATE_WIRE_FIELDS = new Set(['createdAt', 'updatedAt', 'convertedAt']);
 
 const WIRE_FIELD_MAP: Record<string, string> = {
   leadType: 'leadProfileType',
@@ -51,10 +51,6 @@ const WIRE_FIELD_MAP: Record<string, string> = {
   stageId: 'stageId',
   ownerUserId: 'ownerUserId',
   createdByUserId: 'createdByUserId',
-  disqualificationReasonId: 'disqualificationReasonId',
-  qualifiedAt: 'qualifiedAt',
-  disqualifiedAt: 'disqualifiedAt',
-  convertedCustomerId: 'convertedCustomerId',
 };
 
 const COMPILE_FIELDS: QueryField[] = leadSearchFields({

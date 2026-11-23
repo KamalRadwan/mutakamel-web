@@ -5,6 +5,10 @@ import { of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LeadDetail, LeadRow } from '../leads.model';
 import { LeadBoard } from './lead-board';
+import { bindCrmHttpForTest } from '../../shared/crm-http';
+import { LeadListTestHttp, LIST_CAPABILITIES } from './lead-list.testing';
+
+let disposeHttp: () => void;
 
 /*
  * The board runs on the real leads fake. A drop into the Disqualified lane is simulated with an optimistic
@@ -62,7 +66,9 @@ function dropOnDisqualified() {
 }
 
 beforeEach(async () => {
+  vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
   vi.useFakeTimers();
+  disposeHttp = bindCrmHttpForTest(new LeadListTestHttp());
   TestBed.configureTestingModule({
     providers: [
       provideTransloco({
@@ -73,14 +79,17 @@ beforeEach(async () => {
   });
   fixture = TestBed.createComponent(LeadBoard);
   fixture.componentRef.setInput('body', { branchId: 'b1' });
+  fixture.componentRef.setInput('capabilities', LIST_CAPABILITIES);
   c = fixture.componentInstance as unknown as Internals;
   await flush();
 });
 
 afterEach(() => {
+  disposeHttp();
   fixture.destroy();
   TestBed.resetTestingModule();
   vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
 
 describe('lead board: drop on Disqualified', () => {

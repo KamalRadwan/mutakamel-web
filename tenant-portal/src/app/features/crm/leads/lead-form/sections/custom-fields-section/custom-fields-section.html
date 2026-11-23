@@ -1,3 +1,8 @@
+@if (unavailable()) {
+  <ui-field [label]="'leadForm.sections.custom' | transloco" [hint]="unavailableMessage()">
+    <input type="text" disabled [value]="unavailableMessage()" class="w-full bg-transparent text-12 text-text-muted outline-none" />
+  </ui-field>
+} @else {
 <app-record-custom-fields
   [fields]="fields()"
   [values]="draft().customFields"
@@ -10,3 +15,5 @@
   [countries]="countries()"
   (valuesChange)="onValuesChange($event)"
 />
+
+}

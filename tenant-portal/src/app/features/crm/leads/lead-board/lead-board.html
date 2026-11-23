@@ -1,6 +1,8 @@
 @if (failed()) {
-  <p class="p-16 text-center text-12 text-danger-text" role="alert">{{ 'leads.loadFailed' | transloco }}</p>
-}
+  <ui-full-state [kind]="errorState().kind" [title]="'leads.loadFailed' | transloco"
+    [text]="errorState().message + (errorState().correlationId ? ' · ' + errorState().correlationId : '')"
+    [actionLabel]="'leads.retry' | transloco" (action)="refresh()" />
+} @else {
 
 <app-record-board
   [lanes]="boardLanes()"
@@ -10,15 +12,27 @@
   [loading]="loading()"
   [collapseStorageKey]="collapseStorageKey"
   [labels]="boardLabels()"
+  [laneHeaderEnd]="laneRetry"
   (loadMore)="onLoadMore($event)"
   (create)="create.emit($event)"
   (move)="onMove($event)"
 />
+}
+
+<ng-template #laneRetry let-lane>
+  @if (laneErrors()[lane.id]) {
+    <button uiButton size="small" variant="ghost" [disabled]="loadingMore() !== null" (click)="onLoadMore(lane.id)">
+      {{ 'leads.retry' | transloco }}
+    </button>
+  }
+</ng-template>
 
 <ng-template #leadCardTpl let-lead let-lane="lane">
   <app-lead-card
     [lead]="lead"
     [stages]="stages()"
+    [editable]="writes.canUpdate(lead)"
+    [deletable]="writes.canDelete(lead)"
     [expanded]="openCards()[lane.id] === lead.id"
     (expandedChange)="setExpanded(lane.id, lead.id, $event)"
     (moveTo)="move(lead.id, $event)"
@@ -38,4 +52,5 @@
   [cancelLabel]="'common.cancel' | transloco"
 />
 
-<app-lead-disqualify />
+<app-lead-disqualify (writeBlocked)="writes.readOnly.set(true)" />
+<ui-conflict-dialog [(open)]="writes.conflictOpen" (reload)="writes.reloadConflict()" (keepEditing)="writes.keepConflict()" />

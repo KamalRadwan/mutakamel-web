@@ -39,7 +39,7 @@ export interface LeadRow {
   status: LeadStatus;
   rating: number;
   cardColor: CardColor | null;
-  owner: { userId: string; firstName: string | null; lastName: string | null } | null;
+  owner: { userId: string; firstName: string | null; lastName: string | null; avatarUrl?: string | null } | null;
   nextActivity: { activityAt: string; bucket: DueBucket } | null;
   acquisitionSource: ({ id: string } & Named) | null;
   address: PartyAddressView | null;
@@ -103,6 +103,7 @@ export interface LeadSearchOptions {
   stages: LeadStage[];
   sources: ({ id: string } & Named)[];
   tags: LeadTag[];
+  unavailable?: ('stage' | 'source' | 'tag')[];
 }
 
 export interface Page<T> {
@@ -215,6 +216,11 @@ export function initials(name: string): string {
 
 export function canMove(lead: LeadRow): boolean {
   return lead.status !== 'CONVERTED';
+}
+
+export function leadActionAllowed(scope: Scope | null | undefined, lead: LeadRow): boolean {
+  return lead.status !== 'CONVERTED' && !!scope && (scope.scope === 'all'
+    || !!lead.owner && !!scope.ownerUserIds?.includes(lead.owner.userId));
 }
 
 export function nameIn(item: Named, language: string): string {

@@ -74,11 +74,13 @@
         (useCompany)="onUseCompany($event)"
       />
 
-      @if (hasOtherCustomFields()) {
+      @if (hasOtherCustomFields() || customFieldsDenied() || customFieldsFailed() || lookups.customFields() === null) {
         <section class="flex flex-col gap-8">
           <ui-section-bar tone="violet" icon="tablerAdjustments" [title]="'leadForm.sections.custom' | transloco" />
           <app-lf-custom-fields
             scope="others"
+            [unavailable]="customFieldsDenied() || lookups.customFields() === null || customFieldsFailed()"
+            [unavailableMessage]="customFieldsMessage()"
             [draft]="draft()"
             (draftChange)="draft.set($event)"
             [errors]="errors()"
@@ -121,6 +123,7 @@
         (draftChange)="draft.set($event)"
         [errors]="errors()"
         [readonly]="readonly()"
+        [canUpdateRecord]="canUpdateRecord()"
         [mode]="mode()"
         [stages]="resolvedStages()"
         [stageId]="resolvedStageId()"
@@ -161,6 +164,7 @@
         (draftChange)="draft.set($event)"
         [errors]="errors()"
         [readonly]="readonly()"
+        [canUpdateRecord]="canUpdateRecord()"
         [mode]="mode()"
         [stages]="resolvedStages()"
         [stageId]="resolvedStageId()"
@@ -281,11 +285,13 @@
       </section>
     }
 
-    @if (hasOtherCustomFields()) {
+    @if (hasOtherCustomFields() || customFieldsDenied() || customFieldsFailed() || lookups.customFields() === null) {
       <section id="lf-custom" class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
         <ui-section-bar tone="violet" icon="tablerAdjustments" [title]="'leadForm.sections.custom' | transloco" />
         <app-lf-custom-fields
           scope="others"
+            [unavailable]="customFieldsDenied() || lookups.customFields() === null || customFieldsFailed()"
+            [unavailableMessage]="customFieldsMessage()"
           layout="page"
           [draft]="draft()"
           (draftChange)="draft.set($event)"

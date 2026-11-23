@@ -3,6 +3,12 @@ import { LeadSearchBody } from '../lead-search/lead-search.compile';
 import { LeadRow } from '../leads.model';
 import { SELECTION_LIMIT, SelectedRow } from './lead-bulk.model';
 import { LeadSelection, toSelectedRow } from './lead-selection';
+import { Injector } from '@angular/core';
+import { TestBed } from '@angular/core/testing';
+import { TenantScopeState } from '../../../../core/scope/tenant-scope';
+import { bindCrmHttpForTest, crmQueries } from '../../shared/crm-http';
+import { bindCrmInjectorForTest } from '../../shared/crm-runtime';
+import { CrmHttpStub } from '../../shared/testing/crm-http-testing';
 
 function row(id: string): SelectedRow {
   return { id, displayName: `Lead ${id}`, ownerUserId: 'u1', stageId: 'stage-new', stageFlag: 'NEW', status: 'OPEN' };
@@ -206,30 +212,40 @@ describe('LeadSelection (all matching mode)', () => {
 });
 
 describe('LeadSelection.resolve in all mode', () => {
-  beforeEach(() => vi.useFakeTimers());
-  afterEach(() => vi.useRealTimers());
-
-  async function settle<T>(promise: Promise<T>): Promise<T> {
-    const guarded = promise.then(
-      (value) => ({ ok: true as const, value }),
-      (error: unknown) => ({ ok: false as const, error }),
-    );
-    await vi.runAllTimersAsync();
-    const result = await guarded;
-    if (!result.ok) throw result.error;
-    return result.value;
-  }
+  const branchId = '019f0000-0000-7000-8000-000000000011';
+  const companyId = '019f0000-0000-7000-8000-000000000010';
+  let http: CrmHttpStub;
+  let dispose: () => void;
+  let restoreRuntime: () => void;
+  beforeEach(() => {
+    TestBed.configureTestingModule({ providers: [{ provide: TenantScopeState, useValue: {
+      selection: () => ({ branchId, companyId }), branchCompanies: () => new Map([[branchId, companyId]]),
+    } }] });
+    restoreRuntime = bindCrmInjectorForTest(() => TestBed.inject(Injector));
+    http = new CrmHttpStub();
+    dispose = bindCrmHttpForTest(http);
+    crmQueries().clear();
+  });
+  afterEach(() => { dispose(); restoreRuntime(); crmQueries().clear(); vi.restoreAllMocks(); });
 
   it('fetches matching rows from the server and drops excluded ones', async () => {
     const selection = new LeadSelection();
-    selection.selectAllMatching({ branchId: 'b1' }, 5);
-    const everyone = await settle(selection.resolve());
+    vi.spyOn(http, 'write').mockResolvedValue({ data: { items: [row('a'), row('b')], total: 2, truncated: false }, status: 200, etag: null, location: null });
+    selection.selectAllMatching({ branchId }, 5);
+    const everyone = await selection.resolve();
     expect(everyone.length).toBeGreaterThan(1);
 
     selection.toggle(row(everyone[0].id));
-    const remaining = await settle(selection.resolve());
+    const remaining = await selection.resolve();
 
     expect(remaining.map((r) => r.id)).not.toContain(everyone[0].id);
     expect(remaining).toHaveLength(everyone.length - 1);
+  });
+
+  it('refuses a truncated selection instead of submitting only part of it', async () => {
+    vi.spyOn(http, 'write').mockResolvedValue({ data: { items: [row('a')], total: 10001, truncated: true }, status: 200, etag: null, location: null });
+    const selection = new LeadSelection();
+    selection.selectAllMatching({ branchId }, 10000);
+    await expect(selection.resolve()).rejects.toMatchObject({ code: 'LEAD_SELECTION_TOO_LARGE' });
   });
 });

@@ -1,5 +1,7 @@
 @if (list.failed()) {
-  <p class="p-16 text-center text-12 text-danger-text" role="alert">{{ 'leads.loadFailed' | transloco }}</p>
+  <ui-full-state [kind]="list.errorState().kind" [title]="'leads.loadFailed' | transloco"
+    [text]="list.errorState().message + (list.errorState().correlationId ? ' · ' + list.errorState().correlationId : '')"
+    [actionLabel]="'leads.retry' | transloco" (action)="list.reload()" />
 } @else if (!list.loading() && !items().length) {
   <p class="p-16 text-center text-12 text-text-muted">{{ 'leads.noResults' | transloco }}</p>
 } @else {
@@ -176,6 +178,7 @@
                   (focus)="hovered.set({ leadId: lead.id, value: star })"
                   (blur)="hovered.set(null)"
                   (click)="rate(lead, star)"
+                  [disabled]="!list.writes.canUpdate(lead)"
                 >
                   <ng-icon [name]="star <= rating(lead) ? 'tablerStarFill' : 'tablerStar'" size="14" aria-hidden="true" />
                 </button>
@@ -220,4 +223,5 @@
   [cancelLabel]="'common.cancel' | transloco"
 />
 
-<app-lead-disqualify />
+<app-lead-disqualify (writeBlocked)="list.writes.readOnly.set(true)" />
+<ui-conflict-dialog [(open)]="list.writes.conflictOpen" (reload)="list.writes.reloadConflict()" (keepEditing)="list.writes.keepConflict()" />

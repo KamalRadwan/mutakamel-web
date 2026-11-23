@@ -7,6 +7,11 @@ import { ApiError } from '../../settings/shared/settings-api';
 import { fakeBoard, fakeGetLead, fakeListDisqualificationReasons, fakeListLeadStages } from '../leads.fake';
 import { LeadDetail, LeadMoveError, LeadStage } from '../leads.model';
 import { LeadDisqualify, reasonErrorCode } from './lead-disqualify';
+import { bindCrmHttpForTest } from '../../shared/crm-http';
+import { LeadListTestHttp } from '../lead-board/lead-list.testing';
+
+let disposeHttp: () => void;
+let http: LeadListTestHttp;
 
 /*
  * The dialog runs on the real leads fake (vi.mock of relative modules is not supported by the Angular
@@ -72,6 +77,8 @@ async function confirm(): Promise<void> {
 
 beforeEach(async () => {
   vi.useFakeTimers();
+  http = new LeadListTestHttp();
+  disposeHttp = bindCrmHttpForTest(http);
   dialogProto['showModal'] = function (this: HTMLDialogElement) {
     this.setAttribute('open', '');
   };
@@ -94,6 +101,7 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
+  disposeHttp();
   fixture.destroy();
   TestBed.resetTestingModule();
   dialogProto['showModal'] = originalDialog.showModal;
@@ -102,6 +110,48 @@ afterEach(() => {
 });
 
 describe('lead disqualify dialog', () => {
+  it.each([['en', 'light'], ['en', 'dark'], ['ar', 'light'], ['ar', 'dark']])('LeadDisqualify › no reasons access %s / %s', async (lang, theme) => {
+    const old = ['lang', 'dir', 'data-theme'].map((key) => document.documentElement.getAttribute(key));
+    document.documentElement.lang = lang; document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+    document.documentElement.dataset['theme'] = theme;
+    try {
+      vi.spyOn(http, 'read').mockRejectedValue(new ApiError(403, 'PERMISSION_DENIED'));
+      const result = fixture.componentInstance.open(await newLead(), await stage('stage-disqualified'));
+      await flush();
+      c['selectedReasonId'].set('stale-reason');
+      await confirm();
+      expect(c['reasonsUnavailable']()).toBe(true);
+      expect(fixture.nativeElement.textContent).toContain('leads.disqualify.noAccess');
+      expect(http.recordedWrites()).toEqual([]);
+      c['cancel'](); await expect(result).resolves.toBeNull();
+    } finally {
+      ['lang', 'dir', 'data-theme'].forEach((key, i) => old[i] === null
+        ? document.documentElement.removeAttribute(key) : document.documentElement.setAttribute(key, old[i]!));
+    }
+  });
+
+  it.each([['en', 'light'], ['en', 'dark'], ['ar', 'light'], ['ar', 'dark']])('LeadDisqualify › reason flow %s / %s', async (lang, theme) => {
+    const old = ['lang', 'dir', 'data-theme'].map((key) => document.documentElement.getAttribute(key));
+    document.documentElement.lang = lang; document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+    document.documentElement.dataset['theme'] = theme;
+    try {
+      const { result, reasonId } = await open(await newLead(), await stage('stage-disqualified'));
+      c['onReasonChange'](reasonId); await confirm();
+      const saved = await result;
+      expect(saved?.stageFlag).toBe('DISQUALIFIED');
+      expect(http.recordedWrites()[0]).toMatchObject({ path: `/leads/${saved!.id}/stage`, body: {
+        stageId: 'stage-disqualified', disqualificationReasonId: reasonId,
+      } });
+      expect(http.recordedWrites()[0].options.key).toBeTruthy();
+      for (const code of ['CRM_REASON_REQUIRED', 'CRM_REASON_KIND_MISMATCH', 'CRM_REASON_UNAVAILABLE']) {
+        expect(reasonErrorCode(new ApiError(422, code))).toBe(code);
+      }
+    } finally {
+      ['lang', 'dir', 'data-theme'].forEach((key, i) => old[i] === null
+        ? document.documentElement.removeAttribute(key) : document.documentElement.setAttribute(key, old[i]!));
+    }
+  });
+
   it('lists the active DISQUALIFICATION reasons and starts with none chosen', async () => {
     const expected = await settle(fakeListDisqualificationReasons());
     await open(await newLead(), await stage('stage-disqualified'));

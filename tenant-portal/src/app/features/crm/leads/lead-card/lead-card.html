@@ -6,7 +6,7 @@
   [typeLabel]="'leads.profile.' + lead().leadProfileType | transloco"
   [color]="lead().cardColor"
   [rating]="lead().rating"
-  [ratingEditable]="true"
+  [ratingEditable]="editable()"
   [dueBucket]="lead().nextActivity?.bucket ?? null"
   [owner]="cardOwner()"
   [actions]="actions()"

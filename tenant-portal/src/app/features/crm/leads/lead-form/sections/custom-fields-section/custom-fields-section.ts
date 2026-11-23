@@ -1,5 +1,6 @@
 import { Component, computed, inject, input, model } from '@angular/core';
-import { provideTranslocoScope } from '@jsverse/transloco';
+import { TranslocoPipe, provideTranslocoScope } from '@jsverse/transloco';
+import { Field } from '../../../../../../shared/ui/field/field';
 import { GeoCountry } from '../../../../../../core/geo/geo.model';
 import { CustomFieldDef } from '../../../../shared/record/custom-fields/custom-field.model';
 import { RecordCustomFields } from '../../../../shared/record/custom-fields/record-custom-fields';
@@ -8,8 +9,8 @@ import { LeadLookups } from '../../lead-lookups';
 
 @Component({
   selector: 'app-lf-custom-fields',
-  imports: [RecordCustomFields],
-  providers: [provideTranslocoScope({ scope: 'lead-form', alias: 'leadForm' })],
+  imports: [RecordCustomFields, Field, TranslocoPipe],
+  viewProviders: [provideTranslocoScope({ scope: 'lead-form', alias: 'leadForm' })],
   templateUrl: './custom-fields-section.html',
   host: {
     '[class]': "layout() === 'page' && scope() === 'required' ? 'contents' : 'block'",
@@ -18,6 +19,8 @@ import { LeadLookups } from '../../lead-lookups';
 export class CustomFieldsSection {
   private readonly lookups = inject(LeadLookups);
 
+  readonly unavailable = input(false);
+  readonly unavailableMessage = input('');
   readonly layout = input<'modal' | 'page'>('modal');
   readonly draft = model.required<LeadDraft>();
   readonly errors = input<DraftErrors>({});

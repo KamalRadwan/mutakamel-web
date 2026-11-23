@@ -193,6 +193,7 @@ export class ClassificationSection {
   readonly draft = model.required<LeadDraft>();
   readonly errors = input<DraftErrors>({});
   readonly readonly = input(false);
+  readonly canUpdateRecord = input(false);
   readonly mode = input<'create' | 'edit'>('create');
   readonly stages = input<LeadStage[]>([]);
   readonly stageId = input<string | null>(null);
@@ -211,7 +212,8 @@ export class ClassificationSection {
   private companyCheckSeq = 0;
   private pendingOwnerBranchCheck = false;
 
-  protected readonly canEditBranch = computed(() => this.mode() === 'create' && !this.readonly());
+  // Record creation follows the session branch; the top bar is the only scope selector.
+  protected readonly canEditBranch = computed(() => false);
 
   protected readonly activeCompany = computed<ScopeCompany | null>(() => {
     const companies = this.scope.companies();

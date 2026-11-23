@@ -4,10 +4,10 @@
   [decimals]="limits.valueDecimals"
   [amount]="draft().expectedValue || null"
   [currency]="draft().currencyCode"
-  [readonly]="readonly()"
+  [readonly]="readonly() || !lookups.currencies().length"
   [errors]="moneyErrors()"
   labelKey="leadSide.value"
-  hintKey="leadSide.valueHint"
+  [hintKey]="lookups.currencies().length ? 'leadSide.valueHint' : 'leadForm.write.catalogueDenied'"
   (amountChange)="onAmountChange($event)"
   (currencyChange)="onCurrencyChange($event)"
 />

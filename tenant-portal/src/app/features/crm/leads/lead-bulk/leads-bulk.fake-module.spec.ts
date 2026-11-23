@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { resetBulkJobsFake } from '../../../../shared/bulk-jobs/bulk-jobs.fake';
 import {
   cancelBulkJob,
   getBulkJob,
@@ -59,6 +60,7 @@ async function submitQueued(body: BulkJobSubmit) {
 }
 
 beforeEach(() => {
+  resetBulkJobsFake();
   vi.useFakeTimers();
   FAKE_CRM_LEADS_BULK.leadsDisabled = false;
 });

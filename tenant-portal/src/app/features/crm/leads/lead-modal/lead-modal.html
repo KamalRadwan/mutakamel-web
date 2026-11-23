@@ -12,8 +12,8 @@
   [deleting]="deleting()"
   [loading]="loading()"
   [updating]="instantUpdating() || loading()"
-  [actionsDisabled]="loading() || loadFailed()"
-  [canSave]="canEdit()"
+  [actionsDisabled]="loading() || loadFailed() || notFound() || scopeDenied() || chooseBranch()"
+  [canSave]="canEdit() && !formLookups()?.saveBlocked()"
   [saveEnabled]="dirty() || hasUnsavedContact()"
   [canDelete]="canDelete()"
   [createLabel]="'leadModal.footer.create' | transloco"
@@ -30,7 +30,7 @@
   (undo)="undoChanges()"
   (delete)="confirmDelete()"
 >
-  @if (mode() === 'edit' && !loading() && !loadFailed() && detail(); as currentLead) {
+  @if (mode() === 'edit' && !loading() && !loadFailed() && !scopeDenied() && !notFound() && !chooseBranch() && detail(); as currentLead) {
     @if (currentLead.id === leadId()) {
       <app-record-related-badges
         headerRelated
@@ -66,16 +66,14 @@
         </div>
       </div>
     </div>
-  } @else if (loadFailed()) {
-    <div modalMain class="flex flex-1 flex-col items-center justify-center gap-8 p-16 text-center">
-      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
-        <ng-icon name="tablerCloudOff" size="18" aria-hidden="true" />
-      </span>
-      <p class="text-12 leading-18 text-text-muted">{{ 'leadModal.loadFailed' | transloco }}</p>
-      <button type="button" uiButton variant="primary" (click)="retryLoad()">
-        {{ 'recordModal.retry' | transloco }}
-      </button>
-    </div>
+  } @else if (loadFailed() || notFound() || scopeDenied() || chooseBranch()) {
+    <ui-full-state modalMain
+      [kind]="notFound() ? 'not-found' : loadFailed() ? 'load-failure' : 'forbidden'"
+      [title]="(notFound() ? 'leadModal.notFound' : chooseBranch() ? 'leadModal.chooseBranch' : scopeDenied() ? 'leadModal.scopeDenied' : 'leadModal.loadFailed') | transloco"
+      [text]="loadReference() ? ('leadModal.loadReference' | transloco: { id: loadReference() }) : ''"
+      [actionLabel]="'recordModal.retry' | transloco"
+      (action)="retryLoad()"
+    />
   } @else {
     <app-lead-form
       modalMain
@@ -86,6 +84,10 @@
       [errors]="errors()"
       [leadId]="leadId()"
       [revision]="formRevision()"
+          [customFieldsDenied]="customFieldsDenied()"
+          [customFieldsMessage]="(customFieldsFailed() ? 'leadModal.customFieldsFailed' : 'leadModal.customFieldsDenied') | transloco"
+          [customFieldsFailed]="customFieldsFailed()"
+          [canUpdateRecord]="canUpdateRecord()"
       [saveContacts]="saveContactsBound"
       [excludePartyId]="detail()?.partyId ?? null"
       [stages]="headerStages()"
@@ -129,7 +131,7 @@
 />
 
 <ui-conflict-dialog
-  [open]="conflictOpen()"
+  [open]="conflictOpen() || writes.conflictOpen()"
   (openChange)="onConflictOpenChange($event)"
   [recordLabel]="displayName()"
   (reload)="onConflictChoice('reload')"
@@ -146,3 +148,5 @@
     [cancelLabel]="'recordModal.unsaved.cancel' | transloco"
   />
 </div>
+
+<app-lead-disqualify (writeBlocked)="writes.readOnly.set(true)" />

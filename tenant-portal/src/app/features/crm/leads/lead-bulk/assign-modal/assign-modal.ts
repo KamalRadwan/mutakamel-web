@@ -18,11 +18,12 @@ import { tablerCheck, tablerChevronDown, tablerSearch, tablerUserShare } from '@
 import { Notify } from '../../../../../core/notify/notify';
 import { BulkJobsTracker } from '../../../../../shared/bulk-jobs/bulk-jobs-tracker';
 import { BulkJobSelection, BulkJobSubmit } from '../../../../../shared/bulk-jobs/bulk-jobs.model';
+import { FullState } from '../../../../../shared/ui/full-state/full-state';
 import { Field } from '../../../../../shared/ui/field/field';
 import { rectInPage, viewport } from '../../../../../shared/ui/overlay/zoom';
 import { BulkRunModal } from '../../../shared/record/bulk/bulk-run-modal/bulk-run-modal';
 import { ApiError, errorCodeOf } from '../../../settings/shared/settings-api';
-import { LeadBulkSubmitKey, leadBulkErrorParams, selectionBranchMismatch } from '../lead-bulk-submit';
+import { LeadBulkSubmitKey, leadBulkErrorMessage, leadBulkLoadError, leadBulkPrecheck, leadBulkValidationFields } from '../lead-bulk-submit';
 import { initials } from '../../leads.model';
 import { listAssignableOwners } from '../lead-bulk.api';
 import { SelectedRow } from '../lead-bulk.model';
@@ -43,7 +44,7 @@ interface MenuPlace {
 
 @Component({
   selector: 'app-bulk-assign-modal',
-  imports: [NgIcon, TranslocoPipe, BulkRunModal, Field],
+  imports: [FullState, NgIcon, TranslocoPipe, BulkRunModal, Field],
   providers: [
     provideTranslocoScope('leads', { scope: 'record-related', alias: 'recordRelated' }, { scope: 'lead-bulk-actions', alias: 'leadBulk' }),
     provideIcons({ tablerUserShare, tablerChevronDown, tablerCheck, tablerSearch }),
@@ -77,16 +78,18 @@ export class BulkAssignModal {
   protected readonly rows = signal<SelectedRow[]>([]);
   protected readonly resolving = signal(false);
   protected readonly submitting = signal(false);
+  protected readonly loadError = signal<ReturnType<typeof leadBulkLoadError> | null>(null);
   protected readonly owners = signal<OwnerOption[]>([]);
   protected readonly ownersLoading = signal(false);
   protected readonly ownersLoaded = signal(false);
+  protected readonly ownersForbidden = signal(false);
   protected readonly selectedOwnerId = signal('');
   protected readonly ownerSearch = signal('');
   protected readonly ownerMenuOpen = signal(false);
   protected readonly ownerMenuPlaced = signal(false);
   protected readonly ownerMenuPlace = signal<MenuPlace>({ top: 0, start: 0, width: 0, maxHeight: null });
   private readonly serverOwnerError = signal<string | null>(null);
-  private readonly submitKey = new LeadBulkSubmitKey();
+  protected readonly submitKey = new LeadBulkSubmitKey();
 
   protected readonly initials = initials;
 
@@ -113,6 +116,7 @@ export class BulkAssignModal {
     this.i18n();
     const serverErr = this.serverOwnerError();
     if (serverErr) return serverErr;
+    if (this.ownersForbidden()) return this.transloco.translate('leadBulk.catalogueUnavailable');
     if (this.ownersLoaded() && this.owners().length === 0) {
       return this.transloco.translate('leadBulk.assign.noOwners');
     }
@@ -143,10 +147,12 @@ export class BulkAssignModal {
 
   protected readonly canSubmit = computed(
     () =>
+      !this.loadError() &&
+      !this.submitKey.blocked() &&
       !this.submitting() &&
       !this.resolving() &&
       !this.ownersLoading() &&
-      !!this.selectedOwnerId() &&
+      this.owners().some((owner) => owner.id === this.selectedOwnerId()) &&
       this.actionableRows().length > 0,
   );
 
@@ -274,6 +280,14 @@ export class BulkAssignModal {
     this.serverOwnerError.set(null);
   }
 
+  protected async retryLoad(): Promise<void> {
+    const seq = ++this.openSeq;
+    this.loadError.set(null);
+    this.resolving.set(true);
+    await Promise.all([this.loadOwners(seq), this.resolveRows(seq, this.selection?.count() ? undefined : this.rows())]);
+    if (seq === this.openSeq) this.resolving.set(false);
+  }
+
   protected async submit(): Promise<void> {
     if (!this.canSubmit()) return;
     const ownerId = this.selectedOwnerId();
@@ -281,6 +295,11 @@ export class BulkAssignModal {
       this.selection && this.selection.count() > 0
         ? this.selection.snapshot()
         : { kind: 'IDS', ids: this.rows().map((row) => row.id) };
+    const precheck = leadBulkPrecheck(selection, this.branchId());
+    if (precheck) {
+      this.notify.error(this.transloco.translate(`leadBulk.codes.${precheck}`));
+      return;
+    }
     const body: BulkJobSubmit = {
       module: 'crm.leads',
       action: 'ASSIGN',
@@ -297,7 +316,8 @@ export class BulkAssignModal {
       this.close();
       this.submitted.emit(res.jobId);
     } catch (error) {
-      this.handleSubmitError(error, selectionBranchMismatch(selection, this.branchId()));
+      this.submitKey.failed(error);
+      this.handleSubmitError(error);
     } finally {
       this.submitting.set(false);
     }
@@ -305,6 +325,7 @@ export class BulkAssignModal {
 
   private async initOpen(rows?: SelectedRow[]): Promise<void> {
     const seq = ++this.openSeq;
+    this.loadError.set(null);
     this.submitKey.reset();
     this.ownerSearch.set('');
     this.serverOwnerError.set(null);
@@ -322,14 +343,17 @@ export class BulkAssignModal {
 
   private async loadOwners(seq: number): Promise<void> {
     this.ownersLoading.set(true);
+    this.ownersForbidden.set(false);
     try {
       const list = await listAssignableOwners(this.branchId());
       if (seq !== this.openSeq) return;
       this.owners.set(list);
       this.ownersLoaded.set(true);
       this.selectedOwnerId.set(list[0]?.id ?? '');
-    } catch {
+    } catch (error) {
       if (seq !== this.openSeq) return;
+      if (error instanceof ApiError && error.status === 403) this.ownersForbidden.set(true);
+      else this.loadError.set(leadBulkLoadError(this.transloco, error));
       this.owners.set([]);
       this.ownersLoaded.set(true);
     } finally {
@@ -357,8 +381,7 @@ export class BulkAssignModal {
       this.rows.set(resolved);
     } catch (error) {
       if (seq !== this.openSeq) return;
-      this.showResolveError(error);
-      this.close();
+      this.loadError.set(leadBulkLoadError(this.transloco, error));
     } finally {
       if (seq === this.openSeq) {
         this.resolving.set(false);
@@ -366,36 +389,21 @@ export class BulkAssignModal {
     }
   }
 
-  private handleSubmitError(error: unknown, branchMismatch: boolean): void {
+  private handleSubmitError(error: unknown): void {
     const code = errorCodeOf(error);
     if (code === 'BULK_JOB_ACTIVE') return;
-    if (code === 'CRM_SCOPED_PERMISSION_DENIED') {
-      // The backend checks the search branch before the owner; both answer with this code.
-      if (branchMismatch) {
-        this.notify.error(this.transloco.translate('leadBulk.codes.BRANCH_SCOPE_MISMATCH'));
-        return;
-      }
-      this.serverOwnerError.set(this.translateCode(code));
+    this.closeOwnerMenu();
+    if (leadBulkValidationFields(error).includes('ownerUserId')) {
+      this.serverOwnerError.set(this.transloco.translate('leadBulk.invalidValue'));
       return;
     }
     this.notify.error(this.translateCode(code, error));
   }
 
   private translateCode(code: string | null, error?: unknown): string {
-    if (code) {
-      for (const prefix of ['leadBulk.codes.', 'bulkJobs.codes.']) {
-        const key = `${prefix}${code}`;
-        const translated = this.transloco.translate(key, leadBulkErrorParams(error));
-        if (translated !== key) return translated;
-      }
-    }
-    return this.transloco.translate('leadBulk.codes.generic');
+    return leadBulkErrorMessage(this.transloco, error ?? (code ? new ApiError(422, code) : null));
   }
 
-  private showResolveError(error: unknown): void {
-    const code = error instanceof ApiError ? error.code : errorCodeOf(error);
-    this.notify.error(this.translateCode(code, error));
-  }
 
   private initialMenuPlace(trigger: HTMLElement): MenuPlace {
     const rect = rectInPage(trigger);

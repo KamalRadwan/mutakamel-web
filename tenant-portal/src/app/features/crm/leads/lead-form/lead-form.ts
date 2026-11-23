@@ -27,7 +27,7 @@ import {
 } from '@ng-icons/tabler-icons';
 import { listCountries } from '../../../../core/geo/geo.api';
 import { GeoCountry } from '../../../../core/geo/geo.model';
-import { ScopeState } from '../../../../core/scope/scope';
+import { sessionBranch } from '../../shared/lookups/session-branch';
 import { SectionBar } from '../../../../shared/ui/section-bar/section-bar';
 import { PhoneActionSource } from '../../../../shared/widgets/phone-actions/phone-actions';
 import { checkLeadDuplicates } from '../leads.api';
@@ -42,7 +42,7 @@ import {
 import { ContactDraft, DraftErrors, LeadDraft, emptyDraft } from './lead-draft';
 import { LeadLookups } from './lead-lookups';
 import { BasicsSection } from './sections/basics-section/basics-section';
-import { ClassificationSection, pickCompanyBranchId } from './sections/classification-section/classification-section';
+import { ClassificationSection } from './sections/classification-section/classification-section';
 import { CompanySection } from './sections/company-section/company-section';
 import { ContactsSection } from './sections/contacts-section/contacts-section';
 import { CustomFieldsSection } from './sections/custom-fields-section/custom-fields-section';
@@ -117,9 +117,9 @@ const PAGE_SECTION_ORDER = [
     ValueSection,
     MoreSection,
   ],
+  viewProviders: [provideTranslocoScope({ scope: 'lead-form', alias: 'leadForm' })],
   providers: [
     LeadLookups,
-    provideTranslocoScope({ scope: 'lead-form', alias: 'leadForm' }),
     provideIcons({
       tablerChevronDown,
       tablerBuilding,
@@ -142,7 +142,6 @@ export class LeadForm {
 
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
-  private readonly scope = inject(ScopeState);
   readonly lookups = inject(LeadLookups);
   private readonly basicsSection = viewChild(BasicsSection);
   private readonly companySection = viewChild(CompanySection);
@@ -151,6 +150,10 @@ export class LeadForm {
   readonly layout = input<'modal' | 'page'>('modal');
   readonly mode = input<'create' | 'edit'>('create');
   readonly readonly = input(false);
+  readonly customFieldsDenied = input(false);
+  readonly customFieldsFailed = input(false);
+  readonly customFieldsMessage = input('');
+  readonly canUpdateRecord = input(false);
   readonly errors = input<DraftErrors>({});
   readonly showMore = input(false);
   readonly excludePartyId = input<string | null>(null);
@@ -195,6 +198,7 @@ export class LeadForm {
 
   protected readonly hasAnyCustomFields = computed(() => (this.lookups.customFields()?.length ?? 0) > 0);
   protected readonly hasRequiredCustomFields = computed(() => {
+    if (this.customFieldsDenied() || this.customFieldsFailed()) return false;
     const fields = this.lookups.customFields();
     if (!fields?.length) return false;
     return fields.some((field) => field.requiredOnCreate || field.requiredOnUpdate);
@@ -252,22 +256,13 @@ export class LeadForm {
     });
 
     effect(() => {
-      const branches = this.lookups.branches();
+      if (this.readonly()) return;
       const stages = this.lookups.stages();
       const mode = this.mode();
       const currentBranchId = this.branchId();
       const currentStageId = this.draftStageId();
 
-      const nextBranchId =
-        !currentBranchId && branches.length > 0
-          ? (pickCompanyBranchId(
-              this.scope.company(),
-              this.scope.company(),
-              this.scope.branch(),
-              this.scope.companies(),
-              branches,
-            ) ?? branches[0].id)
-          : currentBranchId;
+      const nextBranchId = mode === 'create' ? sessionBranch()?.branchId ?? null : currentBranchId;
       const defaultStageId =
         mode === 'create' && !currentStageId && stages.length > 0 ? pickDefaultStageId(stages) : currentStageId;
 
@@ -275,7 +270,7 @@ export class LeadForm {
         untracked(() => {
           this.draft.update((d) => ({
             ...d,
-            branchId: d.branchId ?? nextBranchId,
+            branchId: nextBranchId,
             stageId: mode === 'create' ? (d.stageId ?? defaultStageId) : d.stageId,
           }));
         });

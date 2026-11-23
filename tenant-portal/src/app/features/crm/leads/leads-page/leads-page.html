@@ -1,16 +1,27 @@
+@if (!canRead()) {
+  <ui-full-state kind="forbidden" [title]="'leads.accessDenied' | transloco" />
+} @else if (!branchId()) {
+  <ui-full-state kind="provisioning" [title]="'leads.chooseBranch' | transloco" />
+} @else {
+@if (kpiCards().length) {
+  <div class="grid grid-cols-2 gap-8 desktop:grid-cols-3 wide:grid-cols-6">
+    @for (card of kpiCards(); track card.key) {
+      <ui-stat-card [label]="'leads.kpis.' + card.key | transloco" [hint]="'leads.kpis.hint' | transloco"
+        [value]="card.value" [chart]="card.chart" />
+    }
+  </div>
+}
 <div class="flex shrink-0 items-center gap-8 rounded-10 bg-surface p-8 shadow-card">
-  <button uiButton class="shrink-0" (click)="openCreate()">
-    <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
-    {{ 'leads.new' | transloco }}
-  </button>
 
   @if (current() === 'table' && selection.count() > 0) {
     <app-lead-bulk-menu
       class="shrink-0"
       [count]="selection.count()"
       [capabilities]="capabilities()?.leads ?? null"
-      [canCreateActivity]="capabilities() ? capabilities()!.activities.create !== null : null"
-      [disabled]="resolvingBulk() || bulkBusy()"
+      [canUpdate]="!!capabilities()?.leads?.update"
+      [canDelete]="!!capabilities()?.leads?.delete"
+      [canCreateActivity]="!!capabilities()?.activities?.create"
+      [disabled]="readOnly() || !capabilities() || resolvingBulk() || bulkBusy()"
       [disabledReason]="bulkBusy() ? ('leadBulk.job.busy' | transloco) : null"
       (action)="openBulkAction($event)"
     />
@@ -57,6 +68,18 @@
   <ui-view-switcher [options]="views()" [label]="'leads.viewSwitcher' | transloco" [value]="current()" (valueChange)="show($event)" />
 </div>
 
+@if (unavailableFacets().length) {
+  <div class="flex flex-wrap gap-8">
+    @for (facet of unavailableFacets(); track facet) {
+      <ui-field [label]="'leads.fields.' + facet | transloco" [for]="'leads-unavailable-' + facet"
+        [hint]="'leads.catalogueUnavailable' | transloco">
+        <input type="text" disabled [id]="'leads-unavailable-' + facet"
+          [attr.aria-describedby]="'leads-unavailable-' + facet + '-hint'" [value]="'leads.unavailable' | transloco" />
+      </ui-field>
+    }
+  </div>
+}
+
 @if (advancedVisible()) {
   <ui-query-builder
     panelId="leads-advanced-search"
@@ -92,11 +115,13 @@
 
 @switch (current()) {
   @case ('board') {
-    <app-lead-board [body]="store.body()" (create)="openCreate($event)" (view)="openLead($event)" (activities)="openActivities($event)" />
+    <app-lead-board [body]="store.body()" [capabilities]="capabilities()" (writeBlocked)="readOnly.set(true)"
+      (view)="openLead($event)" (activities)="openActivities($event)" (countsChanged)="reloadCounts()" />
   }
   @case ('cards') {
     <app-lead-cards
       [body]="store.body()"
+      [capabilities]="capabilities()" (writeBlocked)="readOnly.set(true)"
       [stages]="stages()"
       [stage]="stage()"
       [page]="page()"
@@ -111,6 +136,7 @@
   @case ('table') {
     <app-lead-table
       [body]="store.body()"
+      [capabilities]="capabilities()" (writeBlocked)="readOnly.set(true)"
       [stages]="stages()"
       [stage]="stage()"
       [page]="page()"
@@ -132,3 +158,4 @@
 <app-bulk-stage-modal class="absolute" [branchId]="branchId()" [stages]="stages()" (submitted)="onBulkSubmitted()" />
 <app-bulk-delete-modal class="absolute" [branchId]="branchId()" (submitted)="onBulkSubmitted()" />
 <app-bulk-activity-modal class="absolute" [branchId]="branchId()" (submitted)="onBulkSubmitted()" />
+}

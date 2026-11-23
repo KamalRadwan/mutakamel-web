@@ -5,19 +5,26 @@ import {
   Injector,
   afterNextRender,
   computed,
+  effect,
   inject,
   output,
   signal,
+  untracked,
   viewChild,
 } from '@angular/core';
 import { translationEvents } from '../../../../core/i18n/translation-events';
 import { Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
-import { NgIcon, provideIcons } from '@ng-icons/core';
-import { tablerCloudOff, tablerUserPlus } from '@ng-icons/tabler-icons';
+import { provideIcons } from '@ng-icons/core';
+import { tablerUserPlus } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
-import { Button } from '../../../../shared/ui/button/button';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
+import { leadWriteState } from '../lead-list';
+import { LeadDisqualify } from '../lead-disqualify/lead-disqualify';
+import { sessionBranch } from '../../shared/lookups/session-branch';
+import { readLeadFieldValues } from '../lead-page/lead-record.api';
+import { leadActionRow } from '../lead-page/lead-record-access';
 import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { ConflictDialog } from '../../../../shared/ui/conflict-dialog/conflict-dialog';
 import { UnsavedDialog } from '../../../../shared/ui/unsaved-dialog/unsaved-dialog';
@@ -31,18 +38,17 @@ import {
   ContactDraft,
   DraftErrors,
   LeadDraft,
-  UpdateLeadBody,
   draftFromDetail,
   draftsEqual,
   emptyDraft,
   toCreateBody,
-  toPatchBody,
   validateDraft,
 } from '../lead-form/lead-draft';
 import { LeadDraftStore } from '../lead-form/lead-draft-store';
 import { LeadForm } from '../lead-form/lead-form';
 import { LeadLookups } from '../lead-form/lead-lookups';
-import { mapContactsPatchErrors, toPatchContactsBody } from '../lead-form/sections/contacts-section/contacts-section';
+import { LeadContactSaveError, saveLeadChanges } from '../lead-form/lead-save';
+import { leadServerError } from '../lead-form/lead-server-error';
 import {
   createLead,
   deleteLead,
@@ -50,9 +56,7 @@ import {
   getLeadCapabilities,
   loadSearchOptions,
   moveLead,
-  patchLead,
-  setLeadColor,
-  setLeadRating,
+  updateLead,
 } from '../leads.api';
 import {
   CardColor,
@@ -68,9 +72,9 @@ type ConflictChoice = 'reload' | 'keep' | 'dismiss';
 @Component({
   selector: 'app-lead-modal',
   imports: [
-    NgIcon,
     TranslocoPipe,
-    Button,
+    FullState,
+    LeadDisqualify,
     ConfirmDialog,
     ConflictDialog,
     UnsavedDialog,
@@ -85,7 +89,7 @@ type ConflictChoice = 'reload' | 'keep' | 'dismiss';
       { scope: 'lead-modal', alias: 'leadModal' },
       { scope: 'lead-form', alias: 'leadForm' },
     ),
-    provideIcons({ tablerCloudOff, tablerUserPlus }),
+    provideIcons({ tablerUserPlus }),
   ],
   templateUrl: './lead-modal.html',
   host: {
@@ -106,7 +110,7 @@ export class LeadModal {
   private readonly deleteDialogWrap = viewChild<ElementRef<HTMLElement>>('deleteDialogWrap');
   private readonly deleteDialog = viewChild.required<ConfirmDialog>('deleteDialog');
   private readonly leadForm = viewChild(LeadForm);
-  private readonly formLookups = viewChild<LeadForm, LeadLookups>(LeadForm, { read: LeadLookups });
+  protected readonly formLookups = viewChild<LeadForm, LeadLookups>(LeadForm, { read: LeadLookups });
 
   readonly saved = output<LeadDetail>();
   readonly changed = output<LeadDetail>();
@@ -123,6 +127,25 @@ export class LeadModal {
   protected readonly nav = signal<LeadNavContext | null>(null);
   protected readonly fallbackStages = signal<LeadStage[]>([]);
 
+  protected readonly notFound = signal(false);
+  protected readonly chooseBranch = signal(false);
+  protected readonly loadReference = signal('');
+  protected readonly customFieldsDenied = signal(false);
+  protected readonly customFieldsFailed = signal(false);
+  private readonly disqualify = viewChild(LeadDisqualify);
+  protected readonly writes = leadWriteState(this.capabilities,
+    () => this.retryLoad(), (id) => getLead(id), (row) => {
+      this.detail.update((current) => current ? { ...current, ...row } : current);
+      this.updatedAt.set(row.updatedAt);
+      this.base.update((draft) => ({ ...draft, rating: row.rating, cardColor: row.cardColor }));
+      this.draft.update((draft) => ({ ...draft, rating: row.rating, cardColor: row.cardColor }));
+    });
+  protected readonly canUpdateRecord = computed(() => {
+    const current = this.detail();
+    return !!current && current.id === this.leadId() && !this.loading() && !this.loadFailed()
+      && !this.scopeDenied() && !this.notFound() && !this.chooseBranch() && this.writes.canUpdate(leadActionRow(current));
+  });
+
   protected readonly loading = signal(false);
   private readonly i18nEvents = translationEvents(this.transloco);
   /** The form renders only once the lead-form and lead-modal texts are loaded, so no raw keys flash. */
@@ -133,6 +156,7 @@ export class LeadModal {
     const dict = this.transloco.getTranslation(lang);
     return Boolean(dict['leadForm.basics.individual'] && dict['leadModal.title']);
   });
+  protected readonly scopeDenied = signal(false);
   protected readonly loadFailed = signal(false);
   protected readonly saving = signal(false);
   protected readonly deleting = signal(false);
@@ -164,6 +188,25 @@ export class LeadModal {
   );
 
   constructor() {
+    let previousBranch: string | null | undefined;
+    effect(() => {
+      const scope = sessionBranch();
+      const key = scope ? `${scope.companyId}/${scope.branchId}` : null;
+      const id = this.leadId();
+      const open = this.isOpen();
+      untracked(() => {
+        if (this.mode() === 'create') {
+          this.chooseBranch.set(!scope);
+          this.draft.update((draft) => ({ ...draft, branchId: scope?.branchId ?? null }));
+        }
+        if (previousBranch !== undefined && previousBranch !== key && open && id) {
+          this.detail.set(null);
+          this.capabilities.set(null);
+          void this.loadLead(id);
+        }
+        previousBranch = key;
+      });
+    });
     const onDeleteKeydown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || !this.guardBusy()) return;
       this.dismissDeleteDialog(event);
@@ -187,15 +230,20 @@ export class LeadModal {
     this.onSaveContacts(contacts, editIndex);
 
   protected readonly canEdit = computed(() => {
-    if (this.mode() === 'create') return true;
+    const branch = sessionBranch();
+    if (!branch || this.writes.readOnly() || this.chooseBranch() || this.scopeDenied() || this.notFound()) return false;
+    if (this.mode() === 'create') {
+      const capabilities = this.capabilities() ?? this.formLookups()?.capabilities();
+      return capabilities?.branchId === branch.branchId && !!capabilities.leads.create;
+    }
     const current = this.detail();
-    const caps = this.capabilities();
-    return !!current && !!caps?.leads.update && current.status !== 'CONVERTED';
+    return !!current && current.branchId === branch.branchId && this.canUpdateRecord();
   });
 
   protected readonly canDelete = computed(() => {
     if (this.mode() !== 'edit') return false;
-    return !!this.detail() && !!this.capabilities()?.leads.delete;
+    return !this.loading() && !this.loadFailed() && !this.scopeDenied() && !this.notFound() && !this.chooseBranch()
+      && !!this.detail() && this.detail()!.id === this.leadId() && this.writes.canDelete(leadActionRow(this.detail()!));
   });
 
   protected readonly isReadonly = computed(() => !this.canEdit() || this.loading() || this.loadFailed());
@@ -266,11 +314,16 @@ export class LeadModal {
     this.restoredFromPreset = !!preset?.draft;
 
     const initial = preset?.draft
-      ? preset.draft
-      : emptyDraft(preset?.stageId ? { stageId: preset.stageId } : undefined);
+      ? structuredClone(preset.draft)
+      : emptyDraft({ branchId: sessionBranch()?.branchId ?? null, stageId: preset?.stageId ?? null });
     const baseline = preset?.draft ? emptyDraft() : initial;
 
     this.mode.set('create');
+    this.chooseBranch.set(!sessionBranch());
+    this.notFound.set(false);
+    this.scopeDenied.set(false);
+    this.writes.readOnly.set(false);
+    initial.branchId = sessionBranch()?.branchId ?? null;
     this.leadId.set(null);
     this.nav.set(null);
     this.detail.set(null);
@@ -349,6 +402,10 @@ export class LeadModal {
   protected async save(addAnother: boolean): Promise<boolean> {
     if (this.saving() || this.deleting() || this.loading() || this.loadFailed() || !this.canEdit()) return false;
 
+    if (this.formLookups()?.saveBlocked()) {
+      this.notify.error(this.transloco.translate('leadForm.write.catalogueDenied'));
+      return false;
+    }
     if (this.mode() === 'edit' && this.hasUnsavedContact()) {
       const contactSaved = await (this.leadForm()?.saveEditingContact() ?? Promise.resolve(true));
       if (!contactSaved) return false;
@@ -372,7 +429,7 @@ export class LeadModal {
 
   protected async onRate(rating: number): Promise<void> {
     const current = this.detail();
-    if (this.mode() !== 'edit' || !current || !this.canEdit() || this.instantUpdating() || this.saving() || this.deleting()) return;
+    if (this.mode() !== 'edit' || !current || !this.canUpdateRecord() || this.instantUpdating() || this.saving() || this.deleting()) return;
 
     const prevRating = current.rating;
     const prevBaseRating = this.base().rating;
@@ -384,19 +441,19 @@ export class LeadModal {
     this.instantUpdating.set(true);
 
     try {
-      const updated = await setLeadRating(current.id, rating);
+      const updated = await updateLead(current.id, { rating }, this.updatedAt() ?? undefined);
       if (this.detail()?.id !== current.id) return;
-      this.detail.set(updated);
+      this.detail.set({ ...current, rating: updated.rating, cardColor: updated.cardColor, updatedAt: updated.updatedAt });
       this.updatedAt.set(updated.updatedAt);
       this.base.update((b) => ({ ...b, rating: updated.rating }));
       this.draft.update((d) => ({ ...d, rating: updated.rating }));
       this.changed.emit(updated);
-    } catch {
+    } catch (error) {
       if (this.detail()?.id !== current.id) return;
       this.detail.update((d) => (d ? { ...d, rating: prevRating } : d));
       this.base.update((b) => ({ ...b, rating: prevBaseRating }));
       this.draft.update((d) => ({ ...d, rating: prevDraftRating }));
-      this.notify.error(this.transloco.translate('recordModal.instant.failed'));
+      await this.writes.failure(error, 'recordModal.instant.failed', { lead: current, changes: { rating } });
     } finally {
       this.instantUpdating.set(false);
     }
@@ -404,7 +461,7 @@ export class LeadModal {
 
   protected async onRecolor(cardColor: CardColor | null): Promise<void> {
     const current = this.detail();
-    if (this.mode() !== 'edit' || !current || !this.canEdit() || this.instantUpdating() || this.saving() || this.deleting()) return;
+    if (this.mode() !== 'edit' || !current || !this.canUpdateRecord() || this.instantUpdating() || this.saving() || this.deleting()) return;
 
     const prevColor = current.cardColor;
     const prevBaseColor = this.base().cardColor;
@@ -416,19 +473,19 @@ export class LeadModal {
     this.instantUpdating.set(true);
 
     try {
-      const updated = await setLeadColor(current.id, cardColor);
+      const updated = await updateLead(current.id, { cardColor }, this.updatedAt() ?? undefined);
       if (this.detail()?.id !== current.id) return;
-      this.detail.set(updated);
+      this.detail.set({ ...current, rating: updated.rating, cardColor: updated.cardColor, updatedAt: updated.updatedAt });
       this.updatedAt.set(updated.updatedAt);
       this.base.update((b) => ({ ...b, cardColor: updated.cardColor }));
       this.draft.update((d) => ({ ...d, cardColor: updated.cardColor }));
       this.changed.emit(updated);
-    } catch {
+    } catch (error) {
       if (this.detail()?.id !== current.id) return;
       this.detail.update((d) => (d ? { ...d, cardColor: prevColor } : d));
       this.base.update((b) => ({ ...b, cardColor: prevBaseColor }));
       this.draft.update((d) => ({ ...d, cardColor: prevDraftColor }));
-      this.notify.error(this.transloco.translate('recordModal.instant.failed'));
+      await this.writes.failure(error, 'recordModal.instant.failed', { lead: current, changes: { cardColor } });
     } finally {
       this.instantUpdating.set(false);
     }
@@ -436,7 +493,7 @@ export class LeadModal {
 
   protected async onMoveStage(stageId: string): Promise<void> {
     const current = this.detail();
-    if (this.mode() !== 'edit' || !current || !this.canEdit() || this.instantUpdating() || this.saving() || this.deleting()) return;
+    if (this.mode() !== 'edit' || !current || !this.canUpdateRecord() || this.instantUpdating() || this.saving() || this.deleting()) return;
 
     const targetStage = this.headerStages().find((s) => s.id === stageId);
     const prevStageId = current.stageId;
@@ -455,7 +512,14 @@ export class LeadModal {
     this.instantUpdating.set(true);
 
     try {
-      const movedRow = await moveLead(current.id, stageId);
+      const movedRow = targetStage?.flag === 'DISQUALIFIED'
+        ? await this.disqualify()?.open(current, targetStage) : await moveLead(current.id, stageId);
+      if (!movedRow) {
+        this.detail.set(current);
+        this.base.update((draft) => ({ ...draft, stageId: prevBaseStageId }));
+        this.draft.update((draft) => ({ ...draft, stageId: prevDraftStageId }));
+        return;
+      }
       if (this.detail()?.id !== current.id) return;
       const updatedDetail: LeadDetail = {
         ...current,
@@ -474,14 +538,14 @@ export class LeadModal {
       this.changed.emit(updatedDetail);
       const stageName = targetStage ? nameIn(targetStage, this.language()) : '';
       this.notify.success(this.transloco.translate('leadModal.stage.done', { stage: stageName }));
-    } catch {
+    } catch (error) {
       if (this.detail()?.id !== current.id) return;
       this.detail.update((d) =>
         d ? { ...d, stageId: prevStageId, stageFlag: prevStageFlag, status: prevStatus } : d,
       );
       this.base.update((b) => ({ ...b, stageId: prevBaseStageId }));
       this.draft.update((d) => ({ ...d, stageId: prevDraftStageId }));
-      this.notify.error(this.transloco.translate('recordModal.instant.failed'));
+      await this.writes.failure(error, 'recordModal.instant.failed');
     } finally {
       this.instantUpdating.set(false);
     }
@@ -567,7 +631,7 @@ export class LeadModal {
       this.deleted.emit(current.id);
       this.closeModal();
     } catch (error) {
-      this.toastServerError(errorCodeOf(error));
+      await this.writes.failure(error, 'leads.delete.failed');
     } finally {
       this.deleting.set(false);
     }
@@ -584,11 +648,17 @@ export class LeadModal {
   }
 
   protected onConflictChoice(choice: 'reload' | 'keep'): void {
+    if (this.writes.conflictOpen()) {
+      if (choice === 'reload') this.writes.reloadConflict();
+      else void this.writes.keepConflict();
+      return;
+    }
     this.conflictOpen.set(false);
     this.settleConflict(choice);
   }
 
   protected onConflictOpenChange(open: boolean): void {
+    if (!open) this.writes.conflictOpen.set(false);
     this.conflictOpen.set(open);
     if (!open) {
       this.settleConflict('dismiss');
@@ -758,9 +828,16 @@ export class LeadModal {
       try {
         const [loaded] = await Promise.all([getLead(candidateId), this.ensureFallbackStages()]);
         if (seq !== this.loadSeq) return;
-        const caps = await getLeadCapabilities(loaded.branchId);
+        const [caps, fields] = await Promise.all([
+          getLeadCapabilities(loaded.branchId).catch(() => null),
+          readLeadFieldValues(loaded.branchId, loaded.id).catch(() => {
+            this.customFieldsFailed.set(true);
+            return {};
+          }),
+        ]);
         if (seq !== this.loadSeq) return;
-        this.applyLoadedLead(loaded, caps);
+        this.customFieldsDenied.set(fields === null);
+        this.applyLoadedLead({ ...loaded, customFields: fields ?? {} }, caps);
         return;
       } catch (error) {
         if (seq !== this.loadSeq) return;
@@ -796,24 +873,35 @@ export class LeadModal {
     const seq = ++this.loadSeq;
     this.loading.set(true);
     this.loadFailed.set(false);
-    this.attemptedSubmit.set(false);
-    this.serverErrors.set({});
-    this.instantUpdating.set(false);
-
+    this.notFound.set(false);
+    this.chooseBranch.set(!sessionBranch());
+    this.scopeDenied.set(false);
+    this.capabilities.set(null);
+    this.loadReference.set('');
+    this.customFieldsFailed.set(false);
     try {
-      const [loaded] = await Promise.all([getLead(id), this.ensureFallbackStages()]);
+      const loaded = await getLead(id);
+      const [caps, fields] = await Promise.all([
+        getLeadCapabilities(loaded.branchId).catch(() => null),
+        readLeadFieldValues(loaded.branchId, loaded.id).catch(() => { this.customFieldsFailed.set(true); return {}; }),
+        this.ensureFallbackStages(),
+      ]);
       if (seq !== this.loadSeq) return;
-      const caps = await getLeadCapabilities(loaded.branchId);
+      this.customFieldsDenied.set(fields === null);
+      this.applyLoadedLead({ ...loaded, customFields: fields ?? {} }, caps);
+    } catch (error) {
       if (seq !== this.loadSeq) return;
-      this.applyLoadedLead(loaded, caps);
-    } catch {
-      if (seq !== this.loadSeq) return;
-      this.loading.set(false);
-      this.loadFailed.set(true);
+      this.notFound.set(error instanceof ApiError && error.status === 404);
+      this.chooseBranch.set(error instanceof ApiError && error.code === 'BRANCH_REQUIRED');
+      this.scopeDenied.set(error instanceof ApiError && error.status === 403 && !this.chooseBranch());
+      this.loadFailed.set(!this.notFound() && !this.scopeDenied() && !this.chooseBranch());
+      this.loadReference.set(error instanceof ApiError ? error.correlationId ?? '' : '');
+    } finally {
+      if (seq === this.loadSeq) this.loading.set(false);
     }
   }
 
-  private applyLoadedLead(loaded: LeadDetail, caps: LeadsCapabilities): void {
+  private applyLoadedLead(loaded: LeadDetail, caps: LeadsCapabilities | null): void {
     const mapped = draftFromDetail(loaded);
     this.leadId.set(loaded.id);
     this.detail.set(loaded);
@@ -824,6 +912,9 @@ export class LeadModal {
     this.restoredFromPreset = false;
     this.loading.set(false);
     this.loadFailed.set(false);
+    this.scopeDenied.set(false);
+    this.notFound.set(false);
+    this.chooseBranch.set(false);
     this.formRevision.update((v) => v + 1);
   }
 
@@ -891,6 +982,10 @@ export class LeadModal {
       }
       return true;
     } catch (error) {
+      if (!(error instanceof ApiError && (error.status === 401 || error.status === 0 || error.status >= 500 || error.code === 'GW.IDEM.IN_FLIGHT'))) {
+        this.lastIdempotencyKey = null;
+        this.lastBodyFingerprint = null;
+      }
       this.handleSaveError(error);
       return false;
     } finally {
@@ -906,10 +1001,11 @@ export class LeadModal {
 
     const prevPartyId = this.detail()?.partyId;
     const prevStatus = this.detail()?.status;
-    const patchBody = toPatchBody(this.base(), this.draft(), expectedUpdatedAt);
+    const pendingTagIds = [...this.draft().tagIds];
     this.saving.set(true);
     try {
-      const updated = await patchLead(id, patchBody);
+      const result = await saveLeadChanges({ ...this.detail()!, updatedAt: expectedUpdatedAt }, this.base(), this.draft());
+      const updated = result.lead;
       const mapped = draftFromDetail(updated);
       this.detail.set(updated);
       this.updatedAt.set(updated.updatedAt);
@@ -920,10 +1016,17 @@ export class LeadModal {
       if (updated.partyId !== prevPartyId || updated.status !== prevStatus) {
         invalidateRelatedCounts('LEAD', updated.id);
       }
-      this.notify.success(this.transloco.translate('recordModal.saved'));
+      if (result.tagError) {
+        this.draft.update((draft) => ({ ...draft, tagIds: pendingTagIds }));
+        this.handleTagSaveError(result.tagError);
+      } else this.notify.success(this.transloco.translate('recordModal.saved'));
       this.saved.emit(updated);
       return true;
     } catch (error) {
+      if (error instanceof LeadContactSaveError) {
+        await this.handlePartialContacts(error);
+        return false;
+      }
       if (this.isConcurrentUpdate(error)) {
         this.saving.set(false);
         return this.handleConflict(id);
@@ -936,33 +1039,25 @@ export class LeadModal {
   }
 
   private async handleConflict(id: string): Promise<boolean> {
-    if (this.anyGuardBusy()) return false;
     const choice = await this.openConflictDialog();
     if (choice === 'dismiss') return false;
-
     try {
-      const fresh = await getLead(id);
-      const caps = await getLeadCapabilities(fresh.branchId);
+      const fresh = { ...await getLead(id), customFields: this.detail()?.customFields ?? {} };
+      const freshDraft = draftFromDetail(fresh);
       if (choice === 'reload') {
-        this.applyLoadedLead(fresh, caps);
-        return false;
+        this.detail.set(fresh);
+        this.base.set(freshDraft);
+        this.draft.set(structuredClone(freshDraft));
+        this.updatedAt.set(fresh.updatedAt);
+        this.serverErrors.set({});
+        this.formRevision.update((value) => value + 1);
+      } else {
+        this.detail.set(fresh);
+        this.updatedAt.set(fresh.updatedAt);
       }
-
-      const oldBase = this.base();
-      const userDraft = this.draft();
-      const freshBase = draftFromDetail(fresh);
-      const rebased = this.rebaseDraft(oldBase, userDraft, freshBase);
-
-      this.detail.set(fresh);
-      this.updatedAt.set(fresh.updatedAt);
-      this.capabilities.set(caps);
-      this.base.set(freshBase);
-      this.draft.set(rebased);
-      return await this.save(false);
-    } catch (error) {
-      this.toastServerError(errorCodeOf(error));
-      return false;
-    }
+      if (fresh.status === 'CONVERTED') this.writes.readOnly.set(true);
+    } catch (error) { this.handleSaveError(error); }
+    return false;
   }
 
   private rebaseDraft(oldBase: LeadDraft, userDraft: LeadDraft, freshBase: LeadDraft): LeadDraft {
@@ -984,24 +1079,22 @@ export class LeadModal {
       return {};
     }
 
-    const body: UpdateLeadBody = {
-      expectedUpdatedAt,
-      contacts: toPatchContactsBody(nextContacts, current.existingCompany),
-    };
-
+    const contactDraft = { ...this.base(), contacts: nextContacts };
     this.instantUpdating.set(true);
     try {
-      const updated = await patchLead(id, body);
+      const { lead: updated } = await saveLeadChanges({ ...current, updatedAt: expectedUpdatedAt }, this.base(), contactDraft);
       if (this.leadId() !== id) return {};
       this.applyPatchedContacts(updated);
       return null;
     } catch (error) {
-      if (this.isConcurrentUpdate(error)) {
-        this.instantUpdating.set(false);
-        return await this.handleContactsConflict(id, nextContacts, editIndex);
+      if (error instanceof LeadContactSaveError) {
+        await this.handlePartialContacts(error, contactDraft);
+        return leadServerError(this.transloco, error.error, contactDraft,
+          this.formLookups()?.customFields() ?? [], editIndex).errors;
       }
-      this.toastServerError(errorCodeOf(error));
-      return mapContactsPatchErrors(error, nextContacts, editIndex);
+      this.handleSaveError(error);
+      return leadServerError(this.transloco, error, contactDraft,
+        this.formLookups()?.customFields() ?? [], editIndex).errors;
     } finally {
       this.instantUpdating.set(false);
     }
@@ -1025,101 +1118,53 @@ export class LeadModal {
     this.saved.emit(updated);
   }
 
-  private async handleContactsConflict(
-    id: string,
-    nextContacts: ContactDraft[],
-    editIndex?: number,
-  ): Promise<DraftErrors | null> {
-    if (this.anyGuardBusy()) return {};
-    const choice = await this.openConflictDialog();
-    if (choice === 'dismiss') return {};
-
-    try {
-      const fresh = await getLead(id);
-      const caps = await getLeadCapabilities(fresh.branchId);
-      if (choice === 'reload') {
-        this.applyLoadedLead(fresh, caps);
-        return {};
-      }
-      if (fresh.status === 'CONVERTED' || !caps.leads.update) {
-        this.toastServerError(fresh.status === 'CONVERTED' ? 'LEAD_ALREADY_CONVERTED' : 'CRM_SCOPED_PERMISSION_DENIED');
-        this.applyLoadedLead(fresh, caps);
-        return {};
-      }
-
-      const oldBase = this.base();
-      const userDraft = this.draft();
-      const freshBase = draftFromDetail(fresh);
-      const rebased = this.rebaseDraft(oldBase, userDraft, freshBase);
-      rebased.contacts = freshBase.contacts.map((c) => ({ ...c, phones: [...c.phones] }));
-
-      this.detail.set(fresh);
-      this.updatedAt.set(fresh.updatedAt);
-      this.capabilities.set(caps);
-      this.base.set(freshBase);
-      this.draft.set(rebased);
-      return await this.onSaveContacts(nextContacts, editIndex);
-    } catch (error) {
-      this.toastServerError(errorCodeOf(error));
-      return {};
-    }
-  }
 
   private handleSaveError(error: unknown): void {
-    const code = errorCodeOf(error);
-    if (code === 'GW.IDEM.IN_FLIGHT') {
-      this.toastServerError(code);
-      return;
+    const mapped = leadServerError(this.transloco, error, this.draft(), this.formLookups()?.customFields() ?? []);
+    this.serverErrors.set(mapped.errors);
+    if (mapped.readOnly) this.writes.readOnly.set(true);
+    if (mapped.notFound) this.notFound.set(true);
+    if (Object.keys(mapped.errors).length) {
+      afterNextRender(() => this.leadForm()?.focusFirstError(), { injector: this.injector });
     }
-
-    const details = error instanceof ApiError ? error.details : undefined;
-    if (error instanceof ApiError && error.status === 422 && code) {
-      const nextErrors: DraftErrors = {};
-      let fieldLabel = '';
-
-      if (code === 'CUSTOM_FIELD_REQUIRED' || code.endsWith('.CUSTOM_FIELD_REQUIRED')) {
-        const fieldKey = typeof details?.['fieldKey'] === 'string' ? details['fieldKey'] : '';
-        if (fieldKey) {
-          nextErrors[`customFields.${fieldKey}`] = this.pickFormErrorKey(['required'], 'required');
-          fieldLabel = this.customFieldLabel(fieldKey);
-        }
-      } else if (code.endsWith('_VALUE_INVALID') || code === 'CUSTOM_FIELD_VALUE_INVALID') {
-        const fieldKey = typeof details?.['fieldKey'] === 'string' ? details['fieldKey'] : '';
-        if (fieldKey) {
-          nextErrors[`customFields.${fieldKey}`] = this.customFieldErrorKey(fieldKey);
-          fieldLabel = this.customFieldLabel(fieldKey);
-        }
-      } else if (code === 'LEAD_PHONE_INVALID' || code.endsWith('.LEAD_PHONE_INVALID')) {
-        nextErrors['reach'] = this.pickFormErrorKey(['phoneInvalid', 'reachRequired'], 'phoneInvalid');
-      } else if (code === 'LEAD_COMPANY_NAME_REQUIRED' || code.endsWith('.LEAD_COMPANY_NAME_REQUIRED')) {
-        nextErrors['companyName'] = 'required';
-      } else if (code === 'LEAD_CONTACT_NAME_REQUIRED' || code.endsWith('.LEAD_CONTACT_NAME_REQUIRED')) {
-        const contactIndex = this.draft().contacts.findIndex((c) => !c.contactPartyId && !c.firstName.trim());
-        nextErrors[`contacts.${contactIndex >= 0 ? contactIndex : 0}.firstName`] = 'required';
-      }
-
-      if (Object.keys(nextErrors).length > 0) {
-        this.serverErrors.set(nextErrors);
-        this.toastServerError(code, fieldLabel ? { field: fieldLabel } : undefined);
-        afterNextRender(() => this.focusFirstValidationError(nextErrors), { injector: this.injector });
-        return;
-      }
-    }
-
-    this.toastServerError(code);
+    this.notify.error(mapped.message);
   }
 
-  private focusFirstValidationError(errors: DraftErrors): void {
-    if (errors['firstName'] || errors['lastName'] || errors['companyName']) {
-      this.leadForm()?.focusName();
-      return;
-    }
-    this.leadForm()?.focusFirstError();
+  private handleTagSaveError(error: unknown): void {
+    const mapped = leadServerError(this.transloco, error, this.draft());
+    if (mapped.readOnly) this.writes.readOnly.set(true);
+    this.notify.error(this.transloco.translate('leadForm.write.tagsFailed'), mapped.message);
   }
+
+  private async handlePartialContacts(error: LeadContactSaveError, contactDraft?: LeadDraft): Promise<void> {
+    const pending = contactDraft ? { ...this.draft(), contacts: error.remaining.contacts } : error.remaining;
+    if (error.fresh) {
+      this.detail.set(error.fresh);
+      this.updatedAt.set(error.fresh.updatedAt);
+      this.base.set(draftFromDetail(error.fresh));
+    } else {
+      // No safe token is available; a reload is required before another save.
+      this.writes.readOnly.set(true);
+    }
+    this.draft.set(pending);
+    this.formRevision.update((value) => value + 1);
+    const mapped = leadServerError(this.transloco, error.error, pending, this.formLookups()?.customFields() ?? []);
+    this.serverErrors.set(mapped.errors);
+    if (mapped.readOnly) this.writes.readOnly.set(true);
+    const saved = error.saved.map((item) => this.transloco.translate(`leadForm.write.contactOperation.${item.op}`, { name: item.name })).join('; ');
+    this.notify.error(this.transloco.translate('leadForm.write.contactsStopped'),
+      this.transloco.translate('leadForm.write.contactsSaved', { saved: saved || this.transloco.translate('leadForm.write.noneSaved') }) + ' ' + mapped.message);
+    if (mapped.conflict) {
+      this.saving.set(false);
+      this.instantUpdating.set(false);
+      await this.handleConflict(error.fresh?.id ?? this.leadId()!);
+    }
+  }
+
+  private focusFirstValidationError(_errors: DraftErrors): void { this.leadForm()?.focusFirstError(); }
 
   private isConcurrentUpdate(error: unknown): boolean {
-    if (!(error instanceof ApiError)) return false;
-    return error.status === 409 && error.code === 'CRM.LEAD.CONCURRENT_UPDATE';
+    return error instanceof ApiError && error.code === 'CRM.LEAD.CONCURRENT_UPDATE';
   }
 
   private onlyNullBranchOrStageAdded(prev: LeadDraft, next: LeadDraft): boolean {
@@ -1134,52 +1179,7 @@ export class LeadModal {
     return draftsEqual(normalized, next);
   }
 
-  private customFieldErrorKey(fieldKey: string): string {
-    const field = (this.formLookups()?.customFields() ?? []).find((item) => item.fieldKey === fieldKey);
-    switch (field?.type) {
-      case 'NUMBER':
-        return 'cfNumber';
-      case 'DATE':
-      case 'DATETIME':
-        return 'cfDate';
-      case 'URL':
-        return 'cfUrl';
-      case 'EMAIL':
-        return 'cfEmail';
-      case 'PHONE':
-        return 'cfPhone';
-      default:
-        return this.pickFormErrorKey(['cfInvalid', 'valueInvalid', 'invalid', 'required'], 'required');
-    }
-  }
-
-  private customFieldLabel(fieldKey: string): string {
-    const field = (this.formLookups()?.customFields() ?? []).find((item) => item.fieldKey === fieldKey);
-    return field ? nameIn(field, this.language()) : fieldKey;
-  }
-
-  private pickFormErrorKey(candidates: readonly string[], fallback: string): string {
-    for (const key of candidates) {
-      const full = `leadForm.errors.${key}`;
-      const translated = this.transloco.translate(full);
-      if (translated && translated !== full) return key;
-    }
-    return fallback;
-  }
-
-  private toastServerError(code: string | null, params?: Record<string, string>): void {
-    if (code) {
-      const scoped = `leadForm.server.${code}`;
-      const message = this.transloco.translate(scoped, params);
-      if (message && message !== scoped) {
-        this.notify.error(message);
-        return;
-      }
-    }
-    const genericKey = 'leadForm.server.generic';
-    const genericMsg = this.transloco.translate(genericKey);
-    this.notify.error(
-      genericMsg && genericMsg !== genericKey ? genericMsg : this.transloco.translate('recordModal.instant.failed'),
-    );
+  private toastServerError(code: string | null): void {
+    this.handleSaveError(code ? new ApiError(422, code) : new Error('save_failed'));
   }
 }

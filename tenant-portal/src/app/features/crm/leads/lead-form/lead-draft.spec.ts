@@ -292,14 +292,13 @@ describe('toPatchBody', () => {
     expect(body.ownerUserId).toBeUndefined();
   });
 
-  it('sends the full contact list when a contact changed', () => {
+  it('leaves contact changes to the contactChange sequence', () => {
     const corp = corporate();
     const edited = { ...corp, contacts: [{ ...corp.contacts[0], jobTitle: 'CFO' }] };
 
     const body = toPatchBody(corp, edited, 'v1');
 
-    expect(body.contacts).toHaveLength(1);
-    expect(body.contacts?.[0]).toMatchObject({ jobTitle: 'CFO', isPrimary: true });
+    expect(body).toEqual({ expectedUpdatedAt: 'v1' });
   });
 
   it('does not send contacts when they are unchanged', () => {

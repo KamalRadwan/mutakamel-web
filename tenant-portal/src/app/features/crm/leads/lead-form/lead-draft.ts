@@ -128,6 +128,7 @@ export interface UpdateLeadBody {
   expectedUpdatedAt?: string;
   ownerUserId?: string | null;
   acquisitionSourceId?: string | null;
+  /** Legacy fake compatibility only. patchLead rejects this; edit uses the tag routes. */
   tagIds?: string[];
   rating?: number;
   cardColor?: CardColor | null;
@@ -143,7 +144,9 @@ export interface UpdateLeadBody {
   companyPhones?: string[];
   companyEmail?: string | null;
   companyWebsite?: string | null;
+  /** Legacy fake compatibility only. The live editor uses contactChange exclusively. */
   contacts?: CreateLeadContactBody[];
+  contactChange?: LeadContactChange;
   address?: LeadAddressBody;
   description?: string | null;
   interestSummary?: string | null;
@@ -152,6 +155,11 @@ export interface UpdateLeadBody {
   currencyCode?: CurrencyCode | null;
   customFields?: Record<string, unknown>;
 }
+
+export type LeadContactChange =
+  | { op: 'ADD'; contact: CreateLeadContactBody }
+  | { op: 'UPDATE'; contactPartyId: string; contact: CreateLeadContactBody }
+  | { op: 'REMOVE' | 'SET_PRIMARY'; contactPartyId: string };
 
 export const LEAD_LIMITS: {
   name: 80;
@@ -300,7 +308,7 @@ export function draftFromDetail(detail: LeadDetail): LeadDraft {
           phones: c.phones.length > 0 ? [...c.phones] : [''],
           email: c.email ?? '',
         }))
-      : [newContact(true)]
+      : []
     : [];
 
   return {
@@ -846,41 +854,6 @@ function stringArraysEqual(a: readonly string[], b: readonly string[]): boolean 
   return true;
 }
 
-function contactSignature(c: ContactDraft, baseContact?: ContactDraft): CreateLeadContactBody {
-  const honorificTitle = trimOrUndefined(c.honorificTitle);
-  const jobTitle = trimOrUndefined(c.jobTitle);
-  if (c.contactPartyId) {
-    const out: CreateLeadContactBody = {
-      contactPartyId: c.contactPartyId,
-      isPrimary: c.isPrimary,
-    };
-    if (jobTitle) {
-      out.jobTitle = jobTitle;
-    } else if (baseContact && trimOrUndefined(baseContact.jobTitle)) {
-      out.jobTitle = null;
-    }
-    if (honorificTitle) {
-      out.honorificTitle = honorificTitle;
-    } else if (baseContact && trimOrUndefined(baseContact.honorificTitle)) {
-      out.honorificTitle = null;
-    }
-    return out;
-  }
-  const phones = cleanPhones(c.phones);
-  const lastName = trimOrUndefined(c.lastName);
-  const email = trimOrUndefined(c.email);
-  const out: CreateLeadContactBody = {
-    firstName: c.firstName.trim(),
-    isPrimary: c.isPrimary,
-  };
-  if (honorificTitle) out.honorificTitle = honorificTitle;
-  if (lastName) out.lastName = lastName;
-  if (jobTitle) out.jobTitle = jobTitle;
-  if (phones.length > 0) out.phones = phones;
-  if (email) out.email = email;
-  return out;
-}
-
 function contactsEqual(a: readonly ContactDraft[], b: readonly ContactDraft[]): boolean {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) {
@@ -969,9 +942,6 @@ export function toPatchBody(base: LeadDraft, draft: LeadDraft, expectedUpdatedAt
     body.ownerUserId = nextOwnerId;
   }
   patchNullable('acquisitionSourceId', base.acquisitionSourceId, draft.acquisitionSourceId);
-  if (!stringArraysEqual(base.tagIds, draft.tagIds)) {
-    body.tagIds = [...draft.tagIds];
-  }
   if (base.rating !== draft.rating) {
     body.rating = draft.rating;
   }
@@ -1013,14 +983,6 @@ export function toPatchBody(base: LeadDraft, draft: LeadDraft, expectedUpdatedAt
       patchNullable('companyWebsite', base.companyWebsite, draft.companyWebsite);
     }
 
-    if (!contactsEqual(base.contacts, draft.contacts)) {
-      const baseByPartyId = new Map(
-        base.contacts.filter((c) => !!c.contactPartyId).map((c) => [c.contactPartyId!, c]),
-      );
-      body.contacts = draft.contacts.map((c) =>
-        contactSignature(c, c.contactPartyId ? baseByPartyId.get(c.contactPartyId) : undefined),
-      );
-    }
   }
 
   if (draft.leadProfileType === 'INDIVIDUAL' || !draft.existingCompanyPartyId?.trim()) {
@@ -1032,8 +994,11 @@ export function toPatchBody(base: LeadDraft, draft: LeadDraft, expectedUpdatedAt
   patchNullable('description', base.description, draft.description);
   patchNullable('interestSummary', base.interestSummary, draft.interestSummary);
   patchNullable('expectedNeed', base.expectedNeed, draft.expectedNeed);
-  patchNullable('expectedValue', base.expectedValue, draft.expectedValue);
-  patchNullable('currencyCode', base.currencyCode, draft.currencyCode);
+  if (trimOrNull(base.expectedValue) !== trimOrNull(draft.expectedValue)
+    || trimOrNull(base.currencyCode) !== trimOrNull(draft.currencyCode)) {
+    body.expectedValue = trimOrNull(draft.expectedValue);
+    body.currencyCode = trimOrNull(draft.currencyCode);
+  }
 
   const changedCustomFields: Record<string, unknown> = {};
   let hasCustomChanges = false;

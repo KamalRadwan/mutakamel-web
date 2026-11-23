@@ -13,7 +13,7 @@
       size="bare"
       [label]="'leads.disqualify.reason' | transloco"
       [for]="reasonsLoading() ? '' : reasonId"
-      [hint]="'leads.disqualify.reasonHint' | transloco"
+      [hint]="(reasonsUnavailable() ? 'leads.disqualify.noAccess' : 'leads.disqualify.reasonHint') | transloco"
       [required]="true"
       [error]="reasonError()"
     >
@@ -30,13 +30,15 @@
           [describedBy]="describedBy()"
           [options]="reasonOptions()"
           [value]="selectedReasonId()"
-          [disabled]="submitting() || noReasons()"
+          [disabled]="readOnly() || submitting() || noReasons()"
           (valueChange)="onReasonChange($event)"
         />
       }
     </ui-field>
 
-    @if (noReasons()) {
+    @if (reasonsUnavailable()) {
+      <p class="text-12 leading-18 text-text-muted" role="status">{{ 'leads.disqualify.noAccess' | transloco }}</p>
+    } @else if (noReasons()) {
       <p class="text-12 leading-18 text-text-muted">{{ 'leads.disqualify.noReasons' | transloco }}</p>
     }
   </div>
@@ -47,7 +49,7 @@
       uiButton
       variant="danger"
       [loading]="submitting()"
-      [disabled]="submitting() || reasonsLoading() || noReasons()"
+      [disabled]="readOnly() || submitting() || reasonsLoading() || noReasons()"
       (click)="confirm()"
     >
       {{ 'leads.disqualify.confirm' | transloco }}

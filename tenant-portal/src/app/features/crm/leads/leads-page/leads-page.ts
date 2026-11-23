@@ -2,15 +2,21 @@ import { Component, computed, effect, inject, input, linkedSignal, resource, sig
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { tablerAdjustmentsHorizontal, tablerLayoutGrid, tablerLayoutKanban, tablerPlus, tablerTable } from '@ng-icons/tabler-icons';
+import { tablerAdjustmentsHorizontal, tablerLayoutGrid, tablerLayoutKanban, tablerTable } from '@ng-icons/tabler-icons';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope, translateObjectSignal } from '@jsverse/transloco';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
-import { ScopeState } from '../../../../core/scope/scope';
+import { TenantScopeState } from '../../../../core/scope/tenant-scope';
+import { sessionBranch } from '../../shared/lookups/session-branch';
+import { runInCrm } from '../../shared/crm-runtime';
+import { listAssignableOwners } from '../../shared/lookups/assignable-owners';
+import { can } from '../../../../shared/widgets/dashboard/analytics-permissions';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
+import { StatCard } from '../../../../shared/ui/stat-card/stat-card';
+import { Field } from '../../../../shared/ui/field/field';
 import { listBulkJobItems } from '../../../../shared/bulk-jobs/bulk-jobs.api';
 import { BulkJobsTracker } from '../../../../shared/bulk-jobs/bulk-jobs-tracker';
 import { FieldOption, Query } from '../../../../shared/query-builder/query.model';
-import { Button } from '../../../../shared/ui/button/button';
 import { FacetSearch } from '../../../../shared/ui/facet-search/facet-search';
 import { SearchFacet, SearchField, SearchOption } from '../../../../shared/ui/facet-search/facet-search.model';
 import { QueryBuilder } from '../../../../shared/ui/query-builder/query-builder/query-builder';
@@ -34,8 +40,8 @@ import { ADVANCED_FACET_FIELD } from '../lead-search/lead-search.chips';
 import { LeadSearchBody, WireNode } from '../lead-search/lead-search.compile';
 import { LeadSearchStore } from '../lead-search/lead-search.store';
 import { LeadTable } from '../lead-table/lead-table';
-import { getLeadCapabilities, listLeadBranches, loadBoard, loadSearchOptions } from '../leads.api';
-import { LEAD_VIEWS, LeadDetail, LeadRow, LeadStatus, LeadView, LeadsCapabilities, StageCounts, StageFlag, nameIn, stageCountsOf } from '../leads.model';
+import { getLeadCapabilities, loadLeadKpis, loadSearchOptions } from '../leads.api';
+import { LEAD_VIEWS, LeadDetail, LeadRow, LeadStatus, LeadView, LeadsCapabilities, StageCounts, StageFlag, nameIn } from '../leads.model';
 
 const VIEW_ICONS: Record<LeadView, string> = { board: 'tablerLayoutKanban', cards: 'tablerLayoutGrid', table: 'tablerTable' };
 const PRESETS = ['mine', 'unassigned', 'overdue', 'hot'];
@@ -62,24 +68,14 @@ function parsePageSize(raw: string | undefined): number {
   return PAGE_SIZES.includes(parsed) ? parsed : DEFAULT_PAGE_SIZE;
 }
 
-const FAKE_OWNERS: readonly FieldOption[] = [
-  { value: 'u1', label: 'Kamal Radwan' },
-  { value: 'u2', label: 'Mona Adel' },
-  { value: 'u3', label: 'Omar Fathy' },
-];
-
-async function searchFakeOwners(term: string): Promise<FieldOption[]> {
-  const clean = term.trim().toLowerCase();
-  if (!clean) return [...FAKE_OWNERS];
-  return FAKE_OWNERS.filter((owner) => owner.label.toLowerCase().includes(clean));
-}
-
 @Component({
   selector: 'app-leads-page',
   imports: [
     NgIcon,
     TranslocoPipe,
-    Button,
+    FullState,
+    StatCard,
+    Field,
     FacetSearch,
     QueryBuilder,
     StepFilter,
@@ -101,12 +97,13 @@ async function searchFakeOwners(term: string): Promise<FieldOption[]> {
     LeadSelection,
     provideTranslocoScope(
       'leads',
+      'settings',
       { scope: 'record-related', alias: 'recordRelated' },
       { scope: 'lead-search', alias: 'leadSearch' },
       { scope: 'lead-bulk-bar', alias: 'bulkBar' },
       { scope: 'lead-bulk-actions', alias: 'leadBulk' },
     ),
-    provideIcons({ tablerAdjustmentsHorizontal, tablerLayoutKanban, tablerLayoutGrid, tablerTable, tablerPlus }),
+    provideIcons({ tablerAdjustmentsHorizontal, tablerLayoutKanban, tablerLayoutGrid, tablerTable }),
   ],
   templateUrl: './leads-page.html',
   host: { class: 'flex flex-1 shrink-0 flex-col gap-8 p-12' },
@@ -114,15 +111,34 @@ async function searchFakeOwners(term: string): Promise<FieldOption[]> {
 export class LeadsPage {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
-  private readonly scope = inject(ScopeState);
+  private readonly scope = inject(TenantScopeState);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly language = inject(LanguageState).current;
   private readonly tracker = inject(BulkJobsTracker);
   private readonly queryParams = toSignal(this.route.queryParamMap);
   private readonly texts = translateObjectSignal(GROUPS, {}, 'leads');
-  private readonly options = resource({ loader: () => loadSearchOptions() });
-  private readonly branches = resource({ loader: () => listLeadBranches().catch(() => []) });
+  protected readonly canRead = computed(() => { this.scope.me(); return can('crm.leads.read'); });
+  private readonly options = resource({
+    params: () => this.canRead() && this.branchId() ? this.branchId() : undefined,
+    loader: () => loadSearchOptions(),
+  });
+  protected readonly unavailable = computed(() => this.options.value()?.unavailable ?? []);
+  protected readonly ownersUnavailable = signal(false);
+  protected readonly unavailableFacets = computed(() => [...this.unavailable(), ...(this.ownersUnavailable() ? ['owner'] : [])]);
+  private readonly searchOwners = async (term: string): Promise<FieldOption[]> => {
+    const branchId = this.branchId();
+    if (!branchId || !this.canRead()) return [];
+    try {
+      const page = await listAssignableOwners(branchId, 'leads', 'update');
+      this.ownersUnavailable.set(false);
+      return page.items.filter((owner) => owner.displayName.toLowerCase().includes(term.trim().toLowerCase()))
+        .map((owner) => ({ value: owner.id, label: owner.displayName }));
+    } catch {
+      this.ownersUnavailable.set(true);
+      return [];
+    }
+  };
   private readonly recordActivities = viewChild.required(RecordActivities);
   protected readonly store = inject(LeadSearchStore);
   protected readonly selection = inject(LeadSelection);
@@ -154,13 +170,28 @@ export class LeadsPage {
       this.store.facets().some((facet) => facet.field === ADVANCED_FACET_FIELD),
   );
   protected readonly stages = computed(() => this.options.value()?.stages ?? []);
+  private readonly kpis = resource({
+    params: () => this.canRead() && this.branchId() ? this.effectiveBody() : undefined,
+    loader: ({ params }) => loadLeadKpis(params),
+  });
+  protected readonly kpiCards = computed(() => {
+    const values = this.kpis.value();
+    if (!values || this.kpis.error()) return [];
+    return (['totalLeads', 'newStageLeads', 'newTodayLeads', 'hotLeads', 'overdueActivityLeads', 'qualifiedLeads'] as const)
+      .map((key) => ({ key, value: String(values[key]), chart: { shape: 'progress' as const,
+        ratio: values.totalLeads ? values[key] / values.totalLeads : 0 } }));
+  });
 
   private lastCounts: StageCounts | undefined;
+  private countsBranch = '';
   private readonly counts = resource({
-    params: () => this.store.body(),
+    params: () => this.canRead() && this.branchId() ? this.store.body() : undefined,
     loader: async ({ params }) => {
+      if (this.countsBranch !== params.branchId) { this.lastCounts = undefined; this.countsBranch = params.branchId; }
       try {
-        const res = stageCountsOf(await loadBoard(params));
+        const kpis = await loadLeadKpis(params);
+        const res: StageCounts = { total: kpis.totalLeads,
+          byStage: Object.fromEntries(kpis.byStage.map(({ stageId, count }) => [stageId, count])) };
         this.lastCounts = res;
         return res;
       } catch (error) {
@@ -245,21 +276,17 @@ export class LeadsPage {
   private selectFailedSeq = 0;
 
   protected readonly branchId = computed<string>(() => {
-    const active = this.scope.branch();
-    const list = this.branches.value() ?? [];
-    const matched =
-      list.find((item) => item.id === active?.id) ??
-      list.find((item) => item.name === active?.nameEn || item.name === active?.nameAr) ??
-      list[0];
-    return matched?.id ?? 'b1';
+    return runInCrm(() => sessionBranch())?.branchId ?? '';
   });
 
   private readonly capabilitiesResource = resource({
-    params: () => this.branchId(),
+    params: () => this.canRead() && this.branchId() ? this.branchId() : undefined,
     loader: ({ params }) => getLeadCapabilities(params).catch(() => null),
   });
 
+  protected readonly readOnly = signal(false);
   protected readonly capabilities = computed<LeadsCapabilities | null>(() =>
+    this.readOnly() ? null :
     this.capabilitiesResource.hasValue() ? this.capabilitiesResource.value() : null,
   );
 
@@ -301,17 +328,19 @@ export class LeadsPage {
   });
 
   constructor() {
+    effect(() => { this.branchId(); untracked(() => this.readOnly.set(false)); });
     this.lastBodyJson = JSON.stringify(this.effectiveBody());
     this.selection.onBodyChange(this.effectiveBody());
-    this.store.init({ branchId: this.branchId(), stages: [], sources: [], tags: [], owners: searchFakeOwners });
+    this.store.init({ branchId: this.canRead() ? this.branchId() : '', stages: [], sources: [], tags: [], owners: this.searchOwners });
     effect(() => {
       const options = this.options.value();
       this.store.init({
-        branchId: this.branchId(),
+        branchId: this.canRead() ? this.branchId() : '',
         stages: options?.stages ?? [],
         sources: options?.sources ?? [],
         tags: options?.tags ?? [],
-        owners: searchFakeOwners,
+        owners: this.searchOwners,
+        unavailable: [...(options?.unavailable ?? []), ...(this.ownersUnavailable() ? ['owner' as const] : [])],
       });
     });
     effect(() => {
@@ -448,6 +477,7 @@ export class LeadsPage {
 
   protected reloadCounts() {
     this.counts.reload();
+    this.kpis.reload();
   }
 
   protected toggleAdvanced() {
@@ -548,7 +578,7 @@ export class LeadsPage {
   }
 
   protected async openBulkAction(action: BulkActionId): Promise<void> {
-    if (this.resolvingBulk() || this.bulkBusy() || this.selection.count() <= 0) return;
+    if (!this.capabilities() || this.readOnly() || this.resolvingBulk() || this.bulkBusy() || this.selection.count() <= 0) return;
     this.resolvingBulk.set(true);
     let rows: SelectedRow[];
     try {

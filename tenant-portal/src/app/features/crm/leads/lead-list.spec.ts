@@ -8,6 +8,10 @@ import type { LeadDisqualify } from './lead-disqualify/lead-disqualify';
 import { leadList } from './lead-list';
 import { fakeGetLead, fakeListLeadStages } from './leads.fake';
 import { LeadDetail, LeadRow, LeadStage } from './leads.model';
+import { bindCrmHttpForTest } from '../shared/crm-http';
+import { LeadListTestHttp, LIST_CAPABILITIES } from './lead-board/lead-list.testing';
+
+let disposeHttp: () => void;
 
 /* Cards and Table views: a move into Disqualified changes nothing until the dialog confirms. */
 
@@ -32,7 +36,7 @@ function setup(open: LeadDisqualify['open']) {
   const onChanged = vi.fn();
   const dialog = { open } as unknown as LeadDisqualify;
   const list = TestBed.runInInjectionContext(() =>
-    leadList(signal({ branchId: 'b1' }), signal(stages), undefined, undefined, undefined, undefined, onChanged, () => dialog),
+    leadList(signal({ branchId: 'b1' }), signal(stages), undefined, undefined, undefined, undefined, onChanged, () => dialog, signal(LIST_CAPABILITIES)),
   );
   TestBed.tick();
   return { list, onChanged };
@@ -40,6 +44,7 @@ function setup(open: LeadDisqualify['open']) {
 
 beforeEach(async () => {
   vi.useFakeTimers();
+  disposeHttp = bindCrmHttpForTest(new LeadListTestHttp());
   TestBed.configureTestingModule({
     providers: [
       provideTransloco({
@@ -52,6 +57,7 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
+  disposeHttp();
   TestBed.resetTestingModule();
   vi.useRealTimers();
 });

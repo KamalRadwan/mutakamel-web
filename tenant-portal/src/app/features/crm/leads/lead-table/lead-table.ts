@@ -8,6 +8,8 @@ import { LanguageState } from '../../../../core/i18n/language';
 import { ActionSelection, ActionsMenu } from '../../../../shared/ui/actions-menu/actions-menu';
 import { Checkbox } from '../../../../shared/ui/checkbox/checkbox';
 import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
+import { ConflictDialog } from '../../../../shared/ui/conflict-dialog/conflict-dialog';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { Pagination } from '../../../../shared/ui/pagination/pagination';
 import { PhoneActionSource, PhoneActionSourceType, PhoneActions } from '../../../../shared/widgets/phone-actions/phone-actions';
 import { DEFAULT_LIST_PAGE_SIZE, createListPageSize } from '../../shared/record/list/page-size';
@@ -19,7 +21,7 @@ import { LeadDisqualify } from '../lead-disqualify/lead-disqualify';
 import { leadList } from '../lead-list';
 import { LeadLocations } from '../lead-location';
 import { LeadSearchBody } from '../lead-search/lead-search.compile';
-import { CardColor, LeadNavContext, LeadRow, LeadStage, initials, nameIn, ownerName } from '../leads.model';
+import { CardColor, LeadNavContext, LeadRow, LeadStage, LeadsCapabilities, initials, nameIn, ownerName } from '../leads.model';
 
 export const TABLE_COLUMNS = ['lead', 'contact', 'phone', 'country', 'stage', 'source', 'owner', 'followUp', 'rating'];
 
@@ -27,7 +29,7 @@ const PHONE_SOURCE_TYPE: PhoneActionSourceType = 'LEAD';
 
 @Component({
   selector: 'app-lead-table',
-  imports: [NgIcon, TranslocoPipe, ActionsMenu, Checkbox, ConfirmDialog, Pagination, PhoneActions, LeadDisqualify],
+  imports: [NgIcon, TranslocoPipe, ActionsMenu, Checkbox, ConfirmDialog, ConflictDialog, FullState, Pagination, PhoneActions, LeadDisqualify],
   providers: [provideIcons({ tablerArrowsExchange, tablerBuilding, tablerCalendarEvent, tablerMinus, tablerUser, tablerStar, tablerStarFill })],
   templateUrl: './lead-table.html',
   host: { class: 'flex flex-1 shrink-0 flex-col gap-8' },
@@ -44,6 +46,8 @@ export class LeadTable {
   private readonly locations = inject(LeadLocations);
 
   readonly body = input.required<LeadSearchBody>();
+  readonly capabilities = input<LeadsCapabilities | null>(null);
+  readonly writeBlocked = output<void>();
   readonly stages = input.required<LeadStage[]>();
   readonly stage = input('all');
   readonly page = model(1);
@@ -79,6 +83,7 @@ export class LeadTable {
     (nextPage) => this.page.set(nextPage),
     () => this.countsChanged.emit(),
     this.disqualifyDialog,
+    this.capabilities,
   );
 
   private readonly patches = linkedSignal({
@@ -152,6 +157,7 @@ export class LeadTable {
   });
 
   constructor() {
+    effect(() => { if (this.list.writes.readOnly()) this.writeBlocked.emit(); });
     let lastPage = this.page();
     effect(() => {
       const current = this.page();
@@ -258,7 +264,7 @@ export class LeadTable {
 
   protected actions(lead: LeadRow) {
     this.i18n();
-    return leadActions(lead, this.stages(), this.language(), (key, params) => this.transloco.translate(key, params));
+    return leadActions(lead, this.stages(), this.language(), (key, params) => this.transloco.translate(key, params), this.list.writes.canUpdate(lead), this.list.writes.canDelete(lead));
   }
 
   protected act(lead: LeadRow, selection: ActionSelection) {

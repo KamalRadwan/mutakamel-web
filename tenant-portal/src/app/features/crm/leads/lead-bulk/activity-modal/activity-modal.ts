@@ -34,6 +34,7 @@ import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-d
 import { DateField } from '../../../../../shared/ui/date-time/date-field';
 import { TimeField } from '../../../../../shared/ui/date-time/time-field';
 import { Dropdown, DropdownOption } from '../../../../../shared/ui/dropdown/dropdown';
+import { FullState } from '../../../../../shared/ui/full-state/full-state';
 import { Field } from '../../../../../shared/ui/field/field';
 import { Segmented, SegmentedOption } from '../../../../../shared/ui/segmented/segmented';
 import { Switch } from '../../../../../shared/ui/switch/switch';
@@ -54,8 +55,8 @@ import {
   toLocalDateTime,
 } from '../../../../../shared/widgets/activities/activity-form/activity-form.model';
 import { BulkRunModal } from '../../../shared/record/bulk/bulk-run-modal/bulk-run-modal';
-import { errorCodeOf } from '../../../settings/shared/settings-api';
-import { LeadBulkSubmitKey, leadBulkErrorParams, selectionBranchMismatch } from '../lead-bulk-submit';
+import { ApiError, errorCodeOf } from '../../../settings/shared/settings-api';
+import { LeadBulkSubmitKey, leadBulkErrorMessage, leadBulkLoadError, leadBulkPrecheck, leadBulkValidationFields } from '../lead-bulk-submit';
 import { listAssignableOwners } from '../lead-bulk.api';
 import { SelectedRow } from '../lead-bulk.model';
 import { LeadSelection } from '../lead-selection';
@@ -138,7 +139,7 @@ function parseCustomGapMinutes(raw: string): number | null {
 
 @Component({
   selector: 'app-bulk-activity-modal',
-  imports: [
+  imports: [FullState,
     NgIcon,
     TranslocoPipe,
     BulkRunModal,
@@ -190,7 +191,7 @@ export class BulkActivityModal {
   private readonly discardDialog = viewChild.required<ConfirmDialog>('discardDialog');
   private readonly typeButtons = viewChildren<ElementRef<HTMLButtonElement>>('typeBtn');
 
-  readonly branchId = input<string>('b1');
+  readonly branchId = input<string>('');
   readonly submitted = output<string>();
 
   protected readonly activityTypes = ACTIVITY_TYPES;
@@ -199,8 +200,11 @@ export class BulkActivityModal {
 
   protected readonly rows = signal<SelectedRow[]>([]);
   protected readonly owners = signal<AssignableOwner[]>([]);
+  protected readonly ownersForbidden = signal(false);
+  protected readonly serverFields = signal<Record<string, { value: unknown; message: string }>>({});
   protected readonly resolving = signal(false);
   protected readonly submitting = signal(false);
+  protected readonly loadError = signal<ReturnType<typeof leadBulkLoadError> | null>(null);
   protected readonly nowMs = signal(Date.now());
 
   protected readonly type = signal<ActivityType>(DEFAULT_TYPE);
@@ -232,7 +236,7 @@ export class BulkActivityModal {
   private confirmingDiscard = false;
   private clockTimer: ReturnType<typeof setInterval> | null = null;
   private openSeq = 0;
-  private readonly submitKey = new LeadBulkSubmitKey();
+  protected readonly submitKey = new LeadBulkSubmitKey();
 
   protected readonly typeFields = computed(() => TYPE_FIELDS[this.type()]);
   protected readonly subjectCount = computed(() => codePointLength(this.subject()));
@@ -335,6 +339,8 @@ export class BulkActivityModal {
 
   protected readonly subjectError = computed<string | null>(() => {
     this.i18n();
+    const server = this.serverFieldError('subject', this.subject());
+    if (server) return server;
     if (!this.revealAllErrors() && !this.touched().subject) return null;
     const trimmed = this.subject().trim();
     if (!trimmed) return this.transloco.translate('bulkAct.validation.required');
@@ -346,6 +352,8 @@ export class BulkActivityModal {
 
   protected readonly locationError = computed<string | null>(() => {
     this.i18n();
+    const server = this.serverFieldError('location', this.location());
+    if (server) return server;
     if (!this.typeFields().location) return null;
     if (!this.revealAllErrors() && !this.touched().location) return null;
     if (codePointLength(this.location().trim()) > LIMITS.location) {
@@ -356,6 +364,8 @@ export class BulkActivityModal {
 
   protected readonly meetingUrlError = computed<string | null>(() => {
     this.i18n();
+    const server = this.serverFieldError('meetingUrl', this.meetingUrl());
+    if (server) return server;
     if (!this.typeFields().meetingUrl) return null;
     if (!this.revealAllErrors() && !this.touched().meetingUrl) return null;
     const trimmed = this.meetingUrl().trim();
@@ -371,6 +381,8 @@ export class BulkActivityModal {
 
   protected readonly descriptionError = computed<string | null>(() => {
     this.i18n();
+    const server = this.serverFieldError('description', this.description());
+    if (server) return server;
     if (!this.revealAllErrors() && !this.touched().description) return null;
     if (codePointLength(this.description().trim()) > LIMITS.description) {
       return this.transloco.translate('bulkAct.validation.maxLength', { max: LIMITS.description });
@@ -389,6 +401,8 @@ export class BulkActivityModal {
 
   protected readonly gapError = computed<string | null>(() => {
     this.i18n();
+    const server = this.serverFieldError('gapMinutes', this.parsedGapMinutes());
+    if (server) return server;
     if (this.gapPreset() !== 'custom') return null;
     if (this.parsedGapMinutes() === null) {
       return this.transloco.translate('bulkAct.gapInvalid');
@@ -467,10 +481,10 @@ export class BulkActivityModal {
   });
 
   protected readonly submitBlocked = computed(() => {
-    if (this.submitting() || this.resolving() || this.rows().length === 0) return true;
+    if (this.loadError() || this.submitKey.blocked() || this.submitting() || this.resolving() || this.rows().length === 0) return true;
     if (this.isStartInPast()) return true;
     if (this.gapPreset() === 'custom' && this.parsedGapMinutes() === null) return true;
-    if (this.assigneeMode() === 'other' && !this.chosenAssigneeId()) return true;
+    if (this.assigneeMode() === 'other' && (!this.chosenAssigneeId() || !this.owners().some((owner) => owner.id === this.chosenAssigneeId()))) return true;
     return false;
   });
 
@@ -494,7 +508,11 @@ export class BulkActivityModal {
 
   open(rows?: SelectedRow[]): void {
     const seq = ++this.openSeq;
+    this.loadError.set(null);
     this.submitKey.reset();
+    this.serverFields.set({});
+    this.owners.set([]);
+    this.ownersForbidden.set(false);
     this.resetForm();
     this.allowClose = false;
     this.confirmingDiscard = false;
@@ -516,29 +534,11 @@ export class BulkActivityModal {
         .catch((error) => {
           if (seq !== this.openSeq) return;
           this.resolving.set(false);
-          if (errorCodeOf(error) === 'LEAD_SELECTION_TOO_LARGE') {
-            this.notify.error(this.transloco.translate('bulkAct.toast.tooLarge'));
-          } else {
-            this.notify.error(this.transloco.translate('bulkAct.codes.generic'));
-          }
-          this.allowClose = true;
-          this.modal().close();
+          this.loadError.set(leadBulkLoadError(this.transloco, error));
         });
     }
 
-    const branch = this.branchId() || 'b1';
-    void listAssignableOwners(branch)
-      .then((list) => {
-        if (seq !== this.openSeq) return;
-        this.owners.set(list);
-        if (!this.chosenAssigneeTouched()) {
-          this.chosenAssigneeId.set(list[0]?.id ?? this.currentUser.userId());
-        }
-      })
-      .catch(() => {
-        if (seq !== this.openSeq) return;
-        this.owners.set([]);
-      });
+    void this.loadOwners(seq);
 
     this.modal().open();
   }
@@ -695,11 +695,43 @@ export class BulkActivityModal {
     this.stopClock();
   }
 
+  private async loadOwners(seq: number): Promise<void> {
+    this.ownersForbidden.set(false);
+    try {
+      const list = await listAssignableOwners(this.branchId());
+      if (seq !== this.openSeq) return;
+      this.owners.set(list);
+      if (!this.chosenAssigneeTouched()) this.chosenAssigneeId.set(list[0]?.id ?? '');
+    } catch (error) {
+      if (seq !== this.openSeq) return;
+      if (error instanceof ApiError && error.status === 403) this.ownersForbidden.set(true);
+      else this.loadError.set(leadBulkLoadError(this.transloco, error));
+      this.owners.set([]);
+      this.chosenAssigneeId.set('');
+    }
+  }
+
+  protected async retryLoad(): Promise<void> {
+    const seq = ++this.openSeq;
+    this.loadError.set(null);
+    this.resolving.set(true);
+    try {
+      const [rows] = await Promise.all([
+        this.selection?.count() ? this.selection.resolve() : Promise.resolve(this.rows()), this.loadOwners(seq),
+      ]);
+      if (seq === this.openSeq) this.rows.set(rows);
+    } catch (error) {
+      if (seq === this.openSeq) this.loadError.set(leadBulkLoadError(this.transloco, error));
+    }
+    if (seq === this.openSeq) this.resolving.set(false);
+  }
+
   protected async submit(): Promise<void> {
     if (this.submitting()) return;
     this.nowMs.set(Date.now());
     this.revealAllErrors.set(true);
     this.serverStartError.set(null);
+    this.serverFields.set({});
     if (!this.isFormValid()) {
       this.focusFirstInvalidField();
       return;
@@ -717,7 +749,12 @@ export class BulkActivityModal {
       this.selection && this.selection.count() > 0
         ? this.selection.snapshot()
         : { kind: 'IDS', ids: this.rows().map((row) => row.id) };
-    const branchId = this.branchId() || 'b1';
+    const branchId = this.branchId();
+    const precheck = leadBulkPrecheck(selection, this.branchId());
+    if (precheck) {
+      this.notify.error(this.transloco.translate(`leadBulk.codes.${precheck}`));
+      return;
+    }
     const body: BulkJobSubmit = {
       module: 'crm.leads',
       action: 'CREATE_ACTIVITY',
@@ -756,18 +793,27 @@ export class BulkActivityModal {
       this.modal().close();
       this.submitted.emit(res.jobId);
     } catch (error) {
-      this.handleSubmitError(error, selectionBranchMismatch(selection, branchId));
+      this.submitKey.failed(error);
+      this.handleSubmitError(error);
     } finally {
       this.submitting.set(false);
     }
   }
 
-  private handleSubmitError(error: unknown, branchMismatch: boolean): void {
+  private handleSubmitError(error: unknown): void {
     const code = errorCodeOf(error);
     if (code === 'BULK_JOB_ACTIVE') return;
-    if (code === 'CRM_SCOPED_PERMISSION_DENIED' && branchMismatch) {
-      this.notify.error(this.transloco.translate('leadBulk.codes.BRANCH_SCOPE_MISMATCH'));
-      return;
+    const fields = leadBulkValidationFields(error);
+    if (fields.length > 0) {
+      const values: Record<string, unknown> = {
+        subject: this.subject(), location: this.location(), meetingUrl: this.meetingUrl(), description: this.description(),
+        priority: this.priority(), direction: this.direction(), durationMinutes: this.duration(), reminderOffsetMinutes: this.reminder(),
+        gapMinutes: this.parsedGapMinutes(), order: this.order(), 'assignee.userId': this.chosenAssigneeId(),
+      };
+      const message = this.transloco.translate('leadBulk.invalidValue');
+      this.serverFields.set(Object.fromEntries(fields.filter((field) => field in values).map((field) => [field, { value: values[field], message }])));
+      if (fields.includes('startAt')) this.serverStartError.set(message);
+      if (Object.keys(this.serverFields()).length || fields.includes('startAt')) return;
     }
     if (code === 'LEAD_BULK_START_IN_PAST') {
       const msg = this.translateCode(code);
@@ -778,15 +824,13 @@ export class BulkActivityModal {
     this.notify.error(this.translateCode(code, error));
   }
 
+  protected serverFieldError(field: string, value: unknown): string | null {
+    const error = this.serverFields()[field];
+    return error?.value === value ? error.message : null;
+  }
+
   private translateCode(code: string | null, error?: unknown): string {
-    if (code) {
-      for (const prefix of ['bulkAct.codes.', 'leadBulk.codes.', 'bulkJobs.codes.']) {
-        const key = `${prefix}${code}`;
-        const translated = this.transloco.translate(key, leadBulkErrorParams(error));
-        if (translated !== key) return translated;
-      }
-    }
-    return this.transloco.translate('bulkAct.codes.generic');
+    return leadBulkErrorMessage(this.transloco, error ?? (code ? new ApiError(422, code) : null));
   }
 
   private buildCommonPayload(): BulkActivityCommonParams {
@@ -873,7 +917,7 @@ export class BulkActivityModal {
     this.lastValidGap.set(Number(DEFAULT_GAP));
     this.order.set('table');
     this.assigneeMode.set('owner');
-    this.chosenAssigneeId.set(this.owners()[0]?.id ?? this.currentUser.userId());
+    this.chosenAssigneeId.set(this.owners()[0]?.id ?? '');
     this.chosenAssigneeTouched.set(false);
     this.spacePerAssignee.set(true);
     this.submitting.set(false);

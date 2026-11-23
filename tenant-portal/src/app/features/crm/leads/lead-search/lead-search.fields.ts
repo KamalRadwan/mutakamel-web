@@ -16,6 +16,8 @@ export interface LeadSearchFieldsContext {
   owners: (term: string) => Promise<FieldOption[]>;
   ownerOptions?: FieldOption[];
   language: 'ar' | 'en';
+  unavailable?: readonly ('stage' | 'source' | 'tag' | 'owner')[];
+  timeZone?: string | null;
 }
 
 const LEAD_TYPES: readonly LeadProfileType[] = ['INDIVIDUAL', 'CORPORATE'];
@@ -512,5 +514,11 @@ export function leadSearchFields(ctx: LeadSearchFieldsContext): QueryField[] {
     },
   );
 
-  return fields;
+  return fields.filter((field) => !ctx.unavailable?.includes(field.id as 'stage' | 'source' | 'tag' | 'owner')
+    && !(field.id === 'createdBy' && ctx.unavailable?.includes('owner'))).map((field) => {
+    if (field.kind !== 'date' || ctx.timeZone !== null) return field;
+    const translated = ctx.t('leads.datesUtc');
+    return { ...field, hint: translated && translated !== 'leads.datesUtc' ? translated
+      : ctx.language === 'ar' ? 'التواريخ بالتوقيت العالمي المنسق (UTC).' : 'Dates are in UTC.' };
+  });
 }
