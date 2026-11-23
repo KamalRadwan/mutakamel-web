@@ -32,6 +32,16 @@ import {
   tablerTemplate,
   tablerX,
 } from '@ng-icons/tabler-icons';
+import {
+  ApiError,
+  correlationIdOf,
+  errorCodeOf,
+  errorMessage,
+  isRetryableWriteError,
+  writeErrorMessage,
+} from '../../../../../core/api/api-errors';
+import type { CoreWriteResult } from '../../../../../core/api/core-http';
+import { newIdempotencyKey } from '../../../../../core/api/idempotency';
 import { LanguageState } from '../../../../../core/i18n/language';
 import { Notify } from '../../../../../core/notify/notify';
 import { Button } from '../../../../../shared/ui/button/button';
@@ -41,29 +51,23 @@ import { Modal } from '../../../../../shared/ui/modal/modal';
 import { UnsavedDialog } from '../../../../../shared/ui/unsaved-dialog/unsaved-dialog';
 import { TEMPLATE_FAMILY_META, templateLayoutMeta } from '../../shared/template-family';
 import {
-  CreateTemplateDto,
-  CreateTemplateResponse,
-  TemplateApiError,
-  TemplateCreationScope,
-  TemplateDataSourceItem,
-  TemplateDataSourceKey,
-  TemplateDefinitionScope,
-  TemplateDirection,
-  TemplateDocumentType,
-  TemplateLayoutMode,
-  TemplateLocale,
-  TemplateOutputChannel,
-  TemplatePageOrientation,
-  TemplatePagePreset,
-  TemplateResolvedDirection,
-  TemplateStarterOption,
-  TemplateStartersQuery,
-  createTemplate,
-  getCreationScopes,
-  getStarterThumbnail,
-  listDataSources,
-  listStarters,
-  newTemplateIdempotencyKey,
+  TemplatesApi,
+  type CreateTemplateDto,
+  type CreateTemplateResponse,
+  type TemplateCreationScope,
+  type TemplateDataSourceItem,
+  type TemplateDataSourceKey,
+  type TemplateDefinitionScope,
+  type TemplateDirection,
+  type TemplateDocumentType,
+  type TemplateLayoutMode,
+  type TemplateLocale,
+  type TemplateOutputChannel,
+  type TemplatePageOrientation,
+  type TemplatePagePreset,
+  type TemplateResolvedDirection,
+  type TemplateStarterOption,
+  type TemplateStartersQuery,
 } from '../../templates.api';
 import { TemplatePageDiagram } from '../page-diagram/page-diagram';
 
@@ -142,7 +146,8 @@ function parseScopeKey(key: string): TemplateDefinitionScope {
 }
 
 function extractApiErrorCode(error: unknown): string | null {
-  if (error instanceof TemplateApiError) return error.code;
+  const apiCode = errorCodeOf(error);
+  if (apiCode) return apiCode;
   if (error && typeof error === 'object' && 'code' in error && typeof (error as { code: unknown }).code === 'string') {
     return (error as { code: string }).code;
   }
@@ -189,6 +194,7 @@ export class TemplateCreateWizard {
   private readonly destroyRef = inject(DestroyRef);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly templatesApi = inject(TemplatesApi);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
@@ -225,6 +231,7 @@ export class TemplateCreateWizard {
   protected readonly creationScopes = signal<TemplateCreationScope[]>([]);
   protected readonly dataSources = signal<TemplateDataSourceItem[]>([]);
   protected readonly dataSourcesLoaded = signal(false);
+  protected readonly lastCreateReceipt = signal<Pick<CoreWriteResult<CreateTemplateResponse>, 'status' | 'etag' | 'location'> | null>(null);
 
   // Step 1 fields
   protected readonly name = signal('');
@@ -334,7 +341,7 @@ export class TemplateCreateWizard {
 
   protected readonly languageOptions = computed<DropdownOption<TemplateLocale>[]>(() => {
     this.i18n();
-    const supported = this.activeAdapter()?.supportedLocales;
+    const supported = this.activeAdapter()?.supportedLocales.filter((loc) => ALL_LOCALES.includes(loc));
     const list = supported && supported.length > 0 ? supported : ALL_LOCALES;
     return list.map((loc) => ({
       value: loc,
@@ -820,6 +827,10 @@ export class TemplateCreateWizard {
         this.step.set('document');
         return;
       case 'document':
+        if (this.dataSourcesLoaded() && !this.activeAdapter()) {
+          this.notify.error(this.transloco.translate('tplCreate.document.errors.noCompatibleSources'));
+          return;
+        }
         if (this.isEmail()) {
           void this.enterStarterStep();
         } else {
@@ -874,13 +885,19 @@ export class TemplateCreateWizard {
     const dto = this.buildCreateDto();
     const signature = JSON.stringify(dto);
     if (!this.pendingCreateKey || this.pendingCreateSig !== signature) {
-      this.pendingCreateKey = newTemplateIdempotencyKey();
+      this.pendingCreateKey = newIdempotencyKey();
       this.pendingCreateSig = signature;
     }
 
     this.saving.set(true);
     try {
-      const response = await createTemplate(dto, this.pendingCreateKey);
+      const result = await this.templatesApi.createTemplate(dto, this.pendingCreateKey);
+      const response = result.data;
+      this.lastCreateReceipt.set({
+        status: result.status,
+        etag: result.etag,
+        location: result.location,
+      });
       this.pendingCreateKey = null;
       this.pendingCreateSig = '';
       this.notify.success(
@@ -897,12 +914,16 @@ export class TemplateCreateWizard {
       if (code === 'CORE.TEMPLATE.CODE.CONFLICT') {
         this.pendingCreateKey = null;
         this.pendingCreateSig = '';
-        this.codeConflictError.set(this.translateErrorMessage(error));
+        this.codeConflictError.set(this.translateErrorMessage(error, true));
         this.step1Attempted.set(true);
         this.step.set('details');
         queueMicrotask(() => this.codeInput()?.nativeElement.focus());
       } else {
-        this.notify.error(this.translateErrorMessage(error));
+        if (!isRetryableWriteError(error) && !(error instanceof ApiError && error.status === 401)) {
+          this.pendingCreateKey = null;
+          this.pendingCreateSig = '';
+        }
+        this.notify.error(this.translateErrorMessage(error, true));
       }
     } finally {
       this.saving.set(false);
@@ -1020,6 +1041,7 @@ export class TemplateCreateWizard {
     this.starters.set([]);
     this.selectedStarterKey.set(null);
     this.loadedStartersTupleKey = '';
+    this.lastCreateReceipt.set(null);
     this.revokeStarterThumbnails();
     this.invalidateCreateIdempotency();
     this.baseSnapshot = this.computeFormSnapshot();
@@ -1033,7 +1055,7 @@ export class TemplateCreateWizard {
     this.dataSourcesLoaded.set(false);
 
     try {
-      const scopesRes = await getCreationScopes();
+      const scopesRes = await this.templatesApi.getCreationScopes();
       if (seq !== this.initSeq) return;
 
       const scopes = scopesRes.scopes;
@@ -1063,7 +1085,7 @@ export class TemplateCreateWizard {
     } catch (error: unknown) {
       if (seq !== this.initSeq) return;
       this.loading.set(false);
-      this.loadCorrelationId.set(error instanceof TemplateApiError ? (error.correlationId ?? null) : null);
+      this.loadCorrelationId.set(correlationIdOf(error));
       this.loadFailed.set(true);
     }
   }
@@ -1071,7 +1093,7 @@ export class TemplateCreateWizard {
   private async loadDataSourcesForScope(scope: TemplateDefinitionScope, expectedInitSeq?: number): Promise<void> {
     const seq = ++this.sourcesSeq;
     try {
-      const res = await listDataSources({
+      const res = await this.templatesApi.listDataSources({
         scopeType: scope.type,
         ...(scope.type === 'COMPANY' ? { companyId: scope.companyId } : {}),
       });
@@ -1123,7 +1145,7 @@ export class TemplateCreateWizard {
     this.startersCorrelationId.set(null);
 
     try {
-      const res = await listStarters(query);
+      const res = await this.templatesApi.listStarters(query);
       if (seq !== this.startersSeq) return;
 
       this.starters.set(res.items);
@@ -1138,7 +1160,7 @@ export class TemplateCreateWizard {
     } catch (error: unknown) {
       if (seq !== this.startersSeq) return;
       this.startersLoading.set(false);
-      this.startersCorrelationId.set(error instanceof TemplateApiError ? (error.correlationId ?? null) : null);
+      this.startersCorrelationId.set(correlationIdOf(error));
       this.startersFailed.set(true);
     }
   }
@@ -1154,7 +1176,7 @@ export class TemplateCreateWizard {
         .filter((item) => item.thumbnail.state === 'READY')
         .map(async (item) => {
           try {
-            const blob = await getStarterThumbnail(item.starterKey, query);
+            const blob = await this.templatesApi.getStarterThumbnail(item.starterKey, query);
             return [item.starterKey, URL.createObjectURL(blob)] as const;
           } catch {
             return null;
@@ -1239,7 +1261,7 @@ export class TemplateCreateWizard {
   }
 
   private ensureLocaleSupported(): void {
-    const supported = this.activeAdapter()?.supportedLocales;
+    const supported = this.activeAdapter()?.supportedLocales.filter((loc) => ALL_LOCALES.includes(loc));
     if (supported && supported.length > 0 && !supported.includes(this.locale())) {
       this.locale.set(supported[0]);
     }
@@ -1366,7 +1388,7 @@ export class TemplateCreateWizard {
     buttons?.[targetIdx]?.focus();
   }
 
-  private translateErrorMessage(error: unknown): string {
+  private translateErrorMessage(error: unknown, isWrite = false): string {
     const code = extractApiErrorCode(error);
     if (code) {
       const localKey = `tplCreate.errors.${code}`;
@@ -1377,8 +1399,19 @@ export class TemplateCreateWizard {
       const sharedMsg = this.transloco.translate(sharedKey);
       if (sharedMsg && sharedMsg !== sharedKey) return sharedMsg;
     }
-    if (error instanceof TemplateApiError && error.status === 0) {
-      return this.transloco.translate('templates.errors.network');
+    if (error instanceof ApiError) {
+      const shared = (isWrite ? writeErrorMessage : errorMessage)(error, 'templates', this.transloco);
+      if (
+        shared &&
+        !shared.startsWith('settings.errors.') &&
+        !shared.startsWith('apiErrors.') &&
+        !shared.startsWith('templates.errors.')
+      ) {
+        return shared;
+      }
+      if (error.status === 0) {
+        return this.transloco.translate('templates.errors.network');
+      }
     }
     return this.transloco.translate('templates.errors.generic');
   }

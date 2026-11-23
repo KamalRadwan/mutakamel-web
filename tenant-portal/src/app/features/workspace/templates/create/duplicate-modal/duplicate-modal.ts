@@ -15,6 +15,16 @@ import { Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerArrowsExchange, tablerCloudOff, tablerCopy, tablerLock } from '@ng-icons/tabler-icons';
+import {
+  ApiError,
+  correlationIdOf,
+  errorCodeOf,
+  errorMessage,
+  isRetryableWriteError,
+  writeErrorMessage,
+} from '../../../../../core/api/api-errors';
+import type { CoreWriteResult } from '../../../../../core/api/core-http';
+import { newIdempotencyKey } from '../../../../../core/api/idempotency';
 import { Notify } from '../../../../../core/notify/notify';
 import { Button } from '../../../../../shared/ui/button/button';
 import { Dropdown, DropdownOption } from '../../../../../shared/ui/dropdown/dropdown';
@@ -24,20 +34,15 @@ import { UnsavedDialog } from '../../../../../shared/ui/unsaved-dialog/unsaved-d
 import { templateLayoutMeta } from '../../shared/template-family';
 import { TemplatePageService } from '../../template-page/template-page.service';
 import {
-  CreateTemplateResponse,
-  DuplicateTemplateDto,
-  DuplicateTemplateSource,
-  TemplateApiError,
-  TemplateConvertibleLayoutMode,
-  TemplateCreationScope,
-  TemplateDefinitionDetail,
-  TemplateDefinitionScope,
-  TemplateVersionItem,
-  duplicateTemplate,
-  getCreationScopes,
-  getTemplate,
-  listVersions,
-  newTemplateIdempotencyKey,
+  TemplatesApi,
+  type CreateTemplateResponse,
+  type DuplicateTemplateDto,
+  type DuplicateTemplateSource,
+  type TemplateConvertibleLayoutMode,
+  type TemplateCreationScope,
+  type TemplateDefinitionDetail,
+  type TemplateDefinitionScope,
+  type TemplateVersionItem,
 } from '../../templates.api';
 
 export interface DuplicateTemplateModalOptions {
@@ -77,11 +82,18 @@ function makeDefaultCopyCode(sourceCode: string): string {
 }
 
 function extractApiErrorCode(error: unknown): string | null {
-  if (error instanceof TemplateApiError) return error.code;
+  const apiCode = errorCodeOf(error);
+  if (apiCode) return apiCode;
   if (error && typeof error === 'object' && 'code' in error && typeof (error as { code: unknown }).code === 'string') {
     return (error as { code: string }).code;
   }
   return null;
+}
+
+function extractStringArray(details: Record<string, unknown> | undefined, key: string): string[] {
+  const value = details?.[key];
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === 'string');
 }
 
 @Component({
@@ -98,6 +110,7 @@ function extractApiErrorCode(error: unknown): string | null {
 })
 export class TemplateDuplicateModal {
   private readonly router = inject(Router);
+  private readonly templatesApi = inject(TemplatesApi);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
@@ -159,6 +172,7 @@ export class TemplateDuplicateModal {
   protected readonly templateDetail = signal<TemplateDefinitionDetail | null>(null);
   protected readonly versions = signal<TemplateVersionItem[]>([]);
   protected readonly creationScopes = signal<TemplateCreationScope[]>([]);
+  protected readonly lastDuplicateReceipt = signal<Pick<CoreWriteResult<CreateTemplateResponse>, 'status' | 'etag' | 'location'> | null>(null);
 
   protected readonly sourceKey = signal('DRAFT');
   protected readonly scopeKey = signal('');
@@ -336,6 +350,7 @@ export class TemplateDuplicateModal {
     this.activeTemplateId.set(options.templateId);
     this.convertMode.set(Boolean(options.convertLayout));
     this.optionDraftDirty.set(Boolean(options.draftDirty));
+    this.lastDuplicateReceipt.set(null);
     this.pendingIdempotencyKey = null;
     this.pendingSignature = '';
 
@@ -406,13 +421,19 @@ export class TemplateDuplicateModal {
     const dto = this.buildDto(detail);
     const signature = JSON.stringify(dto);
     if (!this.pendingIdempotencyKey || this.pendingSignature !== signature) {
-      this.pendingIdempotencyKey = newTemplateIdempotencyKey();
+      this.pendingIdempotencyKey = newIdempotencyKey();
       this.pendingSignature = signature;
     }
 
     this.saving.set(true);
     try {
-      const response = await duplicateTemplate(id, dto, this.pendingIdempotencyKey);
+      const result = await this.templatesApi.duplicateTemplate(id, dto, this.pendingIdempotencyKey);
+      const response = result.data;
+      this.lastDuplicateReceipt.set({
+        status: result.status,
+        etag: result.etag,
+        location: result.location,
+      });
       this.pendingIdempotencyKey = null;
       this.pendingSignature = '';
       this.notify.success(
@@ -434,11 +455,19 @@ export class TemplateDuplicateModal {
       if (errCode === 'CORE.TEMPLATE.CODE.CONFLICT') {
         this.pendingIdempotencyKey = null;
         this.pendingSignature = '';
-        this.codeConflictError.set(this.translateErrorMessage(error));
+        this.codeConflictError.set(this.translateErrorMessage(error, true));
         this.attempted.set(true);
         queueMicrotask(() => this.codeInput()?.nativeElement.focus());
       } else {
-        this.notify.error(this.translateErrorMessage(error));
+        if (!isRetryableWriteError(error) && !(error instanceof ApiError && error.status === 401)) {
+          this.pendingIdempotencyKey = null;
+          this.pendingSignature = '';
+        }
+        if (error instanceof ApiError && errCode === 'CORE.TEMPLATE.LAYOUT.INCOMPATIBLE') {
+          this.notifyLayoutIncompatibleError(error);
+        } else {
+          this.notify.error(this.translateErrorMessage(error, true));
+        }
       }
     } finally {
       this.saving.set(false);
@@ -466,9 +495,9 @@ export class TemplateDuplicateModal {
 
     try {
       const [detail, versionsRes, scopesRes] = await Promise.all([
-        getTemplate(options.templateId),
-        listVersions(options.templateId, { limit: 100 }),
-        getCreationScopes(),
+        this.templatesApi.getTemplate(options.templateId),
+        this.templatesApi.listVersions(options.templateId, { limit: 100 }),
+        this.templatesApi.getCreationScopes(),
       ]);
       if (seq !== this.loadSeq) return;
 
@@ -514,7 +543,7 @@ export class TemplateDuplicateModal {
     } catch (error: unknown) {
       if (seq !== this.loadSeq) return;
       this.loading.set(false);
-      this.loadCorrelationId.set(error instanceof TemplateApiError ? (error.correlationId ?? null) : null);
+      this.loadCorrelationId.set(correlationIdOf(error));
       this.loadFailed.set(true);
     }
   }
@@ -530,7 +559,7 @@ export class TemplateDuplicateModal {
       source,
       code: this.code().trim().toUpperCase(),
       name: this.name().trim(),
-      description: trimmedDesc || null,
+      ...(trimmedDesc ? { description: trimmedDesc } : {}),
       scope: parseScopeKey(this.scopeKey()),
       copyAssignments: false,
       ...(this.isConvertiblePrint() ? { conversion: { layoutMode: this.targetLayout() } } : {}),
@@ -560,7 +589,7 @@ export class TemplateDuplicateModal {
   private closeImmediately(): void {
     this.allowClose = true;
     this.modal().close();
-    this.resetStateOnClose();
+    if (this.isOpen()) this.resetStateOnClose();
   }
 
   private resetStateOnClose(): void {
@@ -599,7 +628,32 @@ export class TemplateDuplicateModal {
     });
   }
 
-  private translateErrorMessage(error: unknown): string {
+  private notifyLayoutIncompatibleError(error: ApiError): void {
+    const issueCodes = extractStringArray(error.details, 'issueCodes');
+    const issuePaths = extractStringArray(error.details, 'issuePaths');
+
+    let title = '';
+    for (const issueCode of issueCodes) {
+      const key = `tplCreate.errors.${issueCode}`;
+      const translated = this.transloco.translate(key);
+      if (translated && translated !== key) {
+        title = translated;
+        break;
+      }
+    }
+    if (!title) {
+      title = this.translateErrorMessage(error, true);
+    }
+
+    const uniquePaths = Array.from(new Set(issuePaths.filter((p) => p.length > 0)));
+    if (uniquePaths.length > 0) {
+      this.notify.error(title, uniquePaths.join(', '));
+    } else {
+      this.notify.error(title);
+    }
+  }
+
+  private translateErrorMessage(error: unknown, isWrite = false): string {
     const code = extractApiErrorCode(error);
     if (code) {
       const localKey = `tplCreate.errors.${code}`;
@@ -610,8 +664,19 @@ export class TemplateDuplicateModal {
       const sharedMsg = this.transloco.translate(sharedKey);
       if (sharedMsg && sharedMsg !== sharedKey) return sharedMsg;
     }
-    if (error instanceof TemplateApiError && error.status === 0) {
-      return this.transloco.translate('templates.errors.network');
+    if (error instanceof ApiError) {
+      const shared = (isWrite ? writeErrorMessage : errorMessage)(error, 'templates', this.transloco);
+      if (
+        shared &&
+        !shared.startsWith('settings.errors.') &&
+        !shared.startsWith('apiErrors.') &&
+        !shared.startsWith('templates.errors.')
+      ) {
+        return shared;
+      }
+      if (error.status === 0) {
+        return this.transloco.translate('templates.errors.network');
+      }
     }
     return this.transloco.translate('templates.errors.generic');
   }
