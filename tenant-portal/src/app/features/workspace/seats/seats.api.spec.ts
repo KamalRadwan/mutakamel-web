@@ -1,129 +1,169 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { DOCUMENT } from '@angular/core';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { TestBed } from '@angular/core/testing';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../../core/api/api-errors';
-import { getSeatUsage, listSeatHolders, switchToDerived } from './seats.api';
-import { setFakeMigrationShort, setFakeSeatMode } from './seats.fake';
+import { bindSeatPreviewApi, freeUp, freeUpPreview, getMySeatStates, getSeatUsage,
+  listSeatHolders, releaseSeats, SeatPreviewApi, swapSeat, switchToDerived } from './seats.api';
 import { seatErrorMessage, seatShortfallDetails } from './seat-errors';
+import type { SeatHolder, SeatPreview, SeatUsage } from './seats.model';
 
-const BACKEND_OVER_CAPACITY_CAUSES = ['GRACE_EXPIRED', 'SEAT_SWAPPED', 'INVOLUNTARY_REDUCTION'];
+const root = '/api/tenant/core/v1';
+const key = '019a7c20-0002-7000-8000-000000000099';
+const usage: SeatUsage = { mode: 'DERIVED', revision: 7, modules: [{
+  moduleKey: 'crm', kind: 'ROLE_DERIVED', nameI18n: { en: 'CRM', ar: 'إدارة العملاء' },
+  capacity: 2, used: 2, overCapacity: 1, graceUntil: null, overCapacitySince: null, pendingCapacity: null,
+}] };
+const holder: SeatHolder = { userId: 'user-1', name: 'One', email: 'one@example.test', status: 'SUSPENDED',
+  grantedAt: '2026-11-21T00:00:00.000Z', accessState: 'OVER_CAPACITY', cause: 'SEAT_SWAPPED',
+  roles: [{ roleId: 'role-1', roleName: 'Sales', scope: { target: 'BRANCH', companyId: 'company-1', branchId: 'branch-1' } }] };
+const meta = { page: 2, limit: 1, total: 3, totalPages: 3, hasNext: true, hasPrev: true };
+const preview: SeatPreview = { mode: 'DERIVED', ok: true, modules: [] };
 
-describe('seats api follows the Core seats backend', () => {
-  it('usage modules carry the backend kind', async () => {
-    const usage = await getSeatUsage();
-    expect(usage.modules.length).toBeGreaterThan(0);
-    for (const mod of usage.modules) {
-      expect(['ROLE_DERIVED', 'ENABLED_FLAG']).toContain(mod.kind);
+describe('seats HTTP through the application-bound service', () => {
+  let http: HttpTestingController;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    const doc = TestBed.inject(DOCUMENT);
+    const name = doc.location.protocol === 'https:' ? '__Host-mutakamel-tenant-csrf' : 'mutakamel-http-tenant-csrf';
+    vi.spyOn(doc, 'cookie', 'get').mockReturnValue(`${name}=csrf-proof`);
+    bindSeatPreviewApi(() => TestBed.inject(SeatPreviewApi));
+    http = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => { http.verify(); vi.restoreAllMocks(); });
+
+  it('unwraps live usage without caching subsequent reads', async () => {
+    for (const revision of [7, 8]) {
+      const pending = getSeatUsage();
+      const req = http.expectOne(`${root}/seats/usage`);
+      expect(req.request.withCredentials).toBe(true);
+      req.flush({ success: true, data: { ...usage, revision } });
+      await expect(pending).resolves.toEqual({ ...usage, revision });
     }
   });
 
-  it('read-only holders use a backend cause', async () => {
-    const usage = await getSeatUsage();
-    for (const mod of usage.modules) {
-      const page = await listSeatHolders(mod.moduleKey, { page: 1, limit: 100 });
-      for (const holder of page.data.filter((h) => h.accessState === 'OVER_CAPACITY')) {
-        expect(BACKEND_OVER_CAPACITY_CAUSES).toContain(holder.cause);
-      }
-    }
+  it('reads canonical holder pages, preserving role scope, cause and metadata', async () => {
+    const pending = listSeatHolders('crm', { page: 2, limit: 1, search: 'One & Co' });
+    const req = http.expectOne(r => r.url === `${root}/seats/usage/crm/holders`);
+    expect(req.request.params.keys()).toEqual(['page', 'limit', 'search']);
+    expect(req.request.params.get('search')).toBe('One & Co');
+    req.flush({ success: true, data: [holder], meta });
+    await expect(pending).resolves.toEqual({ data: [holder], meta });
   });
-});
 
-describe('seat holders arrive as a Core page', () => {
-  it('returns { data, meta } with the envelope counters', async () => {
-    const usage = await getSeatUsage();
-    const key = usage.modules[0].moduleKey;
-    const all = await listSeatHolders(key, { page: 1, limit: 100 });
-    const page = await listSeatHolders(key, { page: 1, limit: 1 });
-    expect(Object.keys(page).sort()).toEqual(['data', 'meta']);
-    expect(page.data.length).toBe(Math.min(1, all.meta.total));
-    expect(page.meta).toEqual({
-      page: 1,
-      limit: 1,
-      total: all.meta.total,
-      totalPages: Math.max(1, all.meta.total),
-      hasNext: all.meta.total > 1,
-      hasPrev: false,
+  it('adapts Webphone pages and reads the real user status separately from seat state', async () => {
+    const pending = listSeatHolders('webphone', { page: 2, limit: 1 });
+    http.expectOne(r => r.url === `${root}/seats/usage/webphone/holders`).flush({ success: true, data: {
+      data: [{ userId: 'user-1', name: 'One', extension: '101', enabledAt: holder.grantedAt, accessState: 'ACTIVE' }],
+      meta: { page: 2, limit: 1, total: 3 },
+    } });
+    await vi.waitFor(() => {
+      http.expectOne(`${root}/users/user-1`).flush({ success: true, data: { email: holder.email, status: 'SUSPENDED' } });
     });
-  });
-});
-
-describe('seat shortfall details (parallel string arrays)', () => {
-  const t = (key: string, params?: Record<string, unknown>) =>
-    key === 'seats.errors.capacityGeneric'
-      ? 'Not enough seats.'
-      : key === 'seats.errors.SEAT_CAPACITY_INSUFFICIENT'
-        ? `${params?.['module']}: needs ${params?.['needed']}, free ${params?.['free']}.`
-        : key;
-
-  afterEach(() => {
-    setFakeMigrationShort(false);
-    setFakeSeatMode('DERIVED');
+    await expect(pending).resolves.toEqual({ data: [{ ...holder, accessState: 'ACTIVE', cause: null, roles: [],
+      extension: '101', enabledAt: holder.grantedAt }], meta });
   });
 
-  it('SEAT_CAPACITY_INSUFFICIENT with details names each module', () => {
-    const error = new ApiError(422, 'SEAT_CAPACITY_INSUFFICIENT', {
-      moduleKey: ['crm', 'trade'],
-      needed: ['3', '1'],
-      free: ['1', '0'],
-      capacity: ['5', '0'],
-      userModuleKey: ['crm', 'crm', 'crm', 'trade'],
-      userIds: ['user-1', 'user-2', 'user-3', 'user-4'],
-      userNames: ['User One', 'User Two', 'User Three', 'User Four'],
-    });
-    expect(seatShortfallDetails(error)).toEqual([
-      { moduleKey: 'crm', needed: 3, free: 1, capacity: 5, used: null, usedAfter: null, shortfall: null },
-      { moduleKey: 'trade', needed: 1, free: 0, capacity: 0, used: null, usedAfter: null, shortfall: null },
-    ]);
-    expect(seatErrorMessage(t, error)).toBe('crm: needs 3, free 1. trade: needs 1, free 0.');
+  it('projects only the authenticated profile seat fields', async () => {
+    const pending = getMySeatStates();
+    http.expectOne(`${root}/auth/me`).flush({ success: true, data: {
+      id: 'actual-user', seats: [{ moduleKey: 'crm', accessState: 'OVER_CAPACITY', extra: 'ignored' }],
+    } });
+    await expect(pending).resolves.toEqual([{ moduleKey: 'crm', accessState: 'OVER_CAPACITY' }]);
   });
 
-  it('SEAT_CAPACITY_INSUFFICIENT without details falls back to the generic text', () => {
-    const error = new ApiError(422, 'SEAT_CAPACITY_INSUFFICIENT');
-    expect(seatShortfallDetails(error)).toEqual([]);
-    expect(seatErrorMessage(t, error)).toBe('Not enough seats.');
+  it('does not synthesize missing profile seats', async () => {
+    const pending = getMySeatStates();
+    const rejection = expect(pending).rejects.toMatchObject({ status: 502, code: 'COMMON.GENERIC.INTERNAL_ERROR' });
+    http.expectOne(`${root}/auth/me`).flush({ success: true, data: { id: 'actual-user' } });
+    await rejection;
   });
 
-  it('the fake SEAT_MIGRATION_NOT_READY sends exactly the parallel string arrays', async () => {
-    setFakeSeatMode('MANUAL');
-    setFakeMigrationShort(true);
-    const error = await switchToDerived({}, '019a7c20-0002-7000-8000-000000000099').catch((e: unknown) => e);
-    expect(error).toMatchObject({ status: 409, code: 'SEAT_MIGRATION_NOT_READY' });
-    const details = (error as ApiError).details ?? {};
-    expect(Object.keys(details).sort()).toEqual([
-      'capacity',
-      'free',
-      'moduleKey',
-      'needed',
-      'shortfall',
-      'used',
-      'usedAfter',
-      'userIds',
-      'userModuleKey',
-      'userNames',
-    ]);
-    for (const value of Object.values(details)) {
-      expect(Array.isArray(value) && value.every((item) => typeof item === 'string')).toBe(true);
-    }
-    const modules = (details['moduleKey'] as string[]).length;
-    for (const key of ['needed', 'free', 'capacity', 'used', 'usedAfter', 'shortfall']) {
-      expect((details[key] as string[]).length).toBe(modules);
-    }
-    expect(seatShortfallDetails(error).length).toBeGreaterThan(0);
+  it.each([undefined, false, true])('releases seats with query confirmation %s and no body', async confirmAddonCascade => {
+    const pending = releaseSeats('user/id', { confirmAddonCascade }, key);
+    const req = http.expectOne(r => r.url === `${root}/users/user%2Fid/release-seats`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toBeNull();
+    expect(req.request.headers.get('x-idempotency-key')).toBe(key);
+    expect(req.request.headers.get('x-csrf-token')).toBe('csrf-proof');
+    expect(req.request.params.get('confirmAddonCascade')).toBe(confirmAddonCascade === undefined ? null : String(confirmAddonCascade));
+    req.flush({ success: true, data: preview });
+    await expect(pending).resolves.toEqual(preview);
   });
 
-  it('reads the migration-only used, usedAfter and shortfall arrays by module index', () => {
-    const error = new ApiError(409, 'SEAT_MIGRATION_NOT_READY', {
-      moduleKey: ['crm'],
-      needed: ['3'],
-      free: ['1'],
-      capacity: ['5'],
-      userModuleKey: ['crm', 'crm', 'crm'],
-      userIds: ['user-1', 'user-2', 'user-3'],
-      userNames: ['User One', 'User Two', 'User Three'],
-      used: ['4'],
-      usedAfter: ['7'],
-      shortfall: ['2'],
-    });
-    expect(seatShortfallDetails(error)).toEqual([
+  it('previews free-up without an idempotency key', async () => {
+    const body = { moduleKey: 'crm', targetSeats: 1, keepUserIds: ['user-1'] };
+    const result = { fits: true, removals: [{ userId: 'user-2', name: 'Two',
+      roleAssignments: [{ roleName: 'Sales', scope: 'TENANT' }],
+      alsoLoses: [{ moduleKey: 'trade', nameI18n: { en: 'Trade', ar: 'التجارة' } }], addonsRemoved: ['Reports'] }] };
+    const pending = freeUpPreview(body);
+    const req = http.expectOne(`${root}/seats/free-up/preview`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual(body);
+    expect(req.request.headers.has('x-idempotency-key')).toBe(false);
+    req.flush({ success: true, data: result });
+    await expect(pending).resolves.toEqual(result);
+  });
+
+  it('sends numeric revision and cascade confirmation in the free-up body', async () => {
+    const body = { moduleKey: 'crm', targetSeats: 1, keepUserIds: ['user-1'], expectedUsageRevision: 7, confirmAddonCascade: true };
+    const pending = freeUp(body, key);
+    const req = http.expectOne(`${root}/seats/free-up`);
+    expect(req.request.body).toEqual(body);
+    expect(req.request.params.keys()).toEqual([]);
+    expect(req.request.headers.get('x-idempotency-key')).toBe(key);
+    req.flush({ success: true, data: usage });
+    await expect(pending).resolves.toEqual(usage);
+  });
+
+  it('swaps selected users and encodes the module path', async () => {
+    const body = { keepUserId: 'over-capacity', releaseUserId: 'active' };
+    const pending = swapSeat('module/key', body, key);
+    const req = http.expectOne(`${root}/seats/module%2Fkey/swap`);
+    expect(req.request.body).toEqual(body);
+    expect(req.request.headers.get('x-idempotency-key')).toBe(key);
+    req.flush({ success: true, data: usage });
+    await expect(pending).resolves.toEqual(usage);
+  });
+
+  it('generates a UUIDv7 idempotency key when omitted', async () => {
+    const pending = switchToDerived();
+    const req = http.expectOne(`${root}/seats/switch-to-derived`);
+    expect(req.request.headers.get('x-idempotency-key')).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    req.flush({ success: true, data: usage });
+    await expect(pending).resolves.toEqual(usage);
+  });
+
+  it.each(['SEAT_USAGE_STALE', 'SEAT_ADDON_CASCADE_REQUIRED', 'SEAT_MIGRATION_NOT_READY', 'SEAT_SWAP_INVALID'])('preserves %s and details without retry', async code => {
+    const details = { moduleKey: ['crm'], needed: ['3'], free: ['1'], capacity: ['5'], used: ['4'], usedAfter: ['7'], shortfall: ['2'] };
+    const pending = switchToDerived({ confirmAddonCascade: true }, key);
+    const rejection = expect(pending).rejects.toMatchObject({ status: 409, code, details, correlationId: 'trace-1' });
+    const req = http.expectOne(r => r.url === `${root}/seats/switch-to-derived`);
+    expect(req.request.params.get('confirmAddonCascade')).toBe('true');
+    expect(req.request.body).toBeNull();
+    expect(req.request.headers.get('x-idempotency-key')).toBe(key);
+    req.flush({ errorCode: code, details, correlationId: 'trace-1' }, { status: 409, statusText: 'Conflict' });
+    await rejection;
+    http.expectNone(r => r.url === `${root}/seats/switch-to-derived`);
+    expect(seatErrorMessage(k => k === `seats.errors.${code}` ? 'translated' : k, new ApiError(409, code, details))).toBe('translated');
+    expect(seatShortfallDetails(new ApiError(409, code, details))).toEqual([
       { moduleKey: 'crm', needed: 3, free: 1, capacity: 5, used: 4, usedAfter: 7, shortfall: 2 },
     ]);
+  });
+
+  it.each([401, 403, 422, 500, 503])('propagates HTTP %s failures', async status => {
+    const pending = getSeatUsage();
+    const rejection = expect(pending).rejects.toBeInstanceOf(ApiError);
+    http.expectOne(`${root}/seats/usage`).flush({}, { status, statusText: 'Failure' });
+    await rejection;
+  });
+
+  it('rejects a write when CSRF is missing', async () => {
+    vi.spyOn(TestBed.inject(DOCUMENT), 'cookie', 'get').mockReturnValue('');
+    await expect(releaseSeats('user-1', {}, key)).rejects.toMatchObject({ status: 403, code: 'GW.AUTH.CSRF_INVALID' });
+    http.expectNone(r => r.url.includes('release-seats'));
   });
 });

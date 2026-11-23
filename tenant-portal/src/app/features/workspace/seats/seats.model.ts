@@ -1,4 +1,5 @@
 import type { CorePage } from '../../../core/api/core-page';
+import { ApiError } from '../../../core/api/api-errors';
 
 export type { CorePage };
 
@@ -53,6 +54,71 @@ export interface SeatHolder {
   accessState: SeatAccessState;
   cause: string | null;
   roles: SeatHolderRole[];
+  extension?: string;
+  enabledAt?: string | null;
+}
+
+/** Standard holders and Webphone holders are different Core service results. */
+export interface CoreSeatHolder extends Omit<SeatHolder, 'status' | 'accessState'> {
+  status: string;
+  accessState: string;
+}
+
+export interface SeatHolderUser { email: string; status: string }
+
+export interface WebphoneSeatHolder {
+  userId: string;
+  name: string;
+  extension: string;
+  enabledAt: string | null;
+  accessState: string;
+}
+
+export interface WebphoneSeatHoldersPage {
+  data: WebphoneSeatHolder[];
+  meta: { page: number; limit: number; total: number };
+}
+
+function isSeatAccessState(value: unknown): value is SeatAccessState {
+  return value === 'ACTIVE' || value === 'OVER_CAPACITY';
+}
+
+function isSeatHolderStatus(value: unknown): value is SeatHolderStatus {
+  return value === 'INVITED' || value === 'ACTIVE' || value === 'SUSPENDED' || value === 'DEACTIVATED';
+}
+
+export function seatHolderFromCore(row: CoreSeatHolder): SeatHolder {
+  if (!row || !isSeatAccessState(row.accessState) || !isSeatHolderStatus(row.status) || !Array.isArray(row.roles) ||
+      row.roles.some(role => !role || typeof role.roleId !== 'string' || typeof role.roleName !== 'string' ||
+        !role.scope || !['TENANT', 'COMPANY', 'BRANCH'].includes(role.scope.target))) {
+    throw new ApiError(502, 'COMMON.GENERIC.INTERNAL_ERROR');
+  }
+  return { ...row, status: row.status, accessState: row.accessState };
+}
+
+export function webphoneSeatHolder(row: WebphoneSeatHolder, user: SeatHolderUser): SeatHolder {
+  if (!row || !user || typeof user.email !== 'string' || !isSeatHolderStatus(user.status) ||
+      !isSeatAccessState(row.accessState) || (row.enabledAt !== null && typeof row.enabledAt !== 'string')) {
+    throw new ApiError(502, 'COMMON.GENERIC.INTERNAL_ERROR');
+  }
+  return { userId: row.userId, name: row.name, email: user.email, status: user.status,
+    grantedAt: row.enabledAt ?? '', accessState: row.accessState, cause: null, roles: [],
+    extension: row.extension, enabledAt: row.enabledAt };
+}
+
+export function webphoneSeatHoldersPage(page: WebphoneSeatHoldersPage, holders: SeatHolder[]): CorePage<SeatHolder> {
+  const meta = page?.meta;
+  if (!meta || !Number.isSafeInteger(meta.page) || meta.page < 1 || !Number.isSafeInteger(meta.limit) || meta.limit < 1 ||
+      !Number.isSafeInteger(meta.total) || meta.total < 0) throw new ApiError(502, 'COMMON.GENERIC.INTERNAL_ERROR');
+  const totalPages = Math.ceil(meta.total / meta.limit);
+  return { data: holders, meta: { ...meta, totalPages, hasNext: meta.page < totalPages, hasPrev: meta.page > 1 } };
+}
+
+export function mySeatStatesFromMe(me: { seats: MySeatState[] }): MySeatState[] {
+  if (!me || !Array.isArray(me.seats) || me.seats.some(row => !row || typeof row.moduleKey !== 'string' || !isSeatAccessState(row.accessState))) {
+    throw new ApiError(502, 'COMMON.GENERIC.INTERNAL_ERROR');
+  }
+  return me.seats.map(({ moduleKey, accessState }) => ({ moduleKey, accessState }));
 }
 
 export type SeatChange =
