@@ -53,11 +53,11 @@ import { type TradeContext, tradeContext } from '../../shared/trade-api';
 import { itemName, searchItems } from '../../shared/trade-foundation.api';
 import type { ItemKind, ItemRow, Uom } from '../../shared/trade-foundation.model';
 import { ITEM_KIND_TILE, type TileSpec } from '../../shared/trade-labels';
-import type { PriceEntry } from '../pricing.model';
+import type { PriceVersionDetailEntry } from '../pricing.model';
 import { formatMoney, formatQty } from '../../shared/trade-format';
 import { formatUnitPrice } from '../pricing.service';
 
-export interface PriceLineRow extends PriceEntry {
+export interface PriceLineRow extends PriceVersionDetailEntry {
   isNew?: boolean;
 }
 
@@ -230,7 +230,7 @@ export class PriceLinesTable {
   readonly uoms = input.required<readonly Uom[]>();
   readonly currencyCode = input.required<string>();
   readonly editable = input(false);
-  readonly canViewCost = input(true);
+  readonly canViewCost = input(false);
   readonly loading = input(false);
   readonly loadFailed = input(false);
   readonly total = input(0);
@@ -499,7 +499,7 @@ export class PriceLinesTable {
     if (row.uomId && !options.some((opt) => opt.value === row.uomId)) {
       options.push({
         value: row.uomId,
-        label: row.uomLocalizedNames[language] || row.uomLocalizedNames['en'] || row.uomCode,
+        label: row.uomLocalizedNames?.[language] || row.uomLocalizedNames?.['en'] || row.uomCode || row.uomId,
       });
     }
     return options;
@@ -507,22 +507,14 @@ export class PriceLinesTable {
 
   protected itemDisplayName(row: PriceLineRow): string {
     const language = this.lang();
-    return (
-      row.itemLocalizedNames[language] ||
-      row.itemLocalizedNames['en'] ||
-      row.itemLocalizedNames['ar'] ||
-      ''
-    );
+    const names = row.itemLocalizedNames;
+    return names?.[language] || names?.['en'] || names?.['ar'] || '';
   }
 
   protected uomDisplayName(row: PriceLineRow): string {
     const language = this.lang();
-    return (
-      row.uomLocalizedNames[language] ||
-      row.uomLocalizedNames['en'] ||
-      row.uomLocalizedNames['ar'] ||
-      row.uomCode
-    );
+    const names = row.uomLocalizedNames;
+    return names?.[language] || names?.['en'] || names?.['ar'] || row.uomCode || '—';
   }
 
   protected formattedUnitPrice(row: PriceLineRow): string {

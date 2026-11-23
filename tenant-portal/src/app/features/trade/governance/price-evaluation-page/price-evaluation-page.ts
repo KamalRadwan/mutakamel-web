@@ -12,6 +12,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { FormField, form, required, validate } from '@angular/forms/signals';
+import { Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
@@ -30,10 +31,11 @@ import { DateField } from '../../../../shared/ui/date-time/date-field';
 import { TimeField } from '../../../../shared/ui/date-time/time-field';
 import { Dropdown, type DropdownOption } from '../../../../shared/ui/dropdown/dropdown';
 import { Field } from '../../../../shared/ui/field/field';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { rectInPage, viewport } from '../../../../shared/ui/overlay/zoom';
 import { Segmented, type SegmentedOption } from '../../../../shared/ui/segmented/segmented';
 import { TradeItemPicker } from '../../shared/pickers/item-picker/item-picker';
-import { errorCodeOf, errorKey, tradeContext } from '../../shared/trade-api';
+import { type TradeContext, errorCodeOf, errorKey, tradeContext } from '../../shared/trade-api';
 import { formatMoney, formatQty } from '../../shared/trade-format';
 import {
   getItem,
@@ -50,7 +52,6 @@ import type {
   LocalizedNames,
   Uom,
 } from '../../shared/trade-foundation.model';
-import { governanceErrorKey } from '../governance-fake-actors';
 import {
   PriceAnswer,
   type PriceAnswerContext,
@@ -74,8 +75,7 @@ import type {
   PricingReferenceData,
   VersionHead,
 } from '../pricing.model';
-
-const CAN = { manage: true, test: true, approve: true, publish: true }; // later from the session
+import { governanceErrorKey, hasPricingGrant, isForbiddenError } from '../pricing.service';
 
 const MAX_RECENT_QUESTIONS = 10;
 const POSITIVE_DECIMAL_8_RE = /^(?:\d+(?:\.\d{1,8})?|\.\d{1,8})$/;
@@ -179,18 +179,24 @@ function questionSignature(q: PriceQuestionModel): string {
 async function loadAnswerContext(
   decision: PricingDecision,
   payload: PricingEvaluateInput,
+  ctx: TradeContext,
 ): Promise<PriceAnswerContext | null> {
   try {
     const [head, entries] = await Promise.all([
-      getPriceVersion(decision.priceBookVersionId, { include: 'none' }),
-      listEntries(decision.priceBookVersionId, {
-        itemId: payload.itemId,
-        uomId: payload.uomId,
-        limit: CONTEXT_ENTRY_LIMIT,
-      }),
+      getPriceVersion(decision.priceBookVersionId, { include: 'none' }, ctx),
+      listEntries(
+        decision.priceBookVersionId,
+        {
+          itemId: payload.itemId,
+          uomId: payload.uomId,
+          limit: CONTEXT_ENTRY_LIMIT,
+        },
+        ctx,
+      ),
     ]);
     return { book: head.book, entries: entries.items, promotions: head.promotions };
-  } catch {
+  } catch (error) {
+    if (isForbiddenError(error)) throw error;
     return null;
   }
 }
@@ -214,6 +220,7 @@ function resolveLocalized(
     TimeField,
     Dropdown,
     Field,
+    FullState,
     Segmented,
     TradeItemPicker,
     PriceAnswer,
@@ -237,11 +244,22 @@ function resolveLocalized(
 })
 export class PriceEvaluationPage {
   private readonly transloco = inject(TranslocoService);
+  private readonly router = inject(Router);
   private readonly langState = inject(LanguageState);
   private readonly scopeState = inject(ScopeState);
   private readonly notify = inject(Notify);
   private readonly destroyRef = inject(DestroyRef);
   private readonly injector = inject(Injector);
+
+  protected readonly forbidden = signal(false);
+  protected readonly canRead = computed(() =>
+    hasPricingGrant(this.injector, this.scopeState, 'trade.pricing.read'),
+  );
+  protected readonly canManage = computed(
+    () =>
+      !this.forbidden() &&
+      hasPricingGrant(this.injector, this.scopeState, 'trade.pricing.manage'),
+  );
 
   private readonly itemPickerWrapRef = viewChild<ElementRef<HTMLElement>>('itemPickerWrap');
   private readonly accountAnchorRef = viewChild<ElementRef<HTMLElement>>('accountAnchor');
@@ -310,14 +328,33 @@ export class PriceEvaluationPage {
   );
 
   private readonly referenceResource = resource({
-    loader: () =>
-      getReferenceData().catch((): PricingReferenceData => ({ branches: [], currencies: [] })),
+    params: () => ({
+      companyId: this.scopeState.company().id,
+      canRead: this.canRead(),
+    }),
+    loader: async ({ params }): Promise<PricingReferenceData> => {
+      if (!params.canRead) return { branches: [], currencies: [] };
+      try {
+        return await getReferenceData(tradeContext(this.scopeState, 'COMPANY'));
+      } catch (err) {
+        if (isForbiddenError(err)) {
+          this.forbidden.set(true);
+        }
+        return { branches: [], currencies: [] };
+      }
+    },
   });
 
   private readonly itemDetailResource = resource({
-    params: () => ({ itemId: this.questionModel().itemId, ctx: this.branchContext() }),
+    params: () => ({
+      itemId: this.questionModel().itemId,
+      ctx: this.branchContext(),
+      canRead: this.canRead(),
+    }),
     loader: async ({ params }): Promise<ItemDetail | null> =>
-      params.itemId ? getItem(params.ctx, params.itemId).catch(() => null) : null,
+      params.canRead && params.itemId
+        ? getItem(params.ctx, params.itemId).catch(() => null)
+        : null,
   });
 
   private readonly uomsResource = resource({
@@ -325,9 +362,10 @@ export class PriceEvaluationPage {
       purpose: this.questionModel().purpose,
       itemId: this.questionModel().itemId,
       ctx: tradeContext(this.scopeState, 'COMPANY'),
+      canRead: this.canRead(),
     }),
     loader: async ({ params }): Promise<Uom[]> =>
-      params.itemId
+      params.canRead && params.itemId
         ? listUoms(
             { purpose: params.purpose, itemId: params.itemId, status: 'ACTIVE' },
             params.ctx,
@@ -336,26 +374,67 @@ export class PriceEvaluationPage {
   });
 
   private readonly channelsResource = resource({
-    params: () => ({ ctx: tradeContext(this.scopeState, 'COMPANY') }),
+    params: () => ({
+      ctx: tradeContext(this.scopeState, 'COMPANY'),
+      canRead: this.canRead(),
+    }),
     loader: async ({ params }): Promise<Channel[]> =>
-      params.ctx.companyId ? listChannels(params.ctx).catch(() => []) : [],
+      params.canRead && params.ctx.companyId
+        ? listChannels(params.ctx).catch(() => [])
+        : [],
   });
 
   private readonly booksResource = resource({
-    params: () => ({ purpose: this.questionModel().purpose }),
-    loader: async ({ params }) =>
-      listPriceBooks({ purpose: params.purpose, status: 'ACTIVE', limit: 100 }).catch(() => ({
-        items: [] as PriceBookListItem[],
-        total: 0,
-        page: 1,
-        limit: 100,
-      })),
+    params: () => ({
+      purpose: this.questionModel().purpose,
+      companyId: this.scopeState.company().id,
+      canRead: this.canRead(),
+    }),
+    loader: async ({ params }) => {
+      if (!params.canRead) {
+        return {
+          items: [] as PriceBookListItem[],
+          total: 0,
+          page: 1,
+          limit: 100,
+        };
+      }
+      try {
+        return await listPriceBooks(
+          { purpose: params.purpose, status: 'ACTIVE', limit: 100 },
+          tradeContext(this.scopeState, 'COMPANY'),
+        );
+      } catch (err) {
+        if (isForbiddenError(err)) {
+          this.forbidden.set(true);
+        }
+        return {
+          items: [] as PriceBookListItem[],
+          total: 0,
+          page: 1,
+          limit: 100,
+        };
+      }
+    },
   });
 
   private readonly bookDossierResource = resource({
-    params: () => ({ bookId: this.questionModel().priceBookId }),
-    loader: async ({ params }): Promise<PriceBookDossier | null> =>
-      params.bookId ? getPriceBook(params.bookId).catch(() => null) : null,
+    params: () => ({
+      bookId: this.questionModel().priceBookId,
+      companyId: this.scopeState.company().id,
+      canRead: this.canRead(),
+    }),
+    loader: async ({ params }): Promise<PriceBookDossier | null> => {
+      if (!params.canRead || !params.bookId) return null;
+      try {
+        return await getPriceBook(params.bookId, tradeContext(this.scopeState, 'COMPANY'));
+      } catch (err) {
+        if (isForbiddenError(err)) {
+          this.forbidden.set(true);
+        }
+        return null;
+      }
+    },
   });
 
   private readonly accountsResource = resource({
@@ -439,12 +518,12 @@ export class PriceEvaluationPage {
     const companyId = this.scopeState.company().id;
     const branches = (
       this.referenceResource.hasValue() ? this.referenceResource.value().branches : []
-    ).filter((b) => b.companyId === companyId);
+    ).filter((b) => !companyId || !b.companyId || b.companyId === companyId);
     return [
       { value: '', label: this.transloco.translate('priceEval.question.branch.current') },
       ...branches.map((b) => ({
         value: b.id,
-        label: lang === 'ar' ? b.nameAr : b.nameEn,
+        label: (lang === 'ar' ? b.nameAr : b.nameEn) || b.name || b.code,
       })),
     ];
   });
@@ -491,7 +570,7 @@ export class PriceEvaluationPage {
     const versions = (dossier?.versions ?? [])
       .filter((v: VersionHead) => {
         if (v.status === 'DRAFT' || v.status === 'TESTED') {
-          return CAN.manage;
+          return this.canManage();
         }
         return v.status === 'PUBLISHED' || v.status === 'SCHEDULED';
       })
@@ -801,6 +880,10 @@ export class PriceEvaluationPage {
     }
   }
 
+  protected goHome(): void {
+    void this.router.navigate(['/']);
+  }
+
   protected focusItemPicker(): void {
     const host = this.itemPickerWrapRef()?.nativeElement;
     const control = host?.querySelector<HTMLElement>('input, button, [role="combobox"]');
@@ -881,9 +964,11 @@ export class PriceEvaluationPage {
       priceBookVersionId: (snapshot.priceBookId && snapshot.priceBookVersionId) || undefined,
     };
 
+    const evalCtx = this.branchContext();
+    const readCtx = tradeContext(this.scopeState, 'COMPANY');
     try {
-      const decision = await evaluate(payload);
-      const context = await loadAnswerContext(decision, payload);
+      const decision = await evaluate(payload, evalCtx);
+      const context = await loadAnswerContext(decision, payload, readCtx);
       if (seq !== this.evalSeq) return;
 
       this.answerError.set(null);
@@ -894,6 +979,11 @@ export class PriceEvaluationPage {
       this.pushRecentQuestion(snapshot, labels, decision);
     } catch (err) {
       if (seq !== this.evalSeq) return;
+
+      if (isForbiddenError(err)) {
+        this.forbidden.set(true);
+        return;
+      }
 
       const code = errorCodeOf(err);
       if (code && BUSINESS_ERROR_CODES.has(code as PriceAnswerErrorCode)) {

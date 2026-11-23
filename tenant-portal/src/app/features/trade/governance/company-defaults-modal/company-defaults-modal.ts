@@ -5,12 +5,14 @@ import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerAlertTriangle, tablerInbox, tablerRefresh, tablerStar, tablerTrash } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
+import { ScopeState } from '../../../../core/scope/scope';
 import { Button } from '../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { Dropdown, type DropdownOption } from '../../../../shared/ui/dropdown/dropdown';
 import { Modal } from '../../../../shared/ui/modal/modal';
-import { errorCodeOf, newIdempotencyKey } from '../../shared/trade-api';
+import { errorCodeOf, newIdempotencyKey, tradeContext } from '../../shared/trade-api';
 import { ConflictDialog } from '../governance-shared/conflict-dialog/conflict-dialog';
+import { isForbiddenError } from '../pricing.service';
 import { resolvePricingError } from '../new-version-modal/new-version-modal';
 import {
   deleteCompanyDefault,
@@ -40,6 +42,7 @@ export class CompanyDefaultsModal {
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly lang = inject(LanguageState).current;
+  private readonly scope = inject(ScopeState);
   private readonly notify = inject(Notify);
   private readonly modal = viewChild.required(Modal);
   private readonly removeDialog = viewChild.required<ConfirmDialog>('removeDialog');
@@ -47,6 +50,7 @@ export class CompanyDefaultsModal {
   private readonly conflictDialog = viewChild.required(ConflictDialog);
 
   readonly changed = output<void>();
+  readonly forbidden = output<void>();
 
   protected readonly skeletonRows = [0, 1, 2];
   protected readonly loading = signal(false);
@@ -122,11 +126,18 @@ export class CompanyDefaultsModal {
         row.draftBookId,
         row.mapping?.version ?? 0,
         newIdempotencyKey(),
+        tradeContext(this.scope, 'COMPANY'),
       );
       this.notify.success(this.transloco.translate('priceBooks.defaults.saved'));
       await this.loadData();
       this.changed.emit();
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.allowClose = true;
+        this.modal().close();
+        this.forbidden.emit();
+        return;
+      }
       if (errorCodeOf(error) === 'TRADE.CONCURRENCY.STALE_VERSION') {
         this.pendingConflictAction = { type: 'save', row };
         this.conflictDialog().open();
@@ -151,11 +162,18 @@ export class CompanyDefaultsModal {
         row.currencyCode,
         row.mapping.version,
         newIdempotencyKey(),
+        tradeContext(this.scope, 'COMPANY'),
       );
       this.notify.success(this.transloco.translate('priceBooks.defaults.removed'));
       await this.loadData();
       this.changed.emit();
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.allowClose = true;
+        this.modal().close();
+        this.forbidden.emit();
+        return;
+      }
       if (errorCodeOf(error) === 'TRADE.CONCURRENCY.STALE_VERSION') {
         this.pendingConflictAction = { type: 'remove', row };
         this.conflictDialog().open();
@@ -232,9 +250,10 @@ export class CompanyDefaultsModal {
     this.loading.set(true);
     this.loadFailed.set(false);
     try {
+      const ctx = tradeContext(this.scope, 'COMPANY');
       const [defaults, activePage] = await Promise.all([
-        listCompanyDefaults(),
-        listPriceBooks({ status: 'ACTIVE', limit: 100 }),
+        listCompanyDefaults(ctx),
+        listPriceBooks({ status: 'ACTIVE', limit: 100 }, ctx),
       ]);
       if (seq !== this.loadSeq) return;
 
@@ -283,6 +302,12 @@ export class CompanyDefaultsModal {
 
       this.rows.set(nextRows);
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.allowClose = true;
+        this.modal().close();
+        this.forbidden.emit();
+        return;
+      }
       if (seq === this.loadSeq) {
         this.loadFailed.set(true);
         this.notify.error(resolvePricingError(this.transloco, error));

@@ -1,3 +1,14 @@
+@if (!canRead() || forbidden()) {
+  <div class="flex flex-1 rounded-10 border border-border bg-surface shadow-card">
+    <ui-full-state
+      kind="forbidden"
+      [title]="'errors.forbidden.title' | transloco"
+      [text]="'errors.forbidden.text' | transloco"
+      [actionLabel]="'errors.notFound.action' | transloco"
+      (action)="goHome()"
+    />
+  </div>
+} @else {
 <div class="grid grid-cols-1 items-start gap-12 desktop:grid-cols-12">
   <section class="flex flex-col gap-10 rounded-10 border border-border bg-surface p-10 shadow-card desktop:col-span-5">
     <header class="flex items-center gap-8">
@@ -380,3 +391,4 @@
     />
   </div>
 </div>
+}

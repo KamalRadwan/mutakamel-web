@@ -1,4 +1,14 @@
-@if (loading()) {
+@if (!canRead() || forbidden()) {
+  <div class="flex flex-1 rounded-10 border border-border bg-surface shadow-card">
+    <ui-full-state
+      kind="forbidden"
+      [title]="'errors.forbidden.title' | transloco"
+      [text]="'errors.forbidden.text' | transloco"
+      [actionLabel]="'errors.notFound.action' | transloco"
+      (action)="goHome()"
+    />
+  </div>
+} @else if (loading()) {
   <div class="flex flex-col gap-10" aria-busy="true">
     <div class="flex flex-col gap-10 rounded-10 border border-border bg-surface p-10 shadow-card">
       <div class="flex items-center gap-8">
@@ -78,6 +88,7 @@
         module="price"
         [status]="d.version.status"
         [liveScheduled]="liveScheduled()"
+        [awaitingActivation]="awaitingActivation()"
       />
 
       <span class="flex-1"></span>
@@ -101,7 +112,7 @@
         }
 
         @if (status() === 'DRAFT') {
-          @if (can.manage) {
+          @if (canManage()) {
             <button
               type="button"
               uiButton
@@ -114,7 +125,7 @@
               {{ 'pricing.actions.save' | transloco }}
             </button>
           }
-          @if (can.test) {
+          @if (canManage()) {
             <button
               type="button"
               uiButton
@@ -129,7 +140,7 @@
             </button>
           }
         } @else if (status() === 'TESTED') {
-          @if (can.manage) {
+          @if (canManage()) {
             <button
               type="button"
               uiButton
@@ -142,7 +153,7 @@
               {{ 'pricing.actions.save' | transloco }}
             </button>
           }
-          @if (can.test) {
+          @if (canManage()) {
             <button
               type="button"
               uiButton
@@ -156,7 +167,7 @@
               {{ 'pricing.actions.testAgain' | transloco }}
             </button>
           }
-          @if (can.publish) {
+          @if (canPublish()) {
             <button
               type="button"
               uiButton
@@ -175,7 +186,7 @@
               {{ 'pricing.actions.publish' | transloco }}
             </button>
           }
-        } @else if ((status() === 'PUBLISHED' || status() === 'SCHEDULED') && can.manage) {
+        } @else if ((status() === 'PUBLISHED' || status() === 'SCHEDULED') && canPublish()) {
           <button
             type="button"
             uiButton
@@ -333,7 +344,7 @@
         [uoms]="uoms()"
         [currencyCode]="d.book.currencyCode"
         [editable]="editable()"
-        [canViewCost]="d.canViewCost"
+        [canViewCost]="canViewCost()"
         [loading]="linesLoading()"
         [loadFailed]="linesLoadFailed()"
         [total]="effectiveFilteredLinesTotal()"
@@ -533,7 +544,7 @@
               </span>
             </div>
 
-            @if (editable() && can.test) {
+            @if (editable() && canManage()) {
               <button
                 type="button"
                 uiButton
@@ -642,7 +653,7 @@
             </span>
             <h3 class="text-13 leading-18 font-medium text-text">{{ 'pricing.testResult.emptyTitle' | transloco }}</h3>
             <p class="max-w-modal-confirm text-12 leading-18 text-text-muted">{{ 'pricing.testResult.emptyText' | transloco }}</p>
-            @if (editable() && can.test) {
+            @if (editable() && canManage()) {
               <button
                 type="button"
                 uiButton
@@ -670,6 +681,7 @@
         [class]="activeTab() === 'compare' ? 'block' : 'hidden'"
       >
         <app-price-diff
+          (forbidden)="forbidden.set(true)"
           [versionId]="d.version.id"
           [bookId]="d.book.id"
           [currencyCode]="d.book.currencyCode"
@@ -741,6 +753,7 @@
   />
 
   <app-publish-price-dialog
+    (forbidden)="forbidden.set(true)"
     [versionId]="d.version.id"
     [versionNumber]="d.version.versionNumber"
     [ifMatchVersion]="currentIfMatch()"

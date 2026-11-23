@@ -1,9 +1,16 @@
+import type { TradeContext } from '../shared/trade-api';
 import type {
   CommercialAccountRole,
   CommercialAccountStatus,
   LocalizedNames,
   Page,
 } from '../shared/trade-foundation.model';
+
+export interface PricingWriteOptions {
+  idempotencyKey?: string;
+  ifMatch?: number;
+  ctx?: TradeContext;
+}
 
 // Shapes follow the trade-app pricing module code: pricing.service.ts,
 // pricing-read-projection.service.ts and dto/pricing.dto.ts.
@@ -80,7 +87,7 @@ export interface VersionHead {
 
 /** GET /price-books: the latest five versions also carry their maker. */
 export interface BookListVersionHead extends VersionHead {
-  createdByUserId: string;
+  createdByUserId: string | null;
 }
 
 /** Book header returned by PATCH /price-books/:id and inside GET /price-books/:id. */
@@ -145,7 +152,7 @@ export interface PriceBookKpis {
 export interface VersionSummary extends VersionHead {
   supersededByVersionId: string | null;
   checksum: string;
-  createdByUserId: string;
+  createdByUserId: string | null;
   createdByDisplayName: string | null;
   createdByEmail: string | null;
   createdAt: string;
@@ -164,8 +171,8 @@ export interface PriceVersionRow extends VersionHead {
   priceBookId: string;
   supersededByVersionId: string | null;
   checksum: string;
-  createdBy: string;
-  updatedBy: string;
+  createdBy: string | null;
+  updatedBy: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -204,8 +211,8 @@ export interface GovernanceAuditEntry {
   resourceType: string;
   resourceId: string;
   action: string;
-  actorUserId: string;
-  actorDisplayName: string;
+  actorUserId: string | null;
+  actorDisplayName: string | null;
   reason: string | null;
   reasonCode?: string | null;
   reasonNameEn?: string | null;
@@ -241,6 +248,18 @@ export interface PriceEntry {
   priority: number;
   standardCost: string | null;
   catalogSalesPrice: string | null;
+}
+
+/** GET /price-book-versions/:id?include=entries row: joined item/UoM labels may be null (P-1). */
+export interface PriceVersionDetailEntry
+  extends Omit<
+    PriceEntry,
+    'itemCode' | 'itemLocalizedNames' | 'uomCode' | 'uomLocalizedNames'
+  > {
+  itemCode: string | null;
+  itemLocalizedNames: LocalizedNames | null;
+  uomCode: string | null;
+  uomLocalizedNames: LocalizedNames | null;
 }
 
 /** Stored selector (promotionSelector): only the keys that were sent. */
@@ -320,7 +339,7 @@ export interface PriceVersionBookRef {
 export interface PriceVersionDetailHead extends VersionHead {
   supersededByVersionId: string | null;
   checksum: string;
-  createdByUserId: string;
+  createdByUserId: string | null;
   createdByDisplayName: string | null;
   createdByEmail: string | null;
   notes: string | null;
@@ -335,7 +354,7 @@ export interface PriceVersionDetail {
   soloOwnerGovernanceEligible: boolean;
   book: PriceVersionBookRef;
   version: PriceVersionDetailHead;
-  entries: PriceEntry[];
+  entries: PriceVersionDetailEntry[];
   promotions: PromotionRule[];
   latestTestEvidence: PriceTestEvidence | null;
   auditTrail: GovernanceAuditEntry[];
@@ -444,23 +463,72 @@ export interface DeletedResult {
   deleted: true;
 }
 
+export interface ReferenceItem {
+  itemId: string;
+  canonicalCode: string;
+  itemKind: string;
+  localizedNames: LocalizedNames;
+  baseUomId: string;
+  defaultSalesUomId: string | null;
+  defaultPurchaseUomId: string | null;
+  canSell: boolean;
+  canPurchase: boolean;
+  salesPrice: string | null;
+  standardCost: string | null;
+  currencyCode: string | null;
+}
+
+export interface ReferenceUom {
+  id: string;
+  code: string;
+  displayName: string | null;
+  localizedNames: LocalizedNames;
+}
+
+export interface ReferenceChannel {
+  id: string;
+  code: string;
+  name: string;
+  channelType: string;
+}
+
+export interface ReferenceCommercialAccount {
+  id: string;
+  partyId: string;
+  displayName: string;
+  partyType: 'INDIVIDUAL' | 'ORGANIZATION';
+  accountRole: CommercialAccountRole;
+  priceBookId: string | null;
+  status: CommercialAccountStatus;
+}
+
 export interface ReferenceBranch {
   id: string;
   code: string;
+  name?: string;
   nameEn: string;
   nameAr: string;
   companyId: string;
+  isHeadquarters?: boolean;
 }
 
 export interface ReferenceCurrency {
   code: string;
+  name?: string;
   nameEn: string;
   nameAr: string;
+  symbol?: string | null;
   decimalPlaces: number;
+  isDefault?: boolean;
 }
 
 export interface PricingReferenceData {
+  canViewCost?: boolean;
+  items?: ReferenceItem[];
+  uoms?: ReferenceUom[];
   branches: ReferenceBranch[];
+  channels?: ReferenceChannel[];
+  commercialAccounts?: ReferenceCommercialAccount[];
   currencies: ReferenceCurrency[];
 }
 
@@ -627,6 +695,9 @@ export interface EntryInput {
   priority?: number;
 }
 
+/** P-5: createVersion / updateVersion strip id from entries. */
+export type EntryCreateInput = Omit<EntryInput, 'id'>;
+
 /** PromotionRuleDto (PromotionChangeDto adds the optional id): a flat body. */
 export interface PromotionInput {
   id?: string;
@@ -645,6 +716,9 @@ export interface PromotionInput {
   stackGroup?: string;
   exclusive?: boolean;
 }
+
+/** P-5: createVersion / updateVersion strip id from promotions. */
+export type PromotionCreateInput = Omit<PromotionInput, 'id'>;
 
 /** CreatePriceBookVersionDto: POST /price-books/:id/versions. */
 export interface CreateVersionInput {

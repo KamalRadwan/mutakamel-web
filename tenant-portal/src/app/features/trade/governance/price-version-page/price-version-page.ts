@@ -1,6 +1,7 @@
 import {
   Component,
   DestroyRef,
+  Injector,
   computed,
   effect,
   inject,
@@ -43,12 +44,14 @@ import {
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
 import { ScopeState } from '../../../../core/scope/scope';
+import { TenantScopeState } from '../../../../core/scope/tenant-scope';
 import { type ActionItem, type ActionSelection, ActionsMenu } from '../../../../shared/ui/actions-menu/actions-menu';
 import { Button } from '../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { DateField } from '../../../../shared/ui/date-time/date-field';
 import { TimeField } from '../../../../shared/ui/date-time/time-field';
 import { Field } from '../../../../shared/ui/field/field';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { type TabItem, Tabs, tabButtonId, tabPanelId } from '../../../../shared/ui/tabs/tabs';
 import { UnsavedDialog } from '../../../../shared/ui/unsaved-dialog/unsaved-dialog';
 import { ApiError, type TradeContext, newIdempotencyKey, tradeContext } from '../../shared/trade-api';
@@ -64,7 +67,6 @@ import type {
   CommercialAccountSummary,
   Uom,
 } from '../../shared/trade-foundation.model';
-import { FAKE_ME, actorDisplayName } from '../governance-fake-actors';
 import { ConflictDialog } from '../governance-shared/conflict-dialog/conflict-dialog';
 import { type LifecycleStep, LifecycleStepper } from '../governance-shared/lifecycle-stepper/lifecycle-stepper';
 import { ReasonDialog, type ReasonDialogResult } from '../governance-shared/reason-dialog/reason-dialog';
@@ -95,6 +97,9 @@ import type {
 } from '../pricing.model';
 import {
   formatDateTime,
+  hasPricingGrant,
+  isAwaitingActivation,
+  isForbiddenError,
   isLiveScheduled,
   promotionToInput,
   rangeText,
@@ -111,15 +116,11 @@ import {
 import { PromotionModal } from '../promotion-modal/promotion-modal';
 import { PublishPriceDialog } from '../publish-price-dialog/publish-price-dialog';
 
-const CAN = { manage: true, test: true, approve: true, publish: true }; // later from the session
-
 export type PriceVersionTab = 'lines' | 'promotions' | 'test' | 'compare' | 'history';
 
 const VALID_TABS: readonly PriceVersionTab[] = ['lines', 'promotions', 'test', 'compare', 'history'];
 const DEFAULT_PAGE_SIZE = 50;
-const MAX_TOTAL_OPS_PER_SAVE = 5000;
-const MAX_ENTRY_OPS_PER_CALL = 1000;
-const MAX_PROMO_OPS_PER_CALL = 500;
+const MAX_TOTAL_OPS_PER_SAVE = 4000;
 
 interface LocalDateTimeParts {
   date: string | null;
@@ -235,6 +236,7 @@ function initialsOf(name: string): string {
     ConflictDialog,
     DateField,
     Field,
+    FullState,
     LifecycleStepper,
     PriceDiff,
     PriceLinesTable,
@@ -290,7 +292,9 @@ export class PriceVersionPage {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly injector = inject(Injector);
   private readonly scope = inject(ScopeState);
+  private readonly tenantScope = inject(TenantScopeState);
   protected readonly lang = inject(LanguageState).current;
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
@@ -306,7 +310,21 @@ export class PriceVersionPage {
 
   protected readonly tabButtonId = tabButtonId;
   protected readonly tabPanelId = tabPanelId;
-  protected readonly can = CAN;
+  protected readonly forbidden = signal(false);
+  protected readonly canRead = computed(() =>
+    hasPricingGrant(this.injector, this.scope, 'trade.pricing.read'),
+  );
+  protected readonly canManage = computed(
+    () => !this.forbidden() && hasPricingGrant(this.injector, this.scope, 'trade.pricing.manage'),
+  );
+  protected readonly canPublish = computed(
+    () => !this.forbidden() && hasPricingGrant(this.injector, this.scope, 'trade.policy.publish'),
+  );
+  private readonly currentUserId = computed(() => this.tenantScope.me()?.id ?? '');
+  private readonly refCanViewCost = signal<boolean | null>(null);
+  protected readonly canViewCost = computed(
+    () => this.refCanViewCost() ?? this.detail()?.canViewCost ?? false,
+  );
 
   // Route parameters
   protected readonly bookId = signal('');
@@ -384,7 +402,7 @@ export class PriceVersionPage {
 
   protected readonly editable = computed(() => {
     const s = this.status();
-    return this.can.manage && (s === 'DRAFT' || s === 'TESTED');
+    return this.canManage() && (s === 'DRAFT' || s === 'TESTED');
   });
 
   protected readonly liveScheduled = computed(() => {
@@ -392,10 +410,16 @@ export class PriceVersionPage {
     return v ? isLiveScheduled(v) : false;
   });
 
+  protected readonly awaitingActivation = computed(() => {
+    const v = this.detail()?.version;
+    return v ? isAwaitingActivation(v) : false;
+  });
+
   protected readonly publishBlocked = computed(() => {
     const d = this.detail();
-    if (!d) return false;
-    return d.version.createdByUserId === FAKE_ME && !d.soloOwnerGovernanceEligible;
+    const meId = this.currentUserId();
+    if (!d || !meId) return false;
+    return Boolean(d.version.createdByUserId && d.version.createdByUserId === meId && !d.soloOwnerGovernanceEligible);
   });
 
   protected readonly makerCheckerCaption = computed(() => {
@@ -415,8 +439,9 @@ export class PriceVersionPage {
     this.i18n();
     const v = this.detail()?.version;
     if (!v) return '';
-    const name = actorDisplayName(v.createdByUserId, this.lang()) || v.createdByDisplayName;
-    if (v.createdByUserId === FAKE_ME) {
+    const name = v.createdByDisplayName || v.createdByEmail || v.createdByUserId || '—';
+    const meId = this.currentUserId();
+    if (meId && v.createdByUserId && v.createdByUserId === meId) {
       return `${name} ${this.transloco.translate('governance.common.you')}`;
     }
     return name;
@@ -540,10 +565,10 @@ export class PriceVersionPage {
       if (row.isNew && !row.itemId && !row.uomId) return true;
       if (uomFilter && row.uomId !== uomFilter) return false;
       if (needle) {
-        const codeMatch = row.itemCode.toLowerCase().includes(needle);
-        const nameMatch = Object.values(row.itemLocalizedNames).some((n) =>
-          n.toLowerCase().includes(needle),
-        );
+        const codeMatch = (row.itemCode ?? '').toLowerCase().includes(needle);
+        const nameMatch = row.itemLocalizedNames
+          ? Object.values(row.itemLocalizedNames).some((n) => n.toLowerCase().includes(needle))
+          : false;
         if (!codeMatch && !nameMatch) return false;
       }
       return true;
@@ -650,7 +675,7 @@ export class PriceVersionPage {
         tile: 'bg-icon-gray',
       },
     ];
-    if (this.status() === 'DRAFT' && this.can.manage) {
+    if (this.status() === 'DRAFT' && this.canManage()) {
       items.push({
         id: 'deleteDraft',
         title: this.transloco.translate('pricing.actions.deleteDraft'),
@@ -757,7 +782,7 @@ export class PriceVersionPage {
     effect(() => {
       const ctx = this.companyContext();
       const purpose = this.detail()?.book.purpose;
-      if (!purpose) return;
+      if (!purpose || !this.canRead()) return;
       untracked(() => void this.loadLookups(ctx, purpose));
     });
 
@@ -782,9 +807,13 @@ export class PriceVersionPage {
       const limit = this.linePageSize();
       const q = this.lineSearch();
       const uomId = this.lineUomFilter();
-      if (!vId) return;
+      if (!vId || !this.canRead()) return;
       untracked(() => void this.loadEntriesPage(vId, page, limit, q, uomId));
     });
+  }
+
+  protected goHome(): void {
+    void this.router.navigate(['/']);
   }
 
   protected onBeforeUnload(event: BeforeUnloadEvent): void {
@@ -940,98 +969,51 @@ export class PriceVersionPage {
     this.serverOverlapErrors.set(new Map());
     const versionId = d.version.id;
     const currencyCode = d.book.currencyCode;
+    const ctx = this.companyContext();
 
     try {
-      // 1. Entry changes in sequential chunks <= 1000 ops
+      // Each change family is atomic: one batch and one precondition per request.
       const deleteIds = Array.from(this.entryDeletes());
-      const upsertInputs = upsertsList.map((row) => ({
-        rowId: row.id,
-        input: toEntryInput(row, currencyCode),
-      }));
-
-      let deleteIdx = 0;
-      let upsertIdx = 0;
-      while (deleteIdx < deleteIds.length || upsertIdx < upsertInputs.length) {
-        const chunkDeletes: string[] = [];
-        const chunkUpserts: { rowId: string; input: EntryInput }[] = [];
-
-        while (
-          deleteIdx < deleteIds.length &&
-          chunkDeletes.length + chunkUpserts.length < MAX_ENTRY_OPS_PER_CALL
-        ) {
-          chunkDeletes.push(deleteIds[deleteIdx++]);
-        }
-        while (
-          upsertIdx < upsertInputs.length &&
-          chunkDeletes.length + chunkUpserts.length < MAX_ENTRY_OPS_PER_CALL
-        ) {
-          chunkUpserts.push(upsertInputs[upsertIdx++]);
-        }
-
+      if (deleteIds.length || upsertsList.length) {
         const res = await changeEntries(
           versionId,
           {
-            ...(chunkDeletes.length ? { deletes: chunkDeletes } : {}),
-            ...(chunkUpserts.length ? { upserts: chunkUpserts.map((u) => u.input) } : {}),
+            ...(deleteIds.length ? { deletes: deleteIds } : {}),
+            ...(upsertsList.length
+              ? { upserts: upsertsList.map((row) => toEntryInput(row, currencyCode)) }
+              : {}),
           },
           this.currentIfMatch(),
           newIdempotencyKey(),
+          ctx,
         );
         this.currentIfMatch.set(res.version);
-
-        this.entryDeletes.update((set) => {
-          const next = new Set(set);
-          for (const id of chunkDeletes) next.delete(id);
-          return next;
-        });
+        this.entryDeletes.update((set) => new Set([...set].filter((id) => !deleteIds.includes(id))));
         this.entryUpserts.update((map) => {
           const next = new Map(map);
-          for (const u of chunkUpserts) next.delete(u.rowId);
+          for (const row of upsertsList) next.delete(row.id);
           return next;
         });
       }
 
-      // 2. Promotion changes in sequential chunks <= 500 ops
       const promoDeleteIds = Array.from(this.promoDeletes());
       const promoUpsertsList = Array.from(this.promoUpserts().values());
-      let pDelIdx = 0;
-      let pUpIdx = 0;
-      while (pDelIdx < promoDeleteIds.length || pUpIdx < promoUpsertsList.length) {
-        const chunkDeletes: string[] = [];
-        const chunkUpserts: PromotionRule[] = [];
-
-        while (
-          pDelIdx < promoDeleteIds.length &&
-          chunkDeletes.length + chunkUpserts.length < MAX_PROMO_OPS_PER_CALL
-        ) {
-          chunkDeletes.push(promoDeleteIds[pDelIdx++]);
-        }
-        while (
-          pUpIdx < promoUpsertsList.length &&
-          chunkDeletes.length + chunkUpserts.length < MAX_PROMO_OPS_PER_CALL
-        ) {
-          chunkUpserts.push(promoUpsertsList[pUpIdx++]);
-        }
-
+      if (promoDeleteIds.length || promoUpsertsList.length) {
         const res = await changePromotions(
           versionId,
           {
-            ...(chunkDeletes.length ? { deletes: chunkDeletes } : {}),
-            ...(chunkUpserts.length ? { upserts: chunkUpserts.map(toPromotionInput) } : {}),
+            ...(promoDeleteIds.length ? { deletes: promoDeleteIds } : {}),
+            ...(promoUpsertsList.length ? { upserts: promoUpsertsList.map(toPromotionInput) } : {}),
           },
           this.currentIfMatch(),
           newIdempotencyKey(),
+          ctx,
         );
         this.currentIfMatch.set(res.version);
-
-        this.promoDeletes.update((set) => {
-          const next = new Set(set);
-          for (const id of chunkDeletes) next.delete(id);
-          return next;
-        });
+        this.promoDeletes.update((set) => new Set([...set].filter((id) => !promoDeleteIds.includes(id))));
         this.promoUpserts.update((map) => {
           const next = new Map(map);
-          for (const p of chunkUpserts) next.delete(p.id);
+          for (const promo of promoUpsertsList) next.delete(promo.id);
           return next;
         });
       }
@@ -1046,6 +1028,7 @@ export class PriceVersionPage {
           },
           this.currentIfMatch(),
           newIdempotencyKey(),
+          ctx,
         );
         this.currentIfMatch.set(updated.version);
       }
@@ -1063,6 +1046,10 @@ export class PriceVersionPage {
       );
       return true;
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+        return false;
+      }
       if (error instanceof ApiError && error.code === 'TRADE.CONCURRENCY.STALE_VERSION') {
         this.conflictDialog().open();
         return false;
@@ -1081,11 +1068,16 @@ export class PriceVersionPage {
 
   protected async runTest(): Promise<void> {
     const d = this.detail();
-    if (!d || this.dirty() || this.busy() || !this.can.test) return;
+    if (!d || this.dirty() || this.busy() || !this.canManage()) return;
 
     this.testing.set(true);
     try {
-      const result = await testVersion(d.version.id, this.currentIfMatch(), newIdempotencyKey());
+      const result = await testVersion(
+        d.version.id,
+        this.currentIfMatch(),
+        newIdempotencyKey(),
+        this.companyContext(),
+      );
       this.currentIfMatch.set(result.version);
       this.sessionTestResult.set({ result, testedAt: new Date().toISOString() });
       await this.loadVersion(false);
@@ -1101,6 +1093,10 @@ export class PriceVersionPage {
         this.selectTab('test');
       }
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+        return;
+      }
       if (error instanceof ApiError && error.code === 'TRADE.CONCURRENCY.STALE_VERSION') {
         this.conflictDialog().open();
         return;
@@ -1113,7 +1109,7 @@ export class PriceVersionPage {
 
   protected openPublishDialog(): void {
     const d = this.detail();
-    if (!d || d.version.status !== 'TESTED' || this.dirty() || !this.can.publish) return;
+    if (!d || d.version.status !== 'TESTED' || this.dirty() || !this.canPublish()) return;
     if (this.publishBlocked()) {
       this.notify.warning(this.transloco.translate('governance.makerChecker.self'));
       return;
@@ -1140,7 +1136,7 @@ export class PriceVersionPage {
 
   protected openRetireDialog(): void {
     const d = this.detail();
-    if (!d || (d.version.status !== 'PUBLISHED' && d.version.status !== 'SCHEDULED') || !this.can.manage) {
+    if (!d || (d.version.status !== 'PUBLISHED' && d.version.status !== 'SCHEDULED') || !this.canPublish()) {
       return;
     }
     void this.retireDialog().open();
@@ -1148,7 +1144,7 @@ export class PriceVersionPage {
 
   protected async onRetireConfirmed(result: ReasonDialogResult): Promise<void> {
     const d = this.detail();
-    if (!d || this.retiring()) return;
+    if (!d || this.retiring() || !this.canPublish()) return;
 
     this.retiring.set(true);
     try {
@@ -1157,11 +1153,16 @@ export class PriceVersionPage {
         { reasonCode: result.reasonCode, ...(result.reasonNote ? { reasonNote: result.reasonNote } : {}) },
         this.currentIfMatch(),
         newIdempotencyKey(),
+        this.companyContext(),
       );
       this.currentIfMatch.set(updated.version);
       await this.loadVersion(false);
       this.notify.success(this.transloco.translate('pricing.toasts.retired'));
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+        return;
+      }
       if (error instanceof ApiError && error.code === 'TRADE.CONCURRENCY.STALE_VERSION') {
         this.conflictDialog().open();
         return;
@@ -1182,18 +1183,27 @@ export class PriceVersionPage {
     }
     if (selection.id === 'deleteDraft') {
       const d = this.detail();
-      if (!d || d.version.status !== 'DRAFT' || !this.can.manage) return;
+      if (!d || d.version.status !== 'DRAFT' || !this.canManage()) return;
       const confirmed = await this.deleteDraftDialog().open();
       if (!confirmed) return;
 
       this.deleting.set(true);
       try {
-        await deleteVersion(d.version.id, this.currentIfMatch(), newIdempotencyKey());
+        await deleteVersion(
+          d.version.id,
+          this.currentIfMatch(),
+          newIdempotencyKey(),
+          this.companyContext(),
+        );
         this.resetDraftState();
         this.syncHeaderFromVersion(d.version.effectiveFrom, d.version.effectiveTo);
         this.notify.success(this.transloco.translate('pricing.toasts.deleted'));
         await this.router.navigate(['/trade/governance/price-books', this.bookId()]);
       } catch (error) {
+        if (isForbiddenError(error)) {
+          this.forbidden.set(true);
+          return;
+        }
         if (error instanceof ApiError && error.code === 'TRADE.CONCURRENCY.STALE_VERSION') {
           this.conflictDialog().open();
           return;
@@ -1504,12 +1514,11 @@ export class PriceVersionPage {
   }
 
   protected actorInitials(entry: GovernanceAuditEntry): string {
-    const name = actorDisplayName(entry.actorUserId, this.lang()) || entry.actorDisplayName;
-    return initialsOf(name);
+    return initialsOf(this.auditActorName(entry));
   }
 
   protected auditActorName(entry: GovernanceAuditEntry): string {
-    return actorDisplayName(entry.actorUserId, this.lang()) || entry.actorDisplayName;
+    return entry.actorDisplayName || entry.actorUserId || '—';
   }
 
   protected auditActionText(action: string): string {
@@ -1564,6 +1573,10 @@ export class PriceVersionPage {
   }
 
   private async loadVersion(showPageLoader: boolean): Promise<void> {
+    if (!this.canRead()) {
+      this.loading.set(false);
+      return;
+    }
     const vId = this.versionId();
     if (!vId) return;
     const seq = ++this.versionSeq;
@@ -1572,10 +1585,23 @@ export class PriceVersionPage {
     }
     this.loadFailed.set(false);
     this.notFound.set(false);
+    this.forbidden.set(false);
+    this.refCanViewCost.set(false);
 
+    const ctx = this.companyContext();
     try {
-      const detail = toVersionView(await getPriceVersion(vId, { include: 'none' }));
+      const [rawDetail, refData] = await Promise.all([
+        getPriceVersion(vId, { include: 'none' }, ctx),
+        getReferenceData(ctx).catch((error) => {
+          if (isForbiddenError(error)) throw error;
+          return null;
+        }),
+      ]);
       if (seq !== this.versionSeq) return;
+      if (refData && typeof refData.canViewCost === 'boolean') {
+        this.refCanViewCost.set(refData.canViewCost);
+      }
+      const detail = toVersionView(rawDetail);
       this.detail.set(detail);
       this.currentIfMatch.set(detail.version.version);
       this.syncHeaderFromVersion(detail.version.effectiveFrom, detail.version.effectiveTo);
@@ -1588,13 +1614,15 @@ export class PriceVersionPage {
           queryParamsHandling: 'merge',
           replaceUrl: true,
         });
-        if (detail.version.status === 'TESTED' && this.can.publish) {
+        if (detail.version.status === 'TESTED' && this.canPublish()) {
           queueMicrotask(() => this.openPublishDialog());
         }
       }
     } catch (error) {
       if (seq !== this.versionSeq) return;
-      if (error instanceof ApiError && error.status === 404) {
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+      } else if (error instanceof ApiError && error.status === 404) {
         this.notFound.set(true);
       } else {
         this.loadFailed.set(true);
@@ -1613,23 +1641,32 @@ export class PriceVersionPage {
     q: string,
     uomId: string,
   ): Promise<void> {
+    if (!this.canRead()) return;
     const seq = ++this.entriesSeq;
     this.linesLoading.set(true);
     this.linesLoadFailed.set(false);
     try {
-      const res = await listEntries(versionId, {
-        page,
-        limit,
-        ...(q.trim() ? { q: q.trim() } : {}),
-        ...(uomId ? { uomId } : {}),
-      });
+      const res = await listEntries(
+        versionId,
+        {
+          page,
+          limit,
+          ...(q.trim() ? { q: q.trim() } : {}),
+          ...(uomId ? { uomId } : {}),
+        },
+        this.companyContext(),
+      );
       if (seq !== this.entriesSeq) return;
       this.serverEntries.set(res.items);
       this.serverTotal.set(res.total);
-    } catch {
+    } catch (error) {
       if (seq !== this.entriesSeq) return;
       this.serverEntries.set([]);
-      this.linesLoadFailed.set(true);
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+      } else {
+        this.linesLoadFailed.set(true);
+      }
     } finally {
       if (seq === this.entriesSeq) {
         this.linesLoading.set(false);
@@ -1641,21 +1678,25 @@ export class PriceVersionPage {
     ctx: TradeContext,
     purpose: 'SALES' | 'PURCHASE',
   ): Promise<void> {
+    if (!this.canRead()) return;
     const seq = ++this.lookupsSeq;
     const role = purpose === 'PURCHASE' ? 'SUPPLIER' : 'CUSTOMER';
     const [uomList, refData, channelList, accountList] = await Promise.all([
       listUoms().catch(() => [] as Uom[]),
-      getReferenceData().catch(() => ({ branches: [], currencies: [] })),
+      getReferenceData(ctx).catch(() => ({ branches: [], currencies: [] })),
       ctx.companyId ? listChannels(ctx).catch(() => [] as Channel[]) : Promise.resolve([] as Channel[]),
       ctx.companyId
         ? searchCommercialAccounts(ctx, { role }).catch(() => [] as CommercialAccountSummary[])
         : Promise.resolve([] as CommercialAccountSummary[]),
     ]);
     if (seq !== this.lookupsSeq) return;
+    if ('canViewCost' in refData && typeof refData.canViewCost === 'boolean') {
+      this.refCanViewCost.set(refData.canViewCost);
+    }
     this.uoms.set(uomList);
     this.branches.set(
       ctx.companyId
-        ? refData.branches.filter((b) => b.companyId === ctx.companyId)
+        ? refData.branches.filter((b) => !b.companyId || b.companyId === ctx.companyId)
         : refData.branches,
     );
     this.channels.set(channelList);
@@ -1706,7 +1747,7 @@ export class PriceVersionPage {
       let offset = 0;
       const limit = 200;
       while (foundLineById.size < targets.size) {
-        const res = await listEntries(versionId, { page, limit });
+        const res = await listEntries(versionId, { page, limit }, this.companyContext());
         const deletes = this.entryDeletes();
         for (const item of res.items) {
           if (deletes.has(item.id)) continue;

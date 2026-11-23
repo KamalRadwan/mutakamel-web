@@ -1,3 +1,14 @@
+@if (!canRead() || forbidden()) {
+  <div class="flex flex-1 rounded-10 border border-border bg-surface shadow-card">
+    <ui-full-state
+      kind="forbidden"
+      [title]="'errors.forbidden.title' | transloco"
+      [text]="'errors.forbidden.text' | transloco"
+      [actionLabel]="'errors.notFound.action' | transloco"
+      (action)="goHome()"
+    />
+  </div>
+} @else {
 <header class="shrink-0 overflow-hidden rounded-10 border border-border bg-surface shadow-card">
   @if (loading()) {
     <div aria-busy="true">
@@ -76,7 +87,7 @@
       <span class="flex-1"></span>
 
       <div class="flex flex-wrap items-center gap-8">
-        @if (can.manage) {
+        @if (canManage()) {
           <button
             type="button"
             uiButton
@@ -207,7 +218,7 @@
                     class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
                     [placeholder]="'priceBooks.create.placeholders.nameEn' | transloco"
                     [value]="draftDetails().nameEn"
-                    [readonly]="!can.manage || savingDetails()"
+                    [readonly]="!canManage() || savingDetails()"
                     [attr.aria-invalid]="nameEnError() ? 'true' : null"
                     (input)="onNameEnInput($event)"
                   />
@@ -228,7 +239,7 @@
                     class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
                     [placeholder]="'priceBooks.create.placeholders.nameAr' | transloco"
                     [value]="draftDetails().nameAr"
-                    [readonly]="!can.manage || savingDetails()"
+                    [readonly]="!canManage() || savingDetails()"
                     [attr.aria-invalid]="nameArError() ? 'true' : null"
                     (input)="onNameArInput($event)"
                   />
@@ -246,7 +257,7 @@
                       [label]="'priceBooks.page.details.fields.status' | transloco"
                       [describedBy]="uid + '-details-status-hint'"
                       [checked]="draftDetails().status === 'ACTIVE'"
-                      [disabled]="!can.manage || savingDetails()"
+                      [disabled]="!canManage() || savingDetails()"
                       (checkedChange)="onActiveSwitchChange($event)"
                     />
                     <span class="text-12 text-text">
@@ -272,7 +283,7 @@
                       class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
                       [placeholder]="'priceBooks.create.placeholders.description' | transloco"
                       [value]="draftDetails().description"
-                      [readonly]="!can.manage || savingDetails()"
+                      [readonly]="!canManage() || savingDetails()"
                       [attr.aria-invalid]="descriptionError() ? 'true' : null"
                       (input)="onDescriptionInput($event)"
                     ></textarea>
@@ -280,7 +291,7 @@
                 </div>
               </div>
 
-              @if (can.manage) {
+              @if (canManage()) {
                 <div class="flex flex-wrap items-center justify-end gap-8 border-t border-border pt-8">
                   @if (detailsDirty()) {
                     <span class="text-12 leading-18 text-text-muted">{{ 'tradeShared.common.unsaved' | transloco }}</span>
@@ -514,3 +525,4 @@
   (reload)="onConflictReload()"
   (keep)="onConflictKeep()"
 />
+}

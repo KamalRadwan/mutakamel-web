@@ -1,5 +1,10 @@
+import { type Injector, inject, runInInjectionContext } from '@angular/core';
+import { ApiError as CoreApiError } from '../../../core/api/api-errors';
+import type { ScopeState } from '../../../core/scope/scope';
+import { TenantScopeState } from '../../../core/scope/tenant-scope';
 import type { BadgeTone } from '../../../shared/ui/badge/badge';
-import { currentUiLang } from './governance-fake-actors';
+import { branchGrants, tenantWide } from '../shared/trade-access';
+import { ApiError } from '../shared/trade-api';
 import type {
   GovernanceState,
   PriceBookStatus,
@@ -7,6 +12,48 @@ import type {
   PromotionRule,
   VersionHead,
 } from './pricing.model';
+
+function currentUiLang(): 'en' | 'ar' {
+  if (typeof document !== 'undefined' && document.documentElement.lang.toLowerCase().startsWith('ar')) {
+    return 'ar';
+  }
+  return 'en';
+}
+
+export function isForbiddenError(error: unknown): boolean {
+  return (error instanceof ApiError || error instanceof CoreApiError) && error.status === 403;
+}
+
+export function hasPricingGrant(injector: Injector, scope: ScopeState, key: string): boolean {
+  if (key === 'trade.policy.publish' || key === 'trade.configuration.manage') {
+    return runInInjectionContext(injector, () => tenantWide(key));
+  }
+  const grants = runInInjectionContext(injector, () => branchGrants(key));
+  if (grants === 'ALL') return true;
+  const company = scope.company();
+  if (!company?.id) return grants.size > 0;
+  const branchId = company.branches.length > 0 ? scope.branch()?.id : undefined;
+  if (branchId && grants.has(branchId)) return true;
+  if (!branchId && company.branches.some((branch) => grants.has(branch.id))) return true;
+  const me = runInInjectionContext(injector, () => inject(TenantScopeState).me());
+  const variants = [key, `${key}.own`, `${key}.team`, `${key}.all`];
+  return variants.some(
+    (variant) =>
+      !!me?.permissions.includes(variant) &&
+      !!me.permissionScopes[variant]?.companyIds.includes(company.id),
+  );
+}
+
+export function governanceErrorKey(error: unknown, scope = 'governance'): string {
+  if (!(error instanceof ApiError)) {
+    return 'tradeShared.errors.network';
+  }
+  const reason = error.details?.['reason']?.[0];
+  if (reason) {
+    return `${scope}.errors.${error.code}.${reason}`;
+  }
+  return `${scope}.errors.${error.code}`;
+}
 
 interface ParsedDecimal {
   negative: boolean;
@@ -252,6 +299,19 @@ export function isLiveScheduled(
   }
   const toMs = Date.parse(v.effectiveTo);
   return Number.isNaN(toMs) || nowMs < toMs;
+}
+
+/** B5: a SCHEDULED version whose effectiveFrom is still in the future awaits activation. */
+export function isAwaitingActivation(
+  v: Pick<VersionHead, 'status' | 'effectiveFrom'>,
+  now: Date | number | string = Date.now(),
+): boolean {
+  if (v.status !== 'SCHEDULED') {
+    return false;
+  }
+  const nowMs = now instanceof Date ? now.getTime() : typeof now === 'string' ? Date.parse(now) : now;
+  const fromMs = Date.parse(v.effectiveFrom);
+  return !Number.isNaN(nowMs) && !Number.isNaN(fromMs) && fromMs > nowMs;
 }
 
 export function formatDateOnly(

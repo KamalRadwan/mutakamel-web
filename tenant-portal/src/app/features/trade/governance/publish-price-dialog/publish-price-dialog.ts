@@ -5,17 +5,18 @@ import { provideIcons } from '@ng-icons/core';
 import { tablerRocket } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
+import { ScopeState } from '../../../../core/scope/scope';
+import { TenantScopeState } from '../../../../core/scope/tenant-scope';
 import { Button } from '../../../../shared/ui/button/button';
 import { Checkbox } from '../../../../shared/ui/checkbox/checkbox';
 import { Dropdown, type DropdownOption } from '../../../../shared/ui/dropdown/dropdown';
 import { Field } from '../../../../shared/ui/field/field';
 import { Modal } from '../../../../shared/ui/modal/modal';
-import { ApiError, newIdempotencyKey } from '../../shared/trade-api';
-import { FAKE_ME } from '../governance-fake-actors';
+import { ApiError, newIdempotencyKey, tradeContext } from '../../shared/trade-api';
 import { resolvePricingError } from '../new-version-modal/new-version-modal';
 import { publishVersion } from '../pricing.api';
 import type { PriceVersionRow, PublishPriceVersionInput, VersionHead } from '../pricing.model';
-import { formatDateOnly, formatDateTime } from '../pricing.service';
+import { formatDateOnly, formatDateTime, isForbiddenError } from '../pricing.service';
 
 const MAX_NOTES_LENGTH = 240;
 
@@ -33,6 +34,8 @@ export class PublishPriceDialog {
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly lang = inject(LanguageState).current;
+  private readonly scope = inject(ScopeState);
+  private readonly tenantScope = inject(TenantScopeState);
   private readonly notify = inject(Notify);
   private readonly modal = viewChild.required(Modal);
 
@@ -42,9 +45,10 @@ export class PublishPriceDialog {
   readonly effectiveFrom = input.required<string>();
   readonly bookVersions = input.required<readonly VersionHead[]>();
   readonly soloOwnerGovernanceEligible = input(false);
-  readonly createdByUserId = input('');
+  readonly createdByUserId = input<string | null>(null);
 
   readonly published = output<PriceVersionRow>();
+  readonly forbidden = output<void>();
   readonly staleConflict = output<void>();
   readonly closed = output<void>();
 
@@ -58,7 +62,10 @@ export class PublishPriceDialog {
   private lastIdempotencyKey = '';
   private handledClose = false;
 
-  protected readonly isSelfCreated = computed(() => this.createdByUserId() === FAKE_ME);
+  protected readonly isSelfCreated = computed(() => {
+    const meId = this.tenantScope.me()?.id;
+    return !!meId && this.createdByUserId() === meId;
+  });
 
   protected readonly startsInFuture = computed(() => {
     const ms = Date.parse(this.effectiveFrom());
@@ -167,7 +174,13 @@ export class PublishPriceDialog {
 
     this.submitting.set(true);
     try {
-      const updated = await publishVersion(versionId, payload, ifMatch, this.lastIdempotencyKey);
+      const updated = await publishVersion(
+        versionId,
+        payload,
+        ifMatch,
+        this.lastIdempotencyKey,
+        tradeContext(this.scope, 'COMPANY'),
+      );
       this.lastFingerprint = '';
       this.lastIdempotencyKey = '';
       this.notify.success(
@@ -181,6 +194,12 @@ export class PublishPriceDialog {
       this.modal().close();
       this.published.emit(updated);
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.handledClose = true;
+        this.modal().close();
+        this.forbidden.emit();
+        return;
+      }
       if (error instanceof ApiError && error.code === 'TRADE.CONCURRENCY.STALE_VERSION') {
         this.handledClose = true;
         this.modal().close();

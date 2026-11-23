@@ -1,3 +1,14 @@
+@if (!canRead() || forbidden()) {
+  <div class="flex flex-1 rounded-10 border border-border bg-surface shadow-card">
+    <ui-full-state
+      kind="forbidden"
+      [title]="'errors.forbidden.title' | transloco"
+      [text]="'errors.forbidden.text' | transloco"
+      [actionLabel]="'errors.notFound.action' | transloco"
+      (action)="goHome()"
+    />
+  </div>
+} @else {
 <!-- StatCards row -->
 <section class="grid shrink-0 grid-cols-2 gap-8 wide:grid-cols-4" [attr.aria-busy]="kpisLoading()">
   @if (kpisLoading()) {
@@ -89,7 +100,7 @@
 
 <!-- Toolbar -->
 <div class="flex shrink-0 flex-wrap items-center gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
-  @if (can.manage) {
+  @if (canManage()) {
     <button type="button" uiButton variant="primary" (click)="openCreateModal()">
       <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
       {{ 'priceBooks.toolbar.new' | transloco }}
@@ -147,7 +158,7 @@
     (valueChange)="setStatus($event)"
   />
 
-  @if (can.manageDefaults) {
+  @if (canManageDefaults()) {
     <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
 
     <button type="button" uiButton variant="secondary" (click)="openDefaultsModal()">
@@ -202,7 +213,7 @@
       </button>
     } @else {
       <p class="text-13 leading-18 font-medium text-text">{{ 'priceBooks.empty.title' | transloco }}</p>
-      @if (can.manage) {
+      @if (canManage()) {
         <button type="button" uiButton variant="primary" (click)="openCreateModal()">
           <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
           {{ 'priceBooks.toolbar.new' | transloco }}
@@ -383,6 +394,10 @@
                         <span class="inline-flex h-chip shrink-0 items-center rounded-6 bg-success-soft px-6 text-11 font-medium text-on-success-soft">
                           {{ 'governance.status.price.liveScheduled' | transloco }}
                         </span>
+                      } @else if (isVersionAwaitingActivation(live)) {
+                        <span class="inline-flex h-chip shrink-0 items-center rounded-6 bg-brand-soft px-6 text-11 font-medium text-on-brand-soft">
+                          {{ 'governance.status.policy.awaitingActivation' | transloco }}
+                        </span>
                       }
                     </div>
                     <span class="truncate text-11 leading-16 text-text-muted">
@@ -443,9 +458,9 @@
   </footer>
 }
 
-<app-price-book-modal (created)="onBookCreated($event)" />
+<app-price-book-modal (forbidden)="forbidden.set(true)" (created)="onBookCreated($event)" />
 <app-new-version-modal (created)="onVersionCreated($event)" (conflictReload)="refreshAll()" />
-<app-company-defaults-modal (changed)="refreshAll()" />
+<app-company-defaults-modal (forbidden)="forbidden.set(true)" (changed)="refreshAll()" />
 
 <ui-confirm-dialog
   tone="warning"
@@ -459,3 +474,4 @@
   (reload)="refreshAll()"
   (keep)="refreshAll()"
 />
+}

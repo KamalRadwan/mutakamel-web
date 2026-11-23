@@ -5,13 +5,15 @@ import { provideIcons } from '@ng-icons/core';
 import { tablerBook } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
+import { ScopeState } from '../../../../core/scope/scope';
 import { Button } from '../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { Dropdown, type DropdownOption } from '../../../../shared/ui/dropdown/dropdown';
 import { Field } from '../../../../shared/ui/field/field';
 import { Modal } from '../../../../shared/ui/modal/modal';
 import { Segmented, type SegmentedOption } from '../../../../shared/ui/segmented/segmented';
-import { errorCodeOf, newIdempotencyKey } from '../../shared/trade-api';
+import { errorCodeOf, newIdempotencyKey, tradeContext } from '../../shared/trade-api';
+import { isForbiddenError } from '../pricing.service';
 import { resolvePricingError } from '../new-version-modal/new-version-modal';
 import { createPriceBook, getReferenceData } from '../pricing.api';
 import type { CreatedPriceBook, CreatePriceBookInput, PricePurpose, ReferenceCurrency } from '../pricing.model';
@@ -33,11 +35,13 @@ export class PriceBookModal {
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly lang = inject(LanguageState).current;
+  private readonly scope = inject(ScopeState);
   private readonly notify = inject(Notify);
   private readonly modal = viewChild.required(Modal);
   private readonly discardDialog = viewChild.required(ConfirmDialog);
 
   readonly created = output<CreatedPriceBook>();
+  readonly forbidden = output<void>();
 
   protected readonly maxCode = MAX_CODE;
   protected readonly maxName = MAX_NAME;
@@ -145,7 +149,7 @@ export class PriceBookModal {
     this.modal().open();
 
     try {
-      const ref = await getReferenceData();
+      const ref = await getReferenceData(tradeContext(this.scope, 'COMPANY'));
       this.currencies.set(ref.currencies);
       const first = ref.currencies[0]?.code ?? 'EGP';
       this.defaultCurrency.set(first);
@@ -153,6 +157,12 @@ export class PriceBookModal {
         this.currencyCode.set(first);
       }
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.allowClose = true;
+        this.modal().close();
+        this.forbidden.emit();
+        return;
+      }
       this.notify.error(resolvePricingError(this.transloco, error));
     }
   }
@@ -234,12 +244,22 @@ export class PriceBookModal {
 
     this.saving.set(true);
     try {
-      const book = await createPriceBook(body, this.idempotencyKey);
+      const book = await createPriceBook(
+        body,
+        this.idempotencyKey,
+        tradeContext(this.scope, 'COMPANY'),
+      );
       this.notify.success(this.transloco.translate('priceBooks.create.success'));
       this.allowClose = true;
       this.modal().close();
       this.created.emit(book);
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.allowClose = true;
+        this.modal().close();
+        this.forbidden.emit();
+        return;
+      }
       if (errorCodeOf(error) === 'TRADE.PRICE.BOOK_ALREADY_EXISTS') {
         this.codeServerError.set(resolvePricingError(this.transloco, error));
         return;

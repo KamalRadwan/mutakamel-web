@@ -452,8 +452,8 @@
               } @else {
                 <!-- Read-only plain text cells -->
                 <span role="cell" class="flex min-w-0 items-center justify-between gap-8 border-s border-border px-10">
-                  <span class="min-w-0 truncate text-12 font-medium text-text">{{ itemDisplayName(row) || '—' }}</span>
-                  @if (row.itemCode) {
+                  <span class="min-w-0 truncate text-12 font-medium text-text">{{ itemDisplayName(row) || row.itemCode || '—' }}</span>
+                  @if (row.itemCode && itemDisplayName(row)) {
                     <bdi dir="ltr" class="shrink-0 text-11 text-text-muted tabular-nums">{{ row.itemCode }}</bdi>
                   }
                 </span>

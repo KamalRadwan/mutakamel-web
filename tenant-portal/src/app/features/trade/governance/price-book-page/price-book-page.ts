@@ -2,6 +2,7 @@ import {
   Component,
   DestroyRef,
   ElementRef,
+  Injector,
   computed,
   effect,
   inject,
@@ -40,14 +41,16 @@ import {
 import { tablerStarFill } from '@ng-icons/tabler-icons/fill';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
+import { ScopeState } from '../../../../core/scope/scope';
+import { TenantScopeState } from '../../../../core/scope/tenant-scope';
 import { ActionsMenu, type ActionItem, type ActionSelection } from '../../../../shared/ui/actions-menu/actions-menu';
 import { Button } from '../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { Field } from '../../../../shared/ui/field/field';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { Switch } from '../../../../shared/ui/switch/switch';
 import { UnsavedDialog } from '../../../../shared/ui/unsaved-dialog/unsaved-dialog';
-import { ApiError, errorCodeOf, newIdempotencyKey } from '../../shared/trade-api';
-import { FAKE_ME, actorName } from '../governance-fake-actors';
+import { ApiError, errorCodeOf, newIdempotencyKey, tradeContext } from '../../shared/trade-api';
 import { ConflictDialog } from '../governance-shared/conflict-dialog/conflict-dialog';
 import {
   GovernedVersionsTable,
@@ -77,9 +80,13 @@ import type {
   VersionSummary,
 } from '../pricing.model';
 import { formatMoney } from '../../shared/trade-format';
-import { formatDateTime, isLiveScheduled } from '../pricing.service';
-
-const CAN = { manage: true, test: true, approve: true, publish: true, manageDefaults: true }; // later from the session
+import {
+  formatDateTime,
+  hasPricingGrant,
+  isAwaitingActivation,
+  isForbiddenError,
+  isLiveScheduled,
+} from '../pricing.service';
 
 type BookTab = 'versions' | 'accounts' | 'history';
 const BOOK_TABS: readonly BookTab[] = ['versions', 'accounts', 'history'];
@@ -128,6 +135,7 @@ function initialsOf(name: string): string {
     ConfirmDialog,
     ConflictDialog,
     Field,
+    FullState,
     GovernedVersionsTable,
     NewVersionModal,
     ReasonDialog,
@@ -173,6 +181,9 @@ export class PriceBookPage {
 
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly injector = inject(Injector);
+  private readonly scope = inject(ScopeState);
+  private readonly tenantScope = inject(TenantScopeState);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly notify = inject(Notify);
@@ -186,7 +197,22 @@ export class PriceBookPage {
   private readonly unsavedDialog = viewChild.required(UnsavedDialog);
   private readonly conflictDialog = viewChild.required(ConflictDialog);
 
-  protected readonly can = CAN;
+  protected readonly forbidden = signal(false);
+  protected readonly canRead = computed(() =>
+    hasPricingGrant(this.injector, this.scope, 'trade.pricing.read'),
+  );
+  protected readonly canManage = computed(
+    () => !this.forbidden() && hasPricingGrant(this.injector, this.scope, 'trade.pricing.manage'),
+  );
+  protected readonly canPublish = computed(
+    () => !this.forbidden() && hasPricingGrant(this.injector, this.scope, 'trade.policy.publish'),
+  );
+  protected readonly canManageDefaults = computed(
+    () =>
+      !this.forbidden() &&
+      hasPricingGrant(this.injector, this.scope, 'trade.configuration.manage'),
+  );
+  private readonly currentUserId = computed(() => this.tenantScope.me()?.id ?? '');
   protected readonly maxName = MAX_NAME;
   protected readonly maxDescription = MAX_DESCRIPTION;
   protected readonly versionColumns: readonly GovernedTableColumn[] = [
@@ -278,7 +304,7 @@ export class PriceBookPage {
     if (!current) return [];
     const items: ActionItem[] = [];
 
-    if (this.can.manageDefaults) {
+    if (this.canManageDefaults()) {
       if (current.book.status === 'ACTIVE' && !current.book.isCompanyDefault) {
         items.push({
           id: 'makeDefault',
@@ -296,7 +322,7 @@ export class PriceBookPage {
       }
     }
 
-    if (this.can.manage) {
+    if (this.canManage()) {
       if (current.book.status === 'ACTIVE') {
         items.push({
           id: 'deactivate',
@@ -378,7 +404,7 @@ export class PriceBookPage {
         },
       ];
 
-      if ((v.status === 'DRAFT' || v.status === 'TESTED') && this.can.test) {
+      if ((v.status === 'DRAFT' || v.status === 'TESTED') && this.canManage()) {
         actions.push({
           key: 'test',
           title: this.transloco.translate('governance.versionsTable.actionsList.test'),
@@ -387,8 +413,9 @@ export class PriceBookPage {
         });
       }
 
-      if (v.status === 'TESTED' && this.can.publish) {
-        const isSelf = v.createdByUserId === FAKE_ME;
+      if (v.status === 'TESTED' && this.canPublish()) {
+        const meId = this.currentUserId();
+        const isSelf = Boolean(meId && v.createdByUserId && v.createdByUserId === meId);
         actions.push({
           key: 'publish',
           title: this.transloco.translate('governance.versionsTable.actionsList.publish'),
@@ -399,7 +426,7 @@ export class PriceBookPage {
         });
       }
 
-      if (this.can.manage) {
+      if (this.canManage()) {
         actions.push({
           key: 'clone',
           title: this.transloco.translate('governance.versionsTable.actionsList.clone'),
@@ -417,7 +444,7 @@ export class PriceBookPage {
         });
       }
 
-      if ((v.status === 'PUBLISHED' || v.status === 'SCHEDULED') && this.can.manage) {
+      if ((v.status === 'PUBLISHED' || v.status === 'SCHEDULED') && this.canPublish()) {
         actions.push({
           key: 'retire',
           title: this.transloco.translate('governance.versionsTable.actionsList.retire'),
@@ -427,7 +454,7 @@ export class PriceBookPage {
         });
       }
 
-      if (v.status === 'DRAFT' && v.versionNumber === latestVersionNumber && this.can.manage) {
+      if (v.status === 'DRAFT' && v.versionNumber === latestVersionNumber && this.canManage()) {
         actions.push({
           key: 'deleteDraft',
           title: this.transloco.translate('governance.versionsTable.actionsList.deleteDraft'),
@@ -437,19 +464,21 @@ export class PriceBookPage {
         });
       }
 
-      const actorDisplay = actorName(v.createdByUserId)[lang] || v.createdByDisplayName;
+      const actorDisplay = v.createdByDisplayName || v.createdByEmail || v.createdByUserId || '—';
+      const meId = this.currentUserId();
 
       return {
         id: v.id,
         versionNumber: v.versionNumber,
         status: v.status,
         liveScheduled: isLiveScheduled(v),
+        awaitingActivation: isAwaitingActivation(v),
         supersededByVersionNumber: supersededBy?.versionNumber ?? null,
         effectiveFrom: v.effectiveFrom,
         // Show where the version actually stops: supersededAt wins over the immutable effectiveTo.
         effectiveTo: v.supersededAt ?? v.effectiveTo,
         byPrimary: actorDisplay,
-        byIsMe: v.createdByUserId === FAKE_ME,
+        byIsMe: Boolean(meId && v.createdByUserId && v.createdByUserId === meId),
         testPassed: v.latestTestPassed,
         sourceLabel,
         countsPrimary: this.transloco.translate('priceBooks.counts.lines', {
@@ -511,10 +540,25 @@ export class PriceBookPage {
         void this.loadBook(id);
       }
     });
+
+    let lastCompanyId = this.scope.company()?.id ?? '';
+    effect(() => {
+      const companyId = this.scope.company()?.id ?? '';
+      if (companyId === lastCompanyId) return;
+      lastCompanyId = companyId;
+      const id = this.bookId();
+      if (id) {
+        void untracked(() => this.loadBook(id));
+      }
+    });
+  }
+
+  protected goHome(): void {
+    void this.router.navigate(['/']);
   }
 
   protected onBeforeUnload(event: BeforeUnloadEvent): void {
-    if (this.can.manage && this.detailsDirty()) {
+    if (this.canManage() && this.detailsDirty()) {
       event.preventDefault();
     }
   }
@@ -588,7 +632,7 @@ export class PriceBookPage {
 
   protected async saveDetails(): Promise<boolean> {
     const current = this.dossier();
-    if (!current || !this.can.manage || this.savingDetails() || !this.detailsDirty()) {
+    if (!current || !this.canManage() || this.savingDetails() || !this.detailsDirty()) {
       return true;
     }
     this.detailsSubmitted.set(true);
@@ -626,13 +670,23 @@ export class PriceBookPage {
 
     this.savingDetails.set(true);
     try {
-      await updatePriceBook(current.book.id, body, current.book.version, this.detailsIdempotencyKey);
+      await updatePriceBook(
+        current.book.id,
+        body,
+        current.book.version,
+        this.detailsIdempotencyKey,
+        tradeContext(this.scope, 'COMPANY'),
+      );
       this.notify.success(this.transloco.translate('priceBooks.page.details.saved'));
       this.detailsIdempotencyKey = null;
       this.detailsFingerprint = null;
       await this.loadBook(current.book.id, false);
       return true;
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+        return false;
+      }
       if (errorCodeOf(error) === 'TRADE.CONCURRENCY.STALE_VERSION') {
         this.conflictContext = 'details';
         this.conflictDialog().open();
@@ -647,7 +701,7 @@ export class PriceBookPage {
 
   protected openNewVersionModal(sourceVersionId?: string | null): void {
     const current = this.dossier();
-    if (!current || !this.can.manage) return;
+    if (!current || !this.canManage()) return;
     void this.newVersionModal().open({
       bookId: current.book.id,
       bookVersion: current.book.version,
@@ -733,10 +787,15 @@ export class PriceBookPage {
         { reasonCode: result.reasonCode, ...(result.reasonNote ? { reasonNote: result.reasonNote } : {}) },
         version.version,
         newIdempotencyKey(),
+        tradeContext(this.scope, 'COMPANY'),
       );
       this.notify.success(this.transloco.translate('priceBooks.toasts.retired'));
       await this.loadBook(id, false);
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+        return;
+      }
       if (errorCodeOf(error) === 'TRADE.CONCURRENCY.STALE_VERSION') {
         this.conflictContext = 'header';
         this.conflictDialog().open();
@@ -784,12 +843,12 @@ export class PriceBookPage {
   }
 
   protected auditActorDisplay(entry: GovernanceAuditEntry): string {
-    const lang = this.language();
-    return actorName(entry.actorUserId)[lang] || entry.actorDisplayName;
+    return entry.actorDisplayName || entry.actorUserId || '—';
   }
 
   protected auditIsMe(entry: GovernanceAuditEntry): boolean {
-    return entry.actorUserId === FAKE_ME;
+    const meId = this.currentUserId();
+    return Boolean(meId && entry.actorUserId && entry.actorUserId === meId);
   }
 
   protected auditInitials(entry: GovernanceAuditEntry): string {
@@ -815,7 +874,7 @@ export class PriceBookPage {
   }
 
   private async confirmLeaveIfDirty(): Promise<boolean> {
-    if (!this.can.manage || !this.detailsDirty() || this.loading() || this.loadFailed() || this.notFound()) {
+    if (!this.canManage() || !this.detailsDirty() || this.loading() || this.loadFailed() || this.notFound()) {
       return true;
     }
     const choice = await this.unsavedDialog().open();
@@ -851,7 +910,12 @@ export class PriceBookPage {
     if (this.actionBusy()) return;
     this.actionBusy.set(true);
     try {
-      const result = await testVersion(version.id, version.version, newIdempotencyKey());
+      const result = await testVersion(
+        version.id,
+        version.version,
+        newIdempotencyKey(),
+        tradeContext(this.scope, 'COMPANY'),
+      );
       if (result.passed) {
         this.notify.success(this.transloco.translate('priceBooks.test.passed'));
       } else {
@@ -863,6 +927,10 @@ export class PriceBookPage {
       }
       await this.loadBook(this.bookId(), false);
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+        return;
+      }
       if (errorCodeOf(error) === 'TRADE.CONCURRENCY.STALE_VERSION') {
         this.conflictContext = 'header';
         this.conflictDialog().open();
@@ -889,10 +957,19 @@ export class PriceBookPage {
     }
     this.actionBusy.set(true);
     try {
-      await deleteVersion(version.id, version.version, newIdempotencyKey());
+      await deleteVersion(
+        version.id,
+        version.version,
+        newIdempotencyKey(),
+        tradeContext(this.scope, 'COMPANY'),
+      );
       this.notify.success(this.transloco.translate('priceBooks.toasts.draftDeleted'));
       await this.loadBook(this.bookId(), false);
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+        return;
+      }
       if (errorCodeOf(error) === 'TRADE.CONCURRENCY.STALE_VERSION') {
         this.conflictContext = 'header';
         this.conflictDialog().open();
@@ -916,10 +993,15 @@ export class PriceBookPage {
         current.book.id,
         mappingVersion,
         newIdempotencyKey(),
+        tradeContext(this.scope, 'COMPANY'),
       );
       this.notify.success(this.transloco.translate('priceBooks.toasts.defaultSet'));
       await this.loadBook(current.book.id, false);
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+        return;
+      }
       if (errorCodeOf(error) === 'TRADE.CONCURRENCY.STALE_VERSION') {
         this.conflictContext = 'header';
         this.conflictDialog().open();
@@ -940,10 +1022,15 @@ export class PriceBookPage {
         current.book.currencyCode,
         current.companyDefaultMapping.version,
         newIdempotencyKey(),
+        tradeContext(this.scope, 'COMPANY'),
       );
       this.notify.success(this.transloco.translate('priceBooks.toasts.defaultRemoved'));
       await this.loadBook(current.book.id, false);
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+        return;
+      }
       if (errorCodeOf(error) === 'TRADE.CONCURRENCY.STALE_VERSION') {
         this.conflictContext = 'header';
         this.conflictDialog().open();
@@ -969,6 +1056,7 @@ export class PriceBookPage {
         { status: nextStatus },
         current.book.version,
         newIdempotencyKey(),
+        tradeContext(this.scope, 'COMPANY'),
       );
       this.notify.success(
         this.transloco.translate(
@@ -977,6 +1065,10 @@ export class PriceBookPage {
       );
       await this.loadBook(current.book.id, false);
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+        return;
+      }
       if (errorCodeOf(error) === 'TRADE.CONCURRENCY.STALE_VERSION') {
         this.conflictContext = 'header';
         this.conflictDialog().open();
@@ -994,7 +1086,7 @@ export class PriceBookPage {
     if (!param || !current || this.loading()) return;
     this.pendingNewVersionParam = null;
 
-    if (this.can.manage) {
+    if (this.canManage()) {
       const preset =
         param === '1'
           ? { sourceMode: 'EMPTY_DRAFT' as const }
@@ -1018,6 +1110,10 @@ export class PriceBookPage {
   }
 
   private async loadBook(id: string, showSkeleton = true): Promise<void> {
+    if (!this.canRead()) {
+      this.loading.set(false);
+      return;
+    }
     if (!id) {
       this.notFound.set(true);
       this.loading.set(false);
@@ -1029,11 +1125,16 @@ export class PriceBookPage {
     }
     this.loadFailed.set(false);
     this.notFound.set(false);
+    this.forbidden.set(false);
 
+    const ctx = tradeContext(this.scope, 'COMPANY');
     try {
       const [dossierData, refData] = await Promise.all([
-        getPriceBook(id),
-        getReferenceData().catch(() => ({ branches: [], currencies: [] })),
+        getPriceBook(id, ctx),
+        getReferenceData(ctx).catch((error) => {
+          if (isForbiddenError(error)) throw error;
+          return { branches: [], currencies: [] };
+        }),
       ]);
       if (seq !== this.loadSeq) return;
 
@@ -1048,7 +1149,9 @@ export class PriceBookPage {
       this.detailsSubmitted.set(false);
     } catch (error) {
       if (seq !== this.loadSeq) return;
-      if (error instanceof ApiError && error.status === 404) {
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+      } else if (error instanceof ApiError && error.status === 404) {
         this.notFound.set(true);
       } else {
         this.loadFailed.set(true);

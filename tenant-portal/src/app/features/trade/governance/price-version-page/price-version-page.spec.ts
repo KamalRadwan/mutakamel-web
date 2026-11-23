@@ -1,677 +1,487 @@
-import { Injectable, type WritableSignal } from '@angular/core';
+import { Injectable, type WritableSignal, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import { TranslocoLoader, type Translation, provideTransloco } from '@jsverse/transloco';
-import { map, timer } from 'rxjs';
+import { TranslocoLoader, TranslocoService, type Translation, provideTransloco } from '@jsverse/transloco';
+import { of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import arGlobal from '../../../../../../public/i18n/ar.json';
 import enGlobal from '../../../../../../public/i18n/en.json';
-import enPricing from '../../../../../../public/i18n/trade-gov-pricing/en.json';
+import arGovernance from '../../../../../../public/i18n/trade-governance/ar.json';
 import enGovernance from '../../../../../../public/i18n/trade-governance/en.json';
+import arPricing from '../../../../../../public/i18n/trade-gov-pricing/ar.json';
+import enPricing from '../../../../../../public/i18n/trade-gov-pricing/en.json';
+import arShared from '../../../../../../public/i18n/trade-shared/ar.json';
 import enShared from '../../../../../../public/i18n/trade-shared/en.json';
+import { FAKE_TENANT_ME } from '../../../../core/auth/auth-session.fake';
+import type { TenantMe } from '../../../../core/auth/auth-session.model';
+import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
-import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
-import { FAKE_COLLEAGUE, FAKE_ME, setFakeActor } from '../governance-fake-actors';
-import { ConflictDialog } from '../governance-shared/conflict-dialog/conflict-dialog';
+import { TenantScopeState } from '../../../../core/scope/tenant-scope';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
+import { ApiError } from '../../shared/trade-api';
+import { TradeHttpStub } from '../../shared/testing/trade-http-testing';
+import { bindTradeHttpForTest } from '../../shared/trade-http';
+import { ReasonDialog } from '../governance-shared/reason-dialog/reason-dialog';
+import { VersionStatusBadge } from '../governance-shared/version-status-badge/version-status-badge';
 import type { PriceLineRow } from '../price-lines-table/price-lines-table';
-import { setFakeSoloOwnerEligible } from '../pricing.fake';
-import {
-  createPriceBook,
-  createVersion,
-  getPriceVersion,
-  publishVersion,
-  testVersion,
-  updateVersion,
-} from '../pricing.api';
-import type { EntryInput, GovernanceAuditEntry, PriceEntry, PriceVersionDetailHead } from '../pricing.model';
-import { PublishPriceDialog } from '../publish-price-dialog/publish-price-dialog';
+import type {
+  ChangeEntriesResult,
+  PriceEntry,
+  PriceVersionDetailHead,
+  PriceVersionHeadDetail,
+  PriceVersionRow,
+} from '../pricing.model';
 import { PriceVersionPage } from './price-version-page';
+import { PublishPriceDialog } from '../publish-price-dialog/publish-price-dialog';
 
-/** Real translation files, served asynchronously like the HTTP loader (a sync loader triggers NG0600). */
-const FILES: Record<string, Translation> = {
-  en: enGlobal,
-  'trade-gov-pricing/en': enPricing,
+const UUID_V7_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const TRANSLATIONS: Record<string, Translation> = {
+  en: { ...enGlobal, governance: enGovernance, tradeShared: enShared, pricing: enPricing },
+  ar: { ...arGlobal, governance: arGovernance, tradeShared: arShared, pricing: arPricing },
   'trade-governance/en': enGovernance,
+  'trade-governance/ar': arGovernance,
   'trade-shared/en': enShared,
+  'trade-shared/ar': arShared,
+  'trade-gov-pricing/en': enPricing,
+  'trade-gov-pricing/ar': arPricing,
 };
 
 @Injectable()
-class AsyncFileLoader implements TranslocoLoader {
+class PricingTranslocoLoader implements TranslocoLoader {
   getTranslation(path: string) {
-    return timer(0).pipe(map(() => FILES[path] ?? {}));
+    return of(TRANSLATIONS[path] ?? {});
   }
 }
 
-/** The protected surface the template drives, as the spec calls it. */
 interface PriceVersionView {
   loading(): boolean;
-  notFound(): boolean;
-  loadFailed(): boolean;
-  detail(): {
-    version: PriceVersionDetailHead;
-    entryCount: number;
-    soloOwnerGovernanceEligible: boolean;
-    auditTrail: GovernanceAuditEntry[];
-  } | null;
-  currentIfMatch(): number;
-  status(): string;
-  editable(): boolean;
-  dirty(): boolean;
-  activeTab(): string;
+  forbidden(): boolean;
+  canRead(): boolean;
+  canManage(): boolean;
+  canPublish(): boolean;
+  canViewCost(): boolean;
+  awaitingActivation(): boolean;
+  detail(): { version: PriceVersionDetailHead } | null;
   serverEntries(): readonly PriceEntry[];
-  serverTotal(): number;
-  effectiveEntryCount(): number;
-  allNewLines(): PriceLineRow[];
-  showLineErrors(): boolean;
-  serverOverlapErrors(): ReadonlyMap<string, number>;
-  publishBlocked(): boolean;
-  makerCheckerCaption(): string | null;
-  toError(): string | null;
-  toDate: WritableSignal<string | null>;
-  toTime: WritableSignal<string | null>;
   onEntryChange(row: PriceLineRow): void;
-  onEntryRemove(rowId: string): void;
-  onAddLine(): void;
   save(): Promise<boolean>;
-  undoChanges(): void;
-  openPublishDialog(): void;
-  returnToDraftDialog(): ConfirmDialog;
+  openRetireDialog(): void;
+  onRetireConfirmed(result: { reasonCode: string; reasonNote?: string }): Promise<void>;
 }
 
-interface PublishDialogView {
-  supersedesId: WritableSignal<string>;
-  soloOwnerAttestation: WritableSignal<boolean>;
-  submit(): Promise<void>;
-}
+function makeHeadDetail(overrides: Partial<PriceVersionHeadDetail> = {}): PriceVersionHeadDetail {
+  const versionHead: PriceVersionDetailHead = {
+    id: 'pv-1',
+    versionNumber: 1,
+    status: 'DRAFT',
+    effectiveFrom: '2026-12-01T10:00:00.000Z',
+    effectiveTo: null,
+    supersededAt: null,
+    supersededByVersionId: null,
+    version: 3,
+    checksum: 'chk-1',
+    createdByUserId: 'user-maker',
+    createdByDisplayName: null,
+    createdByEmail: null,
+    notes: null,
+    clonedFromVersionId: null,
+    sourceMode: 'MANUAL',
+    ...(overrides.versionHead ?? {}),
+  };
 
-const dialogProto = HTMLDialogElement.prototype as unknown as Record<string, unknown>;
-const originalDialog = { showModal: dialogProto['showModal'], close: dialogProto['close'] };
-
-const NOW = '2026-11-21T12:00:00.000Z';
-const ITEM = 'item-22';
-const UOM = 'uom-pack';
-const FROM = '2026-12-01T10:00:00.000Z';
-
-let notify: { success: ReturnType<typeof vi.fn>; error: ReturnType<typeof vi.fn>; warning: ReturnType<typeof vi.fn>; info: ReturnType<typeof vi.fn> };
-let harness: RouterTestingHarness;
-let bookSeq = 0;
-
-async function run<T>(promise: Promise<T>): Promise<T> {
-  const settled = promise.then(
-    (value) => ({ ok: true as const, value }),
-    (error: unknown) => ({ ok: false as const, error }),
-  );
-  await vi.advanceTimersByTimeAsync(400);
-  const result = await settled;
-  if (!result.ok) throw result.error;
-  return result.value;
-}
-
-async function tick(ms = 1000): Promise<void> {
-  harness.detectChanges();
-  await vi.advanceTimersByTimeAsync(ms);
-  harness.detectChanges();
-  await vi.advanceTimersByTimeAsync(0);
-  harness.detectChanges();
-}
-
-const entry = (minimumQuantity: string, maximumQuantity: string | null, unitPrice: string): EntryInput => ({
-  itemId: ITEM,
-  uomId: UOM,
-  currencyCode: 'EGP',
-  minimumQuantity,
-  maximumQuantity,
-  unitPrice,
-});
-
-async function newBook(): Promise<string> {
-  bookSeq += 1;
-  return (await run(createPriceBook({ code: `SPEC-PVP-${bookSeq}`, purpose: 'SALES', currencyCode: 'EGP' }))).id;
-}
-
-/** A draft with two tiers of one item: [1, 10) and [20, ∞). */
-async function newDraft(bookId: string, from = FROM, actor = FAKE_ME): Promise<string> {
-  setFakeActor(actor);
-  const saved = await run(
-    createVersion(bookId, { effectiveFrom: from, effectiveTo: null, entries: [entry('1', '10', '10.000'), entry('20', null, '8.000')] }),
-  );
-  setFakeActor(FAKE_ME);
-  return saved.id;
-}
-
-async function tested(bookId: string, from = FROM, actor = FAKE_ME): Promise<string> {
-  const id = await newDraft(bookId, from, actor);
-  setFakeActor(actor);
-  await run(testVersion(id));
-  setFakeActor(FAKE_ME);
-  return id;
-}
-
-/** Tested by FAKE_ME, published by the colleague (maker-checker satisfied). */
-async function published(bookId: string, from: string): Promise<string> {
-  const id = await tested(bookId, from);
-  setFakeActor(FAKE_COLLEAGUE);
-  await run(publishVersion(id));
-  setFakeActor(FAKE_ME);
-  return id;
-}
-
-async function head(id: string): Promise<PriceVersionDetailHead> {
-  return (await run(getPriceVersion(id, { include: 'none' }))).versionHead;
-}
-
-async function stored(id: string) {
-  return run(getPriceVersion(id));
-}
-
-async function openPage(bookId: string, versionId: string, query = ''): Promise<PriceVersionView> {
-  const page = await harness.navigateByUrl(`/trade/governance/price-books/${bookId}/versions/${versionId}${query}`, PriceVersionPage);
-  await tick();
-  await tick();
-  return page as unknown as PriceVersionView;
-}
-
-function conflictOpen(): boolean {
-  const el = harness.fixture.debugElement.query(By.directive(ConflictDialog)).nativeElement as HTMLElement;
-  return el.querySelector('dialog')?.hasAttribute('open') ?? false;
-}
-
-function conflictDialog(): { chooseReload(): void; chooseKeep(): void } {
-  return harness.fixture.debugElement.query(By.directive(ConflictDialog)).componentInstance;
-}
-
-function publishDialog(): { view: PublishDialogView; isOpen(): boolean } {
-  const debug = harness.fixture.debugElement.query(By.directive(PublishPriceDialog));
   return {
-    view: debug.componentInstance as PublishDialogView,
-    isOpen: () => (debug.nativeElement as HTMLElement).querySelector('dialog')?.hasAttribute('open') ?? false,
+    canViewCost: false,
+    entryCount: 1,
+    soloOwnerGovernanceEligible: false,
+    book: {
+      id: 'pb-1',
+      code: 'RETAIL-EGP',
+      purpose: 'SALES',
+      currencyCode: 'EGP',
+      status: 'ACTIVE',
+      version: 2,
+      name: 'Retail',
+      localizedNames: { en: 'Retail', ar: 'التجزئة' },
+      description: null,
+      versions: [versionHead],
+    },
+    versionHead,
+    version: versionHead.version,
+    promotions: [],
+    latestTestEvidence: null,
+    auditTrail: [],
+    ...overrides,
   };
 }
 
-/** The page's own #returnToDraftDialog (child components hold confirm dialogs too). */
-function returnToDraftDialog(page: PriceVersionView): { close(confirmed: boolean): void } {
-  return page.returnToDraftDialog() as unknown as { close(confirmed: boolean): void };
+function makeEntry(overrides: Partial<PriceEntry> = {}): PriceEntry {
+  return {
+    id: 'pe-1',
+    version: 1,
+    itemCompanyProfileId: 'icp-1',
+    itemId: 'item-1',
+    itemCode: 'SUGAR-1',
+    itemLocalizedNames: { en: 'Sugar', ar: 'سكر' },
+    uomId: 'uom-1',
+    uomCode: 'KG',
+    uomDisplayName: 'Kilogram',
+    uomLocalizedNames: { en: 'Kilogram', ar: 'كيلوجرام' },
+    currencyCode: 'EGP',
+    minimumQuantity: '1',
+    maximumQuantity: null,
+    unitPrice: '25.000',
+    minimumAllowedPrice: '20.000',
+    priority: 100,
+    standardCost: '15.000',
+    catalogSalesPrice: '25.000',
+    ...overrides,
+  };
 }
 
-const byMin = (page: PriceVersionView, min: string): PriceEntry =>
-  page.serverEntries().find((e) => e.minimumQuantity === min)!;
-
-beforeEach(async () => {
-  // jsdom has no scrollIntoView; the lines table calls it when it focuses a row.
-  Element.prototype.scrollIntoView = () => undefined;
-  vi.useFakeTimers();
-  vi.setSystemTime(new Date(NOW));
-  setFakeActor(FAKE_ME);
-  setFakeSoloOwnerEligible(FAKE_ME, false);
-  localStorage.clear();
-  sessionStorage.clear();
-  document.documentElement.lang = 'en';
-  dialogProto['showModal'] = function (this: HTMLDialogElement) {
-    this.setAttribute('open', '');
-  };
-  dialogProto['close'] = function (this: HTMLDialogElement) {
-    if (!this.hasAttribute('open')) return;
-    this.removeAttribute('open');
-    // Browsers fire "close" as a later task, after the code that called close() has finished.
-    setTimeout(() => this.dispatchEvent(new Event('close')), 0);
-  };
-  notify = { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() };
-  TestBed.configureTestingModule({
-    providers: [
-      provideRouter([
-        { path: 'trade/governance/price-books/:id', children: [] },
-        { path: 'trade/governance/price-books/:id/versions/:versionId', component: PriceVersionPage },
-      ]),
-      provideTransloco({
-        config: { availableLangs: ['ar', 'en'], defaultLang: 'en', reRenderOnLangChange: true },
-        loader: AsyncFileLoader,
-      }),
-      { provide: Notify, useValue: notify },
-    ],
-  });
-  harness = await RouterTestingHarness.create();
-});
-
-afterEach(() => {
-  harness.fixture.destroy();
-  setFakeActor(FAKE_ME);
-  setFakeSoloOwnerEligible(FAKE_ME, false);
-  vi.useRealTimers();
-  dialogProto['showModal'] = originalDialog.showModal;
-  dialogProto['close'] = originalDialog.close;
-});
-
-describe('PriceVersionPage load', () => {
-  it('loads the version head, its If-Match token and the first page of lines', async () => {
-    const bookId = await newBook();
-    const versionId = await newDraft(bookId);
-    const page = await openPage(bookId, versionId);
-
-    expect(page.loading()).toBe(false);
-    expect(page.notFound()).toBe(false);
-    expect(page.loadFailed()).toBe(false);
-    expect(page.detail()?.version.id).toBe(versionId);
-    expect(page.status()).toBe('DRAFT');
-    expect(page.editable()).toBe(true);
-    expect(page.dirty()).toBe(false);
-    expect(page.currentIfMatch()).toBe((await head(versionId)).version);
-    expect(page.serverEntries().map((e) => e.minimumQuantity).sort()).toEqual(['1', '20']);
-    expect(page.serverTotal()).toBe(2);
-    expect(page.effectiveEntryCount()).toBe(2);
-  });
-
-  it('opens the tab named in the query', async () => {
-    const bookId = await newBook();
-    const versionId = await newDraft(bookId);
-    const page = await openPage(bookId, versionId, '?tab=history');
-    expect(page.activeTab()).toBe('history');
-  });
-
-  it('shows not found for an unknown version', async () => {
-    const bookId = await newBook();
-    const page = await openPage(bookId, '0193a000-0000-7000-8000-0000000fffff');
-    expect(page.notFound()).toBe(true);
-    expect(page.loadFailed()).toBe(false);
-    expect(page.detail()).toBeNull();
-  });
-});
-
-describe('PriceVersionPage edit entries', () => {
-  it('saves a changed price through entries/changes with the If-Match token', async () => {
-    const bookId = await newBook();
-    const versionId = await newDraft(bookId);
-    const page = await openPage(bookId, versionId);
-    const first = byMin(page, '1');
-
-    page.onEntryChange({ ...first, unitPrice: '12.500' });
-    expect(page.dirty()).toBe(true);
-    const saved = page.save();
-    await tick();
-    await tick();
-    expect(await saved).toBe(true);
-
-    const after = await stored(versionId);
-    expect(after.entries.find((e) => e.id === first.id)?.unitPrice).toBe('12.500');
-    expect(page.currentIfMatch()).toBe(after.version.version);
-    expect(page.dirty()).toBe(false);
-    expect(notify.success).toHaveBeenCalledWith(enPricing.toasts.saved);
-  });
-
-  it('adds a new line and removes an existing one in one save', async () => {
-    const bookId = await newBook();
-    const versionId = await newDraft(bookId);
-    const page = await openPage(bookId, versionId);
-    const removed = byMin(page, '20');
-
-    page.onAddLine();
-    const blank = page.allNewLines()[0];
-    page.onEntryChange({ ...blank, itemId: ITEM, itemCode: 'X', uomId: UOM, minimumQuantity: '10', maximumQuantity: '20', unitPrice: '9.000' });
-    page.onEntryRemove(removed.id);
-    expect(page.effectiveEntryCount()).toBe(2);
-
-    const saved = page.save();
-    await tick();
-    await tick();
-    expect(await saved).toBe(true);
-
-    const after = await stored(versionId);
-    expect(after.entries.map((e) => e.minimumQuantity).sort()).toEqual(['1', '10']);
-    expect(after.entries.some((e) => e.id === removed.id)).toBe(false);
-    expect(page.detail()?.entryCount).toBe(2);
-  });
-
-  it('blocks the save on an incomplete new line and sends nothing', async () => {
-    const bookId = await newBook();
-    const versionId = await newDraft(bookId);
-    const page = await openPage(bookId, versionId);
-    const before = (await head(versionId)).version;
-
-    page.onAddLine();
-    const blank = page.allNewLines()[0];
-    const saved = page.save();
-    await tick();
-    expect(await saved).toBe(false);
-
-    expect(page.showLineErrors()).toBe(true);
-    expect(page.activeTab()).toBe('lines');
-    expect((await head(versionId)).version).toBe(before);
-  });
-
-  it('blocks the save when the end is not after the start', async () => {
-    const bookId = await newBook();
-    const versionId = await newDraft(bookId);
-    const page = await openPage(bookId, versionId);
-    const before = (await head(versionId)).version;
-
-    page.toDate.set('2026-11-01');
-    page.toTime.set('00:00');
-    const saved = page.save();
-    await tick();
-    expect(await saved).toBe(false);
-    expect(page.toError()).toBe(enPricing.header.endAfterStart);
-    expect((await head(versionId)).version).toBe(before);
-  });
-
-  it('undo drops every pending change', async () => {
-    const bookId = await newBook();
-    const versionId = await newDraft(bookId);
-    const page = await openPage(bookId, versionId);
-
-    page.onEntryChange({ ...byMin(page, '1'), unitPrice: '99' });
-    page.onAddLine();
-    page.onEntryRemove(byMin(page, '20').id);
-    expect(page.dirty()).toBe(true);
-    page.undoChanges();
-    expect(page.dirty()).toBe(false);
-    expect(page.effectiveEntryCount()).toBe(2);
-  });
-
-  it('editing a TESTED version asks first; cancel keeps it TESTED, confirm saves it back to DRAFT', async () => {
-    const bookId = await newBook();
-    const versionId = await tested(bookId);
-    const page = await openPage(bookId, versionId);
-    expect(page.status()).toBe('TESTED');
-    page.onEntryChange({ ...byMin(page, '1'), unitPrice: '11.000' });
-
-    const declined = page.save();
-    await tick();
-    returnToDraftDialog(page).close(false);
-    await tick();
-    expect(await declined).toBe(false);
-    expect((await head(versionId)).status).toBe('TESTED');
-
-    const confirmed = page.save();
-    await tick();
-    returnToDraftDialog(page).close(true);
-    await tick();
-    await tick();
-    expect(await confirmed).toBe(true);
-    expect((await head(versionId)).status).toBe('DRAFT');
-    expect(page.status()).toBe('DRAFT');
-  });
-
-  it('409 stale version opens the conflict dialog; reload drops the change set and refreshes the token', async () => {
-    const bookId = await newBook();
-    const versionId = await newDraft(bookId);
-    const page = await openPage(bookId, versionId);
-    page.onEntryChange({ ...byMin(page, '1'), unitPrice: '13.000' });
-
-    // Somebody else saves the version meanwhile.
-    await run(updateVersion(versionId, { notes: 'elsewhere' }, page.currentIfMatch()));
-    const saved = page.save();
-    await tick();
-    expect(await saved).toBe(false);
-    expect(conflictOpen()).toBe(true);
-    expect(page.dirty()).toBe(true);
-
-    conflictDialog().chooseReload();
-    await tick();
-    await tick();
-    expect(page.dirty()).toBe(false);
-    expect(page.currentIfMatch()).toBe((await head(versionId)).version);
-    expect((await stored(versionId)).entries.find((e) => e.minimumQuantity === '1')?.unitPrice).toBe('10.000');
-  });
-
-  it('409 stale version, keep mine: the change set stays for another try', async () => {
-    const bookId = await newBook();
-    const versionId = await newDraft(bookId);
-    const page = await openPage(bookId, versionId);
-    page.onEntryChange({ ...byMin(page, '1'), unitPrice: '13.000' });
-    await run(updateVersion(versionId, { notes: 'elsewhere' }, page.currentIfMatch()));
-
-    const saved = page.save();
-    await tick();
-    expect(await saved).toBe(false);
-    conflictDialog().chooseKeep();
-    await tick();
-    expect(page.dirty()).toBe(true);
-  });
-
-  it('server tier overlap between saved lines marks both rows with the other line number', async () => {
-    const bookId = await newBook();
-    const versionId = await newDraft(bookId);
-    const page = await openPage(bookId, versionId);
-    const a = byMin(page, '1');
-    const b = byMin(page, '20');
-    const lineOf = (id: string) => page.serverEntries().findIndex((e) => e.id === id) + 1;
-    const [lineA, lineB] = [lineOf(a.id), lineOf(b.id)];
-
-    // [5, ∞) now overlaps [1, 10).
-    page.onEntryChange({ ...b, minimumQuantity: '5' });
-    const saved = page.save();
-    await tick();
-    await tick();
-    expect(await saved).toBe(false);
-
-    expect(page.showLineErrors()).toBe(true);
-    expect(page.serverOverlapErrors().get(a.id)).toBe(lineB);
-    expect(page.serverOverlapErrors().get(b.id)).toBe(lineA);
-    expect(notify.error).not.toHaveBeenCalled();
-  });
-
-  it('server tier overlap on a new line: today the error is keyed by the backend row name newIndex:0', async () => {
-    const bookId = await newBook();
-    const versionId = await newDraft(bookId);
-    const page = await openPage(bookId, versionId);
-    const a = byMin(page, '1');
-
-    page.onAddLine();
-    const blank = page.allNewLines()[0];
-    page.onEntryChange({ ...blank, itemId: ITEM, itemCode: 'X', uomId: UOM, minimumQuantity: '2', maximumQuantity: '5', unitPrice: '9.000' });
-    const saved = page.save();
-    await tick();
-    await tick();
-    expect(await saved).toBe(false);
-
-    expect([...page.serverOverlapErrors().keys()].sort()).toEqual([a.id, 'newIndex:0'].sort());
-    expect(page.serverOverlapErrors().has(blank.id)).toBe(false);
-  });
-
-  // The backend names unsaved rows `newIndex:N` (validateEntryTiers); the page looks only for its temp-line ids.
-  it.fails('bug: server tier overlap on a new line marks that new row (newIndex:N is never mapped to the temp row)', async () => {
-    const bookId = await newBook();
-    const versionId = await newDraft(bookId);
-    const page = await openPage(bookId, versionId);
-
-    page.onAddLine();
-    const blank = page.allNewLines()[0];
-    page.onEntryChange({ ...blank, itemId: ITEM, itemCode: 'X', uomId: UOM, minimumQuantity: '2', maximumQuantity: '5', unitPrice: '9.000' });
-    const saved = page.save();
-    await tick();
-    await tick();
-    expect(await saved).toBe(false);
-
-    expect(page.serverOverlapErrors().has(blank.id)).toBe(true);
-  });
-});
-
-describe('PriceVersionPage publish and maker-checker', () => {
-  it('the maker cannot publish their own tested version: caption, warning, no dialog', async () => {
-    const bookId = await newBook();
-    const versionId = await tested(bookId);
-    const page = await openPage(bookId, versionId);
-
-    expect(page.publishBlocked()).toBe(true);
-    expect(page.makerCheckerCaption()).toBe(enPricing.lines.makerCheckerNote);
-    page.openPublishDialog();
-    await tick();
-    expect(notify.warning).toHaveBeenCalledWith(enGovernance.makerChecker.self);
-    expect(publishDialog().isOpen()).toBe(false);
-    expect((await head(versionId)).status).toBe('TESTED');
-  });
-
-  it('a checker publishes a colleague\'s version; a future start is scheduled and the page reloads', async () => {
-    const bookId = await newBook();
-    const versionId = await tested(bookId, FROM, FAKE_COLLEAGUE);
-    const page = await openPage(bookId, versionId);
-    expect(page.publishBlocked()).toBe(false);
-    expect(page.makerCheckerCaption()).toBeNull();
-
-    page.openPublishDialog();
-    await tick();
-    const dialog = publishDialog();
-    expect(dialog.isOpen()).toBe(true);
-    const submit = dialog.view.submit();
-    await tick();
-    await tick();
-    await submit;
-
-    expect((await head(versionId)).status).toBe('SCHEDULED');
-    expect(page.status()).toBe('SCHEDULED');
-    expect(page.editable()).toBe(false);
-    expect(page.currentIfMatch()).toBe((await head(versionId)).version);
-    expect(notify.success).toHaveBeenCalledWith(enPricing.toasts.scheduled);
-    expect(dialog.isOpen()).toBe(false);
-  });
-
-  it('an eligible solo owner must attest before publishing their own version', async () => {
-    setFakeSoloOwnerEligible(FAKE_ME, true);
-    const bookId = await newBook();
-    const versionId = await tested(bookId);
-    const page = await openPage(bookId, versionId);
-    expect(page.detail()?.soloOwnerGovernanceEligible).toBe(true);
-    expect(page.publishBlocked()).toBe(false);
-
-    page.openPublishDialog();
-    await tick();
-    const dialog = publishDialog();
-    const unattested = dialog.view.submit();
-    await tick();
-    await unattested;
-    expect((await head(versionId)).status).toBe('TESTED');
-
-    dialog.view.soloOwnerAttestation.set(true);
-    const attested = dialog.view.submit();
-    await tick();
-    await tick();
-    await attested;
-    expect((await head(versionId)).status).toBe('SCHEDULED');
-    expect(page.detail()?.auditTrail.some((a) => a.action === 'SOLO_OWNER_SCHEDULE')).toBe(true);
-  });
-
-  it('the server still refuses the maker when solo-owner eligibility was withdrawn after load', async () => {
-    setFakeSoloOwnerEligible(FAKE_ME, true);
-    const bookId = await newBook();
-    const versionId = await tested(bookId);
-    const page = await openPage(bookId, versionId);
-    page.openPublishDialog();
-    await tick();
-    setFakeSoloOwnerEligible(FAKE_ME, false);
-
-    const dialog = publishDialog();
-    dialog.view.soloOwnerAttestation.set(true);
-    const submit = dialog.view.submit();
-    await tick();
-    await submit;
-    expect(notify.error).toHaveBeenCalledWith(enGovernance.errors['TRADE.APPROVAL.MAKER_CHECKER_REQUIRED']);
-    expect((await head(versionId)).status).toBe('TESTED');
-    expect(dialog.isOpen()).toBe(true);
-  });
-
-  it('replaces the live version by default and stamps its supersededAt with the new start', async () => {
-    const bookId = await newBook();
-    const liveId = await published(bookId, '2026-11-01T00:00:00.000Z');
-    const versionId = await tested(bookId, FROM, FAKE_COLLEAGUE);
-    const page = await openPage(bookId, versionId);
-
-    page.openPublishDialog();
-    await tick();
-    const dialog = publishDialog();
-    expect(dialog.view.supersedesId()).toBe(liveId);
-    const submit = dialog.view.submit();
-    await tick();
-    await tick();
-    await submit;
-
-    expect((await head(versionId)).status).toBe('SCHEDULED');
-    const live = await head(liveId);
-    expect(live.supersededAt).toBe(FROM);
-    expect(live.supersededByVersionId).toBe(versionId);
-  });
-
-  it('supersession error: the start passed while the dialog was open (retroactive_supersession)', async () => {
-    const bookId = await newBook();
-    await published(bookId, '2026-11-01T00:00:00.000Z');
-    const versionId = await tested(bookId, FROM, FAKE_COLLEAGUE);
-    const page = await openPage(bookId, versionId);
-    page.openPublishDialog();
-    await tick();
-
-    vi.setSystemTime(new Date('2026-12-02T00:00:00.000Z'));
-    const dialog = publishDialog();
-    const submit = dialog.view.submit();
-    await tick();
-    await submit;
-
-    expect(notify.error).toHaveBeenCalledWith(
-      enPricing.priceErrors['TRADE.PRICE.PUBLISH_NOT_ALLOWED.retroactive_supersession'],
-    );
-    expect((await head(versionId)).status).toBe('TESTED');
-    expect(page.status()).toBe('TESTED');
-  });
-
-  it('supersession error: the chosen version was replaced meanwhile (predecessor_invalid)', async () => {
-    const bookId = await newBook();
-    const liveId = await published(bookId, '2026-11-01T00:00:00.000Z');
-    const versionId = await tested(bookId, '2026-12-10T00:00:00.000Z', FAKE_COLLEAGUE);
-    const page = await openPage(bookId, versionId);
-    page.openPublishDialog();
-    await tick();
-
-    // Another successor replaces the live version first.
-    const other = await tested(bookId, '2026-11-25T00:00:00.000Z');
-    setFakeActor(FAKE_COLLEAGUE);
-    await run(publishVersion(other, { supersedesVersionId: liveId }));
-    setFakeActor(FAKE_ME);
-
-    const dialog = publishDialog();
-    expect(dialog.view.supersedesId()).toBe(liveId);
-    const submit = dialog.view.submit();
-    await tick();
-    await submit;
-
-    expect(notify.error).toHaveBeenCalledWith(enPricing.priceErrors['TRADE.PRICE.PUBLISH_NOT_ALLOWED.predecessor_invalid']);
-    expect((await head(versionId)).status).toBe('TESTED');
-  });
-
-  it('publishing over a live version without replacing it is a version overlap', async () => {
-    const bookId = await newBook();
-    await published(bookId, '2026-11-01T00:00:00.000Z');
-    const versionId = await tested(bookId, FROM, FAKE_COLLEAGUE);
-    const page = await openPage(bookId, versionId);
-    page.openPublishDialog();
-    await tick();
-
-    const dialog = publishDialog();
-    dialog.view.supersedesId.set('');
-    const submit = dialog.view.submit();
-    await tick();
-    await submit;
-
-    expect(notify.error).toHaveBeenCalledWith(enGovernance.errors['TRADE.PRICE.VERSION_OVERLAP']);
-    expect((await head(versionId)).status).toBe('TESTED');
-  });
-
-  it('a stale publish closes the dialog and opens the page conflict dialog', async () => {
-    const bookId = await newBook();
-    const versionId = await tested(bookId, FROM, FAKE_COLLEAGUE);
-    const page = await openPage(bookId, versionId);
-    page.openPublishDialog();
-    await tick();
-
-    // A re-test elsewhere bumps the version while it stays TESTED.
-    setFakeActor(FAKE_COLLEAGUE);
-    await run(testVersion(versionId, page.currentIfMatch()));
-    setFakeActor(FAKE_ME);
-
-    const dialog = publishDialog();
-    const submit = dialog.view.submit();
-    await tick();
-    await submit;
-
-    expect(dialog.isOpen()).toBe(false);
-    expect(conflictOpen()).toBe(true);
-    expect((await head(versionId)).status).toBe('TESTED');
-  });
-});
+async function flush(harness: RouterTestingHarness): Promise<void> {
+  harness.detectChanges();
+  await Promise.resolve();
+  await Promise.resolve();
+  harness.detectChanges();
+  await Promise.resolve();
+  harness.detectChanges();
+}
+
+for (const lang of ['en', 'ar'] as const) {
+  for (const theme of ['light', 'dark'] as const) {
+    describe(`PriceVersionPage (${lang} ${theme})`, () => {
+      let stub: TradeHttpStub;
+      let dispose: () => void;
+      let harness: RouterTestingHarness;
+      let notify: {
+        success: ReturnType<typeof vi.fn>;
+        error: ReturnType<typeof vi.fn>;
+        warning: ReturnType<typeof vi.fn>;
+        info: ReturnType<typeof vi.fn>;
+      };
+      let me: WritableSignal<TenantMe | null>;
+      let previousTheme: string | null;
+      let previousDir: string;
+      let previousLang: string;
+      const dialogProto = HTMLDialogElement.prototype as unknown as Record<string, unknown>;
+      const originalDialog = {
+        showModal: dialogProto['showModal'],
+        close: dialogProto['close'],
+      };
+
+      function setGrants(keys: string[]): void {
+        const permissionScopes: TenantMe['permissionScopes'] = {};
+        for (const k of keys) {
+          permissionScopes[k] = { tenantWide: true, companyIds: ['c1'], branchIds: [] };
+        }
+        me.set({
+          ...FAKE_TENANT_ME,
+          id: 'user-reviewer',
+          isTenantOwner: false,
+          permissions: keys,
+          permissionScopes,
+          accessibleCompanies: ['c1'],
+          accessibleBranches: ['b1'],
+          accessibleBranchCompanies: [{ companyId: 'c1', branchId: 'b1' }],
+        });
+      }
+
+      beforeEach(async () => {
+        Element.prototype.scrollIntoView = () => undefined;
+        globalThis.ResizeObserver ??= class {
+          observe() {}
+          unobserve() {}
+          disconnect() {}
+        } as never;
+        dialogProto['showModal'] = function (this: HTMLDialogElement) {
+          this.setAttribute('open', '');
+        };
+        dialogProto['close'] = function (this: HTMLDialogElement) {
+          if (!this.hasAttribute('open')) return;
+          this.removeAttribute('open');
+          this.dispatchEvent(new Event('close'));
+        };
+        localStorage.clear();
+        sessionStorage.clear();
+        previousTheme = document.documentElement.getAttribute('data-theme');
+        previousDir = document.documentElement.dir;
+        previousLang = document.documentElement.lang;
+        document.documentElement.lang = lang;
+        document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+        document.documentElement.setAttribute('data-theme', theme);
+
+        me = signal<TenantMe | null>(null);
+        setGrants(['trade.pricing.read', 'trade.pricing.manage', 'trade.policy.publish']);
+
+        notify = { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() };
+        stub = new TradeHttpStub({
+          'GET /price-book-versions/:id': makeHeadDetail(),
+          'GET /price-book-versions/:id/entries': {
+            items: [makeEntry()],
+            total: 1,
+            page: 1,
+            limit: 50,
+          },
+          'GET /pricing/reference-data': {
+            canViewCost: false,
+            items: [],
+            uoms: [],
+            branches: [{ id: 'b1', code: 'HQ', name: 'Main Branch', isHeadquarters: true }],
+            channels: [],
+            commercialAccounts: [],
+            currencies: [{ code: 'EGP', name: 'EGP', symbol: 'E£', decimalPlaces: 2, isDefault: true }],
+          },
+          'GET /uoms': { items: [], total: 0, page: 1, limit: 100 },
+          'GET /channels': [],
+          'GET /commercial-accounts': { items: [], total: 0, page: 1, limit: 20 },
+        });
+        dispose = bindTradeHttpForTest(stub);
+
+        TestBed.configureTestingModule({
+          imports: [PriceVersionPage],
+          providers: [
+            provideRouter([
+              { path: '', children: [] },
+              { path: 'trade/governance/price-books/:id', children: [] },
+              {
+                path: 'trade/governance/price-books/:id/versions/:versionId',
+                component: PriceVersionPage,
+              },
+            ]),
+            provideTransloco({
+              config: { availableLangs: ['en', 'ar'], defaultLang: lang, reRenderOnLangChange: true },
+              loader: PricingTranslocoLoader,
+            }),
+            { provide: Notify, useValue: notify },
+            { provide: TenantScopeState, useValue: { me, selection: signal({ companyId: 'c1', branchId: 'b1' }), branchesFor: () => ['b1'], showScopeSwitcher: signal(false) } },
+            { provide: LanguageState, useValue: { current: signal(lang) } },
+          ],
+        });
+        TestBed.inject(TranslocoService).setTranslation(TRANSLATIONS[lang], lang);
+        harness = await RouterTestingHarness.create();
+      });
+
+      afterEach(() => {
+        harness?.fixture.destroy();
+        dispose();
+        vi.restoreAllMocks();
+        TestBed.resetTestingModule();
+        localStorage.clear();
+        sessionStorage.clear();
+        if (originalDialog.showModal) dialogProto['showModal'] = originalDialog.showModal;
+        else Reflect.deleteProperty(dialogProto, 'showModal');
+        if (originalDialog.close) dialogProto['close'] = originalDialog.close;
+        else Reflect.deleteProperty(dialogProto, 'close');
+        if (previousTheme) document.documentElement.setAttribute('data-theme', previousTheme);
+        else document.documentElement.removeAttribute('data-theme');
+        document.documentElement.dir = previousDir;
+        document.documentElement.lang = previousLang;
+      });
+
+      it('drives canViewCost from reference-data (P-2) and renders null joined labels without crashing (P-1)', async () => {
+        stub.register('GET', '/price-book-versions/:id/entries', {
+          items: [
+            {
+              ...makeEntry(),
+              itemCode: null as unknown as string,
+              itemLocalizedNames: null as unknown as Record<string, string>,
+              uomCode: null as unknown as string,
+              uomLocalizedNames: null as unknown as Record<string, string>,
+            },
+          ],
+          total: 1,
+          page: 1,
+          limit: 50,
+        });
+
+        const page = (await harness.navigateByUrl(
+          '/trade/governance/price-books/pb-1/versions/pv-1',
+          PriceVersionPage,
+        )) as unknown as PriceVersionView;
+        await flush(harness);
+
+        expect(page.canViewCost()).toBe(false);
+        const headersHidden = Array.from(
+          (harness.fixture.nativeElement as HTMLElement).querySelectorAll('[role="columnheader"]'),
+        ).map((el) => el.textContent?.trim());
+        expect(headersHidden).not.toContain(TRANSLATIONS[lang]['pricing']['lines']['columns']['standardCost']);
+        expect(page.serverEntries()).toHaveLength(1);
+        expect(page.serverEntries()[0].itemCode).toBeNull();
+
+        // Re-register with canViewCost: true and reload
+        stub.register('GET', '/pricing/reference-data', {
+          canViewCost: true,
+          branches: [],
+          currencies: [{ code: 'EGP', name: 'EGP', decimalPlaces: 2 }],
+        });
+        await (page as unknown as { retryLoad(): Promise<void> }).retryLoad();
+        await flush(harness);
+        expect(page.canViewCost()).toBe(true);
+      });
+
+      it('enforces 4,000 op save limit (B2), sends batch entries/changes with If-Match, and opens conflict on 409', async () => {
+        const page = (await harness.navigateByUrl(
+          '/trade/governance/price-books/pb-1/versions/pv-1',
+          PriceVersionPage,
+        )) as unknown as PriceVersionView;
+        await flush(harness);
+
+        // B2: 4001 pending ops hits the warning limit
+        for (let i = 0; i < 4001; i += 1) {
+          page.onEntryChange({ ...makeEntry({ id: `temp-${i}` }), unitPrice: '10' });
+        }
+        expect(await page.save()).toBe(false);
+        expect(notify.warning).toHaveBeenCalledWith(TRANSLATIONS[lang]['pricing']['toasts']['tooManyChanges']);
+        expect(stub.recordedWrites()).toHaveLength(0);
+
+        // Fresh page for single-batch save + 409
+        const row = makeEntry();
+        const savedBatch: ChangeEntriesResult = {
+          id: 'pv-1',
+          status: 'DRAFT',
+          checksum: 'chk-2',
+          version: 4,
+          entryCount: 1,
+          promotionCount: 0,
+          changedEntryIds: ['pe-1'],
+        };
+        stub.register('POST', '/price-book-versions/:id/entries/changes', savedBatch);
+
+        const page2 = page;
+        (page2 as unknown as { undoChanges(): void }).undoChanges();
+        page2.onEntryChange({ ...row, unitPrice: '30.000' });
+        expect(await page2.save()).toBe(true);
+
+        const writes = stub.recordedWrites();
+        expect(writes).toHaveLength(1);
+        expect(writes[0].method).toBe('POST');
+        expect(writes[0].path).toBe('/price-book-versions/pv-1/entries/changes');
+        expect(writes[0].ifMatch).toBe('"3"');
+        expect(writes[0].key).toMatch(UUID_V7_REGEX);
+
+        // 409 conflict triggers ConflictDialog without error toast
+        stub.register(
+          'POST',
+          '/price-book-versions/:id/entries/changes',
+          new ApiError(409, 'TRADE.CONCURRENCY.STALE_VERSION'),
+        );
+        page2.onEntryChange({ ...row, unitPrice: '31.000' });
+        expect(await page2.save()).toBe(false);
+        expect(notify.error).not.toHaveBeenCalled();
+      });
+
+      it('submits a large entries delta once and preserves it when the server rejects it', async () => {
+        const page = (await harness.navigateByUrl(
+          '/trade/governance/price-books/pb-1/versions/pv-1',
+          PriceVersionPage,
+        )) as unknown as PriceVersionView;
+        await flush(harness);
+        for (let i = 0; i < 1001; i += 1) {
+          page.onEntryChange(makeEntry({ id: `temp-${i}` }));
+        }
+        stub.register('POST', '/price-book-versions/:id/entries/changes',
+          new ApiError(400, 'TRADE.VALIDATION_FAILED', { upserts: ['array_max_size'] }));
+        expect(await page.save()).toBe(false);
+        expect(stub.recordedWrites()).toHaveLength(1);
+        expect((stub.recordedWrites()[0].body as { upserts: unknown[] }).upserts).toHaveLength(1001);
+        expect(stub.recordedWrites()[0].ifMatch).toBe('"3"');
+      });
+
+      it('wires B5 awaitingActivation on future SCHEDULED version and gates retire on trade.policy.publish', async () => {
+        const future = new Date(Date.now() + 86_400_000).toISOString();
+        stub.register(
+          'GET',
+          '/price-book-versions/:id',
+          makeHeadDetail({
+            versionHead: {
+              ...makeHeadDetail().versionHead,
+              status: 'SCHEDULED',
+              effectiveFrom: future,
+            },
+          }),
+        );
+
+        const page = (await harness.navigateByUrl(
+          '/trade/governance/price-books/pb-1/versions/pv-1',
+          PriceVersionPage,
+        )) as unknown as PriceVersionView;
+        await flush(harness);
+
+        expect(page.awaitingActivation()).toBe(true);
+        const badge = harness.fixture.debugElement.query(By.directive(VersionStatusBadge)).componentInstance as VersionStatusBadge;
+        expect(badge.awaitingActivation()).toBe(true);
+
+        // Retire uses reasonCode + reasonNote (P-6)
+        const retired: PriceVersionRow = {
+          id: 'pv-1',
+          priceBookId: 'pb-1',
+          versionNumber: 1,
+          status: 'RETIRED',
+          effectiveFrom: future,
+          effectiveTo: null,
+          supersededByVersionId: null,
+          supersededAt: null,
+          checksum: 'chk',
+          version: 4,
+          createdBy: null,
+          updatedBy: null,
+          createdAt: '2026-11-23T00:00:00.000Z',
+          updatedAt: '2026-11-23T00:00:00.000Z',
+        };
+        stub.register('POST', '/price-book-versions/:id/retire', retired);
+        await page.onRetireConfirmed({ reasonCode: 'OBSOLETE', reasonNote: 'Replaced' });
+        expect(stub.recordedWrites()[0]).toMatchObject({
+          method: 'POST',
+          path: '/price-book-versions/pv-1/retire',
+          ifMatch: '"3"',
+          body: { reasonCode: 'OBSOLETE', reasonNote: 'Replaced' },
+        });
+      });
+
+      it('shows the page forbidden state when publishing is denied', async () => {
+        await harness.navigateByUrl('/trade/governance/price-books/pb-1/versions/pv-1', PriceVersionPage);
+        await flush(harness);
+        stub.register('POST', '/price-book-versions/:id/publish', new ApiError(403, 'TRADE.AUTH.TARGET_DENIED'));
+        const dialog = harness.fixture.debugElement.query(By.directive(PublishPriceDialog)).componentInstance as PublishPriceDialog;
+        dialog.open();
+        await (dialog as unknown as { submit(): Promise<void> }).submit();
+        await flush(harness);
+        expect(notify.error).not.toHaveBeenCalled();
+        expect(harness.fixture.debugElement.query(By.directive(FullState)).componentInstance.kind()).toBe('forbidden');
+      });
+
+      it('is read-only when manage/publish keys are missing and renders ui-full-state forbidden on 403 without error toast', async () => {
+        setGrants(['trade.pricing.read']);
+        const page = (await harness.navigateByUrl(
+          '/trade/governance/price-books/pb-1/versions/pv-1',
+          PriceVersionPage,
+        )) as unknown as PriceVersionView;
+        await flush(harness);
+
+        expect(page.canRead()).toBe(true);
+        expect(page.canManage()).toBe(false);
+        expect(page.canPublish()).toBe(false);
+
+        const reasonDlg = harness.fixture.debugElement.query(By.directive(ReasonDialog));
+        expect(reasonDlg).toBeTruthy();
+
+        stub.register(
+          'GET',
+          '/price-book-versions/:id',
+          new ApiError(403, 'TRADE.AUTH.TARGET_DENIED'),
+        );
+        await (page as unknown as { retryLoad(): Promise<void> }).retryLoad();
+        await flush(harness);
+
+        expect(page.forbidden()).toBe(true);
+        expect(notify.error).not.toHaveBeenCalled();
+        const fullState = harness.fixture.debugElement.query(By.directive(FullState));
+        expect(fullState).toBeTruthy();
+        expect(fullState.componentInstance.kind()).toBe('forbidden');
+      });
+    });
+  }
+}

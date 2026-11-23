@@ -1,4 +1,4 @@
-import { Component, DestroyRef, computed, effect, inject, input, resource, signal, viewChild } from '@angular/core';
+import { Component, DestroyRef, Injector, computed, effect, inject, input, resource, signal, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../core/i18n/translation-events';
 import { ActivatedRoute, Params, Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
@@ -23,15 +23,17 @@ import {
 import { tablerStarFill } from '@ng-icons/tabler-icons/fill';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
+import { ScopeState } from '../../../../core/scope/scope';
 import type { ActionItem, ActionSelection } from '../../../../shared/ui/actions-menu/actions-menu';
 import { ActionsMenu } from '../../../../shared/ui/actions-menu/actions-menu';
 import { Button } from '../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { Dropdown, type DropdownOption } from '../../../../shared/ui/dropdown/dropdown';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { Pagination } from '../../../../shared/ui/pagination/pagination';
 import { StepFilter, type StepOption } from '../../../../shared/ui/step-filter/step-filter';
 import { ViewSwitcher, type ViewOption } from '../../../../shared/ui/view-switcher/view-switcher';
-import { errorCodeOf, newIdempotencyKey } from '../../shared/trade-api';
+import { errorCodeOf, newIdempotencyKey, tradeContext } from '../../shared/trade-api';
 import { CompanyDefaultsModal } from '../company-defaults-modal/company-defaults-modal';
 import { ConflictDialog } from '../governance-shared/conflict-dialog/conflict-dialog';
 import { ScopeChip } from '../governance-shared/scope-chip/scope-chip';
@@ -57,9 +59,14 @@ import type {
   PricePurpose,
   VersionHead,
 } from '../pricing.model';
-import { bookGovernanceState, isLiveScheduled, rangeText } from '../pricing.service';
-
-const CAN = { manage: true, test: true, approve: true, publish: true, manageDefaults: true }; // later from the session
+import {
+  bookGovernanceState,
+  hasPricingGrant,
+  isAwaitingActivation,
+  isForbiddenError,
+  isLiveScheduled,
+  rangeText,
+} from '../pricing.service';
 
 type ViewMode = 'cards' | 'table';
 type PurposeFilter = 'all' | PricePurpose;
@@ -99,6 +106,7 @@ function pctWidth(part: number, total: number): string {
     ConfirmDialog,
     ConflictDialog,
     Dropdown,
+    FullState,
     NewVersionModal,
     Pagination,
     PriceBookCard,
@@ -135,6 +143,8 @@ function pctWidth(part: number, total: number): string {
 export class PriceBooksPage {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly injector = inject(Injector);
+  private readonly scope = inject(ScopeState);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly notify = inject(Notify);
@@ -154,7 +164,18 @@ export class PriceBooksPage {
   readonly pageParam = input<string | undefined>(undefined, { alias: 'page' });
   readonly sizeParam = input<string | undefined>(undefined, { alias: 'size' });
 
-  protected readonly can = CAN;
+  protected readonly forbidden = signal(false);
+  protected readonly canRead = computed(() =>
+    hasPricingGrant(this.injector, this.scope, 'trade.pricing.read'),
+  );
+  protected readonly canManage = computed(
+    () => !this.forbidden() && hasPricingGrant(this.injector, this.scope, 'trade.pricing.manage'),
+  );
+  protected readonly canManageDefaults = computed(
+    () =>
+      !this.forbidden() &&
+      hasPricingGrant(this.injector, this.scope, 'trade.configuration.manage'),
+  );
   protected readonly pageSizes = PAGE_SIZES;
   protected readonly skeletonRows = [0, 1, 2, 3, 4];
   protected readonly skeletonCards = [0, 1, 2, 3, 4, 5];
@@ -196,17 +217,59 @@ export class PriceBooksPage {
   );
 
   private readonly kpisResource = resource({
-    params: () => ({ tick: this.refreshTick(), lang: this.language() }),
-    loader: () => getKpis(),
+    params: () => ({
+      tick: this.refreshTick(),
+      lang: this.language(),
+      companyId: this.scope.company()?.id ?? '',
+      canRead: this.canRead(),
+    }),
+    loader: async ({ params }) => {
+      if (!params.canRead) return null;
+      try {
+        return await getKpis({}, tradeContext(this.scope, 'COMPANY'));
+      } catch (error) {
+        if (isForbiddenError(error)) {
+          this.forbidden.set(true);
+          return null;
+        }
+        throw error;
+      }
+    },
   });
 
   private readonly defaultsResource = resource({
-    params: () => ({ tick: this.refreshTick() }),
-    loader: () => listCompanyDefaults().then((list) => list.items).catch(() => [] as CompanyDefault[]),
+    params: () => ({
+      tick: this.refreshTick(),
+      companyId: this.scope.company()?.id ?? '',
+      canRead: this.canRead(),
+    }),
+    loader: async ({ params }) => {
+      if (!params.canRead) return [] as CompanyDefault[];
+      try {
+        const res = await listCompanyDefaults(tradeContext(this.scope, 'COMPANY'));
+        return res.items;
+      } catch (error) {
+        if (isForbiddenError(error)) {
+          this.forbidden.set(true);
+        }
+        return [] as CompanyDefault[];
+      }
+    },
   });
 
   private readonly refDataResource = resource({
-    loader: () => getReferenceData().catch(() => ({ branches: [], currencies: [] })),
+    params: () => ({ companyId: this.scope.company()?.id ?? '', canRead: this.canRead() }),
+    loader: async ({ params }) => {
+      if (!params.canRead) return { branches: [], currencies: [] };
+      try {
+        return await getReferenceData(tradeContext(this.scope, 'COMPANY'));
+      } catch (error) {
+        if (isForbiddenError(error)) {
+          this.forbidden.set(true);
+        }
+        return { branches: [], currencies: [] };
+      }
+    },
   });
 
   private readonly booksResource = resource({
@@ -219,8 +282,14 @@ export class PriceBooksPage {
       limit: this.pageSize(),
       tick: this.refreshTick(),
       lang: this.language(),
+      companyId: this.scope.company()?.id ?? '',
+      canRead: this.canRead(),
     }),
     loader: async ({ params }) => {
+      if (!params.canRead) {
+        return { items: [] as PriceBookListItem[], total: 0, page: params.page, limit: params.limit };
+      }
+      const ctx = tradeContext(this.scope, 'COMPANY');
       const query = {
         page: params.page,
         limit: params.limit,
@@ -229,17 +298,25 @@ export class PriceBooksPage {
         ...(params.status !== 'all' ? { status: params.status } : {}),
         ...(params.state !== 'all' ? { governanceState: params.state } : {}),
       };
-      const res = await listPriceBooks(query);
-      if (res.items.length === 0 && params.page > 1) {
-        const lastPage = res.total > 0 ? Math.max(1, Math.ceil(res.total / params.limit)) : 1;
-        if (lastPage !== params.page) {
-          this.updateQuery({ page: lastPage === DEFAULT_PAGE ? null : lastPage }, true);
-          if (res.total > 0) {
-            return listPriceBooks({ ...query, page: lastPage });
+      try {
+        const res = await listPriceBooks(query, ctx);
+        if (res.items.length === 0 && params.page > 1) {
+          const lastPage = res.total > 0 ? Math.max(1, Math.ceil(res.total / params.limit)) : 1;
+          if (lastPage !== params.page) {
+            this.updateQuery({ page: lastPage === DEFAULT_PAGE ? null : lastPage }, true);
+            if (res.total > 0) {
+              return await listPriceBooks({ ...query, page: lastPage }, ctx);
+            }
           }
         }
+        return res;
+      } catch (error) {
+        if (isForbiddenError(error)) {
+          this.forbidden.set(true);
+          return { items: [] as PriceBookListItem[], total: 0, page: params.page, limit: params.limit };
+        }
+        throw error;
       }
-      return res;
     },
   });
 
@@ -396,6 +473,14 @@ export class PriceBooksPage {
     return isLiveScheduled(version);
   }
 
+  protected isVersionAwaitingActivation(version: VersionHead): boolean {
+    return isAwaitingActivation(version);
+  }
+
+  protected goHome(): void {
+    void this.router.navigate(['/']);
+  }
+
   protected versionRange(version: VersionHead): string {
     return rangeText(version.effectiveFrom, version.supersededAt ?? version.effectiveTo, this.language());
   }
@@ -417,7 +502,7 @@ export class PriceBooksPage {
       },
     ];
 
-    if (this.can.manage) {
+    if (this.canManage()) {
       items.push({
         id: 'newVersion',
         title: this.transloco.translate('priceBooks.actions.newVersion'),
@@ -426,7 +511,7 @@ export class PriceBooksPage {
       });
     }
 
-    if (this.can.manageDefaults) {
+    if (this.canManageDefaults()) {
       if (book.status === 'ACTIVE' && !book.isCompanyDefault) {
         items.push({
           id: 'makeDefault',
@@ -444,7 +529,7 @@ export class PriceBooksPage {
       }
     }
 
-    if (this.can.manage) {
+    if (this.canManage()) {
       if (book.status === 'ACTIVE') {
         items.push({
           id: 'deactivate',
@@ -541,12 +626,12 @@ export class PriceBooksPage {
   }
 
   protected openCreateModal(): void {
-    if (!this.can.manage) return;
+    if (!this.canManage()) return;
     void this.createModal().open();
   }
 
   protected openDefaultsModal(): void {
-    if (!this.can.manageDefaults) return;
+    if (!this.canManageDefaults()) return;
     void this.defaultsModal().open();
   }
 
@@ -599,11 +684,12 @@ export class PriceBooksPage {
   }
 
   protected refreshAll(): void {
+    this.forbidden.set(false);
     this.refreshTick.update((n) => n + 1);
   }
 
   private openNewVersionFor(book: PriceBookListItem): void {
-    if (!this.can.manage) return;
+    if (!this.canManage()) return;
     const currencies = this.refDataResource.hasValue() ? this.refDataResource.value().currencies : [];
     const decimals = currencies.find((c) => c.code === book.currencyCode)?.decimalPlaces ?? 3;
     void this.newVersionModal().open({
@@ -623,10 +709,11 @@ export class PriceBooksPage {
   private async makeCompanyDefault(book: PriceBookListItem): Promise<void> {
     if (this.rowBusyIds.has(book.id)) return;
     this.rowBusyIds.add(book.id);
+    const ctx = tradeContext(this.scope, 'COMPANY');
     try {
       const defaults = this.defaultsResource.hasValue()
         ? this.defaultsResource.value()
-        : (await listCompanyDefaults()).items;
+        : (await listCompanyDefaults(ctx)).items;
       const existing = defaults.find(
         (d) => d.purpose === book.purpose && d.currencyCode === book.currencyCode,
       );
@@ -636,10 +723,15 @@ export class PriceBooksPage {
         book.id,
         existing?.version ?? 0,
         newIdempotencyKey(),
+        ctx,
       );
       this.notify.success(this.transloco.translate('priceBooks.toasts.defaultSet'));
       this.refreshAll();
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+        return;
+      }
       if (errorCodeOf(error) === 'TRADE.CONCURRENCY.STALE_VERSION') {
         this.conflictDialog().open();
         return;
@@ -653,10 +745,11 @@ export class PriceBooksPage {
   private async removeCompanyDefault(book: PriceBookListItem): Promise<void> {
     if (this.rowBusyIds.has(book.id)) return;
     this.rowBusyIds.add(book.id);
+    const ctx = tradeContext(this.scope, 'COMPANY');
     try {
       const defaults = this.defaultsResource.hasValue()
         ? this.defaultsResource.value()
-        : (await listCompanyDefaults()).items;
+        : (await listCompanyDefaults(ctx)).items;
       const existing = defaults.find(
         (d) => d.purpose === book.purpose && d.currencyCode === book.currencyCode && d.priceBookId === book.id,
       );
@@ -669,10 +762,15 @@ export class PriceBooksPage {
         book.currencyCode,
         existing.version,
         newIdempotencyKey(),
+        ctx,
       );
       this.notify.success(this.transloco.translate('priceBooks.toasts.defaultRemoved'));
       this.refreshAll();
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+        return;
+      }
       if (errorCodeOf(error) === 'TRADE.CONCURRENCY.STALE_VERSION') {
         this.conflictDialog().open();
         return;
@@ -693,7 +791,13 @@ export class PriceBooksPage {
 
     this.rowBusyIds.add(book.id);
     try {
-      await updatePriceBook(book.id, { status: nextStatus }, book.version, newIdempotencyKey());
+      await updatePriceBook(
+        book.id,
+        { status: nextStatus },
+        book.version,
+        newIdempotencyKey(),
+        tradeContext(this.scope, 'COMPANY'),
+      );
       this.notify.success(
         this.transloco.translate(
           nextStatus === 'ACTIVE' ? 'priceBooks.toasts.activated' : 'priceBooks.toasts.deactivated',
@@ -701,6 +805,10 @@ export class PriceBooksPage {
       );
       this.refreshAll();
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+        return;
+      }
       if (errorCodeOf(error) === 'TRADE.CONCURRENCY.STALE_VERSION') {
         this.conflictDialog().open();
         return;

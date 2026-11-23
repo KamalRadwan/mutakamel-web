@@ -1,15 +1,17 @@
-import { Component, computed, effect, inject, input, model, signal, untracked } from '@angular/core';
+import { Component, computed, effect, inject, input, model, output, signal, untracked } from '@angular/core';
 import { translationEvents } from '../../../../core/i18n/translation-events';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerArrowRight, tablerCloudOff, tablerRefresh } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../core/i18n/language';
+import { ScopeState } from '../../../../core/scope/scope';
 import { Button } from '../../../../shared/ui/button/button';
 import { Dropdown, type DropdownOption } from '../../../../shared/ui/dropdown/dropdown';
 import { Field } from '../../../../shared/ui/field/field';
 import { Segmented, type SegmentedOption } from '../../../../shared/ui/segmented/segmented';
 import type { SparklineSpec } from '../../../../shared/ui/sparkline/sparkline';
 import { StatCard } from '../../../../shared/ui/stat-card/stat-card';
+import { tradeContext } from '../../shared/trade-api';
 import { getDiff, listPriceBooks } from '../pricing.api';
 import type {
   PriceBookListItem,
@@ -21,7 +23,7 @@ import type {
   VersionHead,
 } from '../pricing.model';
 import { formatMoney, formatQty } from '../../shared/trade-format';
-import { formatUnitPrice } from '../pricing.service';
+import { formatUnitPrice, isForbiddenError } from '../pricing.service';
 
 export type DiffFilter = 'ALL_CHANGES' | PriceDiffEntryChange;
 
@@ -55,6 +57,7 @@ export class PriceDiff {
 
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
+  private readonly scope = inject(ScopeState);
   protected readonly lang = inject(LanguageState).current;
 
   readonly versionId = input.required<string>();
@@ -62,6 +65,7 @@ export class PriceDiff {
   readonly currencyCode = input.required<string>();
   readonly bookVersions = input.required<readonly VersionHead[]>();
   readonly baselineId = model<string | null>(null);
+  readonly forbidden = output<void>();
 
   protected readonly skeletonRows = [0, 1, 2, 3, 4];
   protected readonly filter = signal<DiffFilter>('ALL_CHANGES');
@@ -369,7 +373,7 @@ export class PriceDiff {
     const seq = ++this.otherBooksSeq;
     this.loadingOtherBooks.set(true);
     try {
-      const page = await listPriceBooks({ limit: 100 });
+      const page = await listPriceBooks({ limit: 100 }, tradeContext(this.scope, 'COMPANY'));
       if (seq !== this.otherBooksSeq) return;
       this.otherBooks.set(page.items);
       if (this.useOtherBook() && !this.baselineId()) {
@@ -378,8 +382,9 @@ export class PriceDiff {
           this.baselineId.set(first);
         }
       }
-    } catch {
+    } catch (error) {
       if (seq !== this.otherBooksSeq) return;
+      if (isForbiddenError(error)) this.forbidden.emit();
       this.otherBooks.set([]);
     } finally {
       if (seq === this.otherBooksSeq) {
@@ -393,12 +398,16 @@ export class PriceDiff {
     this.loading.set(true);
     this.loadFailed.set(false);
     try {
-      const data = await getDiff(versionId, compareId);
+      const data = await getDiff(versionId, compareId, tradeContext(this.scope, 'COMPANY'));
       if (seq !== this.diffSeq) return;
       this.diff.set(data);
-    } catch {
+    } catch (error) {
       if (seq !== this.diffSeq) return;
       this.diff.set(null);
+      if (isForbiddenError(error)) {
+        this.forbidden.emit();
+        return;
+      }
       this.loadFailed.set(true);
     } finally {
       if (seq === this.diffSeq) {
