@@ -1,13 +1,13 @@
 import { HttpClient, HttpErrorResponse, type HttpHeaders, type HttpResponse } from '@angular/common/http';
-import { DOCUMENT, Service, inject } from '@angular/core';
+import { DOCUMENT, DestroyRef, Service, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { ApiError } from '../api/api-errors';
 
 const AUTH_PATH = '/api/tenant/core/v1/auth';
 const PUBLIC_BRANDING_PATH = '/api/tenant/core/v1/branding/public';
 
-type DataRoute = 'login' | 'mfa/verify' | 'mfa/resend' | 'me' | 'refresh';
-type EmptyRoute = 'logout' | 'activity';
+type DataRoute = 'login' | 'mfa/verify' | 'mfa/resend' | 'me' | 'refresh' | 'accept-invite';
+type EmptyRoute = 'logout' | 'activity' | 'forgot-password' | 'reset-password';
 type AuthRoute = DataRoute | EmptyRoute;
 
 interface CoreAuthEnvelope<T> {
@@ -17,10 +17,24 @@ interface CoreAuthEnvelope<T> {
 
 export class TenantProvisioningError extends ApiError {}
 
+let activeTransport: AuthTransport | undefined;
+
+/** AuthSession initializes this channel at startup; form callbacks run outside DI. */
+export function authTransport(): AuthTransport {
+  return activeTransport ?? inject(AuthTransport);
+}
+
 @Service()
 export class AuthTransport {
   private readonly http = inject(HttpClient);
   private readonly document = inject(DOCUMENT);
+
+  constructor() {
+    activeTransport = this;
+    inject(DestroyRef).onDestroy(() => {
+      if (activeTransport === this) activeTransport = undefined;
+    });
+  }
 
   hasCsrfCookie(): boolean {
     return Boolean(readCsrfCookie(this.document));
@@ -44,8 +58,8 @@ export class AuthTransport {
     return envelope.data;
   }
 
-  async requestNoContent(route: EmptyRoute): Promise<void> {
-    const response = await this.request(route, null, false);
+  async requestNoContent(route: EmptyRoute, body: unknown = null): Promise<void> {
+    const response = await this.request(route, body, false);
     if (response.status !== 204) {
       throw authError(response.status, response.body, response.headers);
     }

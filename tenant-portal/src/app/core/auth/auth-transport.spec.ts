@@ -8,7 +8,7 @@ import { login } from '../../features/auth/login/login.api';
 import { resendCode, verifyCode } from '../../features/auth/verify/verify.api';
 import { acceptLanguageInterceptor } from '../api/accept-language.interceptor';
 import { AuthSessionApi } from './auth-session.api';
-import { AuthTransport } from './auth-transport';
+import { AuthTransport, authTransport } from './auth-transport';
 
 describe('Tenant auth HTTP contract', () => {
   const base = '/api/tenant/core/v1/auth';
@@ -40,6 +40,33 @@ describe('Tenant auth HTTP contract', () => {
   });
 
   afterEach(() => { http.verify(); vi.restoreAllMocks(); });
+
+  it('resolves the startup channel in form callbacks and releases it with its injector', () => {
+    expect(authTransport()).toBe(transport);
+    expect(TestBed.runInInjectionContext(authTransport)).toBe(transport);
+    TestBed.resetTestingModule();
+    expect(authTransport).toThrow();
+  });
+
+  it.each(['forgot-password', 'reset-password'] as const)('sends a body to %s and requires a 204 response', async route => {
+    const body = route === 'forgot-password' ? { email: 'user@example.test' } : { token: 'action-token', newPassword: 'password' };
+    const result = transport.requestNoContent(route, body);
+    const req = http.expectOne({ method: 'POST', url: base + '/' + route });
+    expect(req.request.body).toEqual(body);
+    expect(req.request.withCredentials).toBe(true);
+    req.flush({ success: true, data: {} });
+    await expect(result).rejects.toMatchObject({ status: 200 });
+    http.expectNone(base + '/' + route);
+  });
+
+  it.each([null, { success: true }, { mfaRequired: true }, { success: false, data: challenge }])(
+    'rejects malformed invitation success envelopes without replay: %j', async body => {
+      const result = transport.requestData('accept-invite', { token: 'action-token', newPassword: 'password' });
+      http.expectOne(base + '/accept-invite').flush(body, { status: 200, statusText: 'OK' });
+      await expect(result).rejects.toMatchObject({ status: 200 });
+      http.expectNone(base + '/accept-invite');
+    },
+  );
 
   it.each([true, false])('submits login once with remember=%s and unwraps the MFA step', async remember => {
     lang = remember ? 'ar' : 'en';
