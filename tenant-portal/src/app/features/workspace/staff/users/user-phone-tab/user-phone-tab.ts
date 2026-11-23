@@ -24,22 +24,16 @@ import { Dropdown, DropdownOption } from '../../../../../shared/ui/dropdown/drop
 import { Field } from '../../../../../shared/ui/field/field';
 import { rectInPage, viewport } from '../../../../../shared/ui/overlay/zoom';
 import { Switch } from '../../../../../shared/ui/switch/switch';
-import { ApiError, errorCodeOf, newIdempotencyKey } from '../../shared/staff.api';
-import {
-  createExtension,
-  getExtensionByOwner,
-  getExtensionServers,
-  getPhoneSeats,
-  listPhoneServers,
-  putExtensionServers,
-  updateExtension,
-} from '../../shared/staff-phone.api';
+import { ApiError, errorCodeOf } from '../../../../../core/api/api-errors';
+import { newIdempotencyKey } from '../../../../../core/api/idempotency';
+import { StaffPhoneApi } from '../../shared/staff-phone.api';
 import {
   CALLER_ID_PATTERN,
   EXTENSION_PATTERN,
   PhoneSeats,
   STAFF_PHONE_LIMITS,
   StaffPhoneExtension,
+  StaffPhoneChainLink,
   StaffPhoneServer,
   UpdateStaffPhoneExtensionPatch,
 } from '../../shared/staff-phone.model';
@@ -100,6 +94,7 @@ export class UserPhoneTab {
 
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly session = inject(StaffSession);
+  private readonly api = inject(StaffPhoneApi);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
@@ -122,6 +117,7 @@ export class UserPhoneTab {
   protected readonly extension = signal<StaffPhoneExtension | null>(null);
   protected readonly scopeServers = signal<StaffPhoneServer[]>([]);
   protected readonly savedChainIds = signal<string[]>([]);
+  private readonly savedChain = signal<StaffPhoneChainLink[]>([]);
   protected readonly seats = signal<PhoneSeats | null>(null);
   protected readonly seatsLoading = signal(false);
   protected readonly seatsError = signal(false);
@@ -399,7 +395,7 @@ export class UserPhoneTab {
     if (!this.extension() && !this.sipUsernameEdited()) {
       this.sipUsernameDraft.set(val);
     }
-    if (this.extensionServerError() && this.extensionServerError()!.value !== val.trim()) {
+    if (this.extensionServerError()?.value !== val.trim()) {
       this.extensionServerError.set(null);
     }
   }
@@ -408,7 +404,7 @@ export class UserPhoneTab {
     const val = (event.target as HTMLInputElement).value;
     this.sipUsernameEdited.set(true);
     this.sipUsernameDraft.set(val);
-    if (this.usernameServerError() && this.usernameServerError()!.value !== val.trim()) {
+    if (this.usernameServerError()?.value !== val.trim()) {
       this.usernameServerError.set(null);
     }
   }
@@ -540,10 +536,11 @@ export class UserPhoneTab {
           enabled: enabledVal,
         };
         const extKey = this.idempotencyKeyFor('ext', body);
-        currentExt = await createExtension(body, extKey);
+        currentExt = await this.api.createExtension(body, extKey);
         this.clearExtIdempotency();
         this.extension.set(currentExt);
         this.savedChainIds.set(this.defaultAllServerIds());
+        this.savedChain.set([]);
         this.passwordDraft.set(null);
         this.passwordControl()?.reset();
       } else {
@@ -557,7 +554,7 @@ export class UserPhoneTab {
 
         if (Object.keys(patch).length > 0) {
           const extKey = this.idempotencyKeyFor('ext', { id: currentExt.id, patch });
-          currentExt = await updateExtension(currentExt.id, patch, extKey);
+          currentExt = await this.api.updateExtension(currentExt.id, patch, extKey);
           this.clearExtIdempotency();
           this.extension.set(currentExt);
           this.passwordDraft.set(null);
@@ -566,16 +563,18 @@ export class UserPhoneTab {
       }
 
       if (needsChainPut) {
+        const savedLinks = new Map(this.savedChain().map((link) => [link.serverId, link]));
         const serversBody = {
           servers: chainIds.map((serverId) => ({
             serverId,
-            timeoutSeconds: null,
-            maxRetries: null,
+            timeoutSeconds: savedLinks.get(serverId)?.timeoutSeconds ?? null,
+            maxRetries: savedLinks.get(serverId)?.maxRetries ?? null,
           })),
         };
         const chainKey = this.idempotencyKeyFor('chain', { id: currentExt.id, serversBody });
-        const savedChain = await putExtensionServers(currentExt.id, serversBody, chainKey);
+        const savedChain = await this.api.putExtensionServers(currentExt.id, serversBody, chainKey);
         this.clearChainIdempotency();
+        this.savedChain.set(savedChain);
         this.savedChainIds.set(
           [...savedChain].sort((a, b) => a.priority - b.priority).map((l) => l.serverId),
         );
@@ -606,14 +605,14 @@ export class UserPhoneTab {
 
     try {
       const [servers, extResult, seatsResult] = await Promise.all([
-        listPhoneServers(),
-        getExtensionByOwner(ownerId).catch((error: unknown) => {
+        this.api.listPhoneServers(),
+        this.api.getExtensionByOwner(ownerId).catch((error: unknown) => {
           if (errorCodeOf(error) === 'WEBPHONE_EXTENSION_NOT_FOUND') {
             return null;
           }
           throw error;
         }),
-        getPhoneSeats()
+        this.api.getPhoneSeats()
           .then((value) => ({ ok: true as const, value }))
           .catch((error: unknown) => ({ ok: false as const, error })),
       ]);
@@ -628,8 +627,9 @@ export class UserPhoneTab {
       }
 
       let chainIds: string[] = [];
+      let chain: StaffPhoneChainLink[] = [];
       if (extResult) {
-        const chain = await getExtensionServers(extResult.id);
+        chain = await this.api.getExtensionServers(extResult.id);
         if (seq !== this.loadSeq) return;
         chainIds = [...chain].sort((a, b) => a.priority - b.priority).map((l) => l.serverId);
       }
@@ -645,6 +645,7 @@ export class UserPhoneTab {
       this.scopeServers.set(servers);
       this.extension.set(extResult);
       this.savedChainIds.set(chainIds);
+      this.savedChain.set(chain);
       this.applyToForm(extResult, chainIds, servers);
     } catch (error) {
       if (seq !== this.loadSeq) return;
@@ -665,18 +666,26 @@ export class UserPhoneTab {
   }
 
   private async reloadAfterSave(ownerId: string): Promise<void> {
+    let refreshError: unknown = null;
     const [extResult, seatsResult] = await Promise.all([
-      getExtensionByOwner(ownerId).catch(() => this.extension()),
-      getPhoneSeats()
+      this.api.getExtensionByOwner(ownerId).catch((error: unknown) => {
+        refreshError = error;
+        return this.extension();
+      }),
+      this.api.getPhoneSeats()
         .then((value) => ({ ok: true as const, value }))
         .catch(() => ({ ok: false as const })),
     ]);
 
     if (extResult) {
-      const chain = await getExtensionServers(extResult.id).catch(() => null);
+      const chain = await this.api.getExtensionServers(extResult.id).catch((error: unknown) => {
+        refreshError = error;
+        return null;
+      });
       const chainIds = chain
         ? [...chain].sort((a, b) => a.priority - b.priority).map((l) => l.serverId)
-        : this.chainDraft();
+        : this.savedChainIds();
+      if (chain) this.savedChain.set(chain);
       this.extension.set(extResult);
       this.savedChainIds.set(chainIds);
       this.applyToForm(extResult, chainIds, this.scopeServers());
@@ -688,12 +697,13 @@ export class UserPhoneTab {
     } else {
       this.seatsError.set(true);
     }
+    if (refreshError) this.notify.error(resolveStaffError(refreshError, this.transloco));
   }
 
   private async refreshSeats(): Promise<void> {
     this.seatsLoading.set(true);
     try {
-      const updated = await getPhoneSeats();
+      const updated = await this.api.getPhoneSeats();
       this.seats.set(updated);
       this.seatsError.set(false);
     } catch {

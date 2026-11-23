@@ -1,14 +1,7 @@
-import {
-  fakeCreateExtension,
-  fakeGetExtensionByOwner,
-  fakeGetExtensionServers,
-  fakeGetPhoneSeats,
-  fakeListPhoneServers,
-  fakeListUserCallLogs,
-  fakePutExtensionServers,
-  fakeUpdateExtension,
-} from './staff-phone.fake';
-import {
+import { inject, Service } from '@angular/core';
+import { ApiError } from '../../../../core/api/api-errors';
+import { CoreHttp } from '../../../../core/api/core-http';
+import type {
   CreateStaffPhoneExtensionBody,
   ListUserCallLogsQuery,
   ListUserCallLogsResponse,
@@ -17,65 +10,68 @@ import {
   StaffPhoneChainLink,
   StaffPhoneExtension,
   StaffPhoneServer,
-  UpdateStaffPhoneExtensionPatch,
+  UpdateStaffPhoneExtensionBody,
 } from './staff-phone.model';
 
 export { toCallLogTypeParam } from './staff-phone.model';
 
-// Real browser base: /api/tenant/webphone/v1. Core wraps every 2xx response as `{ success, data, ... }`;
-// a central unwrap (Phase 5 Core HTTP adapter) strips it and each function returns what it leaves: the `data`
-// part, except the paged GET users/:userId/call-logs, which gives `{ data, meta }`.
+const PHONE_PATH = '/api/tenant/webphone/v1';
 
-export function getExtensionByOwner(ownerId: string): Promise<StaffPhoneExtension> {
-  // GET /api/tenant/webphone/v1/extensions/by-owner/:ownerId [webphone.extensions.read]
-  return fakeGetExtensionByOwner(ownerId);
-}
+@Service()
+export class StaffPhoneApi {
+  private readonly http = inject(CoreHttp);
 
-export function createExtension(
-  body: CreateStaffPhoneExtensionBody,
-  key: string,
-): Promise<StaffPhoneExtension> {
-  // POST /api/tenant/webphone/v1/extensions (x-idempotency-key) [webphone.extensions.manage]
-  return fakeCreateExtension(body, key);
-}
+  getExtensionByOwner(ownerId: string): Promise<StaffPhoneExtension> {
+    return this.http.read(`${PHONE_PATH}/extensions/by-owner/${encodeURIComponent(ownerId)}`);
+  }
 
-export function updateExtension(
-  id: string,
-  patch: UpdateStaffPhoneExtensionPatch,
-  key: string,
-): Promise<StaffPhoneExtension> {
-  // PATCH /api/tenant/webphone/v1/extensions/:id (x-idempotency-key) [webphone.extensions.manage]
-  return fakeUpdateExtension(id, patch, key);
-}
+  async createExtension(body: CreateStaffPhoneExtensionBody, key: string): Promise<StaffPhoneExtension> {
+    return (await this.http.write<StaffPhoneExtension>('POST', `${PHONE_PATH}/extensions`, body, { key })).data;
+  }
 
-export function getExtensionServers(id: string): Promise<StaffPhoneChainLink[]> {
-  // GET /api/tenant/webphone/v1/extensions/:id/servers [webphone.extensions.read]
-  return fakeGetExtensionServers(id);
-}
+  async updateExtension(id: string, patch: UpdateStaffPhoneExtensionBody, key: string): Promise<StaffPhoneExtension> {
+    return (await this.http.write<StaffPhoneExtension>(
+      'PATCH', `${PHONE_PATH}/extensions/${encodeURIComponent(id)}`, patch, { key },
+    )).data;
+  }
 
-export function putExtensionServers(
-  id: string,
-  body: PutStaffPhoneServersBody,
-  key: string,
-): Promise<StaffPhoneChainLink[]> {
-  // PUT /api/tenant/webphone/v1/extensions/:id/servers (x-idempotency-key) [webphone.extensions.manage]
-  return fakePutExtensionServers(id, body, key);
-}
+  getExtensionServers(id: string): Promise<StaffPhoneChainLink[]> {
+    return this.http.read(`${PHONE_PATH}/extensions/${encodeURIComponent(id)}/servers`);
+  }
 
-export function listPhoneServers(): Promise<StaffPhoneServer[]> {
-  // GET /api/tenant/webphone/v1/servers [webphone.settings.read]
-  return fakeListPhoneServers();
-}
+  async putExtensionServers(id: string, body: PutStaffPhoneServersBody, key: string): Promise<StaffPhoneChainLink[]> {
+    return (await this.http.write<StaffPhoneChainLink[]>(
+      'PUT', `${PHONE_PATH}/extensions/${encodeURIComponent(id)}/servers`, body, { key },
+    )).data;
+  }
 
-export function getPhoneSeats(): Promise<PhoneSeats> {
-  // GET /api/tenant/webphone/v1/seats [webphone.settings.read]
-  return fakeGetPhoneSeats();
-}
+  listPhoneServers(): Promise<StaffPhoneServer[]> {
+    return this.http.read(`${PHONE_PATH}/servers`);
+  }
 
-export function listUserCallLogs(
-  userId: string,
-  query: ListUserCallLogsQuery = {},
-): Promise<ListUserCallLogsResponse> {
-  // GET /api/tenant/webphone/v1/users/:userId/call-logs?page&limit&type=A,B&from&to&q -> { data, meta } [webphone.call_logs.read] (always paged; page defaults to 1; `type` is one comma list, unknown keys are rejected; every view is audited as WEBPHONE_CALL_LOGS_VIEWED)
-  return fakeListUserCallLogs(userId, query);
+  getPhoneSeats(): Promise<PhoneSeats> {
+    return this.http.read(`${PHONE_PATH}/seats`);
+  }
+
+  async listUserCallLogs(userId: string, query: ListUserCallLogsQuery = {}): Promise<ListUserCallLogsResponse> {
+    // Webphone returns a nested { data, meta: { page, limit, total } } inside the
+    // success envelope. It is not a CorePage and must not go through readPage.
+    const page = await this.http.read<ListUserCallLogsResponse>(
+      `${PHONE_PATH}/users/${encodeURIComponent(userId)}/call-logs`, {
+        page: query.page ?? 1,
+        limit: query.limit,
+        type: query.type,
+        from: query.from,
+        to: query.to,
+        q: query.q,
+      },
+    );
+    if (!page || !Array.isArray(page.data) || !page.meta ||
+        !Number.isSafeInteger(page.meta.page) || page.meta.page < 1 ||
+        !Number.isSafeInteger(page.meta.limit) || page.meta.limit < 1 ||
+        !Number.isSafeInteger(page.meta.total) || page.meta.total < 0) {
+      throw new ApiError(502, 'COMMON.GENERIC.INTERNAL_ERROR');
+    }
+    return { data: page.data, meta: page.meta };
+  }
 }

@@ -9,12 +9,15 @@ import {
   CallLogRow,
 } from '../../../../../shared/widgets/call-log/call-log.model';
 import { CallLogTable } from '../../../../../shared/widgets/call-log/call-log-table/call-log-table';
-import { listUserCallLogs, toCallLogTypeParam } from '../../shared/staff-phone.api';
+import { StaffPhoneApi, toCallLogTypeParam } from '../../shared/staff-phone.api';
 import { StaffUserCallLog } from '../../shared/staff-phone.model';
 import { TenantUser } from '../../shared/staff.model';
+import { staffErrorMessage } from '../../shared/staff.api';
 
 function mapUserCallLogRow(row: StaffUserCallLog): CallLogRow {
-  const isLead = row.sourceType === 'LEAD' && Boolean(row.sourceId) && Boolean(row.sourceLabel);
+  const record: CallLogRow['record'] = row.sourceType === 'LEAD' && row.sourceId && row.sourceLabel
+    ? { type: 'LEAD', id: row.sourceId, label: row.sourceLabel }
+    : null;
   const plainName =
     (row.sourceType && row.sourceType !== 'LEAD' ? row.sourceLabel : null) ??
     row.displayName ??
@@ -28,7 +31,7 @@ function mapUserCallLogRow(row: StaffUserCallLog): CallLogRow {
     startedAt: row.startedAt ?? row.createdAt,
     durationSeconds: row.durationSeconds,
     ownerName: row.ownerName,
-    record: isLead ? { type: 'LEAD', id: row.sourceId!, label: row.sourceLabel! } : null,
+    record,
     linkKind: null,
   };
 }
@@ -42,6 +45,7 @@ function mapUserCallLogRow(row: StaffUserCallLog): CallLogRow {
 })
 export class UserCallsTab {
   private readonly router = inject(Router);
+  private readonly api = inject(StaffPhoneApi);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
 
@@ -50,21 +54,31 @@ export class UserCallsTab {
 
   protected readonly columns: CallLogColumn[] = ['type', 'party', 'date', 'duration'];
   protected readonly reloadToken = signal(0);
+  private readonly loadError = signal<unknown>(null);
   private prevUserId: string | null = null;
 
   protected readonly errorText = computed<(status: number) => string | null>(() => {
     this.i18n();
     const message = this.transloco.translate('users.calls.noAccess');
-    return (status: number) => (status === 403 ? message : null);
+    const error = this.loadError();
+    const resolved = error === null ? null : staffErrorMessage(error, 'users', this.transloco, 'read');
+    return (status: number) => (status === 403 ? message : resolved);
   });
 
   protected readonly loader: CallLogLoader = async (query: CallLogQuery) => {
     const { types, ...rest } = query;
-    const result = await listUserCallLogs(this.user().id, { ...rest, type: toCallLogTypeParam(types) });
-    return {
-      data: result.data.map(mapUserCallLogRow),
-      meta: result.meta,
-    };
+    const ownerId = this.user().id;
+    this.loadError.set(null);
+    try {
+      const result = await this.api.listUserCallLogs(ownerId, { ...rest, type: toCallLogTypeParam(types) });
+      return {
+        data: result.data.map(mapUserCallLogRow),
+        meta: result.meta,
+      };
+    } catch (error) {
+      if (ownerId === this.user().id) this.loadError.set(error);
+      throw error;
+    }
   };
 
   constructor() {

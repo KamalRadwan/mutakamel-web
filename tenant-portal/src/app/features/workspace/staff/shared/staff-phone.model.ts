@@ -5,14 +5,15 @@ export interface StaffPhoneExtension {
   id: string;
   tenantId: string | null;
   ownerId: string;
-  ownerType: 'TENANT_USER' | 'ADMIN_USER';
+  /** Management views declare wire enums as strings. Preserve the server value. */
+  ownerType: string;
   extension: string;
   sipUsername: string;
   displayName: string | null;
   outboundCallerId: string | null;
   enabled: boolean;
   passwordConfigured: boolean;
-  accessState: 'ACTIVE' | 'OVER_CAPACITY';
+  accessState: string;
   enabledAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -25,10 +26,41 @@ export interface StaffPhoneServer {
   sipDomain: string;
   websocketUrl: string;
   enabled: boolean;
+  /** Additive management fields; older consumers only require the summary above. */
+  tenantId?: string | null;
+  realm?: string | null;
+  outboundProxy?: string | null;
+  fromDomain?: string | null;
+  registrarServer?: string | null;
+  contactUri?: string | null;
+  registerExpires?: number;
+  defaultCallerId?: string | null;
+  iceTransportPolicy?: string;
+  iceEnabled?: boolean;
+  traceSip?: boolean;
+  sessionTimers?: boolean;
+  allowInvalidTlsCertificate?: boolean;
+  defaultTimeoutSeconds?: number;
+  defaultMaxRetries?: number;
+  iceServers?: StaffPhoneIceServer[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface StaffPhoneIceServer {
+  id: string;
+  kind: string;
+  urls: string[];
+  username: string | null;
+  credentialConfigured: boolean;
+  enabled: boolean;
+  sortOrder: number;
 }
 
 export interface StaffPhoneChainLink {
+  id?: string;
   serverId: string;
+  serverName?: string | null;
   priority: number;
   timeoutSeconds: number | null;
   maxRetries: number | null;
@@ -48,7 +80,7 @@ export interface CreateStaffPhoneExtensionBody {
   ownerId: string;
   extension: string;
   sipUsername: string;
-  sipPassword?: string;
+  sipPassword?: string | null;
   displayName?: string | null;
   outboundCallerId?: string | null;
   enabled?: boolean;
@@ -62,6 +94,11 @@ export interface UpdateStaffPhoneExtensionPatch {
   outboundCallerId?: string | null;
   enabled?: boolean;
 }
+
+/** The editor keeps an unchanged password; the HTTP contract also permits clearing it. */
+export type UpdateStaffPhoneExtensionBody = Omit<UpdateStaffPhoneExtensionPatch, 'sipPassword'> & {
+  sipPassword?: string | null;
+};
 
 export interface PutStaffPhoneServersBody {
   servers: {
@@ -103,6 +140,8 @@ export interface StaffUserCallLog {
   sourceLabel: string | null;
   transferKind: 'BLIND' | 'ATTENDED' | null;
   conferenceId: string | null;
+  /** Optional, unloaded entity relation; it is not the management extension view. */
+  extension?: Readonly<Record<string, unknown>> | null;
 }
 
 export type CallLog = StaffUserCallLog;
