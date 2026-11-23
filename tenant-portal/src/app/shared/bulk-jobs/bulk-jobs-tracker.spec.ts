@@ -13,15 +13,14 @@ import { TRADE_ACCOUNTS_BULK_MODULE } from '../../features/trade/foundation/comm
 import { TRADE_ITEMS_BULK_MODULE } from '../../features/trade/foundation/items/item-bulk/items-bulk.descriptor';
 import { submitItemsBulkJob } from '../../features/trade/foundation/items/item-bulk/item-bulk.model';
 import { type BulkJobModuleDescriptor, provideBulkJobModules } from './bulk-job-modules';
-import { FAKE_BULK, type FakeBulkModule, fakeCancelBulkJob, fakeListBulkJobs, fakeSubmitBulkJob, registerFakeBulkModule, resetBulkJobsFake } from './bulk-jobs.fake';
+import { FAKE_BULK, type FakeBulkModule, fakeBulkJobsTransport, fakeCancelBulkJob, fakeListBulkJobs, fakeSubmitBulkJob, registerFakeBulkModule, resetBulkJobsFake } from './bulk-jobs.fake';
 import { BulkJobsTracker } from './bulk-jobs-tracker';
 import { submitBulkJob } from './bulk-jobs.api';
 import type { BulkJob, BulkJobItem, BulkJobItemStatus, BulkJobSubmit } from './bulk-jobs.model';
 
 /*
- * The Angular unit-test builder refuses vi.mock on relative imports, so the tracker runs against the
- * in-memory fake backend (bulk-jobs.fake.ts, what bulk-jobs.api.ts calls). A test-only module on app
- * 'core' records every server-side call through vi.fn hooks.
+ * The test setup binds the function facade to the fixture transport. The separate API spec exercises
+ * the injected HTTP service. A test-only module on app 'core' records fixture calls through vi.fn hooks.
  */
 
 const TEST_MODULE = 'core.bulk-test';
@@ -142,7 +141,7 @@ let visibility: DocumentVisibilityState;
 async function setup(extraProviders: unknown[] = []): Promise<BulkJobsTracker> {
   TestBed.configureTestingModule({
     providers: [
-      provideTransloco({ config: { availableLangs: ['en'], defaultLang: 'en' }, loader: TestLoader }),
+      provideTransloco({ config: { availableLangs: ['en', 'ar'], defaultLang: 'en' }, loader: TestLoader }),
       provideBulkJobModules([
         TEST_DESCRIPTOR,
         OTHER_DESCRIPTOR,
@@ -193,6 +192,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
+  vi.restoreAllMocks();
   TestBed.resetTestingModule();
   FAKE_BULK.getFailures = 0;
   await drainFakeJobs();
@@ -524,6 +524,102 @@ describe('BulkJobsTracker: retry', () => {
     expect(hooks.resolve).toHaveBeenCalledTimes(2);
     expect(hooks.resolve.mock.calls[1][0].selection).toEqual({ kind: 'IDS', ids: ['fail-b', 'fail-c'] });
     expect(tracker.hasActive('core', TEST_MODULE)).toBe(true);
+  });
+});
+
+describe('BulkJobsTracker: real transport preconditions and failures', () => {
+  const completed = makeJob({ app: 'trading', status: 'COMPLETED_WITH_ERRORS', revision: 7,
+    counts: { succeeded: 2, unchanged: 0, skipped: 0, failed: 1, cancelled: 0 } });
+  const accepted = { jobId: 'retry-job', status: 'QUEUED' as const, total: 1,
+    skippedAtSubmit: 0, failedAtSubmit: 0, chunkCount: 1 };
+
+  it('sends the revision the user saw when cancelling', async () => {
+    const tracker = await setup();
+    const cancel = vi.spyOn(fakeBulkJobsTransport, 'cancelBulkJob')
+      .mockResolvedValue({ ...completed, status: 'CANCELLED', revision: 8 });
+    await tracker.cancel(completed);
+    expect(cancel).toHaveBeenCalledWith('trading', completed.id, 7);
+  });
+
+  it('retains the retry key, body and original revision after network and server failures', async () => {
+    const tracker = await setup();
+    const retry = vi.spyOn(fakeBulkJobsTransport, 'retryBulkJob')
+      .mockRejectedValueOnce(new ApiError(0, 'NETWORK_ERROR'))
+      .mockRejectedValueOnce(new ApiError(503, 'SERVER_ERROR'))
+      .mockResolvedValue(accepted);
+    vi.spyOn(fakeBulkJobsTransport, 'getBulkJob').mockResolvedValue({ ...completed, id: accepted.jobId });
+    const overrides = { startAt: '2026-11-24T10:00:00.000Z' };
+    await expect(tracker.retry(completed, overrides)).rejects.toMatchObject({ status: 0 });
+    await expect(tracker.retry({ ...completed, revision: 8 }, { ...overrides })).rejects.toMatchObject({ status: 503 });
+    await expect(tracker.retry({ ...completed, revision: 9 }, overrides)).resolves.toBe(accepted.jobId);
+    expect(retry).toHaveBeenCalledTimes(3);
+    expect(retry.mock.calls[1]).toEqual(retry.mock.calls[0]);
+    expect(retry.mock.calls[2]).toEqual(retry.mock.calls[0]);
+    expect(retry.mock.calls[0][4]).toBe(7);
+  });
+
+  it('uses a new retry intent when the overrides change', async () => {
+    const tracker = await setup();
+    const retry = vi.spyOn(fakeBulkJobsTransport, 'retryBulkJob').mockRejectedValue(new ApiError(0, 'NETWORK_ERROR'));
+    await expect(tracker.retry(completed, null)).rejects.toBeInstanceOf(ApiError);
+    await expect(tracker.retry({ ...completed, revision: 8 }, { startAt: '2026-11-24T12:00:00.000Z' }))
+      .rejects.toBeInstanceOf(ApiError);
+    expect(retry.mock.calls[1][3]).not.toBe(retry.mock.calls[0][3]);
+    expect(retry.mock.calls[1][4]).toBe(8);
+  });
+
+  it('does not replay stale conflicts and clears the rejected retry intent', async () => {
+    const tracker = await setup();
+    const retry = vi.spyOn(fakeBulkJobsTransport, 'retryBulkJob')
+      .mockRejectedValue(new ApiError(409, 'TRADE.CONCURRENCY.STALE_VERSION'));
+    await expect(tracker.retry(completed, null)).rejects.toMatchObject({ status: 409 });
+    expect(retry).toHaveBeenCalledTimes(1);
+    await expect(tracker.retry({ ...completed, revision: 8 }, null)).rejects.toMatchObject({ status: 409 });
+    expect(retry.mock.calls[1][3]).not.toBe(retry.mock.calls[0][3]);
+    expect(retry.mock.calls[1][4]).toBe(8);
+  });
+
+  it('excludes accounting descriptors and persisted accounting job references', async () => {
+    localStorage.setItem('bulkJobs.recent', JSON.stringify([{ app: 'accounting', id: 'old-simulation' }]));
+    const get = vi.spyOn(fakeBulkJobsTransport, 'getBulkJob');
+    const tracker = await setup([provideBulkJobModules([{ ...TEST_DESCRIPTOR, app: 'accounting' }])]);
+    expect(tracker.registeredApps()).not.toContain('accounting');
+    expect(get).not.toHaveBeenCalled();
+    expect(localStorage.getItem('bulkJobs.recent')).toBe('[]');
+  });
+
+  it('preserves full API errors for status-based shared translations', async () => {
+    const tracker = await setup();
+    TestBed.inject(TranslocoService).setTranslation({ apiErrors: { network: 'Offline', permission: 'Access denied',
+      rateLimited: 'Try later', generic: 'Server failure' } }, 'en', { merge: true });
+    expect(tracker.errorText(new ApiError(0, 'NETWORK_ERROR'), null)).toBe('Offline');
+    expect(tracker.errorText(new ApiError(403, 'UNKNOWN'), null)).toBe('Access denied');
+    expect(tracker.errorText(new ApiError(429, 'UNKNOWN'), null)).toBe('Try later');
+    expect(tracker.errorText(new ApiError(503, 'UNKNOWN'), null)).toBe('Server failure');
+    expect(tracker.errorText(new ApiError(409, 'TRADE.CONCURRENCY.STALE_VERSION'), completed))
+      .toBe('The batch changed. Reload its report before trying again.');
+    expect(tracker.reasonText('BULK_JOBS_UNAVAILABLE', null)).toBe('Batch operations are unavailable for this app.');
+  });
+
+  it('shows one read-failure toast while stale and clears stale on recovery', async () => {
+    const tracker = await setup();
+    const list = vi.spyOn(fakeBulkJobsTransport, 'listBulkJobs').mockRejectedValue(new ApiError(0, 'NETWORK_ERROR'));
+    await tracker.loadRecent();
+    await tracker.loadRecent();
+    expect(tracker.stale()).toBe(true);
+    expect(notify.error).toHaveBeenCalledTimes(1);
+    list.mockResolvedValue({ items: [], total: 0, page: 1, limit: 20 });
+    await tracker.loadRecent();
+    expect(tracker.stale()).toBe(false);
+  });
+
+  it('provides MSA fallback messages while the unowned translation keys are pending', async () => {
+    const tracker = await setup();
+    TestBed.inject(TranslocoService).setActiveLang('ar');
+    await tracker.ensureScopesLoaded(['bulk-jobs']);
+    expect(tracker.reasonText('BULK_JOBS_UNAVAILABLE', null)).toBe('العمليات المجمّعة غير متاحة لهذا التطبيق.');
+    expect(tracker.reasonText('TRADE.CONCURRENCY.STALE_VERSION', completed))
+      .toBe('تغيّرت العملية. أعد تحميل التقرير قبل المحاولة مجددًا.');
   });
 });
 

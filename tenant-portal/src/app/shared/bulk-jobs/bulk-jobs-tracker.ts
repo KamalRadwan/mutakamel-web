@@ -4,10 +4,10 @@ import { DestroyRef, Injectable, Signal, computed, inject, signal } from '@angul
 import { TranslocoService } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
 import { Notify } from '../../core/notify/notify';
-import { ApiError, errorMessage } from '../../core/api/api-errors';
+import { ApiError, errorMessage, isRetryableWriteError } from '../../core/api/api-errors';
 import { newIdempotencyKey } from '../../core/api/idempotency';
 import { BULK_JOB_MODULES, BulkJobActionDescriptor, BulkJobModuleDescriptor } from './bulk-job-modules';
-import { cancelBulkJob, getBulkJob, listBulkJobs, retryBulkJob, submitBulkJob } from './bulk-jobs.api';
+import { cancelBulkJob, getBulkJob, hasBulkJobsBackend, listBulkJobs, retryBulkJob, submitBulkJob } from './bulk-jobs.api';
 import {
   BULK_JOB_LIMITS,
   BulkJob,
@@ -136,6 +136,8 @@ export class BulkJobsTracker {
   private readonly activeScopes = new Set<string>(['bulk-jobs']);
   private readonly scopeLoading = new Map<string, Promise<void>>();
   private readonly notifiedTerminalKeys = new Set<string>();
+  private readonly retryIntents = new Map<string, { payload: string; overrides: unknown | null; key: string; revision: number }>();
+  readonly stale = signal(false);
 
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
   private pollingInFlight = false;
@@ -213,7 +215,7 @@ export class BulkJobsTracker {
   }
 
   registeredApps(): BulkJobApp[] {
-    return Array.from(new Set(this.descriptors.map((d) => d.app)));
+    return Array.from(new Set(this.descriptors.map((d) => d.app))).filter(hasBulkJobsBackend);
   }
 
   setPopoverOpen(open: boolean): void {
@@ -271,7 +273,7 @@ export class BulkJobsTracker {
   }
 
   async cancel(job: BulkJob): Promise<void> {
-    const updated = await cancelBulkJob(job.app, job.id);
+    const updated = await cancelBulkJob(job.app, job.id, job.revision);
     this.upsertJob(updated, true);
     if (isBulkJobActive(updated.status)) {
       this.schedulePoll();
@@ -280,11 +282,19 @@ export class BulkJobsTracker {
 
   async retry(job: BulkJob, overrides: unknown | null): Promise<string> {
     await this.ensureScopesForModule(job.module);
-    const key = newIdempotencyKey();
+    const intentId = this.jobKey(job.app, job.id);
+    const payload = JSON.stringify(overrides);
+    const previous = this.retryIntents.get(intentId);
+    const intent = previous?.payload === payload ? previous : {
+      payload, overrides: JSON.parse(payload) as unknown, key: newIdempotencyKey(), revision: job.revision,
+    };
+    this.retryIntents.set(intentId, intent);
     let res: BulkJobSubmitResult;
     try {
-      res = await retryBulkJob(job.app, job.id, overrides, key);
+      res = await retryBulkJob(job.app, job.id, intent.overrides, intent.key, intent.revision);
+      this.retryIntents.delete(intentId);
     } catch (error) {
+      if (!isRetryableWriteError(error)) this.retryIntents.delete(intentId);
       if (error instanceof ApiError && error.code === 'BULK_JOB_ACTIVE') {
         await this.handleActiveConflict(job.app, job.module, error);
       }
@@ -313,10 +323,11 @@ export class BulkJobsTracker {
         ...Array.from(this.jobsByKey().values()).map((job) => job.app),
       ]),
     );
-    if (apps.length === 0) return;
+    const supportedApps = apps.filter(hasBulkJobsBackend);
+    if (supportedApps.length === 0) return;
 
     const results = await Promise.allSettled(
-      apps.map((app) => listBulkJobs(app, { scope: 'recent', page: 1, limit: 20 })),
+      supportedApps.map((app) => listBulkJobs(app, { scope: 'recent', page: 1, limit: 20 })),
     );
     const loaded: BulkJob[] = [];
     for (const res of results) {
@@ -324,6 +335,7 @@ export class BulkJobsTracker {
         loaded.push(...res.value.items);
       }
     }
+    this.setReadFailure(results.find((result) => result.status === 'rejected')?.reason);
     if (loaded.length === 0) return;
 
     for (const job of loaded) {
@@ -340,6 +352,13 @@ export class BulkJobsTracker {
 
   reasonText(code: string | undefined, job: BulkJob | null, params?: Record<string, unknown>): string {
     this.scopesVersionSignal();
+    if (code === 'BULK_JOBS_UNAVAILABLE' || code === 'TRADE.CONCURRENCY.STALE_VERSION') {
+      const arabic = this.transloco.getActiveLang() === 'ar';
+      const fallback = code === 'BULK_JOBS_UNAVAILABLE'
+        ? arabic ? 'العمليات المجمّعة غير متاحة لهذا التطبيق.' : 'Batch operations are unavailable for this app.'
+        : arabic ? 'تغيّرت العملية. أعد تحميل التقرير قبل المحاولة مجددًا.' : 'The batch changed. Reload its report before trying again.';
+      return this.translateOrFallback(`bulkJobs.codes.${code}`, fallback);
+    }
     const mergedParams: Record<string, unknown> = { ...params, max: formatMaxItems(params?.['max']) };
     if (code) {
       const descriptor = job ? this.descriptorFor(job.module) : undefined;
@@ -360,6 +379,17 @@ export class BulkJobsTracker {
       }
       return this.translateOrFallback('bulkJobs.codes.generic', 'Something went wrong.', mergedParams);
     });
+  }
+
+  errorText(error: unknown, job: BulkJob | null): string {
+    if (error instanceof ApiError) {
+      const specific = this.reasonText(error.code, job, error.details);
+      if (specific !== this.reasonText(undefined, job)) return specific;
+      const text = errorMessage(error, 'bulkJobs', this.transloco);
+      return text.startsWith('settings.errors.') || text.startsWith('apiErrors.')
+        ? this.reasonText(error.code, job, error.details) : text;
+    }
+    return this.reasonText(undefined, job);
   }
 
   jobTitle(job: BulkJob): string {
@@ -395,20 +425,25 @@ export class BulkJobsTracker {
 
   private async restoreOnStart(): Promise<void> {
     const apps = this.registeredApps();
-    const recentRefs = readRecentRefs();
+    const recentRefs = readRecentRefs().filter((ref) => hasBulkJobsBackend(ref.app));
+    const failures: unknown[] = [];
 
     const activePromises = apps.map((app) =>
       listBulkJobs(app, { scope: 'active', page: 1, limit: 100 })
         .then((page) => page.items)
-        .catch(() => [] as BulkJob[]),
+        .catch((error: unknown) => { failures.push(error); return [] as BulkJob[]; }),
     );
-    const recentPromises = recentRefs.map((ref) => getBulkJob(ref.app, ref.id).catch(() => null));
+    const recentPromises = recentRefs.map((ref) => getBulkJob(ref.app, ref.id).catch((error: unknown) => {
+      if (!(error instanceof ApiError && error.status === 404)) failures.push(error);
+      return null;
+    }));
 
     const [activeLists, recentJobs] = await Promise.all([
       Promise.all(activePromises),
       Promise.all(recentPromises),
     ]);
     if (this.destroyed) return;
+    this.setReadFailure(failures[0]);
 
     for (const list of activeLists) {
       for (const job of list) {
@@ -475,6 +510,7 @@ export class BulkJobsTracker {
       if (this.destroyed) return;
 
       let failed = false;
+      let failure: unknown;
       for (let i = 0; i < results.length; i++) {
         const res = results[i];
         if (res.status === 'fulfilled') {
@@ -483,8 +519,10 @@ export class BulkJobsTracker {
           this.removeJob(active[i].app, active[i].id);
         } else {
           failed = true;
+          failure = res.reason;
         }
       }
+      this.setReadFailure(failure);
       // Back off while the server or network fails, so a broken backend is not polled every 2 s.
       this.pollErrorStreak = failed ? this.pollErrorStreak + 1 : 0;
     } finally {
@@ -495,6 +533,16 @@ export class BulkJobsTracker {
           this.schedulePoll();
         }
       }
+    }
+  }
+
+  private setReadFailure(error: unknown): void {
+    if (this.destroyed) return;
+    if (error === undefined) {
+      this.stale.set(false);
+    } else if (!this.stale()) {
+      this.stale.set(true);
+      this.notify.error(this.errorText(error, null));
     }
   }
 
@@ -558,8 +606,8 @@ export class BulkJobsTracker {
         if (isBulkJobActive(fresh.status)) {
           this.schedulePoll();
         }
-      } catch {
-        // Seeded state is already in place; polling will synchronize.
+      } catch (error) {
+        this.setReadFailure(error);
       }
       return;
     }
@@ -567,7 +615,8 @@ export class BulkJobsTracker {
     try {
       const fresh = await getBulkJob(app, res.jobId);
       this.upsertJob(fresh, true);
-    } catch {
+    } catch (error) {
+      this.setReadFailure(error);
       this.upsertJob(seeded, true);
     }
   }

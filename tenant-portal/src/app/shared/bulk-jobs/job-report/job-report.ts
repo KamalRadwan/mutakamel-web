@@ -22,7 +22,7 @@ import {
 } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../core/i18n/language';
 import { Notify } from '../../../core/notify/notify';
-import { ApiError, errorCodeOf } from '../../../features/crm/settings/shared/settings-api';
+import { errorCodeOf } from '../../../core/api/api-errors';
 import { Button } from '../../ui/button/button';
 import { DateField } from '../../ui/date-time/date-field';
 import { TimeField } from '../../ui/date-time/time-field';
@@ -473,8 +473,7 @@ export class BulkJobReport {
     } catch (error) {
       const code = errorCodeOf(error);
       if (code === 'BULK_JOB_ACTIVE') return;
-      const details = error instanceof ApiError ? error.details : undefined;
-      this.notify.error(this.tracker.reasonText(code ?? undefined, current, details));
+      this.notify.error(this.tracker.errorText(error, current));
     } finally {
       this.retrying.set(false);
     }
@@ -534,8 +533,7 @@ export class BulkJobReport {
       if (seq !== this.loadSeq) return;
       this.loadingJob.set(false);
       this.loadingItems.set(false);
-      const details = error instanceof ApiError ? error.details : undefined;
-      this.notify.error(this.tracker.reasonText(errorCodeOf(error) ?? undefined, existing, details));
+      this.notify.error(this.tracker.errorText(error, existing));
       this.close();
     }
   }
@@ -570,8 +568,7 @@ export class BulkJobReport {
         this.items.set([]);
         this.totalItems.set(0);
       }
-      const details = error instanceof ApiError ? error.details : undefined;
-      this.notify.error(this.tracker.reasonText(errorCodeOf(error) ?? undefined, targetJob, details));
+      this.notify.error(this.tracker.errorText(error, targetJob));
     } finally {
       if (seq === this.itemsLoadSeq) {
         this.loadingItems.set(false);

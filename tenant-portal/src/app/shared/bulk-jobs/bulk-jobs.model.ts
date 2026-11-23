@@ -96,6 +96,8 @@ export interface BulkJob {
   cancelRequestedAt?: string;
   failureCode?: string;
   revision: number;
+  /** Trade GET/cancel projection: the ETag version equals revision. */
+  version?: number;
 }
 
 export interface BulkJobItem {

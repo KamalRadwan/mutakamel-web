@@ -2,7 +2,7 @@ import { Service, inject } from '@angular/core';
 import { QueryClient } from '@tanstack/angular-query';
 import { CoreHttp, type CoreQuery } from '../../core/api/core-http';
 import type { CorePage } from '../../core/api/core-page';
-import { fakeBulkJobsTransport } from './bulk-jobs.fake';
+import { ApiError } from '../../core/api/api-errors';
 import {
   BulkJob,
   BulkJobApp,
@@ -17,11 +17,15 @@ import {
 export type BulkJobsTransport = Pick<BulkJobsApi,
   'submitBulkJob' | 'getBulkJob' | 'listBulkJobItems' | 'listBulkJobs' | 'cancelBulkJob' | 'retryBulkJob'>;
 
-const BASES = { core: '/api/tenant/core/v1', crm: '/api/tenant/crm/v1' } as const;
+const BASES = { core: '/api/tenant/core/v1', crm: '/api/tenant/crm/v1', trading: '/api/tenant/trade/v1' } as const;
 
-function hasHttpRoutes(app: BulkJobApp): app is keyof typeof BASES {
-  // FAKE-ONLY, no backend route: accounting; Trade bulk gateway rows have not landed.
-  return app === 'core' || app === 'crm';
+export function hasBulkJobsBackend(app: BulkJobApp): app is keyof typeof BASES {
+  return app === 'core' || app === 'crm' || app === 'trading';
+}
+
+function baseFor(app: BulkJobApp): string {
+  if (!hasBulkJobsBackend(app)) throw new ApiError(503, 'BULK_JOBS_UNAVAILABLE');
+  return BASES[app];
 }
 
 function bulkPage<T>({ data, meta }: CorePage<T>): BulkJobPage<T> {
@@ -36,47 +40,56 @@ export class BulkJobsApi {
   });
 
   async submitBulkJob(app: BulkJobApp, body: BulkJobSubmit, key: string): Promise<BulkJobSubmitResult> {
-    if (!hasHttpRoutes(app)) return fakeBulkJobsTransport.submitBulkJob(app, body, key);
-    const result = await this.http.write<BulkJobSubmitResult>('POST', `${BASES[app]}/bulk-jobs`, body,
-      { key, bare: app !== 'core' });
+    const result = await this.http.write<BulkJobSubmitResult>('POST', `${baseFor(app)}/bulk-jobs`, body,
+      { key, bare: app === 'crm' });
     return result.data;
   }
 
-  getBulkJob(app: BulkJobApp, id: string): Promise<BulkJob> {
-    if (!hasHttpRoutes(app)) return fakeBulkJobsTransport.getBulkJob(app, id);
-    const path = `${BASES[app]}/bulk-jobs/${encodeURIComponent(id)}`;
+  async getBulkJob(app: BulkJobApp, id: string): Promise<BulkJob> {
+    const path = `${baseFor(app)}/bulk-jobs/${encodeURIComponent(id)}`;
     return this.queries.fetchQuery({ queryKey: ['bulk-jobs', app, id],
-      queryFn: () => this.http.read<BulkJob>(path, undefined, { bare: app !== 'core' }) });
+      queryFn: () => this.http.read<BulkJob>(path, undefined, { bare: app === 'crm' }) });
   }
 
   listBulkJobItems(app: BulkJobApp, id: string, q: ListBulkJobItemsQuery): Promise<BulkJobPage<BulkJobItem>> {
-    if (!hasHttpRoutes(app)) return fakeBulkJobsTransport.listBulkJobItems(app, id, q);
     return this.readPage(app, `/bulk-jobs/${encodeURIComponent(id)}/items`, { ...q });
   }
 
   listBulkJobs(app: BulkJobApp, q: ListBulkJobsQuery): Promise<BulkJobPage<BulkJob>> {
-    if (!hasHttpRoutes(app)) return fakeBulkJobsTransport.listBulkJobs(app, q);
     return this.readPage(app, '/bulk-jobs', { ...q });
   }
 
-  async cancelBulkJob(app: BulkJobApp, id: string): Promise<BulkJob> {
-    if (!hasHttpRoutes(app)) return fakeBulkJobsTransport.cancelBulkJob(app, id);
-    const result = await this.http.write<BulkJob>('POST', `${BASES[app]}/bulk-jobs/${encodeURIComponent(id)}/cancel`, {},
-      { bare: app !== 'core' });
+  async cancelBulkJob(app: BulkJobApp, id: string, revision?: number): Promise<BulkJob> {
+    const base = baseFor(app);
+    const ifMatch = app === 'trading' ? await this.ifMatch(app, id, revision) : undefined;
+    const result = await this.http.write<BulkJob>('POST', `${base}/bulk-jobs/${encodeURIComponent(id)}/cancel`, {},
+      { bare: app === 'crm', ifMatch });
     return result.data;
   }
 
-  async retryBulkJob(app: BulkJobApp, id: string, overrides: unknown | null, key: string): Promise<BulkJobSubmitResult> {
-    if (!hasHttpRoutes(app)) return fakeBulkJobsTransport.retryBulkJob(app, id, overrides, key);
-    const result = await this.http.write<BulkJobSubmitResult>('POST', `${BASES[app]}/bulk-jobs/${encodeURIComponent(id)}/retry`,
-      overrides === null ? {} : { overrides }, { key, bare: app !== 'core' });
+  async retryBulkJob(app: BulkJobApp, id: string, overrides: unknown | null, key: string, revision?: number): Promise<BulkJobSubmitResult> {
+    const base = baseFor(app);
+    const ifMatch = app === 'trading' ? await this.ifMatch(app, id, revision) : undefined;
+    const result = await this.http.write<BulkJobSubmitResult>('POST', `${base}/bulk-jobs/${encodeURIComponent(id)}/retry`,
+      overrides === null ? {} : { overrides }, { key, bare: app === 'crm', ifMatch });
     return result.data;
   }
 
-  private readPage<T>(app: keyof typeof BASES, path: string, query: CoreQuery): Promise<BulkJobPage<T>> {
+  private async ifMatch(app: BulkJobApp, id: string, revision?: number): Promise<string | undefined> {
+    if (app !== 'trading') return undefined;
+    // Legacy function callers have no snapshot; tracker callers supply the revision the user saw.
+    const expected = revision ?? (await this.getBulkJob(app, id)).revision;
+    if (!Number.isSafeInteger(expected) || expected < 1) {
+      throw new ApiError(400, 'TRADE.CONCURRENCY.IF_MATCH_REQUIRED');
+    }
+    return `"${expected}"`;
+  }
+
+  private async readPage<T>(app: BulkJobApp, path: string, query: CoreQuery): Promise<BulkJobPage<T>> {
+    const base = baseFor(app);
     return this.queries.fetchQuery({ queryKey: ['bulk-jobs', app, path, query], queryFn: async () =>
-      app === 'core' ? bulkPage(await this.http.readPage<T>(`${BASES[app]}${path}`, query))
-        : this.http.read<BulkJobPage<T>>(`${BASES[app]}${path}`, query, { bare: true }) });
+      app === 'core' ? bulkPage(await this.http.readPage<T>(`${base}${path}`, query))
+        : this.http.read<BulkJobPage<T>>(`${base}${path}`, query, { bare: app === 'crm' }) });
   }
 }
 
@@ -125,9 +138,9 @@ export function listBulkJobs(app: BulkJobApp, q: ListBulkJobsQuery): Promise<Bul
   return transport().listBulkJobs(app, q);
 }
 
-/** POST /api/tenant/<app>/v1/bulk-jobs/:jobId/cancel (200); body {}. */
-export function cancelBulkJob(app: BulkJobApp, id: string): Promise<BulkJob> {
-  return transport().cancelBulkJob(app, id);
+/** POST cancel with body {}; Trade uses the supplied revision as If-Match. */
+export function cancelBulkJob(app: BulkJobApp, id: string, revision?: number): Promise<BulkJob> {
+  return transport().cancelBulkJob(app, id, revision);
 }
 
 /**
@@ -139,6 +152,7 @@ export function retryBulkJob(
   id: string,
   overrides: unknown | null,
   key: string,
+  revision?: number,
 ): Promise<BulkJobSubmitResult> {
-  return transport().retryBulkJob(app, id, overrides, key);
+  return transport().retryBulkJob(app, id, overrides, key, revision);
 }

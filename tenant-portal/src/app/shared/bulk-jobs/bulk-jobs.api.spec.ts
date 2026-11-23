@@ -15,7 +15,6 @@ import { BulkJobsTracker } from './bulk-jobs-tracker';
 import {
   bindBulkJobsApi, BulkJobsApi, cancelBulkJob, getBulkJob, listBulkJobItems, listBulkJobs, retryBulkJob, submitBulkJob,
 } from './bulk-jobs.api';
-import { fakeBulkJobsTransport } from './bulk-jobs.fake';
 import type { BulkJob, BulkJobItem, BulkJobSubmit, BulkJobSubmitResult } from './bulk-jobs.model';
 
 const job: BulkJob = {
@@ -38,12 +37,12 @@ class BulkLoader implements TranslocoLoader {
   getTranslation(path: string) { return of(path === 'bulk-jobs/ar' ? ar : en); }
 }
 
-describe.each(['core', 'crm'] as const)('BulkJobsApi: %s HTTP', (app) => {
-  const base = `/api/tenant/${app}/v1/bulk-jobs`;
-  const wire = <T extends object>(data: T) => app === 'core' ? { success: true, data } : data;
+describe.each(['core', 'crm', 'trading'] as const)('BulkJobsApi: %s HTTP', (app) => {
+  const base = `/api/tenant/${app === 'trading' ? 'trade' : app}/v1/bulk-jobs`;
+  const wire = <T extends object>(data: T) => app === 'crm' ? data : { success: true, data };
   const pageWire = (items: unknown[], pageMeta = meta) => app === 'core'
     ? { success: true, data: items, meta: pageMeta }
-    : { items, total: pageMeta.total, page: pageMeta.page, limit: pageMeta.limit };
+    : wire({ items, total: pageMeta.total, page: pageMeta.page, limit: pageMeta.limit });
   let http: HttpTestingController;
   let notify: { warning: ReturnType<typeof vi.fn> };
 
@@ -107,22 +106,26 @@ describe.each(['core', 'crm'] as const)('BulkJobsApi: %s HTTP', (app) => {
   });
 
   it('cancels with an empty body and no reserved key', async () => {
-    const pending = cancelBulkJob(app, job.id);
+    const pending = cancelBulkJob(app, job.id, job.revision);
+    await Promise.resolve();
     const req = http.expectOne(`${base}/${job.id}/cancel`);
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual({});
     expect(req.request.headers.has('x-idempotency-key')).toBe(false);
+    expect(req.request.headers.get('If-Match')).toBe(app === 'trading' ? '"1"' : null);
     req.flush(wire({ ...job, app, status: 'CANCELLING' }));
     await expect(pending).resolves.toMatchObject({ app, status: 'CANCELLING' });
   });
 
   it.each([null, { startAt: '2026-11-24T10:00:00.000Z' }])('retries with optional overrides %j and the supplied key', async (overrides) => {
     const key = newIdempotencyKey();
-    const pending = retryBulkJob(app, job.id, overrides, key);
+    const pending = retryBulkJob(app, job.id, overrides, key, job.revision);
+    await Promise.resolve();
     const req = http.expectOne(`${base}/${job.id}/retry`);
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual(overrides === null ? {} : { overrides });
     expect(req.request.headers.get('x-idempotency-key')).toBe(key);
+    expect(req.request.headers.get('If-Match')).toBe(app === 'trading' ? '"1"' : null);
     req.flush(wire(submitted), { status: 202, statusText: 'Accepted' });
     await expect(pending).resolves.toEqual(submitted);
   });
@@ -208,28 +211,71 @@ describe('BulkJobsApi: missing gateway routes', () => {
   });
   afterEach(() => { TestBed.inject(HttpTestingController).verify(); vi.restoreAllMocks(); });
 
-  it.each(['accounting', 'trading'] as const)('%s keeps all six calls on the fake', async (app) => {
-    vi.spyOn(fakeBulkJobsTransport, 'submitBulkJob').mockResolvedValue(submitted);
-    vi.spyOn(fakeBulkJobsTransport, 'getBulkJob').mockResolvedValue(job);
-    vi.spyOn(fakeBulkJobsTransport, 'listBulkJobItems').mockResolvedValue({ items: [item], total: 1, page: 1, limit: 50 });
-    vi.spyOn(fakeBulkJobsTransport, 'listBulkJobs').mockResolvedValue({ items: [job], total: 1, page: 1, limit: 50 });
-    vi.spyOn(fakeBulkJobsTransport, 'cancelBulkJob').mockResolvedValue(job);
-    vi.spyOn(fakeBulkJobsTransport, 'retryBulkJob').mockResolvedValue(submitted);
+  it('rejects every accounting operation without issuing a request', async () => {
+    const app = 'accounting';
     const key = newIdempotencyKey();
-    await expect(submitBulkJob(app, body, key)).resolves.toEqual(submitted);
-    await expect(getBulkJob(app, job.id)).resolves.toEqual(job);
+    const unavailable = { status: 503, code: 'BULK_JOBS_UNAVAILABLE' };
+    await expect(submitBulkJob(app, body, key)).rejects.toMatchObject(unavailable);
+    await expect(getBulkJob(app, job.id)).rejects.toMatchObject(unavailable);
     const itemsQuery = { page: 1, limit: 50 };
-    await expect(listBulkJobItems(app, job.id, itemsQuery)).resolves.toMatchObject({ items: [item] });
+    await expect(listBulkJobItems(app, job.id, itemsQuery)).rejects.toMatchObject(unavailable);
     const jobsQuery = { scope: 'active' as const };
-    await expect(listBulkJobs(app, jobsQuery)).resolves.toMatchObject({ items: [job] });
-    await expect(cancelBulkJob(app, job.id)).resolves.toEqual(job);
-    await expect(retryBulkJob(app, job.id, null, key)).resolves.toEqual(submitted);
-    expect(fakeBulkJobsTransport.submitBulkJob).toHaveBeenCalledWith(app, body, key);
-    expect(fakeBulkJobsTransport.getBulkJob).toHaveBeenCalledWith(app, job.id);
-    expect(fakeBulkJobsTransport.listBulkJobItems).toHaveBeenCalledWith(app, job.id, itemsQuery);
-    expect(fakeBulkJobsTransport.listBulkJobs).toHaveBeenCalledWith(app, jobsQuery);
-    expect(fakeBulkJobsTransport.cancelBulkJob).toHaveBeenCalledWith(app, job.id);
-    expect(fakeBulkJobsTransport.retryBulkJob).toHaveBeenCalledWith(app, job.id, null, key);
+    await expect(listBulkJobs(app, jobsQuery)).rejects.toMatchObject(unavailable);
+    await expect(cancelBulkJob(app, job.id)).rejects.toMatchObject(unavailable);
+    await expect(retryBulkJob(app, job.id, null, key)).rejects.toMatchObject(unavailable);
     TestBed.inject(HttpTestingController).expectNone(() => true);
+  });
+});
+
+describe('BulkJobsApi: Trade preconditions', () => {
+  const base = '/api/tenant/trade/v1/bulk-jobs';
+  let http: HttpTestingController;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({ providers: [
+      provideHttpClient(), provideHttpClientTesting(), { provide: BulkJobsApi, useClass: BulkJobsApi },
+    ] });
+    const doc = TestBed.inject(DOCUMENT);
+    const name = doc.location.protocol === 'https:' ? '__Host-mutakamel-tenant-csrf' : 'mutakamel-http-tenant-csrf';
+    vi.spyOn(doc, 'cookie', 'get').mockReturnValue(`${name}=csrf-proof`);
+    http = TestBed.inject(HttpTestingController);
+    bindBulkJobsApi(() => TestBed.inject(BulkJobsApi));
+  });
+  afterEach(() => { http.verify(); vi.restoreAllMocks(); });
+
+  it('loads the real revision for a legacy caller before cancelling', async () => {
+    const pending = cancelBulkJob('trading', job.id);
+    http.expectOne(`${base}/${job.id}`).flush({ success: true, data: { ...job, app: 'trading', revision: 7, version: 7 } });
+    await vi.waitFor(() => {
+      const req = http.expectOne(`${base}/${job.id}/cancel`);
+      expect(req.request.headers.get('If-Match')).toBe('"7"');
+      req.flush({ success: true, data: { ...job, app: 'trading', status: 'CANCELLING', revision: 8, version: 8 } });
+    });
+    await expect(pending).resolves.toMatchObject({ revision: 8, version: 8 });
+  });
+
+  it.each([0, -1, 1.5, NaN])('rejects an invalid revision %s before writing', async (revision) => {
+    await expect(cancelBulkJob('trading', job.id, revision)).rejects.toMatchObject({
+      code: 'TRADE.CONCURRENCY.IF_MATCH_REQUIRED',
+    });
+    http.expectNone(() => true);
+  });
+
+  it('surfaces a stale revision without fetching a new version or replaying the write', async () => {
+    const pending = retryBulkJob('trading', job.id, null, newIdempotencyKey(), 3);
+    const rejected = expect(pending).rejects.toMatchObject({ status: 409, code: 'TRADE.CONCURRENCY.STALE_VERSION' });
+    await Promise.resolve();
+    const req = http.expectOne(`${base}/${job.id}/retry`);
+    expect(req.request.headers.get('If-Match')).toBe('"3"');
+    req.flush({ code: 'TRADE.CONCURRENCY.STALE_VERSION' }, { status: 409, statusText: 'Conflict' });
+    await rejected;
+    http.expectNone(() => true);
+  });
+
+  it('rejects an unwrapped Trade response', async () => {
+    const pending = getBulkJob('trading', job.id);
+    const rejected = expect(pending).rejects.toMatchObject({ status: 502 });
+    http.expectOne(`${base}/${job.id}`).flush(job);
+    await rejected;
   });
 });
