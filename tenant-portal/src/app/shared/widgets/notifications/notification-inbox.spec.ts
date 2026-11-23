@@ -12,7 +12,6 @@ import type {
   NotificationsUnreadState,
 } from '../../../core/realtime/notifications-feed.model';
 import { NotificationInbox } from './notification-inbox';
-import { fakeListNotifications, resetFakeNotifications } from './notifications.fake';
 import type { NotificationListResult, NotificationView } from './notifications.model';
 
 const BASE = '/api/tenant/core/v1/notifications';
@@ -32,8 +31,32 @@ describe('NotificationInbox with real CoreHttp', () => {
   const lang = signal('en');
 
   beforeEach(async () => {
-    resetFakeNotifications();
-    snapshot = await fakeListNotifications();
+    snapshot = {
+      items: [1, 2, 3, 4].map((n): NotificationView => ({
+        id: `01900000-0000-7000-8000-${String(n).padStart(12, '0')}`,
+        recipientId: 'recipient',
+        sourceApp: 'core',
+        notificationType: 'core.activity.assigned',
+        priority: 'P2_NORMAL',
+        title: `Notification ${n}`,
+        body: 'Assigned activity',
+        actionUrl: null,
+        entityType: null,
+        entityId: null,
+        channels: ['IN_APP'],
+        metadata: {},
+        createdAt: '2026-11-23T09:00:00Z',
+        readAt: null,
+        acknowledgedAt: null,
+        deliveredAt: null,
+        recipientStateVersion: 1,
+      })),
+      unreadCount: 4,
+      unreadRevision: 1,
+      unreadChangedAt: '2026-11-23T09:00:00Z',
+      nextCursor: null,
+      hasNext: false,
+    };
     unread = signal<NotificationsUnreadState | null>(null);
     unsubscribe = vi.fn();
     vi.clearAllMocks();
@@ -290,9 +313,24 @@ describe('NotificationInbox with real CoreHttp', () => {
     await refreshCount();
     await done;
     expect(inbox.items().some((row) => row.id === first.id)).toBe(false);
-    inbox.items.set([first]);
-    done = inbox.markRead(first.id);
-    const retry = http.expectOne(BASE + '/' + first.id + '/read');
+    // A terminal not-found never resurrects the item from a delayed detail view.
+    done = inbox.markRead(first.id, first);
+    await done;
+    http.expectNone(BASE + '/' + first.id + '/read');
+    expect(key).toMatch(UUID_V7);
+  });
+
+  it('a successful action uses a fresh key for another notification', async () => {
+    await load();
+    const [first, second] = snapshot.items;
+    let done = inbox.markRead(first.id);
+    const request = http.expectOne(BASE + '/' + first.id + '/read');
+    const key = request.request.headers.get('x-idempotency-key');
+    request.flush(null, { status: 204, statusText: 'No content' });
+    await refreshCount();
+    await done;
+    done = inbox.markRead(second.id);
+    const retry = http.expectOne(BASE + '/' + second.id + '/read');
     expect(retry.request.headers.get('x-idempotency-key')).not.toBe(key);
     retry.flush(null, { status: 204, statusText: 'No content' });
     await refreshCount();
@@ -366,6 +404,263 @@ describe('NotificationInbox with real CoreHttp', () => {
     retry.flush(null, { status: 204, statusText: 'No content' });
     await refreshCount();
     await done;
+  });
+
+  it('a failed read cannot undo a newer acknowledged event or unread revision', async () => {
+    await load();
+    const row = snapshot.items[0];
+    const failed = inbox.markRead(row.id).catch((e: unknown) => e);
+    emit({
+      kind: 'updated',
+      notificationId: row.id,
+      change: 'ACKNOWLEDGED',
+      recipientStateVersion: 3,
+      readAt: '2026-11-23T11:00:00Z',
+      acknowledgedAt: '2026-11-23T11:00:00Z',
+    });
+    unread.set({ unreadCount: 2, unreadRevision: 3, at: 1 });
+    TestBed.tick();
+    http.expectOne(BASE + '/' + row.id + '/read').flush({}, { status: 500, statusText: 'Error' });
+    await failed;
+    expect(inbox.items()[0].acknowledgedAt).toBe('2026-11-23T11:00:00Z');
+    expect(inbox.items()[0].recipientStateVersion).toBe(3);
+    expect(inbox.unreadCount()).toBe(2);
+  });
+
+  it('failed dismissal restores only its row and preserves a concurrent creation', async () => {
+    await load();
+    const row = snapshot.items[0];
+    const failed = inbox.dismiss(row.id).catch((e: unknown) => e);
+    emit({ kind: 'created', notificationId: 'new' });
+    http.expectOne(BASE + '/new').flush({ success: true, data: { ...row, id: 'new' } });
+    await settle();
+    update(row, 'READ', 3);
+    http.expectOne(BASE + '/' + row.id).flush({}, { status: 500, statusText: 'Error' });
+    await failed;
+    expect(inbox.items()[0].id).toBe('new');
+    expect(inbox.items().find((item) => item.id === row.id)?.recipientStateVersion).toBe(3);
+  });
+
+  it('late read-all failure preserves a successful read and new rows', async () => {
+    await load();
+    const row = snapshot.items[0];
+    const failed = inbox.markAllRead().catch((e: unknown) => e);
+    update(row, 'READ', 2);
+    emit({ kind: 'created', notificationId: 'new' });
+    http.expectOne(BASE + '/new').flush({ success: true, data: { ...row, id: 'new' } });
+    await settle();
+    http.expectOne(BASE + '/read-all').flush({}, { status: 500, statusText: 'Error' });
+    await failed;
+    expect(inbox.items()[0].id).toBe('new');
+    expect(inbox.items().find((item) => item.id === row.id)?.readAt).not.toBeNull();
+    expect(inbox.items().find((item) => item.id === snapshot.items[1].id)?.readAt).toBeNull();
+  });
+
+  it('read-all success does not mark a notification arriving after dispatch as read', async () => {
+    await load();
+    const done = inbox.markAllRead();
+    emit({ kind: 'created', notificationId: 'new' });
+    http
+      .expectOne(BASE + '/new')
+      .flush({ success: true, data: { ...snapshot.items[0], id: 'new' } });
+    await settle();
+    http.expectOne(BASE + '/read-all').flush({ success: true, data: { updated: 4 } });
+    await refreshCount(1);
+    await done;
+    expect(inbox.items()[0].readAt).toBeNull();
+    expect(inbox.unreadCount()).toBe(1);
+  });
+
+  it('a dismiss event before created-detail completion prevents resurrection', async () => {
+    await load();
+    const row = { ...snapshot.items[0], id: 'new' };
+    emit({ kind: 'created', notificationId: row.id });
+    update(row, 'DISMISSED', 3);
+    http.expectOne(BASE + '/new').flush({ success: true, data: row });
+    await settle();
+    expect(inbox.items().some((item) => item.id === row.id)).toBe(false);
+  });
+
+  it('a duplicate created event whose detail is gone removes an existing row', async () => {
+    await load();
+    const row = snapshot.items[0];
+    emit({ kind: 'created', notificationId: row.id });
+    http
+      .expectOne(BASE + '/' + row.id)
+      .flush({ errorCode: 'NOTIFICATION_NOT_FOUND' }, { status: 404, statusText: 'Missing' });
+    await settle();
+    expect(inbox.items().some((item) => item.id === row.id)).toBe(false);
+    expect(inbox.stale()).toBe(true);
+    expect(notify.error).not.toHaveBeenCalled();
+  });
+
+  it('a recipient update before created-detail completion is applied by version', async () => {
+    await load();
+    const row = { ...snapshot.items[0], id: 'new' };
+    emit({ kind: 'created', notificationId: row.id });
+    update(row, 'READ', 3);
+    http.expectOne(BASE + '/new').flush({ success: true, data: row });
+    await settle();
+    expect(inbox.items()[0].recipientStateVersion).toBe(3);
+    expect(inbox.items()[0].readAt).not.toBeNull();
+  });
+
+  it('a stale reload cannot undo recipient events received while loading', async () => {
+    await load();
+    const done = inbox.reload();
+    update(snapshot.items[0], 'READ', 3);
+    update(snapshot.items[1], 'DISMISSED', 3);
+    await load();
+    await done;
+    expect(inbox.items()[0].recipientStateVersion).toBe(3);
+    expect(inbox.items().some((row) => row.id === snapshot.items[1].id)).toBe(false);
+  });
+
+  it('an equal-revision list cannot overwrite a count or pending action received while loading', async () => {
+    await load();
+    const reload = inbox.reload();
+    const failed = inbox.markRead(snapshot.items[0].id).catch((e: unknown) => e);
+    await load();
+    await reload;
+    expect(inbox.unreadCount()).toBe(3);
+    http
+      .expectOne(BASE + '/' + snapshot.items[0].id + '/read')
+      .flush({}, { status: 500, statusText: 'Error' });
+    await failed;
+    expect(inbox.unreadCount()).toBe(4);
+  });
+
+  it('an acknowledgement pending alongside a failed read counts the recipient only once', async () => {
+    await load();
+    const row = snapshot.items[0];
+    const failed = inbox.markRead(row.id).catch((e: unknown) => e);
+    const done = inbox.acknowledge(row.id);
+    expect(inbox.unreadCount()).toBe(3);
+    http.expectOne(BASE + '/' + row.id + '/read').flush({}, { status: 500, statusText: 'Error' });
+    await failed;
+    expect(inbox.unreadCount()).toBe(3);
+    http
+      .expectOne(BASE + '/' + row.id + '/acknowledge')
+      .flush(null, { status: 204, statusText: 'OK' });
+    await refreshCount(3);
+    await done;
+    expect(inbox.items()[0].acknowledgedAt).not.toBeNull();
+    expect(inbox.unreadCount()).toBe(3);
+  });
+
+  it('unread-only rows disappear optimistically and return on failure', async () => {
+    inbox.unreadOnly.set(true);
+    await load();
+    const row = snapshot.items[0];
+    const failed = inbox.markRead(row.id).catch((e: unknown) => e);
+    expect(inbox.items().some((item) => item.id === row.id)).toBe(false);
+    http.expectOne(BASE + '/' + row.id + '/read').flush({}, { status: 500, statusText: 'Error' });
+    await failed;
+    expect(inbox.items()[0]).toEqual(row);
+  });
+
+  it('coalesces duplicate pending dismissals into one user intent', async () => {
+    await load();
+    const row = snapshot.items[0];
+    const first = inbox.dismiss(row.id);
+    const second = inbox.dismiss(row.id, row);
+    expect(first).toBe(second);
+    http.expectOne(BASE + '/' + row.id).flush(null, { status: 204, statusText: 'OK' });
+    await refreshCount(3);
+    await first;
+  });
+
+  it('count recovery failure marks stale and reports missing-user and connection failures', async () => {
+    await load();
+    const done = inbox.markRead(snapshot.items[0].id);
+    http
+      .expectOne(BASE + '/' + snapshot.items[0].id + '/read')
+      .flush(null, { status: 204, statusText: 'OK' });
+    await settle();
+    http.expectOne(BASE + '/unread-count').error(new ProgressEvent('error'));
+    await done;
+    expect(inbox.stale()).toBe(true);
+    expect(notify.connectionLost).toHaveBeenCalledOnce();
+    const other = inbox.markRead(snapshot.items[1].id);
+    http
+      .expectOne(BASE + '/' + snapshot.items[1].id + '/read')
+      .flush(null, { status: 204, statusText: 'OK' });
+    await settle();
+    http
+      .expectOne(BASE + '/unread-count')
+      .flush({ errorCode: 'NOTIFICATION_USER_NOT_FOUND' }, { status: 404, statusText: 'Missing' });
+    await other;
+    expect(inbox.userMissing()).toBe(true);
+  });
+
+  it('a count requested before a newer unread revision cannot overwrite it', async () => {
+    await load();
+    const done = inbox.markRead(snapshot.items[0].id);
+    http
+      .expectOne(BASE + '/' + snapshot.items[0].id + '/read')
+      .flush(null, { status: 204, statusText: 'OK' });
+    await settle();
+    unread.set({ unreadCount: 8, unreadRevision: 5, at: 1 });
+    TestBed.tick();
+    http.expectOne(BASE + '/unread-count').flush({ success: true, data: { unreadCount: 0 } });
+    await done;
+    expect(inbox.unreadCount()).toBe(8);
+  });
+
+  it('serializes count recovery after concurrent writes rather than reusing an old in-flight count', async () => {
+    await load();
+    const first = inbox.markRead(snapshot.items[0].id);
+    http
+      .expectOne(BASE + '/' + snapshot.items[0].id + '/read')
+      .flush(null, { status: 204, statusText: 'OK' });
+    await settle();
+    const count = http.expectOne(BASE + '/unread-count');
+    const second = inbox.markRead(snapshot.items[1].id);
+    http
+      .expectOne(BASE + '/' + snapshot.items[1].id + '/read')
+      .flush(null, { status: 204, statusText: 'OK' });
+    await settle();
+    http.expectNone(BASE + '/unread-count');
+    count.flush({ success: true, data: { unreadCount: 3 } });
+    await refreshCount(2);
+    await Promise.all([first, second]);
+    expect(inbox.unreadCount()).toBe(2);
+  });
+
+  it('does not hide a missing-user error from a created-detail request as a missing item', async () => {
+    await load();
+    emit({ kind: 'created', notificationId: 'new' });
+    http
+      .expectOne(BASE + '/new')
+      .flush({ errorCode: 'NOTIFICATION_USER_NOT_FOUND' }, { status: 404, statusText: 'Missing' });
+    await settle();
+    expect(inbox.userMissing()).toBe(true);
+    expect(inbox.stale()).toBe(true);
+    expect(notify.error).toHaveBeenCalledOnce();
+  });
+
+  it('a malformed count is reported as stale without changing the last known count', async () => {
+    await load();
+    const done = inbox.markRead(snapshot.items[0].id);
+    http
+      .expectOne(BASE + '/' + snapshot.items[0].id + '/read')
+      .flush(null, { status: 204, statusText: 'OK' });
+    await settle();
+    http.expectOne(BASE + '/unread-count').flush({ success: true, data: { unreadCount: -1 } });
+    await done;
+    expect(inbox.unreadCount()).toBe(3);
+    expect(inbox.stale()).toBe(true);
+    expect(notify.error).toHaveBeenCalledOnce();
+  });
+
+  it('ignores a write completion after destruction and starts no count recovery', async () => {
+    await load();
+    const done = inbox.markRead(snapshot.items[0].id);
+    const request = http.expectOne(BASE + '/' + snapshot.items[0].id + '/read');
+    TestBed.resetTestingModule();
+    request.flush(null, { status: 204, statusText: 'OK' });
+    await done;
+    http.expectNone(BASE + '/unread-count');
   });
 
   it('inbox write without csrf sends nothing', async () => {

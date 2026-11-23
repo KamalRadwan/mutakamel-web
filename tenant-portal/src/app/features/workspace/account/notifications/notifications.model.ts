@@ -1,3 +1,13 @@
+import { z } from 'zod';
+
+export const notificationPreferenceSchema = z.object({
+  notificationType: z.string().min(1).max(128),
+  inAppEnabled: z.boolean(),
+  updatedAt: z.iso.datetime({ offset: true }),
+});
+
+export const notificationPreferencesSchema = z.array(notificationPreferenceSchema);
+
 export const NOTIFICATION_TYPES = [
   'core.activity.assigned',
   'core.activity.updated',
@@ -11,11 +21,7 @@ export const NOTIFICATION_TYPES = [
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
-export interface NotificationPreference {
-  notificationType: string;
-  inAppEnabled: boolean;
-  updatedAt: string;
-}
+export type NotificationPreference = z.infer<typeof notificationPreferenceSchema>;
 
 export interface NotificationPreferenceBody {
   notificationType: NotificationType;

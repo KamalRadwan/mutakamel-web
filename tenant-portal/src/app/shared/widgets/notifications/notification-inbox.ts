@@ -17,7 +17,7 @@ import type {
   NotificationsFeedEvent,
   NotificationsUnreadState,
 } from '../../../core/realtime/notifications-feed.model';
-import { NotificationsApi } from './notifications.api';
+import { NotificationsApi, notificationsErrorMessage } from './notifications.api';
 import {
   NOTIFICATION_LIMITS,
   NotificationListResult,
@@ -28,6 +28,16 @@ import {
 export const NOTIFICATION_INBOX_PAGE_SIZE = new InjectionToken<number>(
   'NOTIFICATION_INBOX_PAGE_SIZE',
 );
+
+type RecipientUpdate = Extract<NotificationsFeedEvent, { kind: 'updated' }>;
+type ChangeKind = 'read' | 'acknowledge' | 'dismiss' | 'read-all';
+interface PendingChange {
+  kind: ChangeKind;
+  ids: ReadonlySet<string>;
+  at: string;
+  unreadDelta: number;
+  countEpoch: number;
+}
 
 /** Coordinates reloads between independent notification inboxes (bell and page) after writes. */
 @Service()
@@ -72,6 +82,18 @@ export class NotificationInbox {
   private loadSeq = 0;
   private listUnreadCount = 0;
   private destroyed = false;
+  private rows: NotificationView[] = [];
+  private readonly recipientUpdates = new Map<string, RecipientUpdate>();
+  private readonly dismissed = new Set<string>();
+  private readonly pending = new Map<string, PendingChange>();
+  private readonly writes = new Map<string, Promise<void>>();
+  private readonly changedRows = new Map<string, number>();
+  private changeEpoch = 0;
+  private countEpoch = 0;
+  private countBase = 0;
+  private countSeq = 0;
+  private countRefresh: Promise<void> | null = null;
+  private countRefreshAgain = false;
   /**
    * x-idempotency-key per user action ("read:<id>", "read-all", ...). A failed action keeps its key, so
    * clicking it again is a retry with the same key; a success or a 404 (item gone) forgets it.
@@ -102,7 +124,9 @@ export class NotificationInbox {
   }
 
   async reload(): Promise<void> {
+    if (this.destroyed) return;
     const seq = ++this.loadSeq;
+    const epoch = this.changeEpoch;
     this.loading.set(true);
     this.loadFailed.set(false);
     this.userMissing.set(false);
@@ -111,8 +135,9 @@ export class NotificationInbox {
       if (this.unreadOnly()) query.unreadOnly = true;
       const page = await this.api.listNotifications(query);
       if (seq !== this.loadSeq) return;
-      this.items.set(page.items);
-      this.applyListSnapshot(page, true);
+      const changed = this.rows.filter((row) => (this.changedRows.get(row.id) ?? 0) > epoch);
+      this.mergeRows([...changed, ...page.items], true);
+      this.applyListSnapshot(page, true, epoch);
       this.nextCursor.set(page.nextCursor);
     } catch (error) {
       if (seq !== this.loadSeq) return;
@@ -129,8 +154,9 @@ export class NotificationInbox {
 
   async loadMore(): Promise<void> {
     const cursor = this.nextCursor();
-    if (!cursor || this.loading()) return;
+    if (this.destroyed || !cursor || this.loading()) return;
     const seq = ++this.loadSeq;
+    const epoch = this.changeEpoch;
     this.loading.set(true);
     let shouldReloadOnce = false;
     let failed: unknown = null;
@@ -139,16 +165,8 @@ export class NotificationInbox {
       if (this.unreadOnly()) query.unreadOnly = true;
       const page = await this.api.listNotifications(query);
       if (seq !== this.loadSeq) return;
-      const seen = new Set(this.items().map((item) => item.id));
-      this.items.update((items) => [
-        ...items,
-        ...page.items.filter((item) => {
-          if (seen.has(item.id)) return false;
-          seen.add(item.id);
-          return true;
-        }),
-      ]);
-      this.applyListSnapshot(page, false);
+      this.mergeRows(page.items, false);
+      this.applyListSnapshot(page, false, epoch);
       this.nextCursor.set(page.nextCursor);
     } catch (error) {
       if (seq !== this.loadSeq) return;
@@ -172,124 +190,146 @@ export class NotificationInbox {
     if (failed !== null) throw failed;
   }
 
-  async markRead(id: string, known?: NotificationView): Promise<void> {
-    const existing = this.items().find((entry) => entry.id === id);
-    const item = existing ?? known;
-    if (!item || item.readAt !== null) return;
-    const prevUnread = this.unreadCount();
-    const readAt = new Date().toISOString();
-    if (existing) this.patch(id, { readAt });
-    this.unreadCount.update((count) => Math.max(0, count - 1));
-    const action = `read:${id}`;
-    let failed: unknown = null;
-    try {
-      await this.api.markNotificationRead(id, this.keyFor(action));
-      this.actionKeys.delete(action);
-      this.patch(id, { readAt });
-      this.sync.changed(this);
-    } catch (error) {
-      failed = this.recover(error, id, action, () => {
-        if (existing) this.patch(id, { readAt: null });
-        this.unreadCount.set(prevUnread);
-      });
-    }
-    if (failed === null) await this.refreshUnreadCount();
-    if (failed !== null) throw failed;
+  markRead(id: string, known?: NotificationView): Promise<void> {
+    return this.change('read', id, known);
   }
 
-  async acknowledge(id: string, known?: NotificationView): Promise<void> {
-    const existing = this.items().find((entry) => entry.id === id);
-    const item = existing ?? known;
-    if (!item || item.acknowledgedAt !== null) return;
-    const prevUnread = this.unreadCount();
-    const wasUnread = item.readAt === null;
-    const now = new Date().toISOString();
-    if (existing) this.patch(id, { acknowledgedAt: now, readAt: item.readAt ?? now });
-    if (wasUnread) this.unreadCount.update((count) => Math.max(0, count - 1));
-    const action = `acknowledge:${id}`;
-    let failed: unknown = null;
-    try {
-      await this.api.acknowledgeNotification(id, this.keyFor(action));
-      this.actionKeys.delete(action);
-      const after = this.items().find((entry) => entry.id === id);
-      if (after) this.patch(id, { acknowledgedAt: now, readAt: after.readAt ?? now });
-      this.sync.changed(this);
-    } catch (error) {
-      failed = this.recover(error, id, action, () => {
-        if (existing) this.patch(id, { acknowledgedAt: null, readAt: item.readAt });
-        if (wasUnread) this.unreadCount.set(prevUnread);
-      });
-    }
-    if (failed === null) await this.refreshUnreadCount();
-    if (failed !== null) throw failed;
+  acknowledge(id: string, known?: NotificationView): Promise<void> {
+    return this.change('acknowledge', id, known);
   }
 
-  async dismiss(id: string, known?: NotificationView): Promise<void> {
-    const before = this.items();
-    const existing = before.find((entry) => entry.id === id);
-    const item = existing ?? known;
-    if (!item) return;
-    const prevUnread = this.unreadCount();
-    const wasUnread = item.readAt === null;
-    if (existing) this.items.set(before.filter((entry) => entry.id !== id));
-    if (wasUnread) this.unreadCount.update((count) => Math.max(0, count - 1));
-    const action = `dismiss:${id}`;
-    let failed: unknown = null;
-    try {
-      await this.api.dismissNotification(id, this.keyFor(action));
-      this.actionKeys.delete(action);
-      this.items.update((items) => items.filter((entry) => entry.id !== id));
-      this.sync.changed(this);
-    } catch (error) {
-      failed = this.recover(error, id, action, () => {
-        if (existing) this.items.set(before);
-        if (wasUnread) this.unreadCount.set(prevUnread);
-      });
-    }
-    if (failed === null) await this.refreshUnreadCount();
-    if (failed !== null) throw failed;
+  dismiss(id: string, known?: NotificationView): Promise<void> {
+    return this.change('dismiss', id, known);
   }
 
-  async markAllRead(): Promise<void> {
-    const before = this.items();
-    const prevUnread = this.unreadCount();
-    const now = new Date().toISOString();
-    this.items.set(before.map((item) => (item.readAt === null ? { ...item, readAt: now } : item)));
-    this.unreadCount.set(0);
-    let failed: unknown = null;
-    try {
-      await this.api.markAllNotificationsRead(this.keyFor('read-all'));
-      this.actionKeys.delete('read-all');
-      this.items.update((items) =>
-        items.map((item) => (item.readAt === null ? { ...item, readAt: now } : item)),
-      );
-      this.sync.changed(this);
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 404) this.actionKeys.delete('read-all');
-      if (errorCodeOf(error) === 'NOTIFICATION_USER_NOT_FOUND') this.userMissing.set(true);
-      this.items.set(before);
-      this.unreadCount.set(prevUnread);
-      failed = error;
-    }
-    if (failed === null) await this.refreshUnreadCount();
-    if (failed !== null) throw failed;
+  markAllRead(): Promise<void> {
+    return this.change('read-all');
   }
 
-  private async refreshUnreadCount(): Promise<void> {
+  private change(kind: ChangeKind, id?: string, known?: NotificationView): Promise<void> {
+    if (this.destroyed) return Promise.resolve();
+    const action = kind === 'read-all' ? kind : `${kind}:${id}`;
+    const inFlight = this.writes.get(action);
+    if (inFlight) return inFlight;
+    const item = this.items().find((row) => row.id === id) ?? known;
+    if (kind !== 'read-all') {
+      if (!item || this.dismissed.has(item.id)) return Promise.resolve();
+      if (kind === 'read' && item.readAt !== null) return Promise.resolve();
+      if (kind === 'acknowledge' && item.acknowledgedAt !== null) return Promise.resolve();
+    }
+    const change: PendingChange = {
+      kind,
+      ids: new Set(kind === 'read-all' ? this.rows.map((row) => row.id) : item ? [item.id] : []),
+      at: new Date().toISOString(),
+      unreadDelta:
+        kind === 'read-all'
+          ? this.countBase
+          : (this.rows.find((row) => row.id === id) ?? item)?.readAt === null
+            ? 1
+            : 0,
+      countEpoch: this.countEpoch,
+    };
+    this.pending.set(action, change);
+    this.changeEpoch++;
+    this.publish();
+    const done = this.writeChange(action, change, id).finally(() => this.writes.delete(action));
+    this.writes.set(action, done);
+    return done;
+  }
+
+  private async writeChange(action: string, change: PendingChange, id?: string): Promise<void> {
     try {
-      const seq = this.loadSeq;
-      const revision = this.unreadRevision();
-      const result = await this.api.getUnreadNotificationCount();
-      if (
-        !this.destroyed &&
-        seq === this.loadSeq &&
-        revision === this.unreadRevision() &&
-        !this.loading()
-      ) {
-        this.unreadCount.set(result.unreadCount);
+      const key = this.keyFor(action);
+      if (change.kind === 'read-all') await this.api.markAllNotificationsRead(key);
+      else if (id !== undefined) {
+        if (change.kind === 'read') await this.api.markNotificationRead(id, key);
+        else if (change.kind === 'acknowledge') await this.api.acknowledgeNotification(id, key);
+        else await this.api.dismissNotification(id, key);
       }
-    } catch {
-      // Keep the local count; the next list load returns the server snapshot.
+      if (this.destroyed) return;
+      this.actionKeys.delete(action);
+      if (change.countEpoch === this.countEpoch) {
+        this.countBase = Math.max(0, this.countBase - this.unreadDelta(change));
+      }
+      if (change.kind === 'dismiss') {
+        for (const changedId of change.ids) this.dismissed.add(changedId);
+      } else {
+        this.rows = this.rows.map((row) =>
+          change.ids.has(row.id) ? this.applyChange(row, change) : row,
+        );
+      }
+      for (const changedId of change.ids) this.changedRows.set(changedId, ++this.changeEpoch);
+      this.sync.changed(this);
+    } catch (error) {
+      if (this.destroyed) return;
+      this.connectionError(error);
+      if (error instanceof ApiError && error.status === 404) this.actionKeys.delete(action);
+      if (errorCodeOf(error) === 'NOTIFICATION_USER_NOT_FOUND') this.userMissing.set(true);
+      if (id !== undefined && errorCodeOf(error) === 'NOTIFICATION_NOT_FOUND') {
+        if (change.countEpoch === this.countEpoch) {
+          this.countBase = Math.max(0, this.countBase - this.unreadDelta(change));
+        }
+        this.dismissed.add(id);
+        this.actionKeys.delete(action);
+        this.sync.changed(this);
+      } else {
+        this.stale.set(true);
+        throw error;
+      }
+    } finally {
+      if (!this.destroyed) {
+        this.pending.delete(action);
+        this.changeEpoch++;
+        this.publish();
+      }
+    }
+    if (!this.destroyed) await this.refreshUnreadCount();
+  }
+
+  private refreshUnreadCount(): Promise<void> {
+    if (this.countRefresh) {
+      this.countRefreshAgain = true;
+      return this.countRefresh;
+    }
+    this.countRefresh = (async () => {
+      do {
+        this.countRefreshAgain = false;
+        await this.readUnreadCount();
+      } while (this.countRefreshAgain && !this.destroyed);
+    })().finally(() => {
+      this.countRefresh = null;
+    });
+    return this.countRefresh;
+  }
+
+  private async readUnreadCount(): Promise<void> {
+    const seq = ++this.countSeq;
+    const epoch = this.changeEpoch;
+    const load = this.loadSeq;
+    const revision = this.unreadRevision();
+    try {
+      const result = await this.api.getUnreadNotificationCount();
+      if (!Number.isSafeInteger(result.unreadCount) || result.unreadCount < 0) {
+        throw new ApiError(502, 'GENERIC');
+      }
+      if (this.destroyed || seq !== this.countSeq) return;
+      if (
+        epoch !== this.changeEpoch ||
+        load !== this.loadSeq ||
+        revision !== this.unreadRevision() ||
+        this.loading() ||
+        this.pending.size > 0
+      ) {
+        this.stale.set(true);
+        return;
+      }
+      this.countBase = result.unreadCount;
+      this.countEpoch++;
+      this.publish();
+      this.notify.connectionRestored();
+    } catch (error) {
+      if (this.destroyed || seq !== this.countSeq) return;
+      this.recoveryError(error);
     }
   }
 
@@ -302,73 +342,155 @@ export class NotificationInbox {
     return key;
   }
 
-  /**
-   * 404 NOTIFICATION_NOT_FOUND means the item is gone or out of scope: drop it and its key. Anything else
-   * rolls back, keeps the key for a retry, and returns the error.
-   */
-  private recover(error: unknown, id: string, action: string, rollback: () => void): unknown {
-    if (error instanceof ApiError && error.status === 404) this.actionKeys.delete(action);
-    if (errorCodeOf(error) === 'NOTIFICATION_USER_NOT_FOUND') this.userMissing.set(true);
-    if (errorCodeOf(error) === 'NOTIFICATION_NOT_FOUND') {
-      this.actionKeys.delete(action);
-      this.items.update((items) => items.filter((entry) => entry.id !== id));
-      return null;
+  /** Keep server rows separate from pending intent so one failure cannot undo another write. */
+  private publish(): void {
+    let rows = this.rows.filter((row) => !this.dismissed.has(row.id));
+    let allDelta = 0;
+    const unreadIds = new Set<string>();
+    for (const change of this.pending.values()) {
+      rows = rows.flatMap((row) => {
+        if (!change.ids.has(row.id)) return [row];
+        return change.kind === 'dismiss' ? [] : [this.applyChange(row, change)];
+      });
+      if (change.countEpoch === this.countEpoch) {
+        if (change.kind === 'read-all') allDelta = Math.max(allDelta, this.unreadDelta(change));
+        else if (this.unreadDelta(change) > 0) {
+          for (const id of change.ids) unreadIds.add(id);
+        }
+      }
     }
-    rollback();
-    return error;
+    this.items.set(this.unreadOnly() ? rows.filter((row) => row.readAt === null) : rows);
+    this.unreadCount.set(Math.max(0, this.countBase - Math.max(allDelta, unreadIds.size)));
   }
 
-  private patch(id: string, changes: Partial<NotificationView>): void {
-    this.items.update((items) =>
-      items.map((item) => (item.id === id ? { ...item, ...changes } : item)),
-    );
+  private unreadDelta(change: PendingChange): number {
+    if (change.kind === 'read-all') return Math.min(this.countBase, change.unreadDelta);
+    for (const id of change.ids) {
+      if (this.dismissed.has(id)) return 0;
+      const row = this.rows.find((item) => item.id === id);
+      if (row) return row.readAt === null ? 1 : 0;
+    }
+    return change.unreadDelta;
   }
 
-  private applyListSnapshot(page: NotificationListResult, reset: boolean): void {
+  private applyChange(row: NotificationView, change: PendingChange): NotificationView {
+    return {
+      ...row,
+      readAt: row.readAt ?? change.at,
+      acknowledgedAt:
+        change.kind === 'acknowledge' ? (row.acknowledgedAt ?? change.at) : row.acknowledgedAt,
+    };
+  }
+
+  private mergeRows(incoming: NotificationView[], reset: boolean): void {
+    const previous = new Map(this.rows.map((row) => [row.id, row]));
+    const merged = new Map<string, NotificationView>();
+    for (const item of reset ? incoming : [...this.rows, ...incoming]) {
+      if (this.dismissed.has(item.id)) continue;
+      const old = merged.get(item.id) ?? previous.get(item.id);
+      const row =
+        old && old.recipientStateVersion > item.recipientStateVersion
+          ? old
+          : {
+              ...item,
+              // Recipient reads and acknowledgements are monotonic, including HTTP 204 confirmations.
+              readAt: item.readAt ?? old?.readAt ?? null,
+              acknowledgedAt: item.acknowledgedAt ?? old?.acknowledgedAt ?? null,
+            };
+      const update = this.recipientUpdates.get(item.id);
+      merged.set(
+        item.id,
+        update && update.recipientStateVersion > row.recipientStateVersion
+          ? {
+              ...row,
+              readAt: update.readAt,
+              acknowledgedAt: update.acknowledgedAt,
+              recipientStateVersion: update.recipientStateVersion,
+            }
+          : row,
+      );
+    }
+    this.rows = [...merged.values()];
+    this.publish();
+  }
+
+  private applyListSnapshot(page: NotificationListResult, reset: boolean, epoch: number): void {
     this.listUnreadCount = page.unreadCount;
-    if (page.unreadRevision >= this.unreadRevision()) {
-      this.unreadCount.set(page.unreadCount);
+    if (
+      page.unreadRevision > this.unreadRevision() ||
+      (page.unreadRevision === this.unreadRevision() && epoch === this.changeEpoch)
+    ) {
+      this.countBase = page.unreadCount;
+      this.countEpoch++;
       this.unreadRevision.set(page.unreadRevision);
     }
+    this.changeEpoch++;
+    this.publish();
     if (reset) this.stale.set(this.unreadCount() > page.unreadCount);
     this.notify.connectionRestored();
   }
 
   private applyUnread(state: NotificationsUnreadState): void {
     if (
-      state.unreadRevision === null ? this.loading() : state.unreadRevision <= this.unreadRevision()
+      this.destroyed ||
+      (state.unreadRevision === null
+        ? this.loading()
+        : state.unreadRevision <= this.unreadRevision())
     )
       return;
-    this.unreadCount.set(state.unreadCount);
+    this.countBase = state.unreadCount;
+    this.countEpoch++;
+    this.changeEpoch++;
     if (state.unreadRevision !== null) this.unreadRevision.set(state.unreadRevision);
+    this.publish();
     if (state.unreadCount > this.listUnreadCount) this.stale.set(true);
   }
 
   private async onFeedEvent(event: NotificationsFeedEvent): Promise<void> {
+    if (this.destroyed) return;
     if (event.kind === 'sync') {
       await this.reload();
     } else if (event.kind === 'created') {
+      const seq = this.loadSeq;
       try {
         const item = await this.api.getNotification(event.notificationId);
-        if (this.destroyed || (this.unreadOnly() && item.readAt !== null)) return;
-        this.items.update((items) =>
-          items.some((row) => row.id === item.id) ? items : [item, ...items],
-        );
+        if (this.destroyed) return;
+        if (seq !== this.loadSeq) {
+          this.stale.set(true);
+          return;
+        }
+        this.changedRows.set(item.id, ++this.changeEpoch);
+        this.mergeRows([item, ...this.rows], true);
       } catch (error) {
-        if (!(error instanceof ApiError && error.status === 404)) this.connectionError(error);
+        if (this.destroyed || seq !== this.loadSeq) return;
+        if (errorCodeOf(error) === 'NOTIFICATION_NOT_FOUND') {
+          this.dismissed.add(event.notificationId);
+          if (this.rows.some((row) => row.id === event.notificationId)) this.stale.set(true);
+          this.publish();
+          return;
+        }
+        this.recoveryError(error);
       }
     } else {
-      const row = this.items().find((item) => item.id === event.notificationId);
-      if (!row || event.recipientStateVersion <= row.recipientStateVersion) return;
-      if (event.change === 'DISMISSED') {
-        this.items.update((items) => items.filter((item) => item.id !== event.notificationId));
-      } else {
-        this.patch(event.notificationId, {
-          readAt: event.readAt,
-          acknowledgedAt: event.acknowledgedAt,
-          recipientStateVersion: event.recipientStateVersion,
-        });
-      }
+      const row = this.rows.find((item) => item.id === event.notificationId);
+      const previous = this.recipientUpdates.get(event.notificationId);
+      const version = Math.max(
+        row?.recipientStateVersion ?? -1,
+        previous?.recipientStateVersion ?? -1,
+      );
+      if (event.recipientStateVersion <= version) return;
+      this.recipientUpdates.set(event.notificationId, event);
+      this.changedRows.set(event.notificationId, ++this.changeEpoch);
+      if (event.change === 'DISMISSED') this.dismissed.add(event.notificationId);
+      this.mergeRows(this.rows, true);
+    }
+  }
+  private recoveryError(error: unknown): void {
+    this.stale.set(true);
+    if (errorCodeOf(error) === 'NOTIFICATION_USER_NOT_FOUND') this.userMissing.set(true);
+    this.connectionError(error);
+    if (!(error instanceof ApiError && error.status === 0)) {
+      this.notify.error(notificationsErrorMessage(error, 'wsNotif', this.transloco));
     }
   }
 
