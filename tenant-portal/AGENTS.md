@@ -168,7 +168,7 @@ Every agent must structure code exactly like this. Do not change this approach.
 - Angular has no separate controller: the component class in its `.ts` file is the controller.
 - File names have no type suffix: `lead-card.ts`, not `lead-card.component.ts`.
 - Files that belong to one thing sit together in one folder with the same base name.
-- Organize by feature (`features/crm/leads/`, `features/trade/quotes/`), never by file type (no global `components/` or `services/` folder for feature code).
+- Organize by feature (`features/crm/leads/`, `features/trade/documents/`), never by file type (no global `components/` or `services/` folder for feature code).
 - One concept per file. Keep every component small with a single responsibility.
 
 Per component:
@@ -221,7 +221,7 @@ features/
   auth/          login, verify, invitation, reset-password
   workspace/     home, organization, users, roles, contacts, templates, notifications, audit-log, billing, profile, settings
   crm/           dashboard, leads, customers, opportunities, activities, reports, settings
-  trade/         shared, foundation, dashboard, products, price-lists, quotes, sales-orders, purchase-orders, invoices, contracts, inventory, governance, imports, settings
+  trade/         shared, foundation, dashboard, documents, inventory, governance, automation, settings
   accounting/    dashboard, journal, accounts, receivables, payables, banking, assets, tax, closing, reports, settings
 ```
 
@@ -245,15 +245,15 @@ features/crm/leads/
 - `app.routes.ts` lists `auth` and one `layout` route. Under the layout route it has flat per-feature lines (for example `crm/leads`, `crm/settings`, `workspace/staff`), not one line per app. It changes only when a feature or an app is added.
 - Each app owns `<app>.routes.ts` and `<app>.menu.ts`. Each feature owns `<feature>.routes.ts` and is lazy-loaded.
 - Guards: `authGuard` on the layout route, `accessGuard` (permission or subscription) on each route.
-- URLs are `/<app>/<feature>`: `/crm/leads`, `/trade/quotes/42`, `/crm/settings/pipelines`.
+- URLs are `/<app>/<feature>`: `/crm/leads`, `/trade/documents/quotations/42`, `/crm/settings/pipelines`.
 - `/<app>/<feature>/:id` opens the record dialog over the list, so every record has a link.
-- Documents with line items (quotes, orders, invoices) are full pages: `/trade/quotes/:id`.
+- Documents with line items (quotations, orders, invoices) are full pages: `/trade/documents/quotations/:id`.
 
 ### Naming
 
 - Folders and files are kebab-case. Plural for lists (`leads`), singular for one thing (`lead-dialog`).
 - Components have no suffix. The only suffixes are `.routes.ts`, `.api.ts`, `.model.ts`, `.menu.ts` and `.service.ts`.
-- Use the simplest clear business name (`customers`, `products`, `quotes`, `price-lists`, `contacts`).
+- Use the simplest clear business name (`customers`, `items`, `quotations`, `price-books`, `contacts`).
 - Translations: `public/i18n/<app>/ar.json` and `en.json`.
 
 ## Rule 4: every feature is built in six phases, in order
