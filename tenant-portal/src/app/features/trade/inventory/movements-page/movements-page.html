@@ -1,14 +1,25 @@
+@if (showForbidden()) {
+  <div class="flex flex-1 flex-col rounded-10 border border-border bg-surface p-16 shadow-card">
+    <ui-full-state
+      kind="forbidden"
+      [title]="'errors.forbidden.title' | transloco"
+      [text]="'errors.forbidden.text' | transloco"
+      [actionLabel]="'errors.notFound.action' | transloco"
+      (action)="goHome()"
+    />
+  </div>
+} @else {
 <app-settings-frame
   [addLabel]="'invMoves.actions.openingBalance' | transloco"
   [searchPlaceholder]="'invMoves.searchPlaceholder' | transloco"
   [loading]="loading()"
-  [showAdd]="canOpening"
+  [showAdd]="canOpening()"
   [(search)]="searchInput"
   (add)="openOpeningBalance()"
   (reload)="reload()"
 >
   <div notices class="flex flex-col gap-8">
-    @if (!canOpening && !canAdjust) {
+    @if (!canOpening() && !canAdjust()) {
       <app-settings-notice tone="info">
         {{ 'tradeInventory.common.canManageOff' | transloco }}
       </app-settings-notice>
@@ -170,7 +181,7 @@
           <ng-icon name="tablerTruck" size="18" aria-hidden="true" />
         </span>
         <p class="text-12 leading-18 text-text-muted">{{ 'invMoves.empty.text' | transloco }}</p>
-        @if (canOpening) {
+        @if (canOpening()) {
           <button type="button" uiButton variant="primary" (click)="openOpeningBalance()">
             <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
             {{ 'invMoves.actions.openingBalance' | transloco }}
@@ -372,17 +383,21 @@
 <app-opening-balance-modal
   [presetNodeId]="nodeFilter() || null"
   (saved)="onOpeningBalanceSaved()"
+  (forbidden)="onForbidden()"
 />
 
 <app-movement-modal
-  [canAdjust]="canAdjust"
+  [canAdjust]="canAdjust()"
   (closed)="onMovementModalClosed()"
   (openMovement)="onOpenMovementById($event)"
   (openDecision)="onOpenDecision($event)"
   (reverseRequested)="onReverseFromDetail($event)"
+  (forbidden)="onForbidden()"
 />
 
 <app-reverse-modal
   (reversed)="onReversed()"
   (openDecision)="onOpenDecision($event)"
+  (forbidden)="onForbidden()"
 />
+}

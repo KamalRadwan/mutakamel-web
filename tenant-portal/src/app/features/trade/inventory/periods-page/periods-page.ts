@@ -1,10 +1,12 @@
 import {
   Component,
   DestroyRef,
+  Injector,
   computed,
   effect,
   inject,
   input,
+  runInInjectionContext,
   signal,
   untracked,
   viewChild,
@@ -33,11 +35,13 @@ import {
 import { Button } from '../../../../shared/ui/button/button';
 import { DateField } from '../../../../shared/ui/date-time/date-field';
 import { Field } from '../../../../shared/ui/field/field';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { Modal } from '../../../../shared/ui/modal/modal';
 import { Pagination } from '../../../../shared/ui/pagination/pagination';
 import { SettingsFrame } from '../../../../shared/ui/settings-frame/settings-frame';
 import { SettingsNotice } from '../../../../shared/ui/settings-notice/settings-notice';
 import { StepFilter, type StepOption } from '../../../../shared/ui/step-filter/step-filter';
+import { branchGrants } from '../../shared/trade-access';
 import { ApiError, newIdempotencyKey, tradeContext } from '../../shared/trade-api';
 import { itemName, listReasons, listReferenceData } from '../../shared/trade-foundation.api';
 import type { ReasonCode } from '../../shared/trade-foundation.model';
@@ -48,13 +52,12 @@ import {
   type InventoryReasonKind,
   type PeriodStatus,
 } from '../inventory.model';
-import { errorKey, errorReason, periodDays } from '../inventory.service';
+import { errorKey, errorReason, hasCompanyGrant, isForbiddenError, periodDays } from '../inventory.service';
 import { InventoryBadge } from '../inventory-shared/inventory-badge/inventory-badge';
 import { InventoryConflict } from '../inventory-shared/inventory-conflict/inventory-conflict';
 import { InventoryReasonDialog } from '../inventory-shared/inventory-reason-dialog/inventory-reason-dialog';
 import { PeriodModal } from '../period-modal/period-modal';
 
-const CAN_GOVERN = true; // later from the session permissions
 const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = INVENTORY_LIMITS.pageSize;
 const PAGE_SIZES: number[] = [25, 50, 100];
@@ -102,6 +105,7 @@ function parseSizeParam(raw: string | undefined): number {
     Button,
     DateField,
     Field,
+    FullState,
     Modal,
     Pagination,
     SettingsFrame,
@@ -133,6 +137,7 @@ export class PeriodsPage {
 
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly injector = inject(Injector);
   private readonly destroyRef = inject(DestroyRef);
   private readonly notify = inject(Notify);
   private readonly scope = inject(ScopeState);
@@ -156,7 +161,12 @@ export class PeriodsPage {
   /** Bound from `?size=`. */
   readonly sizeParam = input<string | undefined>(undefined, { alias: 'size' });
 
-  protected readonly canGovern = CAN_GOVERN;
+  protected readonly forbidden = signal(false);
+  protected readonly canRead = computed(() => this.hasGrant('trade.inventory.read'));
+  protected readonly showForbidden = computed(() => !this.canRead() || this.forbidden());
+  protected readonly canGovern = computed(
+    () => !this.forbidden() && this.hasGrant('trade.inventory.governance.manage'),
+  );
   protected readonly pageSizes = PAGE_SIZES;
   protected readonly skeletonRows = SKELETON_ROWS;
   protected readonly gridColumns =
@@ -177,6 +187,7 @@ export class PeriodsPage {
   protected readonly warningMessage = signal('');
 
   private lastOpenedRouteId: string | null = null;
+  private lastCompanyId: string | null = null;
   private loadSeq = 0;
   private routeOpenSeq = 0;
   private destroyed = false;
@@ -284,20 +295,41 @@ export class PeriodsPage {
   );
 
   constructor() {
-    void this.loadLookups();
+    effect(() => {
+      const companyId = this.scope.company().id;
+      const allowed = this.canRead();
+      if (this.lastCompanyId !== companyId) {
+        this.lastCompanyId = companyId;
+        this.forbidden.set(false);
+      }
+      if (!allowed) return;
+      untracked(() => {
+        void this.loadLookups();
+      });
+    });
 
     effect(() => {
       const status = this.statusFilter();
       const effectiveAt = this.effectiveAtFilter();
       const page = this.page();
       const size = this.pageSize();
+      const allowed = this.canRead();
       this.scope.company();
       untracked(() => {
+        if (!allowed) {
+          this.rows.set([]);
+          this.total.set(0);
+          this.counts.set(null);
+          this.loading.set(false);
+          this.loadFailed.set(false);
+          return;
+        }
         void this.loadPeriods(status, effectiveAt, page, size);
       });
     });
 
     effect(() => {
+      if (this.showForbidden()) return;
       const routeId = this.id()?.trim() ?? '';
       if (!routeId) {
         this.lastOpenedRouteId = null;
@@ -316,6 +348,8 @@ export class PeriodsPage {
   }
 
   protected reload(): void {
+    if (!this.canRead()) return;
+    this.forbidden.set(false);
     void this.loadLookups();
     void this.loadPeriods(
       this.statusFilter(),
@@ -325,14 +359,26 @@ export class PeriodsPage {
     );
   }
 
+  protected goHome(): void {
+    void this.router.navigate(['/']);
+  }
+
+  protected onForbidden(): void {
+    this.forbidden.set(true);
+  }
+
   protected async openCreate(): Promise<void> {
-    if (!this.canGovern || this.creatingOpenBusy()) return;
+    if (!this.canGovern() || this.creatingOpenBusy()) return;
     this.creatingOpenBusy.set(true);
     let latest: InventoryPeriod | null = null;
     try {
-      const firstPage = await listPeriods({ page: 1, limit: 20 });
+      const firstPage = await listPeriods({ page: 1, limit: 20 }, tradeContext(this.scope, 'COMPANY'));
       latest = this.pickLatestPeriod(firstPage.items);
-    } catch {
+    } catch (error) {
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+        return;
+      }
       latest = this.pickLatestPeriod(this.rows());
     } finally {
       this.creatingOpenBusy.set(false);
@@ -444,7 +490,7 @@ export class PeriodsPage {
       },
     ];
 
-    if (this.canGovern) {
+    if (this.canGovern()) {
       if (period.status === 'OPEN') {
         items.push({
           id: 'close',
@@ -481,7 +527,7 @@ export class PeriodsPage {
   }
 
   protected startTransition(mode: 'close' | 'reopen', period: InventoryPeriod): void {
-    if (!this.canGovern || this.transitionPending()) return;
+    if (!this.canGovern() || this.transitionPending()) return;
     this.pendingTransition.set({
       mode,
       period,
@@ -494,12 +540,13 @@ export class PeriodsPage {
     const pending = this.pendingTransition();
     if (!pending || this.transitionPending()) return;
 
+    const ctx = tradeContext(this.scope, 'COMPANY');
     this.transitionPending.set(true);
     try {
       const updated =
         pending.mode === 'close'
-          ? await closePeriod(pending.period.id, pending.period.version, reasonCode, pending.key)
-          : await reopenPeriod(pending.period.id, pending.period.version, reasonCode, pending.key);
+          ? await closePeriod(pending.period.id, pending.period.version, reasonCode, pending.key, ctx)
+          : await reopenPeriod(pending.period.id, pending.period.version, reasonCode, pending.key, ctx);
 
       if (this.destroyed) return;
       this.reasonDialog().close();
@@ -559,6 +606,12 @@ export class PeriodsPage {
   }
 
   private handleTransitionError(error: unknown): void {
+    if (isForbiddenError(error)) {
+      this.reasonDialog().close();
+      this.pendingTransition.set(null);
+      this.forbidden.set(true);
+      return;
+    }
     if (error instanceof ApiError) {
       if (error.code === 'TRADE.CONCURRENCY.STALE_VERSION') {
         this.reasonDialog().close();
@@ -586,25 +639,33 @@ export class PeriodsPage {
     page: number,
     limit: number,
   ): Promise<void> {
+    if (!this.canRead()) {
+      this.loading.set(false);
+      return;
+    }
     const seq = ++this.loadSeq;
     this.loading.set(true);
     this.loadFailed.set(false);
 
+    const ctx = tradeContext(this.scope, 'COMPANY');
     const commonFilter = {
       effectiveAt: effectiveAt || undefined,
     };
 
     try {
       const [listPage, allCountPage, openCountPage, closedCountPage] = await Promise.all([
-        listPeriods({
-          ...commonFilter,
-          status: status || undefined,
-          page,
-          limit,
-        }),
-        listPeriods({ ...commonFilter, page: 1, limit: 1 }),
-        listPeriods({ ...commonFilter, status: 'OPEN', page: 1, limit: 1 }),
-        listPeriods({ ...commonFilter, status: 'CLOSED', page: 1, limit: 1 }),
+        listPeriods(
+          {
+            ...commonFilter,
+            status: status || undefined,
+            page,
+            limit,
+          },
+          ctx,
+        ),
+        listPeriods({ ...commonFilter, page: 1, limit: 1 }, ctx),
+        listPeriods({ ...commonFilter, status: 'OPEN', page: 1, limit: 1 }, ctx),
+        listPeriods({ ...commonFilter, status: 'CLOSED', page: 1, limit: 1 }, ctx),
       ]);
       if (seq !== this.loadSeq) return;
       this.rows.set(listPage.items);
@@ -618,6 +679,11 @@ export class PeriodsPage {
       if (seq !== this.loadSeq) return;
       this.rows.set([]);
       this.total.set(0);
+      if (isForbiddenError(error)) {
+        this.loadFailed.set(false);
+        this.forbidden.set(true);
+        return;
+      }
       this.loadFailed.set(true);
       this.notify.error(this.transloco.translate(errorKey(error)));
     } finally {
@@ -647,6 +713,10 @@ export class PeriodsPage {
       );
     } catch (error) {
       if (seq !== this.routeOpenSeq || this.destroyed) return;
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+        return;
+      }
       this.notify.error(this.transloco.translate(errorKey(error)));
     }
 
@@ -658,10 +728,11 @@ export class PeriodsPage {
   }
 
   private async findPeriodById(periodId: string): Promise<InventoryPeriod | null> {
+    const ctx = tradeContext(this.scope, 'COMPANY');
     let page = 1;
     let fetched = 0;
     while (true) {
-      const res = await listPeriods({ page, limit: 200 });
+      const res = await listPeriods({ page, limit: 100 }, ctx);
       const match = res.items.find((p) => p.id === periodId);
       if (match) return match;
       fetched += res.items.length;
@@ -670,10 +741,17 @@ export class PeriodsPage {
     }
   }
 
+  private hasGrant(key: string): boolean {
+    const grants = runInInjectionContext(this.injector, () => branchGrants(key));
+    const company = this.scope.company();
+    const companyBranchIds = company?.branches.map((b) => b.id) ?? [];
+    return hasCompanyGrant(grants, this.scope.branch()?.id ?? null, companyBranchIds);
+  }
+
   private async loadLookups(): Promise<void> {
     const ctx = tradeContext(this.scope, 'COMPANY');
     const [reasonsRes, refRes] = await Promise.allSettled([
-      listReasons('INVENTORY_PERIOD_CLOSE', { includeInactive: true }),
+      listReasons('INVENTORY_PERIOD_CLOSE', { includeInactive: true }, ctx),
       listReferenceData(ctx),
     ]);
     if (this.destroyed) return;

@@ -1,13 +1,15 @@
-import { Component, computed, effect, input, output, signal, untracked, viewChild } from '@angular/core';
+import { Component, computed, effect, inject, input, output, signal, untracked, viewChild } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { provideIcons } from '@ng-icons/core';
 import { tablerAlertTriangle } from '@ng-icons/tabler-icons';
+import { ScopeState } from '../../../../../core/scope/scope';
 import { Button } from '../../../../../shared/ui/button/button';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import {
   type ReasonPickerValue,
   TradeReasonPicker,
 } from '../../../shared/pickers/reason-picker/reason-picker';
+import { tradeContext } from '../../../shared/trade-api';
 import { listReasons } from '../../../shared/trade-foundation.api';
 import type { ReasonCode } from '../../../shared/trade-foundation.model';
 import type { InventoryReasonKind } from '../../inventory.model';
@@ -23,6 +25,7 @@ function emptyChoice(): ReasonPickerValue {
   templateUrl: './inventory-reason-dialog.html',
 })
 export class InventoryReasonDialog {
+  private readonly scope = inject(ScopeState);
   private readonly modal = viewChild.required<Modal>('dialog');
   private readonly picker = viewChild(TradeReasonPicker);
 
@@ -87,7 +90,7 @@ export class InventoryReasonDialog {
       const seq = this.loadSeq;
       this.resolving.set(true);
       try {
-        const fresh = await listReasons(this.kind());
+        const fresh = await listReasons(this.kind(), undefined, tradeContext(this.scope, 'COMPANY'));
         if (seq !== this.loadSeq || !this.isOpen()) return;
         this.loadedReasons.set(fresh);
         matched = fresh.find((reason) => reason.id === reasonCodeId);
@@ -124,7 +127,7 @@ export class InventoryReasonDialog {
   private async loadReasonsForOpen(kind: InventoryReasonKind): Promise<void> {
     const seq = ++this.loadSeq;
     try {
-      const rows = await listReasons(kind);
+      const rows = await listReasons(kind, undefined, tradeContext(this.scope, 'COMPANY'));
       if (seq !== this.loadSeq) return;
       this.loadedReasons.set(rows);
     } catch {

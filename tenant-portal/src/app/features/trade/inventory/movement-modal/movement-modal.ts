@@ -24,16 +24,28 @@ import {
 } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
+import { ScopeState } from '../../../../core/scope/scope';
 import { Button } from '../../../../shared/ui/button/button';
 import { Field } from '../../../../shared/ui/field/field';
 import { Modal } from '../../../../shared/ui/modal/modal';
 import { SectionBar } from '../../../../shared/ui/section-bar/section-bar';
-import { ApiError } from '../../shared/trade-api';
+import { ApiError, tradeContext } from '../../shared/trade-api';
 import { itemName as foundationItemName, listReasons, listUoms } from '../../shared/trade-foundation.api';
 import type { ReasonCode, Uom } from '../../shared/trade-foundation.model';
 import { getMovement } from '../inventory.api';
 import type { LedgerEntryDetail } from '../inventory.model';
-import { canReverseEntry, errorKey, factorText, formatDateTime, formatQuantity, itemName, movementGroup, shortId, signOf } from '../inventory.service';
+import {
+  canReverseEntry,
+  errorKey,
+  factorText,
+  formatDateTime,
+  formatQuantity,
+  isForbiddenError,
+  itemName,
+  movementGroup,
+  shortId,
+  signOf,
+} from '../inventory.service';
 import { InventoryQuantity } from '../inventory-shared/inventory-quantity/inventory-quantity';
 
 const MAX_SERIAL_CHIPS = 50;
@@ -87,6 +99,7 @@ export class MovementModal {
   private static nextId = 0;
   protected readonly uid = `movement-modal-${++MovementModal.nextId}`;
 
+  private readonly scope = inject(ScopeState);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
@@ -100,6 +113,7 @@ export class MovementModal {
   readonly openMovement = output<string>();
   readonly openDecision = output<string>();
   readonly reverseRequested = output<LedgerEntryDetail>();
+  readonly forbidden = output<void>();
 
   protected readonly skeletonRows = SKELETON_ROWS;
   protected readonly maxSerialChips = MAX_SERIAL_CHIPS;
@@ -352,9 +366,10 @@ export class MovementModal {
   private async ensureLookups(): Promise<void> {
     if (this.lookupsLoaded) return;
     this.lookupsLoaded = true;
+    const ctx = tradeContext(this.scope, 'COMPANY');
     const [uomsRes, reasonsRes] = await Promise.allSettled([
-      listUoms(),
-      listReasons('INVENTORY_REVERSAL', { includeInactive: true }),
+      listUoms(undefined, ctx),
+      listReasons('INVENTORY_REVERSAL', { includeInactive: true }, ctx),
     ]);
     if (this.destroyed) return;
     if (uomsRes.status === 'fulfilled') {
@@ -371,13 +386,18 @@ export class MovementModal {
   private async loadMovement(id: string): Promise<void> {
     const seq = ++this.loadSeq;
     try {
-      const detail = await getMovement(id);
+      const detail = await getMovement(id, tradeContext(this.scope, 'BRANCH'));
       if (this.destroyed || seq !== this.loadSeq) return;
       this.movement.set(detail);
       this.loading.set(false);
     } catch (error) {
       if (this.destroyed || seq !== this.loadSeq) return;
       this.loading.set(false);
+      if (isForbiddenError(error)) {
+        this.closeSilently();
+        this.forbidden.emit();
+        return;
+      }
       if (error instanceof ApiError && error.status === 404) {
         this.notify.error(this.transloco.translate(errorKey(error)));
         this.modal().close();

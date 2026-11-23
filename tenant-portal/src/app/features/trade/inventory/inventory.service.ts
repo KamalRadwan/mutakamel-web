@@ -39,16 +39,21 @@ const STRING_ERROR_CODES: ReadonlySet<string> = new Set([
   'TRADE_IDEMPOTENCY_KEY_MISSING',
   'TRADE_IDEMPOTENCY_MISMATCH',
   'TRADE_INVENTORY_NODE_CONFLICT',
+  'TRADE_INVENTORY_NODE_INVALID',
   'TRADE_INVENTORY_NODE_IN_USE',
   'TRADE_INVENTORY_NODE_NOT_FOUND',
   'TRADE_INVENTORY_SCOPE_INVALID',
+  'TRADE_INVENTORY_PERIOD_NOT_FOUND',
   'TRADE_INVENTORY_PERIOD_CODE_TAKEN',
   'TRADE_INVENTORY_SCOPE_NOT_FOUND',
   'TRADE_INVENTORY_ITEM_NOT_STOCK_TRACKED',
+  'TRADE_INVENTORY_ITEM_TRACKING_CONFLICT',
   'TRADE_INVENTORY_TRACKING_UNSUPPORTED',
   'TRADE_INVENTORY_UOM_CONVERSION_UNAVAILABLE',
+  'TRADE_INVENTORY_INSUFFICIENT_AVAILABILITY',
   'TRADE_INVENTORY_TRACKING_REQUIRED',
   'TRADE_INVENTORY_SERIAL_CONFLICT',
+  'TRADE_INVENTORY_SERIAL_NOT_FOUND',
   'TRADE_INVENTORY_QUANTITY_CONFLICT',
   'TRADE_INVENTORY_REVERSAL_NOT_ALLOWED',
   'TRADE_INVENTORY_POLICY_REJECTED',
@@ -58,6 +63,7 @@ const STRING_ERROR_CODES: ReadonlySet<string> = new Set([
   'TRADE_INVENTORY_MOVEMENT_NOT_FOUND',
   'TRADE_INVENTORY_RECEIPT_NOT_FOUND',
   'TRADE_INVENTORY_DELIVERY_NOT_FOUND',
+  'TRADE_INVENTORY_DECISION_NOT_FOUND',
 ]);
 
 function parseUtcDate(raw: string): number | null {
@@ -167,7 +173,11 @@ export function periodDays(startsOn: string, endsOn: string): number {
   return Math.round((endMs - startMs) / DAY_MS) + 1;
 }
 
-export function itemName(names: Record<string, string>, lang: 'en' | 'ar' | string): string {
+export function itemName(
+  names: Record<string, string> | null | undefined,
+  lang: 'en' | 'ar' | string,
+): string {
+  if (!names) return '';
   const byLang = names[lang]?.trim();
   if (byLang) return byLang;
   const byEn = names['en']?.trim();
@@ -177,6 +187,28 @@ export function itemName(names: Record<string, string>, lang: 'en' | 'ar' | stri
     if (trimmed) return trimmed;
   }
   return '';
+}
+
+export function isForbiddenError(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 403;
+}
+
+export function hasBranchGrant(grants: 'ALL' | ReadonlySet<string>, branchId: string | null): boolean {
+  if (grants === 'ALL') return true;
+  return branchId ? grants.has(branchId) : grants.size > 0;
+}
+
+export function hasCompanyGrant(
+  grants: 'ALL' | ReadonlySet<string>,
+  branchId: string | null,
+  companyBranchIds: readonly string[],
+): boolean {
+  if (grants === 'ALL') return true;
+  if (branchId) return grants.has(branchId);
+  if (companyBranchIds.length > 0) {
+    return companyBranchIds.some((id) => grants.has(id));
+  }
+  return grants.size > 0;
 }
 
 export function movementGroup(type: MovementType): 'OPENING' | 'RECEIPT' | 'DELIVERY' | 'REVERSAL' {

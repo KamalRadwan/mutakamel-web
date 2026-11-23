@@ -8,7 +8,9 @@
   (closed)="onModalClosed()"
 >
   @if (decision(); as d) {
-    <app-inventory-badge modal-header-end kind="outcome" [value]="outcomeBadgeValue(d)" />
+    @if (outcomeBadgeValue(d); as outcome) {
+      <app-inventory-badge modal-header-end kind="outcome" [value]="outcome" />
+    }
   }
 
   @if (loading()) {

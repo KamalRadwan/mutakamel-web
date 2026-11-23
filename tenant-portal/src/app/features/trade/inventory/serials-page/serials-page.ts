@@ -1,9 +1,11 @@
 import {
   Component,
   DestroyRef,
+  Injector,
   computed,
   effect,
   inject,
+  runInInjectionContext,
   signal,
   untracked,
   viewChild,
@@ -24,10 +26,12 @@ import {
 } from '../../../../shared/ui/actions-menu/actions-menu';
 import { Button } from '../../../../shared/ui/button/button';
 import { Field } from '../../../../shared/ui/field/field';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { Pagination } from '../../../../shared/ui/pagination/pagination';
 import { SettingsFrame } from '../../../../shared/ui/settings-frame/settings-frame';
 import { StepFilter, type StepOption } from '../../../../shared/ui/step-filter/step-filter';
 import { TradeItemPicker } from '../../shared/pickers/item-picker/item-picker';
+import { branchGrants } from '../../shared/trade-access';
 import { tradeContext } from '../../shared/trade-api';
 import { searchItemSummaries } from '../../shared/trade-foundation.api';
 import type { ItemKind } from '../../shared/trade-foundation.model';
@@ -37,7 +41,7 @@ import {
   type SerialState,
   type SerialUnit,
 } from '../inventory.model';
-import { errorKey, formatDateTime, itemName } from '../inventory.service';
+import { errorKey, formatDateTime, hasCompanyGrant, isForbiddenError, itemName } from '../inventory.service';
 import { InventoryBadge } from '../inventory-shared/inventory-badge/inventory-badge';
 import { SerialModal } from '../serial-modal/serial-modal';
 
@@ -94,6 +98,7 @@ function parsePageSize(raw: string | null): number {
     NgIcon,
     SettingsFrame,
     Field,
+    FullState,
     StepFilter,
     Pagination,
     ActionsMenu,
@@ -115,6 +120,7 @@ export class SerialsPage {
 
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly injector = inject(Injector);
   private readonly scope = inject(ScopeState);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
@@ -123,7 +129,7 @@ export class SerialsPage {
 
   private readonly paramMap = toSignal(this.route.paramMap);
   private readonly queryParamMap = toSignal(this.route.queryParamMap);
-  private readonly serialModal = viewChild.required(SerialModal);
+  private readonly serialModal = viewChild(SerialModal);
 
   protected readonly skeletonRows = SKELETON_ROWS;
   protected readonly pageSizes = PAGE_SIZES;
@@ -142,6 +148,15 @@ export class SerialsPage {
   );
 
   protected readonly companyContext = computed(() => tradeContext(this.scope, 'COMPANY'));
+
+  protected readonly forbidden = signal(false);
+  protected readonly canRead = computed(() => {
+    const grants = runInInjectionContext(this.injector, () => branchGrants('trade.inventory.read'));
+    const company = this.scope.company();
+    const companyBranchIds = company?.branches.map((b) => b.id) ?? [];
+    return hasCompanyGrant(grants, this.scope.branch()?.id ?? null, companyBranchIds);
+  });
+  protected readonly showForbidden = computed(() => !this.canRead() || this.forbidden());
 
   protected readonly searchDraft = signal('');
   protected readonly rows = signal<SerialUnit[]>([]);
@@ -177,6 +192,7 @@ export class SerialsPage {
   private countsSeq = 0;
   private itemsSeq = 0;
   private lastCountsKey: string | null = null;
+  private lastCompanyId: string | null = null;
   private openedModalId: string | null = null;
   private pendingScanAutoOpen = false;
   private destroyed = false;
@@ -193,6 +209,16 @@ export class SerialsPage {
 
     effect(() => {
       const ctx = this.companyContext();
+      const companyId = ctx.companyId ?? '';
+      const allowed = this.canRead();
+      if (this.lastCompanyId !== companyId) {
+        this.lastCompanyId = companyId;
+        this.forbidden.set(false);
+      }
+      if (!allowed) {
+        untracked(() => this.nonSerialItemIds.set([]));
+        return;
+      }
       untracked(() => void this.loadNonSerialItemIds(ctx.companyId));
     });
 
@@ -202,10 +228,23 @@ export class SerialsPage {
       const state = this.stateFilter();
       const page = this.page();
       const limit = this.pageSize();
+      const allowed = this.canRead();
+      this.scope.company();
+
+      if (!allowed) {
+        untracked(() => {
+          this.rows.set([]);
+          this.total.set(0);
+          this.counts.set(EMPTY_COUNTS);
+          this.loading.set(false);
+          this.loadFailed.set(false);
+        });
+        return;
+      }
 
       untracked(() => {
         void this.loadSerials({ itemId, serialKey, state, page, limit });
-        const countsKey = `${itemId}|${serialKey}`;
+        const countsKey = `${this.lastCompanyId ?? ''}|${itemId}|${serialKey}`;
         if (countsKey !== this.lastCountsKey) {
           this.lastCountsKey = countsKey;
           void this.loadCounts(itemId, serialKey);
@@ -214,8 +253,10 @@ export class SerialsPage {
     });
 
     effect(() => {
+      if (this.showForbidden()) return;
       const id = this.routeId();
       const modal = this.serialModal();
+      if (!modal) return;
       if (id) {
         if (this.openedModalId !== id) {
           this.openedModalId = id;
@@ -236,6 +277,8 @@ export class SerialsPage {
   }
 
   protected reload(): void {
+    if (!this.canRead()) return;
+    this.forbidden.set(false);
     this.pendingScanAutoOpen = false;
     const itemId = this.itemId();
     const serialKey = this.serialFilter();
@@ -247,6 +290,14 @@ export class SerialsPage {
       limit: this.pageSize(),
     });
     void this.loadCounts(itemId, serialKey);
+  }
+
+  protected goHome(): void {
+    void this.router.navigate(['/']);
+  }
+
+  protected onForbidden(): void {
+    this.forbidden.set(true);
   }
 
   protected onFrameEnter(event: Event): void {
@@ -451,18 +502,25 @@ export class SerialsPage {
     page: number;
     limit: number;
   }): Promise<void> {
+    if (!this.canRead()) {
+      this.loading.set(false);
+      return;
+    }
     const seq = ++this.listSeq;
     this.loading.set(true);
     this.loadFailed.set(false);
 
     try {
-      const res = await listSerials({
-        itemId: params.itemId || undefined,
-        serialKey: params.serialKey || undefined,
-        state: params.state || undefined,
-        page: params.page,
-        limit: params.limit,
-      });
+      const res = await listSerials(
+        {
+          itemId: params.itemId || undefined,
+          serialKey: params.serialKey || undefined,
+          state: params.state || undefined,
+          page: params.page,
+          limit: params.limit,
+        },
+        this.companyContext(),
+      );
       if (this.destroyed || seq !== this.listSeq) return;
 
       this.rows.set(res.items);
@@ -480,13 +538,20 @@ export class SerialsPage {
       this.rows.set([]);
       this.total.set(0);
       this.loading.set(false);
+      if (isForbiddenError(error)) {
+        this.loadFailed.set(false);
+        this.forbidden.set(true);
+        return;
+      }
       this.loadFailed.set(true);
       this.errorMessageKey.set(errorKey(error));
     }
   }
 
   private async loadCounts(itemId: string, serialKey: string): Promise<void> {
+    if (!this.canRead()) return;
     const seq = ++this.countsSeq;
+    const ctx = this.companyContext();
     const base = {
       itemId: itemId || undefined,
       serialKey: serialKey || undefined,
@@ -496,11 +561,11 @@ export class SerialsPage {
 
     try {
       const [all, onHand, reserved, delivered, voided] = await Promise.all([
-        listSerials(base),
-        listSerials({ ...base, state: 'ON_HAND' }),
-        listSerials({ ...base, state: 'RESERVED' }),
-        listSerials({ ...base, state: 'DELIVERED' }),
-        listSerials({ ...base, state: 'VOIDED' }),
+        listSerials(base, ctx),
+        listSerials({ ...base, state: 'ON_HAND' }, ctx),
+        listSerials({ ...base, state: 'RESERVED' }, ctx),
+        listSerials({ ...base, state: 'DELIVERED' }, ctx),
+        listSerials({ ...base, state: 'VOIDED' }, ctx),
       ]);
       if (this.destroyed || seq !== this.countsSeq) return;
       this.counts.set({
@@ -510,9 +575,13 @@ export class SerialsPage {
         DELIVERED: delivered.total,
         VOIDED: voided.total,
       });
-    } catch {
+    } catch (error) {
       if (this.destroyed || seq !== this.countsSeq) return;
       this.counts.set(EMPTY_COUNTS);
+      if (isForbiddenError(error)) {
+        this.loadFailed.set(false);
+        this.forbidden.set(true);
+      }
     }
   }
 

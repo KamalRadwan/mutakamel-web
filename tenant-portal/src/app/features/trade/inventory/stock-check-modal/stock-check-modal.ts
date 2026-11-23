@@ -21,7 +21,7 @@ import { itemName, listUoms } from '../../shared/trade-foundation.api';
 import type { Uom } from '../../shared/trade-foundation.model';
 import { getAvailability } from '../inventory.api';
 import type { Availability } from '../inventory.model';
-import { errorKey, errorReason, formatQuantity } from '../inventory.service';
+import { errorKey, errorReason, formatQuantity, isForbiddenError } from '../inventory.service';
 
 export interface StockCheckRequest {
   nodeId: string;
@@ -82,6 +82,7 @@ export class StockCheckModal {
   private readonly modal = viewChild.required<Modal>('dialog');
 
   readonly closed = output<void>();
+  readonly forbidden = output<void>();
 
   protected readonly request = signal<StockCheckRequest | null>(null);
   protected readonly availability = signal<Availability | null>(null);
@@ -221,12 +222,15 @@ export class StockCheckModal {
     this.loadErrorKey.set(null);
 
     try {
-      const result = await getAvailability({
-        nodeId: req.nodeId,
-        itemId: req.itemId,
-        ...(uomId ? { uomId } : {}),
-        ...(req.lotKey ? { lotKey: req.lotKey } : {}),
-      });
+      const result = await getAvailability(
+        {
+          nodeId: req.nodeId,
+          itemId: req.itemId,
+          ...(uomId ? { uomId } : {}),
+          ...(req.lotKey ? { lotKey: req.lotKey } : {}),
+        },
+        tradeContext(this.scope, 'BRANCH'),
+      );
       if (seq !== this.loadSeq || !this.isOpen) return;
       this.availability.set(result);
       this.ambiguousUom.set(false);
@@ -235,6 +239,11 @@ export class StockCheckModal {
       }
     } catch (error) {
       if (seq !== this.loadSeq || !this.isOpen) return;
+      if (isForbiddenError(error)) {
+        this.close();
+        this.forbidden.emit();
+        return;
+      }
       const code = errorCodeOf(error);
 
       if (code === 'TRADE.INVENTORY.NODE_NOT_FOUND') {
@@ -271,14 +280,14 @@ export class StockCheckModal {
       const ctx = tradeContext(this.scope, 'COMPANY');
       let list = await listUoms({ itemId }, ctx);
       if (list.length === 0) {
-        list = await listUoms({ status: 'ACTIVE' });
+        list = await listUoms({ status: 'ACTIVE' }, ctx);
       }
       if (seq !== this.uomLoadSeq || !this.isOpen) return;
       this.uoms.set(list);
     } catch {
       if (seq !== this.uomLoadSeq || !this.isOpen) return;
       try {
-        const fallback = await listUoms({ status: 'ACTIVE' });
+        const fallback = await listUoms({ status: 'ACTIVE' }, tradeContext(this.scope, 'COMPANY'));
         if (seq !== this.uomLoadSeq || !this.isOpen) return;
         this.uoms.set(fallback);
       } catch {

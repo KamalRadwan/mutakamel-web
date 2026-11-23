@@ -1,9 +1,11 @@
 import {
   Component,
   DestroyRef,
+  Injector,
   computed,
   effect,
   inject,
+  runInInjectionContext,
   signal,
   untracked,
   viewChild,
@@ -19,22 +21,24 @@ import { ScopeState } from '../../../../core/scope/scope';
 import { Button } from '../../../../shared/ui/button/button';
 import { Dropdown, type DropdownOption } from '../../../../shared/ui/dropdown/dropdown';
 import { Field } from '../../../../shared/ui/field/field';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { Pagination } from '../../../../shared/ui/pagination/pagination';
 import { SettingsFrame } from '../../../../shared/ui/settings-frame/settings-frame';
 import { SettingsNotice } from '../../../../shared/ui/settings-notice/settings-notice';
 import { Switch } from '../../../../shared/ui/switch/switch';
+import { branchGrants } from '../../shared/trade-access';
+import { tradeContext } from '../../shared/trade-api';
 import { listBalances, listNodes } from '../inventory.api';
 import {
   INVENTORY_LIMITS,
   type FulfillmentNode,
   type StockBalanceRow,
 } from '../inventory.model';
-import { errorKey, itemName, signOf } from '../inventory.service';
+import { errorKey, hasBranchGrant, isForbiddenError, itemName, signOf } from '../inventory.service';
 import { InventoryQuantity } from '../inventory-shared/inventory-quantity/inventory-quantity';
 import { OpeningBalanceModal } from '../opening-balance-modal/opening-balance-modal';
 import { StockCheckModal } from '../stock-check-modal/stock-check-modal';
 
-const CAN_OPENING = true; // later from the session permissions
 const DEFAULT_PAGE = 1;
 const PAGE_SIZES: number[] = [20, 50, 100];
 const DEFAULT_PAGE_SIZE = INVENTORY_LIMITS.pageSize;
@@ -117,6 +121,7 @@ function readNavState(): AvailabilityNavState {
     Button,
     Dropdown,
     Field,
+    FullState,
     Pagination,
     SettingsFrame,
     SettingsNotice,
@@ -138,6 +143,7 @@ export class AvailabilityPage {
 
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly injector = inject(Injector);
   private readonly destroyRef = inject(DestroyRef);
   private readonly scope = inject(ScopeState);
   private readonly transloco = inject(TranslocoService);
@@ -149,7 +155,17 @@ export class AvailabilityPage {
   private readonly stockCheckModal = viewChild(StockCheckModal);
   private readonly openingBalanceModal = viewChild(OpeningBalanceModal);
 
-  protected readonly canOpening = CAN_OPENING;
+  protected readonly forbidden = signal(false);
+  protected readonly canRead = computed(() => {
+    const grants = runInInjectionContext(this.injector, () => branchGrants('trade.inventory.read'));
+    return hasBranchGrant(grants, this.scope.branch()?.id ?? null);
+  });
+  protected readonly showForbidden = computed(() => !this.canRead() || this.forbidden());
+  protected readonly canOpening = computed(() => {
+    if (this.forbidden()) return false;
+    const grants = runInInjectionContext(this.injector, () => branchGrants('trade.inventory.opening_balance'));
+    return hasBranchGrant(grants, this.scope.branch()?.id ?? null);
+  });
   protected readonly pageSizes = PAGE_SIZES;
   protected readonly skeletonRows = SKELETON_ROWS;
   protected readonly gridColumns =
@@ -261,7 +277,14 @@ export class AvailabilityPage {
     effect(() => {
       this.scope.company();
       this.scope.branch();
+      const allowed = this.canRead();
       untracked(() => {
+        this.forbidden.set(false);
+        if (!allowed) {
+          this.nodes.set([]);
+          this.nodesLoaded.set(true);
+          return;
+        }
         void this.loadNodesForBranch();
       });
     });
@@ -269,13 +292,22 @@ export class AvailabilityPage {
     effect(() => {
       this.scope.company();
       this.scope.branch();
+      const allowed = this.canRead();
       const q = this.listQuery();
       untracked(() => {
+        if (!allowed) {
+          this.rows.set([]);
+          this.total.set(0);
+          this.loading.set(false);
+          this.loadFailed.set(false);
+          return;
+        }
         void this.loadBalances(q);
       });
     });
 
     effect(() => {
+      if (this.showForbidden()) return;
       const itemId = this.routeItemId();
       const qp = this.queryParams();
       const modal = this.stockCheckModal();
@@ -316,12 +348,22 @@ export class AvailabilityPage {
   }
 
   protected reload(): void {
+    if (!this.canRead()) return;
+    this.forbidden.set(false);
     void this.loadNodesForBranch();
     void this.loadBalances(this.listQuery());
   }
 
+  protected goHome(): void {
+    void this.router.navigate(['/']);
+  }
+
+  protected onForbidden(): void {
+    this.forbidden.set(true);
+  }
+
   protected openOpeningBalance(): void {
-    if (!this.canOpening) return;
+    if (!this.canOpening()) return;
     this.openingBalanceModal()?.open({
       nodeId: this.nodeFilter() || null,
     });
@@ -446,9 +488,10 @@ export class AvailabilityPage {
   }
 
   private async loadNodesForBranch(): Promise<void> {
+    if (!this.canRead()) return;
     const seq = ++this.nodesSeq;
     try {
-      const list = await listNodes();
+      const list = await listNodes({}, tradeContext(this.scope, 'BRANCH'));
       if (seq !== this.nodesSeq || this.destroyed) return;
       this.nodes.set(list);
       this.nodesLoaded.set(true);
@@ -461,25 +504,36 @@ export class AvailabilityPage {
       ) {
         this.updateQueryParams({ node: null, page: null }, true);
       }
-    } catch {
+    } catch (error) {
       if (seq !== this.nodesSeq || this.destroyed) return;
       this.nodes.set([]);
       this.nodesLoaded.set(true);
+      if (isForbiddenError(error)) {
+        this.loadFailed.set(false);
+        this.forbidden.set(true);
+      }
     }
   }
 
   private async loadBalances(q: ListQueryState): Promise<void> {
+    if (!this.canRead()) {
+      this.loading.set(false);
+      return;
+    }
     const seq = ++this.listSeq;
     this.loading.set(true);
     this.loadFailed.set(false);
     try {
-      const res = await listBalances({
-        ...(q.nodeId ? { nodeId: q.nodeId } : {}),
-        ...(q.onlyInStock ? { onlyInStock: true } : {}),
-        ...(q.search.trim() ? { search: q.search.trim() } : {}),
-        page: q.page,
-        limit: q.pageSize,
-      });
+      const res = await listBalances(
+        {
+          ...(q.nodeId ? { nodeId: q.nodeId } : {}),
+          ...(q.onlyInStock ? { onlyInStock: true } : {}),
+          ...(q.search.trim() ? { search: q.search.trim() } : {}),
+          page: q.page,
+          limit: q.pageSize,
+        },
+        tradeContext(this.scope, 'BRANCH'),
+      );
       if (seq !== this.listSeq || this.destroyed) return;
       this.rows.set(res.items);
       this.total.set(res.total);
@@ -487,6 +541,11 @@ export class AvailabilityPage {
       if (seq !== this.listSeq || this.destroyed) return;
       this.rows.set([]);
       this.total.set(0);
+      if (isForbiddenError(error)) {
+        this.loadFailed.set(false);
+        this.forbidden.set(true);
+        return;
+      }
       this.loadErrorKey.set(errorKey(error));
       this.loadFailed.set(true);
     } finally {

@@ -21,14 +21,15 @@ import {
 } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
+import { ScopeState } from '../../../../core/scope/scope';
 import { Button } from '../../../../shared/ui/button/button';
 import { Field } from '../../../../shared/ui/field/field';
 import { Modal } from '../../../../shared/ui/modal/modal';
 import { SectionBar } from '../../../../shared/ui/section-bar/section-bar';
-import { ApiError } from '../../shared/trade-api';
+import { ApiError, tradeContext } from '../../shared/trade-api';
 import { getSerial } from '../inventory.api';
 import type { SerialDetail, SerialEventType } from '../inventory.model';
-import { errorKey, formatDateTime, itemName, shortId } from '../inventory.service';
+import { errorKey, formatDateTime, isForbiddenError, itemName, shortId } from '../inventory.service';
 import { InventoryBadge } from '../inventory-shared/inventory-badge/inventory-badge';
 
 const LIFECYCLE_PAGE_LIMIT = 500;
@@ -74,6 +75,7 @@ export class SerialModal {
   protected readonly uid = `serial-modal-${++SerialModal.nextId}`;
 
   private readonly router = inject(Router);
+  private readonly scope = inject(ScopeState);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
@@ -82,6 +84,7 @@ export class SerialModal {
   private readonly modal = viewChild.required(Modal);
 
   readonly closed = output<void>();
+  readonly forbidden = output<void>();
 
   protected readonly skeletonFields = SKELETON_FIELDS;
   protected readonly skeletonEvents = SKELETON_EVENTS;
@@ -103,10 +106,13 @@ export class SerialModal {
   });
 
   protected readonly itemLabel = computed(() => {
+    this.i18n();
     const unit = this.serial();
     if (!unit) return '';
     const name = itemName(unit.itemNames, this.language());
-    return name ? `${unit.itemCode} — ${name}` : unit.itemCode;
+    const code = unit.itemCode?.trim() ?? '';
+    if (code && name) return `${code} — ${name}`;
+    return code || name || this.transloco.translate('tradeInventory.common.none');
   });
 
   protected readonly currentNodeLabel = computed(() => {
@@ -195,13 +201,18 @@ export class SerialModal {
   private async loadSerial(id: string): Promise<void> {
     const seq = ++this.loadSeq;
     try {
-      const detail = await getSerial(id);
+      const detail = await getSerial(id, tradeContext(this.scope, 'COMPANY'));
       if (this.destroyed || seq !== this.loadSeq) return;
       this.serial.set(detail);
       this.loading.set(false);
     } catch (error) {
       if (this.destroyed || seq !== this.loadSeq) return;
       this.loading.set(false);
+      if (isForbiddenError(error)) {
+        this.closeSilently();
+        this.forbidden.emit();
+        return;
+      }
       if (error instanceof ApiError && error.status === 404) {
         this.notify.error(this.transloco.translate(errorKey(error)));
         this.modal().close();

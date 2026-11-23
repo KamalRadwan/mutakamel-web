@@ -36,7 +36,7 @@ import {
   type InventoryTracking,
   type OpeningBalanceResult,
 } from '../inventory.model';
-import { errorKey, errorReason, signOf } from '../inventory.service';
+import { errorKey, errorReason, isForbiddenError, signOf } from '../inventory.service';
 
 type OpeningField = 'node' | 'item' | 'uom' | 'quantity' | 'effectiveAt' | 'lotKey' | 'serials';
 
@@ -133,6 +133,7 @@ export class OpeningBalanceModal {
 
   readonly saved = output<OpeningBalanceResult>();
   readonly closed = output<void>();
+  readonly forbidden = output<void>();
 
   protected readonly limits = INVENTORY_LIMITS;
   protected readonly productKinds = PRODUCT_KINDS;
@@ -511,6 +512,7 @@ export class OpeningBalanceModal {
           tracking,
         },
         this.idempotencyKey,
+        tradeContext(this.scope, 'BRANCH'),
       );
       if (!this.isOpen) return;
       this.notify.success(this.transloco.translate('invStock.opening.recorded'));
@@ -581,7 +583,32 @@ export class OpeningBalanceModal {
   }
 
   private handleSubmitError(error: unknown, currentItemId: string): void {
+    if (isForbiddenError(error)) {
+      this.close();
+      this.forbidden.emit();
+      return;
+    }
+
     const code = errorCodeOf(error);
+
+    if (code === 'TRADE.INVENTORY.NODE_INVALID') {
+      this.serverErrors.set({ node: { key: errorKey(error) } });
+      return;
+    }
+
+    if (code === 'TRADE.INVENTORY.ITEM_TRACKING_CONFLICT') {
+      if (this.trackingMode() === 'SERIAL') {
+        this.serverErrors.set({ serials: { key: errorKey(error) } });
+      } else {
+        this.serverErrors.set({ item: { key: errorKey(error) } });
+      }
+      return;
+    }
+
+    if (code === 'TRADE.INVENTORY.INSUFFICIENT_AVAILABILITY') {
+      this.serverErrors.set({ quantity: { key: errorKey(error) } });
+      return;
+    }
 
     if (code === 'TRADE.INVENTORY.PERIOD_CONFLICT') {
       this.serverErrors.set({ effectiveAt: { key: errorKey(error) } });
@@ -661,7 +688,7 @@ export class OpeningBalanceModal {
     const seq = ++this.nodesSeq;
     this.nodesLoading.set(true);
     try {
-      const list = await listNodes();
+      const list = await listNodes({}, tradeContext(this.scope, 'BRANCH'));
       if (seq !== this.nodesSeq || !this.isOpen) return;
       const active = list.filter((node) => node.status === 'ACTIVE');
       this.activeNodes.set(active);
@@ -675,6 +702,11 @@ export class OpeningBalanceModal {
     } catch (error) {
       if (seq !== this.nodesSeq || !this.isOpen) return;
       this.activeNodes.set([]);
+      if (isForbiddenError(error)) {
+        this.close();
+        this.forbidden.emit();
+        return;
+      }
       this.notify.error(this.transloco.translate(errorKey(error)));
     } finally {
       if (seq === this.nodesSeq) {
@@ -762,6 +794,11 @@ export class OpeningBalanceModal {
       this.selectedItem.set(null);
       this.itemUoms.set([]);
       this.uomId.set('');
+      if (isForbiddenError(error)) {
+        this.close();
+        this.forbidden.emit();
+        return;
+      }
       this.notify.error(this.transloco.translate(errorKey(error)));
     } finally {
       if (seq === this.itemSeq) {

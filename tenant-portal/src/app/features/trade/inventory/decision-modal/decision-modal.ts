@@ -18,13 +18,14 @@ import {
   tablerGavel,
 } from '@ng-icons/tabler-icons';
 import { Notify } from '../../../../core/notify/notify';
+import { ScopeState } from '../../../../core/scope/scope';
 import { Button } from '../../../../shared/ui/button/button';
 import { Field } from '../../../../shared/ui/field/field';
 import { Modal } from '../../../../shared/ui/modal/modal';
-import { ApiError } from '../../shared/trade-api';
+import { ApiError, tradeContext } from '../../shared/trade-api';
 import { getDecision } from '../inventory.api';
 import type { DecisionAggregateType, InventoryDecision } from '../inventory.model';
-import { errorKey, formatDateTime } from '../inventory.service';
+import { errorKey, formatDateTime, isForbiddenError } from '../inventory.service';
 import { InventoryBadge } from '../inventory-shared/inventory-badge/inventory-badge';
 
 const SKELETON_FIELDS = [0, 1, 2, 3, 4, 5] as const;
@@ -48,6 +49,7 @@ export class DecisionModal {
   protected readonly uid = `decision-modal-${++DecisionModal.nextId}`;
 
   private readonly router = inject(Router);
+  private readonly scope = inject(ScopeState);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
@@ -55,6 +57,7 @@ export class DecisionModal {
   private readonly modal = viewChild.required(Modal);
 
   readonly closed = output<void>();
+  readonly forbidden = output<void>();
 
   protected readonly skeletonFields = SKELETON_FIELDS;
 
@@ -79,7 +82,10 @@ export class DecisionModal {
     this.i18n();
     const d = this.decision();
     if (!d) return '';
-    const outcome = d.result.outcome;
+    const outcome = d.result.outcome?.trim();
+    if (!outcome) {
+      return this.transloco.translate('tradeInventory.common.none');
+    }
     const selected = d.result.selectedValue;
     if (outcome === 'SELECT' && selected) {
       const selectLabel = this.transloco.translate('invEvidence.outcomes.SELECT');
@@ -106,7 +112,7 @@ export class DecisionModal {
         return translated;
       }
     }
-    return d.explanation;
+    return d.explanation?.trim() || this.transloco.translate('tradeInventory.common.none');
   });
 
   protected readonly showOriginalExplanation = computed(() => {
@@ -176,17 +182,24 @@ export class DecisionModal {
     }
   }
 
-  protected outcomeBadgeValue(d: InventoryDecision): string {
-    return d.result.outcome === 'SELECT' && d.result.selectedValue
+  protected outcomeBadgeValue(d: InventoryDecision): string | null {
+    const outcome = d.result.outcome?.trim();
+    if (!outcome) return null;
+    return outcome === 'SELECT' && d.result.selectedValue
       ? d.result.selectedValue
-      : d.result.outcome;
+      : outcome;
   }
 
-  protected aggregateTypeLabel(type: DecisionAggregateType): string {
+  protected aggregateTypeLabel(type: DecisionAggregateType | string | null | undefined): string {
     this.i18n();
-    const key = `invEvidence.aggregateTypes.${type}`;
+    const clean = type?.trim();
+    if (!clean) return this.transloco.translate('tradeInventory.common.none');
+    const key = `invEvidence.aggregateTypes.${clean}`;
     const translated = this.transloco.translate(key);
-    return translated && translated !== key ? translated : type;
+    if (translated && translated !== key) {
+      return translated;
+    }
+    return this.transloco.translate('invEvidence.aggregateTypes.unknown');
   }
 
   protected canOpenRecord(d: InventoryDecision): boolean {
@@ -220,13 +233,18 @@ export class DecisionModal {
   private async loadDecision(id: string): Promise<void> {
     const seq = ++this.loadSeq;
     try {
-      const detail = await getDecision(id);
+      const detail = await getDecision(id, tradeContext(this.scope, 'COMPANY'));
       if (this.destroyed || seq !== this.loadSeq) return;
       this.decision.set(detail);
       this.loading.set(false);
     } catch (error) {
       if (this.destroyed || seq !== this.loadSeq) return;
       this.loading.set(false);
+      if (isForbiddenError(error)) {
+        this.closeSilently();
+        this.forbidden.emit();
+        return;
+      }
       if (error instanceof ApiError && error.status === 404) {
         this.notify.error(this.transloco.translate(errorKey(error)));
         this.modal().close();

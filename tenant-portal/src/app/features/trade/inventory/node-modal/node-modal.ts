@@ -35,7 +35,7 @@ import { Modal } from '../../../../shared/ui/modal/modal';
 import { rectInPage, viewport } from '../../../../shared/ui/overlay/zoom';
 import { Switch } from '../../../../shared/ui/switch/switch';
 import { TagPicker, type TagOption } from '../../../../shared/ui/tag-picker/tag-picker';
-import { ApiError, newIdempotencyKey } from '../../shared/trade-api';
+import { ApiError, newIdempotencyKey, tradeContext } from '../../shared/trade-api';
 import { createNode, getCompanyNode, updateNode } from '../inventory.api';
 import {
   INVENTORY_LIMITS,
@@ -45,7 +45,7 @@ import {
   type NodeType,
   type UpdateNodePatch,
 } from '../inventory.model';
-import { errorKey } from '../inventory.service';
+import { errorKey, isForbiddenError } from '../inventory.service';
 import { InventoryBadge } from '../inventory-shared/inventory-badge/inventory-badge';
 import { InventoryConflict } from '../inventory-shared/inventory-conflict/inventory-conflict';
 
@@ -183,6 +183,7 @@ export class NodeModal {
   readonly canManage = input(true);
   readonly saved = output<{ node: FulfillmentNode; isNew: boolean }>();
   readonly closed = output<void>();
+  readonly forbidden = output<void>();
 
   protected readonly limits = INVENTORY_LIMITS;
   protected readonly maxBranches = MAX_NODE_BRANCHES;
@@ -630,7 +631,7 @@ export class NodeModal {
 
   private async fetchNode(id: string, seq: number): Promise<void> {
     try {
-      const node = await getCompanyNode(id);
+      const node = await getCompanyNode(id, tradeContext(this.scope, 'COMPANY'));
       if (seq !== this.loadSeq) return;
       this.applyLoadedNode(node);
       this.resetValidation();
@@ -638,6 +639,11 @@ export class NodeModal {
     } catch (error) {
       if (seq !== this.loadSeq) return;
       this.loading.set(false);
+      if (isForbiddenError(error)) {
+        this.close();
+        this.forbidden.emit();
+        return;
+      }
       this.notify.error(this.transloco.translate(errorKey(error)));
       this.close();
     }
@@ -668,6 +674,7 @@ export class NodeModal {
           branchIds: [...this.branchIds()],
         },
         this.formIdempotencyKey,
+        tradeContext(this.scope, 'COMPANY'),
       );
       this.notify.success(this.transloco.translate('invSetup.nodes.toast.created'));
       this.saved.emit({ node: created, isNew: true });
@@ -700,7 +707,13 @@ export class NodeModal {
 
     this.saving.set(true);
     try {
-      const updated = await updateNode(base.id, base.version, patch, this.formIdempotencyKey);
+      const updated = await updateNode(
+        base.id,
+        base.version,
+        patch,
+        this.formIdempotencyKey,
+        tradeContext(this.scope, 'COMPANY'),
+      );
       this.notify.success(this.transloco.translate('invSetup.nodes.toast.saved'));
       this.saved.emit({ node: updated, isNew: false });
       this.close();
@@ -712,6 +725,11 @@ export class NodeModal {
   }
 
   private handleSaveError(error: unknown): void {
+    if (isForbiddenError(error)) {
+      this.close();
+      this.forbidden.emit();
+      return;
+    }
     if (error instanceof ApiError) {
       if (error.code === 'TRADE.INVENTORY.NODE_CONFLICT') {
         this.serverErrors.update((prev) => ({

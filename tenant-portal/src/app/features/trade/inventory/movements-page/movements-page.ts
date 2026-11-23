@@ -1,9 +1,11 @@
 import {
   Component,
   DestroyRef,
+  Injector,
   computed,
   effect,
   inject,
+  runInInjectionContext,
   signal,
   untracked,
   viewChild,
@@ -30,10 +32,13 @@ import { Button } from '../../../../shared/ui/button/button';
 import { DateField } from '../../../../shared/ui/date-time/date-field';
 import { Dropdown, type DropdownOption } from '../../../../shared/ui/dropdown/dropdown';
 import { Field } from '../../../../shared/ui/field/field';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { Pagination } from '../../../../shared/ui/pagination/pagination';
 import { SettingsFrame } from '../../../../shared/ui/settings-frame/settings-frame';
 import { SettingsNotice } from '../../../../shared/ui/settings-notice/settings-notice';
 import { StepFilter, type StepOption } from '../../../../shared/ui/step-filter/step-filter';
+import { branchGrants } from '../../shared/trade-access';
+import { tradeContext } from '../../shared/trade-api';
 import { listMovements, listNodes } from '../inventory.api';
 import {
   INVENTORY_LIMITS,
@@ -42,15 +47,21 @@ import {
   type LedgerEntryDetail,
   type MovementQuery,
 } from '../inventory.model';
-import { canReverseEntry, errorKey, formatDateTime, itemName, shortId, signOf } from '../inventory.service';
+import {
+  canReverseEntry,
+  errorKey,
+  formatDateTime,
+  hasBranchGrant,
+  isForbiddenError,
+  itemName,
+  shortId,
+  signOf,
+} from '../inventory.service';
 import { InventoryBadge } from '../inventory-shared/inventory-badge/inventory-badge';
 import { InventoryQuantity } from '../inventory-shared/inventory-quantity/inventory-quantity';
 import { MovementModal } from '../movement-modal/movement-modal';
 import { OpeningBalanceModal } from '../opening-balance-modal/opening-balance-modal';
 import { ReverseModal } from '../reverse-modal/reverse-modal';
-
-const CAN_OPENING = true; // later from the session permissions
-const CAN_ADJUST = true; // later from the session permissions
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = INVENTORY_LIMITS.pageSize;
@@ -141,6 +152,7 @@ function parsePageSize(raw: string | null | undefined): number {
     DateField,
     Dropdown,
     Field,
+    FullState,
     Pagination,
     SettingsFrame,
     SettingsNotice,
@@ -164,6 +176,7 @@ export class MovementsPage {
 
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly injector = inject(Injector);
   private readonly destroyRef = inject(DestroyRef);
   private readonly scope = inject(ScopeState);
   private readonly transloco = inject(TranslocoService);
@@ -174,11 +187,18 @@ export class MovementsPage {
   private readonly queryParamMap = toSignal(this.route.queryParamMap);
 
   private readonly openingBalanceModal = viewChild(OpeningBalanceModal);
-  private readonly movementModal = viewChild.required(MovementModal);
+  private readonly movementModal = viewChild(MovementModal);
   private readonly reverseModal = viewChild.required(ReverseModal);
 
-  protected readonly canOpening = CAN_OPENING;
-  protected readonly canAdjust = CAN_ADJUST;
+  protected readonly forbidden = signal(false);
+  protected readonly canRead = computed(() => this.hasGrant('trade.inventory.read'));
+  protected readonly showForbidden = computed(() => !this.canRead() || this.forbidden());
+  protected readonly canOpening = computed(
+    () => !this.forbidden() && this.hasGrant('trade.inventory.opening_balance'),
+  );
+  protected readonly canAdjust = computed(
+    () => !this.forbidden() && this.hasGrant('trade.inventory.adjust'),
+  );
   protected readonly pageSizes = PAGE_SIZES;
   protected readonly skeletonRows = SKELETON_ROWS;
   protected readonly gridColumns =
@@ -208,6 +228,7 @@ export class MovementsPage {
   private lastCountsKey = '';
   private lastCountsReloadTick = -1;
   private openedModalId: string | null = null;
+  private lastScopeKey = '';
   private destroyed = false;
 
   protected readonly routeId = computed(() => this.paramMap()?.get('id')?.trim() || null);
@@ -349,10 +370,20 @@ export class MovementsPage {
     });
 
     effect(() => {
-      this.scope.company();
-      this.scope.branch();
+      const compId = this.scope.company()?.id ?? '';
+      const brId = this.scope.branch()?.id ?? '';
+      const scopeKey = `${compId}|${brId}`;
       this.reloadTick();
+      const allowed = this.canRead();
       untracked(() => {
+        if (scopeKey !== this.lastScopeKey) {
+          this.lastScopeKey = scopeKey;
+          this.forbidden.set(false);
+        }
+        if (!allowed) {
+          this.nodes.set([]);
+          return;
+        }
         void this.loadNodesForBranch();
       });
     });
@@ -360,8 +391,20 @@ export class MovementsPage {
     effect(() => {
       this.scope.company();
       this.scope.branch();
+      const allowed = this.canRead();
       const q = this.listQuery();
       const tick = this.reloadTick();
+
+      if (!allowed) {
+        untracked(() => {
+          this.loading.set(false);
+          this.loadFailed.set(false);
+          this.rows.set([]);
+          this.total.set(0);
+          this.counts.set(EMPTY_COUNTS);
+        });
+        return;
+      }
 
       if (q.from && q.to && q.to < q.from) {
         untracked(() => {
@@ -393,8 +436,10 @@ export class MovementsPage {
     });
 
     effect(() => {
+      if (this.showForbidden()) return;
       const id = this.routeId();
       const modal = this.movementModal();
+      if (!modal) return;
       if (id) {
         if (this.openedModalId !== id) {
           this.openedModalId = id;
@@ -416,11 +461,21 @@ export class MovementsPage {
   }
 
   protected reload(): void {
+    if (!this.canRead()) return;
+    this.forbidden.set(false);
     this.reloadTick.update((n) => n + 1);
   }
 
+  protected goHome(): void {
+    void this.router.navigate(['/']);
+  }
+
+  protected onForbidden(): void {
+    this.forbidden.set(true);
+  }
+
   protected openOpeningBalance(): void {
-    if (!this.canOpening) return;
+    if (!this.canOpening()) return;
     this.openingBalanceModal()?.open({
       nodeId: this.nodeFilter() || null,
     });
@@ -532,14 +587,14 @@ export class MovementsPage {
   }
 
   protected onReverseFromDetail(detail: LedgerEntryDetail): void {
-    if (!this.canAdjust) return;
+    if (!this.canAdjust()) return;
     this.reverseModal().open(detail);
   }
 
   protected onReversed(): void {
     this.reload();
     if (this.routeId()) {
-      this.movementModal().reload();
+      this.movementModal()?.reload();
     }
   }
 
@@ -573,7 +628,7 @@ export class MovementsPage {
   }
 
   protected canReverseRow(row: LedgerEntry): boolean {
-    return canReverseEntry(row, this.canAdjust);
+    return canReverseEntry(row, this.canAdjust());
   }
 
   protected rowActions(row: LedgerEntry): ActionItem[] {
@@ -664,9 +719,10 @@ export class MovementsPage {
   }
 
   private async loadNodesForBranch(): Promise<void> {
+    if (!this.canRead()) return;
     const seq = ++this.nodesSeq;
     try {
-      const list = await listNodes();
+      const list = await listNodes({}, tradeContext(this.scope, 'BRANCH'));
       if (seq !== this.nodesSeq || this.destroyed) return;
       this.nodes.set(list);
 
@@ -674,25 +730,36 @@ export class MovementsPage {
       if (selectedNode && !list.some((node) => node.id === selectedNode)) {
         this.updateQueryParams({ node: null, page: null }, true);
       }
-    } catch {
+    } catch (error) {
       if (seq !== this.nodesSeq || this.destroyed) return;
       this.nodes.set([]);
+      if (isForbiddenError(error)) {
+        this.loadFailed.set(false);
+        this.forbidden.set(true);
+      }
     }
   }
 
   private async loadMovements(q: MovementsQueryState): Promise<void> {
+    if (!this.canRead()) {
+      this.loading.set(false);
+      return;
+    }
     const seq = ++this.listSeq;
     this.loading.set(true);
     this.loadFailed.set(false);
     const base = this.buildBaseQuery(q);
 
     try {
-      const res = await listMovements({
-        ...base,
-        ...(q.group ? { group: q.group } : {}),
-        page: q.page,
-        limit: q.pageSize,
-      });
+      const res = await listMovements(
+        {
+          ...base,
+          ...(q.group ? { group: q.group } : {}),
+          page: q.page,
+          limit: q.pageSize,
+        },
+        tradeContext(this.scope, 'BRANCH'),
+      );
       if (seq !== this.listSeq || this.destroyed) return;
       this.rows.set(res.items);
       this.total.set(res.total);
@@ -709,6 +776,11 @@ export class MovementsPage {
       if (seq !== this.listSeq || this.destroyed) return;
       this.rows.set([]);
       this.total.set(0);
+      if (isForbiddenError(error)) {
+        this.loadFailed.set(false);
+        this.forbidden.set(true);
+        return;
+      }
       this.loadErrorKey.set(errorKey(error));
       this.loadFailed.set(true);
     } finally {
@@ -719,7 +791,9 @@ export class MovementsPage {
   }
 
   private async loadCounts(q: MovementsQueryState): Promise<void> {
+    if (!this.canRead()) return;
     const seq = ++this.countsSeq;
+    const ctx = tradeContext(this.scope, 'BRANCH');
     const base = {
       ...this.buildBaseQuery(q),
       page: 1,
@@ -728,11 +802,11 @@ export class MovementsPage {
 
     try {
       const [all, opening, receipt, delivery, reversal] = await Promise.all([
-        listMovements(base),
-        listMovements({ ...base, group: 'OPENING' }),
-        listMovements({ ...base, group: 'RECEIPT' }),
-        listMovements({ ...base, group: 'DELIVERY' }),
-        listMovements({ ...base, group: 'REVERSAL' }),
+        listMovements(base, ctx),
+        listMovements({ ...base, group: 'OPENING' }, ctx),
+        listMovements({ ...base, group: 'RECEIPT' }, ctx),
+        listMovements({ ...base, group: 'DELIVERY' }, ctx),
+        listMovements({ ...base, group: 'REVERSAL' }, ctx),
       ]);
       if (seq !== this.countsSeq || this.destroyed) return;
       this.counts.set({
@@ -748,9 +822,18 @@ export class MovementsPage {
           sourceNumber: all.items[0].sourceNumber,
         });
       }
-    } catch {
+    } catch (error) {
       if (seq !== this.countsSeq || this.destroyed) return;
       this.counts.set(EMPTY_COUNTS);
+      if (isForbiddenError(error)) {
+        this.loadFailed.set(false);
+        this.forbidden.set(true);
+      }
     }
+  }
+
+  private hasGrant(key: string): boolean {
+    const grants = runInInjectionContext(this.injector, () => branchGrants(key));
+    return hasBranchGrant(grants, this.scope.branch()?.id ?? null);
   }
 }

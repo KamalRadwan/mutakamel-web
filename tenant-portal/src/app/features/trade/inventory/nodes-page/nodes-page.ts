@@ -1,10 +1,12 @@
 import {
   Component,
   DestroyRef,
+  Injector,
   computed,
   effect,
   inject,
   input,
+  runInInjectionContext,
   signal,
   untracked,
   viewChild,
@@ -34,24 +36,25 @@ import { Button } from '../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { Dropdown, type DropdownOption } from '../../../../shared/ui/dropdown/dropdown';
 import { Field } from '../../../../shared/ui/field/field';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { Modal } from '../../../../shared/ui/modal/modal';
 import { Pagination } from '../../../../shared/ui/pagination/pagination';
 import { SettingsFrame } from '../../../../shared/ui/settings-frame/settings-frame';
 import { SettingsNotice } from '../../../../shared/ui/settings-notice/settings-notice';
 import { StepFilter, type StepOption } from '../../../../shared/ui/step-filter/step-filter';
-import { ApiError, newIdempotencyKey } from '../../shared/trade-api';
-import { INVENTORY_API_LIVE, listCompanyNodes, updateNode } from '../inventory.api';
+import { branchGrants } from '../../shared/trade-access';
+import { ApiError, newIdempotencyKey, tradeContext } from '../../shared/trade-api';
+import { listCompanyNodes, updateNode } from '../inventory.api';
 import {
   INVENTORY_LIMITS,
   type CompanyNode,
   type NodeStatus,
 } from '../inventory.model';
-import { errorKey } from '../inventory.service';
+import { errorKey, hasCompanyGrant, isForbiddenError } from '../inventory.service';
 import { InventoryBadge } from '../inventory-shared/inventory-badge/inventory-badge';
 import { InventoryConflict } from '../inventory-shared/inventory-conflict/inventory-conflict';
 import { NodeModal } from '../node-modal/node-modal';
 
-const CAN_MANAGE_NODES = true; // later from the session permissions
 const SEARCH_DEBOUNCE_MS = 300;
 const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = INVENTORY_LIMITS.pageSize;
@@ -94,6 +97,7 @@ function parseSizeParam(raw: string | undefined): number {
     ConfirmDialog,
     Dropdown,
     Field,
+    FullState,
     Modal,
     Pagination,
     SettingsFrame,
@@ -124,6 +128,7 @@ export class NodesPage {
 
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly injector = inject(Injector);
   private readonly destroyRef = inject(DestroyRef);
   private readonly notify = inject(Notify);
   private readonly scope = inject(ScopeState);
@@ -149,8 +154,12 @@ export class NodesPage {
   /** Bound from `?size=`. */
   readonly sizeParam = input<string | undefined>(undefined, { alias: 'size' });
 
-  protected readonly canManage = CAN_MANAGE_NODES;
-  protected readonly companyNodesLive = INVENTORY_API_LIVE.companyNodes;
+  protected readonly forbidden = signal(false);
+  protected readonly canRead = computed(() => this.hasGrant('trade.inventory.read'));
+  protected readonly showForbidden = computed(() => !this.canRead() || this.forbidden());
+  protected readonly canManage = computed(
+    () => !this.forbidden() && this.hasGrant('trade.inventory.nodes.manage'),
+  );
   protected readonly pageSizes = PAGE_SIZES;
   protected readonly skeletonRows = SKELETON_ROWS;
   protected readonly gridColumns =
@@ -312,6 +321,7 @@ export class NodesPage {
       }
       if (this.lastCompanyId !== companyId) {
         this.lastCompanyId = companyId;
+        this.forbidden.set(false);
         if (selectedBranch && !branches.some((b) => b.id === selectedBranch)) {
           untracked(() => {
             void this.router.navigate([], {
@@ -331,13 +341,23 @@ export class NodesPage {
       const q = this.searchQuery();
       const page = this.page();
       const size = this.pageSize();
+      const allowed = this.canRead();
       this.scope.company();
       untracked(() => {
+        if (!allowed) {
+          this.rows.set([]);
+          this.total.set(0);
+          this.counts.set(null);
+          this.loading.set(false);
+          this.loadFailed.set(false);
+          return;
+        }
         void this.loadNodes(status, branch, q, page, size);
       });
     });
 
     effect(() => {
+      if (this.showForbidden()) return;
       const routeId = this.id()?.trim() ?? '';
       if (!routeId) {
         this.lastOpenedRouteId = null;
@@ -357,6 +377,8 @@ export class NodesPage {
   }
 
   protected reload(): void {
+    if (!this.canRead()) return;
+    this.forbidden.set(false);
     this.clearSearchTimer();
     const term = this.searchInput().trim();
     if (term !== this.searchQuery()) {
@@ -377,8 +399,16 @@ export class NodesPage {
     );
   }
 
+  protected goHome(): void {
+    void this.router.navigate(['/']);
+  }
+
+  protected onForbidden(): void {
+    this.forbidden.set(true);
+  }
+
   protected openCreate(): void {
-    if (!this.canManage) return;
+    if (!this.canManage()) return;
     this.nodeModal().openCreate();
   }
 
@@ -479,7 +509,7 @@ export class NodesPage {
       },
     ];
 
-    if (this.canManage) {
+    if (this.canManage()) {
       items.push({
         id: 'edit',
         title: this.transloco.translate('invSetup.actions.edit'),
@@ -540,7 +570,7 @@ export class NodesPage {
   }
 
   private async requestToggleStatus(node: CompanyNode): Promise<void> {
-    if (!this.canManage || this.busyIds().has(node.id)) return;
+    if (!this.canManage() || this.busyIds().has(node.id)) return;
     const nextStatus: NodeStatus = node.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
     this.pendingToggle.set({ node, nextStatus });
     const confirmed = await this.confirmToggle().open();
@@ -550,7 +580,13 @@ export class NodesPage {
     const key = newIdempotencyKey();
     this.setBusy(node.id, true);
     try {
-      await updateNode(node.id, node.version, { status: nextStatus }, key);
+      await updateNode(
+        node.id,
+        node.version,
+        { status: nextStatus },
+        key,
+        tradeContext(this.scope, 'COMPANY'),
+      );
       if (this.destroyed) return;
       const toastKey =
         nextStatus === 'ACTIVE'
@@ -560,6 +596,10 @@ export class NodesPage {
       this.reload();
     } catch (error) {
       if (this.destroyed) return;
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+        return;
+      }
       if (error instanceof ApiError) {
         if (error.code === 'TRADE.INVENTORY.NODE_IN_USE') {
           this.inUseAlert().open();
@@ -583,10 +623,15 @@ export class NodesPage {
     page: number,
     limit: number,
   ): Promise<void> {
+    if (!this.canRead()) {
+      this.loading.set(false);
+      return;
+    }
     const seq = ++this.loadSeq;
     this.loading.set(true);
     this.loadFailed.set(false);
 
+    const ctx = tradeContext(this.scope, 'COMPANY');
     const commonFilter = {
       branchId: branchId || undefined,
       search: search || undefined,
@@ -594,15 +639,18 @@ export class NodesPage {
 
     try {
       const [listPage, allCountPage, activeCountPage, inactiveCountPage] = await Promise.all([
-        listCompanyNodes({
-          ...commonFilter,
-          status: status || undefined,
-          page,
-          limit,
-        }),
-        listCompanyNodes({ ...commonFilter, page: 1, limit: 1 }),
-        listCompanyNodes({ ...commonFilter, status: 'ACTIVE', page: 1, limit: 1 }),
-        listCompanyNodes({ ...commonFilter, status: 'INACTIVE', page: 1, limit: 1 }),
+        listCompanyNodes(
+          {
+            ...commonFilter,
+            status: status || undefined,
+            page,
+            limit,
+          },
+          ctx,
+        ),
+        listCompanyNodes({ ...commonFilter, page: 1, limit: 1 }, ctx),
+        listCompanyNodes({ ...commonFilter, status: 'ACTIVE', page: 1, limit: 1 }, ctx),
+        listCompanyNodes({ ...commonFilter, status: 'INACTIVE', page: 1, limit: 1 }, ctx),
       ]);
       if (seq !== this.loadSeq) return;
       this.rows.set(listPage.items);
@@ -616,6 +664,11 @@ export class NodesPage {
       if (seq !== this.loadSeq) return;
       this.rows.set([]);
       this.total.set(0);
+      if (isForbiddenError(error)) {
+        this.loadFailed.set(false);
+        this.forbidden.set(true);
+        return;
+      }
       this.loadFailed.set(true);
       this.notify.error(this.transloco.translate(errorKey(error)));
     } finally {
@@ -623,6 +676,13 @@ export class NodesPage {
         this.loading.set(false);
       }
     }
+  }
+
+  private hasGrant(key: string): boolean {
+    const grants = runInInjectionContext(this.injector, () => branchGrants(key));
+    const company = this.scope.company();
+    const companyBranchIds = company?.branches.map((b) => b.id) ?? [];
+    return hasCompanyGrant(grants, this.scope.branch()?.id ?? null, companyBranchIds);
   }
 
   private setBusy(id: string, busy: boolean): void {

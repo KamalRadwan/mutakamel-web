@@ -5,15 +5,16 @@ import { provideIcons } from '@ng-icons/core';
 import { tablerCalendarStats } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
+import { ScopeState } from '../../../../core/scope/scope';
 import { Button } from '../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { DateField } from '../../../../shared/ui/date-time/date-field';
 import { Field } from '../../../../shared/ui/field/field';
 import { Modal } from '../../../../shared/ui/modal/modal';
-import { ApiError, newIdempotencyKey } from '../../shared/trade-api';
+import { ApiError, newIdempotencyKey, tradeContext } from '../../shared/trade-api';
 import { createPeriod } from '../inventory.api';
 import { CODE_PATTERN, INVENTORY_LIMITS, type InventoryPeriod } from '../inventory.model';
-import { errorKey, errorReason, formatDateTime as formatDateTimeDisplay } from '../inventory.service';
+import { errorKey, errorReason, formatDateTime as formatDateTimeDisplay, isForbiddenError } from '../inventory.service';
 import { InventoryBadge } from '../inventory-shared/inventory-badge/inventory-badge';
 
 type PeriodField = 'code' | 'startsOn' | 'endsOn' | 'maxBackdateDays';
@@ -86,6 +87,7 @@ export class PeriodModal {
   protected readonly uid = `period-modal-${++PeriodModal.nextId}`;
 
   private readonly notify = inject(Notify);
+  private readonly scope = inject(ScopeState);
   private readonly language = inject(LanguageState).current;
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
@@ -101,6 +103,7 @@ export class PeriodModal {
   readonly closeRequested = output<InventoryPeriod>();
   readonly reopenRequested = output<InventoryPeriod>();
   readonly closed = output<void>();
+  readonly forbidden = output<void>();
 
   protected readonly limits = INVENTORY_LIMITS;
   protected readonly mode = signal<'create' | 'view'>('create');
@@ -345,6 +348,7 @@ export class PeriodModal {
           maxBackdateDays: Number(this.maxBackdateDays().trim()),
         },
         this.formIdempotencyKey,
+        tradeContext(this.scope, 'COMPANY'),
       );
       this.notify.success(this.transloco.translate('invSetup.periods.toast.created'));
       this.created.emit(created);
@@ -369,6 +373,11 @@ export class PeriodModal {
   }
 
   private handleCreateError(error: unknown): void {
+    if (isForbiddenError(error)) {
+      this.close();
+      this.forbidden.emit();
+      return;
+    }
     if (error instanceof ApiError) {
       if (error.code === 'TRADE.INVENTORY.PERIOD_CODE_TAKEN') {
         this.serverErrors.update((prev) => ({

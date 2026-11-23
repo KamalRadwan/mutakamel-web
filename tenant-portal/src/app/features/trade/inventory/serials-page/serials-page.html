@@ -1,3 +1,14 @@
+@if (showForbidden()) {
+  <div class="flex flex-1 flex-col rounded-10 border border-border bg-surface p-16 shadow-card">
+    <ui-full-state
+      kind="forbidden"
+      [title]="'errors.forbidden.title' | transloco"
+      [text]="'errors.forbidden.text' | transloco"
+      [actionLabel]="'errors.notFound.action' | transloco"
+      (action)="goHome()"
+    />
+  </div>
+} @else {
 <app-settings-frame
   [addLabel]="''"
   [showAdd]="false"
@@ -144,7 +155,7 @@
               <div
                 role="row"
                 tabindex="0"
-                [attr.aria-label]="row.serialKey + ' ' + row.itemCode"
+                [attr.aria-label]="row.serialKey + ' ' + (row.itemCode || ('tradeInventory.common.none' | transloco))"
                 class="mt-6 grid h-table-row cursor-pointer rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
                 [class]="gridCols"
                 (click)="openSerial(row)"
@@ -162,7 +173,7 @@
 
                 <span role="cell" class="flex min-w-0 items-center gap-6 border-s border-border px-10">
                   <bdi dir="ltr" class="shrink-0 text-12 leading-18 text-text-muted tabular-nums">
-                    {{ row.itemCode }}
+                    {{ row.itemCode || ('tradeInventory.common.none' | transloco) }}
                   </bdi>
                   @if (itemLabel(row); as name) {
                     <span dir="auto" class="min-w-0 truncate text-13 leading-18 text-text" [title]="name">
@@ -227,4 +238,5 @@
   </div>
 </app-settings-frame>
 
-<app-serial-modal (closed)="onModalClosed()" />
+<app-serial-modal (closed)="onModalClosed()" (forbidden)="onForbidden()" />
+}

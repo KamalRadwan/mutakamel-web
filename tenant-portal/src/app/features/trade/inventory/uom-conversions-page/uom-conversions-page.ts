@@ -1,9 +1,11 @@
 import {
   Component,
   DestroyRef,
+  Injector,
   computed,
   effect,
   inject,
+  runInInjectionContext,
   signal,
   untracked,
   viewChild,
@@ -27,12 +29,14 @@ import { Notify } from '../../../../core/notify/notify';
 import { ScopeState } from '../../../../core/scope/scope';
 import { type ActionItem, type ActionSelection, ActionsMenu } from '../../../../shared/ui/actions-menu/actions-menu';
 import { Button } from '../../../../shared/ui/button/button';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { Modal } from '../../../../shared/ui/modal/modal';
 import { Pagination } from '../../../../shared/ui/pagination/pagination';
 import { SettingsFrame } from '../../../../shared/ui/settings-frame/settings-frame';
 import { SettingsNotice } from '../../../../shared/ui/settings-notice/settings-notice';
 import { StepFilter, type StepOption } from '../../../../shared/ui/step-filter/step-filter';
-import { type TradeContext, errorCodeOf, newIdempotencyKey, tradeContext } from '../../shared/trade-api';
+import { branchGrants } from '../../shared/trade-access';
+import { ApiError, type TradeContext, errorCodeOf, newIdempotencyKey, tradeContext } from '../../shared/trade-api';
 import { getItem, searchItems } from '../../shared/trade-foundation.api';
 import type { ItemRow } from '../../shared/trade-foundation.model';
 import { listUomConversions, publishUomConversion, retireUomConversion } from '../inventory.api';
@@ -42,13 +46,21 @@ import {
   type UomConversionRevision,
   type UomConversionStatus,
 } from '../inventory.model';
-import { errorKey, errorReason, factorText, formatDateTime, formatQuantity, itemName } from '../inventory.service';
+import {
+  errorKey,
+  errorReason,
+  factorText,
+  formatDateTime,
+  formatQuantity,
+  hasCompanyGrant,
+  isForbiddenError,
+  itemName,
+} from '../inventory.service';
 import { InventoryBadge } from '../inventory-shared/inventory-badge/inventory-badge';
 import { InventoryConflict } from '../inventory-shared/inventory-conflict/inventory-conflict';
 import { InventoryReasonDialog } from '../inventory-shared/inventory-reason-dialog/inventory-reason-dialog';
 import { UomConversionModal } from '../uom-conversion-modal/uom-conversion-modal';
 
-const CAN_GOVERN = true; // later from the session permissions
 const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = INVENTORY_LIMITS.pageSize;
 const PAGE_SIZES: readonly number[] = [20, 50, 100];
@@ -108,10 +120,17 @@ function parsePageSize(raw: string | null | undefined): number {
   return PAGE_SIZES.includes(parsed) ? parsed : DEFAULT_PAGE_SIZE;
 }
 
-function formatItemLabel(code: string, localizedNames: Record<string, string>, lang: string): string {
+function formatItemLabel(
+  code: string | null | undefined,
+  localizedNames: Record<string, string> | null | undefined,
+  lang: string,
+): string {
+  const cleanCode = code?.trim() ?? '';
   const name = itemName(localizedNames, lang);
-  if (!name || name === code) return code;
-  return `\u2066${code}\u2069 — ${name}`;
+  if (!name && !cleanCode) return '—';
+  if (!cleanCode) return name;
+  if (!name || name === cleanCode) return cleanCode;
+  return `\u2066${cleanCode}\u2069 — ${name}`;
 }
 
 @Component({
@@ -121,6 +140,7 @@ function formatItemLabel(code: string, localizedNames: Record<string, string>, l
     TranslocoPipe,
     ActionsMenu,
     Button,
+    FullState,
     Modal,
     Pagination,
     SettingsFrame,
@@ -149,6 +169,7 @@ function formatItemLabel(code: string, localizedNames: Record<string, string>, l
 export class UomConversionsPage {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly injector = inject(Injector);
   private readonly destroyRef = inject(DestroyRef);
   private readonly notify = inject(Notify);
   private readonly scope = inject(ScopeState);
@@ -163,7 +184,12 @@ export class UomConversionsPage {
   private readonly conflictDialog = viewChild.required(InventoryConflict);
   private readonly transitionAlertModal = viewChild.required<Modal>('transitionAlertModal');
 
-  protected readonly canGovern = CAN_GOVERN;
+  protected readonly forbidden = signal(false);
+  protected readonly canRead = computed(() => this.hasGrant('trade.inventory.read'));
+  protected readonly showForbidden = computed(() => !this.canRead() || this.forbidden());
+  protected readonly canGovern = computed(
+    () => !this.forbidden() && this.hasGrant('trade.inventory.governance.manage'),
+  );
   protected readonly skeletonRows = SKELETON_ROWS;
   protected readonly pageSizes = [...PAGE_SIZES];
   protected readonly gridColumns =
@@ -274,7 +300,7 @@ export class UomConversionsPage {
     const action = this.reasonAction();
     if (!action) return '';
     const { row } = action;
-    return `${formatItemLabel(row.itemCode, row.itemNames, this.language())} · ${row.fromUomCode} → ${row.toUomCode}`;
+    return `${formatItemLabel(row.itemCode, row.itemNames, this.language())} · ${row.fromUomCode || '—'} → ${row.toUomCode || '—'}`;
   });
 
   protected readonly reasonDialogMessage = computed(() => {
@@ -310,7 +336,15 @@ export class UomConversionsPage {
     effect(() => {
       const param = this.itemParam();
       const ctx = this.companyCtx();
-      untracked(() => void this.syncItemFromUrl(param, ctx));
+      const allowed = this.canRead();
+      untracked(() => {
+        this.forbidden.set(false);
+        if (!allowed) {
+          this.resolvedItemKey.set(`${ctx.companyId ?? ''}:${param}`);
+          return;
+        }
+        void this.syncItemFromUrl(param, ctx);
+      });
     });
 
     // Keep selected item display label localized when language switches.
@@ -341,8 +375,17 @@ export class UomConversionsPage {
       const page = this.page();
       const limit = this.pageSize();
       const tick = this.reloadTick();
+      const allowed = this.canRead();
 
       untracked(() => {
+        if (!allowed) {
+          this.rows.set([]);
+          this.total.set(0);
+          this.counts.set(null);
+          this.loading.set(false);
+          this.loadFailed.set(false);
+          return;
+        }
         void this.loadList(profileId, status, page, limit);
         const profileKey = profileId ?? '';
         if (profileKey !== this.countsTargetProfileKey || tick !== this.lastCountsReloadTick) {
@@ -355,6 +398,7 @@ export class UomConversionsPage {
 
     // Open or close record modal when route :id changes.
     effect(() => {
+      if (this.showForbidden()) return;
       const id = this.routeId();
       untracked(() => {
         if (!id) {
@@ -377,12 +421,22 @@ export class UomConversionsPage {
   }
 
   protected openCreate(prefill?: UomConversionRevision): void {
-    if (!this.canGovern) return;
+    if (!this.canGovern()) return;
     this.conversionModal().openCreate(prefill);
   }
 
   protected reload(): void {
+    if (!this.canRead()) return;
+    this.forbidden.set(false);
     this.reloadTick.update((n) => n + 1);
+  }
+
+  protected goHome(): void {
+    void this.router.navigate(['/']);
+  }
+
+  protected onForbidden(): void {
+    this.forbidden.set(true);
   }
 
   protected onStatusChange(next: string): void {
@@ -516,7 +570,7 @@ export class UomConversionsPage {
         tile: 'bg-icon-blue',
       },
     ];
-    if (!this.canGovern) return items;
+    if (!this.canGovern()) return items;
 
     items.push({
       id: 'newRevision',
@@ -575,7 +629,7 @@ export class UomConversionsPage {
   }
 
   protected async requestPublish(row: UomConversionRevision): Promise<void> {
-    if (!this.canGovern || row.status !== 'DRAFT' || this.transitionPending()) return;
+    if (!this.canGovern() || row.status !== 'DRAFT' || this.transitionPending()) return;
 
     let predecessor =
       this.rows().find(
@@ -589,17 +643,24 @@ export class UomConversionsPage {
 
     if (!predecessor) {
       try {
-        const res = await listUomConversions({
-          itemCompanyProfileId: row.itemCompanyProfileId,
-          fromUomId: row.fromUomId,
-          toUomId: row.toUomId,
-          status: 'PUBLISHED',
-          page: 1,
-          limit: 1,
-        });
+        const res = await listUomConversions(
+          {
+            itemCompanyProfileId: row.itemCompanyProfileId,
+            fromUomId: row.fromUomId,
+            toUomId: row.toUomId,
+            status: 'PUBLISHED',
+            page: 1,
+            limit: 1,
+          },
+          this.companyCtx(),
+        );
         if (this.destroyed) return;
         predecessor = res.items.find((candidate) => candidate.id !== row.id) ?? null;
-      } catch {
+      } catch (error) {
+        if (isForbiddenError(error)) {
+          this.forbidden.set(true);
+          return;
+        }
         // Proceed even if predecessor check fails; backend remains authoritative.
       }
     }
@@ -616,7 +677,7 @@ export class UomConversionsPage {
   }
 
   protected requestRetire(row: UomConversionRevision): void {
-    if (!this.canGovern || row.status !== 'PUBLISHED' || this.transitionPending()) return;
+    if (!this.canGovern() || row.status !== 'PUBLISHED' || this.transitionPending()) return;
     this.transitionKeySig = '';
     this.transitionKey = '';
     this.reasonAction.set({
@@ -639,12 +700,13 @@ export class UomConversionsPage {
       this.transitionKey = newIdempotencyKey();
     }
 
+    const ctx = this.companyCtx();
     this.transitionPending.set(true);
     try {
       const updated =
         mode === 'publish'
-          ? await publishUomConversion(row.id, row.version, reasonCode, this.transitionKey)
-          : await retireUomConversion(row.id, row.version, reasonCode, this.transitionKey);
+          ? await publishUomConversion(row.id, row.version, reasonCode, this.transitionKey, ctx)
+          : await retireUomConversion(row.id, row.version, reasonCode, this.transitionKey, ctx);
 
       if (this.destroyed) return;
       this.transitionPending.set(false);
@@ -753,7 +815,10 @@ export class UomConversionsPage {
 
     // Fallback when URL carries a raw itemCompanyProfileId.
     try {
-      const probe = await listUomConversions({ itemCompanyProfileId: param, page: 1, limit: 1 });
+      const probe = await listUomConversions(
+        { itemCompanyProfileId: param, page: 1, limit: 1 },
+        ctx,
+      );
       if (seq !== this.itemResolveSeq || this.destroyed) return;
       const first = probe.items[0];
       const code = first?.itemCode ?? param;
@@ -769,8 +834,12 @@ export class UomConversionsPage {
       });
       this.appliedSearchLabel = label;
       this.search.set(label);
-    } catch {
+    } catch (error) {
       if (seq !== this.itemResolveSeq || this.destroyed) return;
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+        return;
+      }
       this.selectedItem.set({
         param,
         companyId,
@@ -848,25 +917,37 @@ export class UomConversionsPage {
     page: number,
     limit: number,
   ): Promise<void> {
+    if (!this.canRead()) {
+      this.loading.set(false);
+      return;
+    }
     const seq = ++this.listSeq;
     this.loading.set(true);
     this.loadFailed.set(false);
     try {
-      const res = await listUomConversions({
-        itemCompanyProfileId,
-        status: status === 'ALL' ? undefined : status,
-        page,
-        limit,
-      });
+      const res = await listUomConversions(
+        {
+          itemCompanyProfileId,
+          status: status === 'ALL' ? undefined : status,
+          page,
+          limit,
+        },
+        this.companyCtx(),
+      );
       if (seq !== this.listSeq || this.destroyed) return;
       this.rows.set(res.items);
       this.total.set(res.total);
       this.hasLoaded.set(true);
-    } catch {
+    } catch (error) {
       if (seq !== this.listSeq || this.destroyed) return;
-      this.loadFailed.set(true);
       this.rows.set([]);
       this.total.set(0);
+      if (isForbiddenError(error)) {
+        this.loadFailed.set(false);
+        this.forbidden.set(true);
+        return;
+      }
+      this.loadFailed.set(true);
     } finally {
       if (seq === this.listSeq && !this.destroyed) {
         this.loading.set(false);
@@ -875,14 +956,16 @@ export class UomConversionsPage {
   }
 
   private async loadCounts(itemCompanyProfileId: string | undefined): Promise<void> {
+    if (!this.canRead()) return;
     const seq = ++this.countsSeq;
+    const ctx = this.companyCtx();
     const base = itemCompanyProfileId ? { itemCompanyProfileId } : {};
     try {
       const [allPage, draftPage, pubPage, retPage] = await Promise.all([
-        listUomConversions({ ...base, page: 1, limit: 1 }),
-        listUomConversions({ ...base, status: 'DRAFT', page: 1, limit: 1 }),
-        listUomConversions({ ...base, status: 'PUBLISHED', page: 1, limit: 1 }),
-        listUomConversions({ ...base, status: 'RETIRED', page: 1, limit: 1 }),
+        listUomConversions({ ...base, page: 1, limit: 1 }, ctx),
+        listUomConversions({ ...base, status: 'DRAFT', page: 1, limit: 1 }, ctx),
+        listUomConversions({ ...base, status: 'PUBLISHED', page: 1, limit: 1 }, ctx),
+        listUomConversions({ ...base, status: 'RETIRED', page: 1, limit: 1 }, ctx),
       ]);
       if (seq !== this.countsSeq || this.destroyed) return;
       this.counts.set({
@@ -891,7 +974,10 @@ export class UomConversionsPage {
         PUBLISHED: pubPage.total,
         RETIRED: retPage.total,
       });
-    } catch {
+    } catch (error) {
+      if (isForbiddenError(error) && !this.destroyed && seq === this.countsSeq) {
+        this.forbidden.set(true);
+      }
       // Non-blocking count refresh; previous counts stay visible.
     }
   }
@@ -910,15 +996,26 @@ export class UomConversionsPage {
       return;
     }
 
-    const found = await this.findConversionById(id);
-    if (seq !== this.routeResolveSeq || this.destroyed) return;
-    if (found) {
-      this.lastOpenedRouteId = id;
-      this.conversionModal().openView(found);
-      return;
+    try {
+      const found = await this.findConversionById(id);
+      if (seq !== this.routeResolveSeq || this.destroyed) return;
+      if (found) {
+        this.lastOpenedRouteId = id;
+        this.conversionModal().openView(found);
+        return;
+      }
+      this.notify.error(
+        this.transloco.translate('tradeInventory.errors.TRADE_INVENTORY_SCOPE_NOT_FOUND'),
+      );
+    } catch (error) {
+      if (seq !== this.routeResolveSeq || this.destroyed) return;
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+        return;
+      }
+      this.notify.error(this.transloco.translate(errorKey(error)));
     }
 
-    this.notify.error(this.transloco.translate('tradeInventory.errors.TRADE_INVENTORY_UOM_CONVERSION_NOT_FOUND'));
     void this.router.navigate(['/trade/inventory/uom-conversions'], {
       queryParamsHandling: 'preserve',
       replaceUrl: true,
@@ -926,11 +1023,12 @@ export class UomConversionsPage {
   }
 
   private async findConversionById(id: string): Promise<UomConversionRevision | null> {
+    const ctx = this.companyCtx();
     let page = 1;
-    const limit = 200;
+    const limit = 100;
     try {
       while (true) {
-        const res = await listUomConversions({ page, limit });
+        const res = await listUomConversions({ page, limit }, ctx);
         const matched = res.items.find((item) => item.id === id);
         if (matched) return matched;
         if (page * limit >= res.total || res.items.length === 0) {
@@ -938,12 +1036,31 @@ export class UomConversionsPage {
         }
         page += 1;
       }
-    } catch {
+    } catch (error) {
+      if (isForbiddenError(error)) {
+        throw error;
+      }
       return null;
     }
   }
 
+  private hasGrant(key: string): boolean {
+    const grants = runInInjectionContext(this.injector, () => branchGrants(key));
+    const company = this.scope.company();
+    const companyBranchIds = company?.branches.map((b) => b.id) ?? [];
+    return hasCompanyGrant(grants, this.scope.branch()?.id ?? null, companyBranchIds);
+  }
+
   private handleTransitionError(error: unknown, row: UomConversionRevision): void {
+    if (isForbiddenError(error)) {
+      this.transitionKeySig = '';
+      this.transitionKey = '';
+      this.reasonDialog().close();
+      this.reasonAction.set(null);
+      this.forbidden.set(true);
+      return;
+    }
+
     const code = errorCodeOf(error);
     const reason = errorReason(error);
 
@@ -957,30 +1074,38 @@ export class UomConversionsPage {
       return;
     }
 
-    const isConflict = code === 'TRADE.INVENTORY.UOM_CONVERSION_CONFLICT';
-    if (isConflict || (reason && TRANSITION_ALERT_REASONS.has(reason))) {
-      const alertReason = isConflict ? (reason ?? 'published_revision_exists') : reason!;
+    const isInvalidOrUnavailable =
+      code === 'TRADE.INVENTORY.UOM_CONVERSION_INVALID' ||
+      code === 'TRADE.INVENTORY.UOM_CONVERSION_UNAVAILABLE';
+    if (isInvalidOrUnavailable && reason && TRANSITION_ALERT_REASONS.has(reason)) {
       this.transitionKeySig = '';
       this.transitionKey = '';
       this.reasonDialog().close();
       this.reasonAction.set(null);
-      if (isConflict || alertReason === 'published_revision_exists') {
+      if (reason === 'published_revision_exists') {
         this.reload();
         if (this.routeId() === row.id) {
-          void this.findConversionById(row.id).then((fresh) => {
-            if (fresh && !this.destroyed) {
-              this.conversionModal().updateViewing(fresh);
-            }
-          });
+          void this.findConversionById(row.id)
+            .then((fresh) => {
+              if (fresh && !this.destroyed) {
+                this.conversionModal().updateViewing(fresh);
+              }
+            })
+            .catch(() => {
+              // Ignored: list reload handles errors.
+            });
         }
       }
-      this.transitionAlertKey.set(`invUom.transitionAlert.${alertReason.toUpperCase()}`);
+      this.transitionAlertKey.set(`invUom.transitionAlert.${reason.toUpperCase()}`);
       this.transitionAlertModal().open();
       return;
     }
 
     this.notify.error(this.transloco.translate(errorKey(error)));
-    if (code === 'TRADE.INVENTORY.UOM_CONVERSION_NOT_FOUND') {
+    if (
+      (error instanceof ApiError && error.status === 404 && code === 'TRADE.INVENTORY.SCOPE_NOT_FOUND') ||
+      code === 'TRADE.INVENTORY.UOM_CONVERSION_UNAVAILABLE'
+    ) {
       this.transitionKeySig = '';
       this.transitionKey = '';
       this.reasonDialog().close();

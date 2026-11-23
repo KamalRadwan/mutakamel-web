@@ -35,7 +35,17 @@ import {
   FACTOR_PATTERN,
   type UomConversionRevision,
 } from '../inventory.model';
-import { convertPreview, errorKey, errorReason, factorText, formatDateTime, formatQuantity, itemName, shortId } from '../inventory.service';
+import {
+  convertPreview,
+  errorKey,
+  errorReason,
+  factorText,
+  formatDateTime,
+  formatQuantity,
+  isForbiddenError,
+  itemName,
+  shortId,
+} from '../inventory.service';
 import { InventoryBadge } from '../inventory-shared/inventory-badge/inventory-badge';
 
 type ModalMode = 'create' | 'view';
@@ -87,9 +97,12 @@ function localPartsToUtcIso(dateStr: string | null, timeStr: string | null): str
   return dt.toISOString();
 }
 
-function isolateCode(code: string, name: string): string {
-  if (!name || name === code) return code;
-  return `\u2066${code}\u2069 — ${name}`;
+function isolateCode(code: string | null | undefined, name: string): string {
+  const cleanCode = code?.trim() ?? '';
+  if (!cleanCode && !name) return '—';
+  if (!cleanCode) return name;
+  if (!name || name === cleanCode) return cleanCode;
+  return `\u2066${cleanCode}\u2069 — ${name}`;
 }
 
 function approxTenBigInt(num: string, den: string): string {
@@ -141,6 +154,7 @@ export class UomConversionModal {
   readonly publishRequested = output<UomConversionRevision>();
   readonly retireRequested = output<UomConversionRevision>();
   readonly closed = output<void>();
+  readonly forbidden = output<void>();
 
   protected readonly productKinds = PRODUCT_KINDS;
   protected readonly companyCtx = computed<TradeContext>(() => tradeContext(this.scope, 'COMPANY'));
@@ -262,7 +276,8 @@ export class UomConversionModal {
     const rev = this.viewing();
     if (this.mode() !== 'view' || !rev) return '';
     const name = itemName(rev.itemNames, this.language());
-    return isolateCode(rev.itemCode, name);
+    const display = isolateCode(rev.itemCode, name);
+    return display === '—' ? '' : display;
   });
 
   protected readonly itemError = computed<string | null>(() => {
@@ -360,9 +375,9 @@ export class UomConversionModal {
       const rev = this.viewing();
       if (!rev) return null;
       fromId = rev.fromUomId;
-      fromFallback = rev.fromUomCode;
+      fromFallback = rev.fromUomCode ?? '';
       toId = rev.toUomId;
-      toFallback = rev.toUomCode;
+      toFallback = rev.toUomCode ?? '';
       num = rev.factorNumerator;
       den = rev.factorDenominator;
     } else {
@@ -450,7 +465,7 @@ export class UomConversionModal {
     this.lastIdempotencyKey = '';
 
     if (prefill) {
-      this.selectedItemId.set(prefill.itemId);
+      this.selectedItemId.set(prefill.itemId ?? null);
       this.itemDetail.set(null);
       this.fromUomId.set('');
       this.factorNumerator.set(prefill.factorNumerator);
@@ -458,7 +473,11 @@ export class UomConversionModal {
       this.pendingPrefillFromUomId = prefill.fromUomId;
       this.capturePrefillSnapshot = true;
       this.initialSnapshot.set(this.snapshot());
-      void this.loadItemDetail(prefill.itemId);
+      if (prefill.itemId) {
+        void this.loadItemDetail(prefill.itemId);
+      } else {
+        this.loadingItem.set(false);
+      }
     } else {
       this.selectedItemId.set(null);
       this.itemDetail.set(null);
@@ -607,7 +626,7 @@ export class UomConversionModal {
 
     this.saving.set(true);
     try {
-      const created = await createUomConversion(body, this.lastIdempotencyKey);
+      const created = await createUomConversion(body, this.lastIdempotencyKey, this.companyCtx());
       this.lastSubmitFingerprint = '';
       this.lastIdempotencyKey = '';
       this.notify.success(this.transloco.translate('invUom.modal.created', { n: created.revisionNumber }));
@@ -661,10 +680,11 @@ export class UomConversionModal {
     return isolateCode(rev.itemCode, itemName(rev.itemNames, this.language()));
   }
 
-  protected viewUnitDisplay(uomId: string, code: string): string {
+  protected viewUnitDisplay(uomId: string, code: string | null): string {
+    const cleanCode = code?.trim() || '';
     const uom = this.uomById().get(uomId);
-    if (!uom) return code;
-    return isolateCode(code, itemName(uom.localizedNames, this.language()) || uom.displayName);
+    if (!uom) return cleanCode || uomId || '—';
+    return isolateCode(cleanCode || uom.code, itemName(uom.localizedNames, this.language()) || uom.displayName);
   }
 
   protected viewDateTime(iso: string | null): string {
@@ -739,6 +759,11 @@ export class UomConversionModal {
       this.itemDetail.set(null);
       this.fromUomId.set('');
       this.pendingPrefillFromUomId = null;
+      if (isForbiddenError(error)) {
+        this.close();
+        this.forbidden.emit();
+        return;
+      }
       this.notify.error(this.transloco.translate(errorKey(error)));
     } finally {
       if (seq === this.itemLoadSeq) {
@@ -754,14 +779,17 @@ export class UomConversionModal {
   ): Promise<void> {
     const seq = ++this.predecessorSeq;
     try {
-      const page = await listUomConversions({
-        itemCompanyProfileId,
-        fromUomId,
-        toUomId,
-        status: 'PUBLISHED',
-        page: 1,
-        limit: 1,
-      });
+      const page = await listUomConversions(
+        {
+          itemCompanyProfileId,
+          fromUomId,
+          toUomId,
+          status: 'PUBLISHED',
+          page: 1,
+          limit: 1,
+        },
+        this.companyCtx(),
+      );
       if (seq !== this.predecessorSeq) return;
       this.publishedPredecessor.set(page.items[0] ?? null);
     } catch {
@@ -773,7 +801,7 @@ export class UomConversionModal {
   private async loadUomLookup(): Promise<void> {
     const seq = ++this.lookupsSeq;
     try {
-      const rows = await listUoms();
+      const rows = await listUoms(undefined, this.companyCtx());
       if (seq !== this.lookupsSeq) return;
       this.uoms.set(rows);
     } catch {
@@ -783,11 +811,12 @@ export class UomConversionModal {
 
   private async loadViewLookups(): Promise<void> {
     const seq = ++this.lookupsSeq;
+    const ctx = this.companyCtx();
     const [uomRes, pubRes, retRes, refRes] = await Promise.allSettled([
-      listUoms(),
-      listReasons('INVENTORY_UOM_PUBLISH', { includeInactive: true }),
-      listReasons('INVENTORY_UOM_RETIRE', { includeInactive: true }),
-      listReferenceData(this.companyCtx()),
+      listUoms(undefined, ctx),
+      listReasons('INVENTORY_UOM_PUBLISH', { includeInactive: true }, ctx),
+      listReasons('INVENTORY_UOM_RETIRE', { includeInactive: true }, ctx),
+      listReferenceData(ctx),
     ]);
     if (seq !== this.lookupsSeq) return;
     if (uomRes.status === 'fulfilled') this.uoms.set(uomRes.value);
@@ -797,6 +826,12 @@ export class UomConversionModal {
   }
 
   private handleCreateError(error: unknown): void {
+    if (isForbiddenError(error)) {
+      this.close();
+      this.forbidden.emit();
+      return;
+    }
+    const code = errorCodeOf(error);
     const reason = errorReason(error);
     if (reason === 'identity_not_required') {
       this.serverErrors.set({
@@ -810,8 +845,16 @@ export class UomConversionModal {
       });
       return;
     }
-    if (errorCodeOf(error) === 'TRADE.INVENTORY.ITEM_NOT_STOCK_TRACKED') {
+    if (code === 'TRADE.INVENTORY.UOM_CONVERSION_UNAVAILABLE') {
+      this.serverErrors.set({ fromUnit: errorKey(error) });
+      return;
+    }
+    if (code === 'TRADE.INVENTORY.ITEM_NOT_STOCK_TRACKED') {
       this.serverErrors.set({ item: 'invUom.validation.itemNotStockTracked' });
+      return;
+    }
+    if (code === 'TRADE.INVENTORY.ITEM_TRACKING_CONFLICT') {
+      this.serverErrors.set({ item: errorKey(error) });
       return;
     }
     if (reason === 'non_exact_result') {

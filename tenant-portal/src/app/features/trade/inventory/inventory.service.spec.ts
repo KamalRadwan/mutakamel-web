@@ -5,6 +5,9 @@ import {
   errorKey,
   factorText,
   formatQuantity,
+  hasBranchGrant,
+  hasCompanyGrant,
+  isForbiddenError,
   itemName,
   movementGroup,
   periodDays,
@@ -107,8 +110,10 @@ describe('inventory.service itemName', () => {
     expect(itemName({ fr: 'Eau' }, 'ar')).toBe('Eau');
   });
 
-  it('returns an empty string when no name exists', () => {
+  it('returns an empty string when no name exists or map is null/undefined', () => {
     expect(itemName({}, 'en')).toBe('');
+    expect(itemName(null, 'en')).toBe('');
+    expect(itemName(undefined, 'ar')).toBe('');
   });
 });
 
@@ -174,8 +179,48 @@ describe('inventory.service errorKey', () => {
     );
   });
 
+  it('maps the three newly added inventory field/domain codes', () => {
+    expect(errorKey(new ApiError(422, 'TRADE.INVENTORY.NODE_INVALID'))).toBe(
+      'tradeInventory.errors.TRADE_INVENTORY_NODE_INVALID',
+    );
+    expect(errorKey(new ApiError(422, 'TRADE.INVENTORY.ITEM_TRACKING_CONFLICT'))).toBe(
+      'tradeInventory.errors.TRADE_INVENTORY_ITEM_TRACKING_CONFLICT',
+    );
+    expect(errorKey(new ApiError(409, 'TRADE.INVENTORY.INSUFFICIENT_AVAILABILITY'))).toBe(
+      'tradeInventory.errors.TRADE_INVENTORY_INSUFFICIENT_AVAILABILITY',
+    );
+    expect(errorKey(new ApiError(404, 'TRADE.INVENTORY.PERIOD_NOT_FOUND'))).toBe(
+      'tradeInventory.errors.TRADE_INVENTORY_PERIOD_NOT_FOUND',
+    );
+    expect(errorKey(new ApiError(404, 'TRADE.INVENTORY.SERIAL_NOT_FOUND'))).toBe(
+      'tradeInventory.errors.TRADE_INVENTORY_SERIAL_NOT_FOUND',
+    );
+    expect(errorKey(new ApiError(404, 'TRADE.INVENTORY.DECISION_NOT_FOUND'))).toBe(
+      'tradeInventory.errors.TRADE_INVENTORY_DECISION_NOT_FOUND',
+    );
+  });
+
   it('maps an unknown 403 to permission and other unknowns to generic', () => {
     expect(errorKey(new ApiError(403, 'SOMETHING'))).toBe('tradeInventory.errors.permission');
     expect(errorKey(new ApiError(500, 'SOMETHING'))).toBe('tradeInventory.errors.generic');
+  });
+});
+
+describe('inventory.service permission helpers', () => {
+  it('detects 403 ApiError via isForbiddenError', () => {
+    expect(isForbiddenError(new ApiError(403, 'TRADE.AUTH.TARGET_DENIED'))).toBe(true);
+    expect(isForbiddenError(new ApiError(404, 'TRADE.INVENTORY.SCOPE_NOT_FOUND'))).toBe(false);
+    expect(isForbiddenError(new Error('nope'))).toBe(false);
+  });
+
+  it('evaluates branch and company grants', () => {
+    expect(hasBranchGrant('ALL', null)).toBe(true);
+    expect(hasBranchGrant(new Set(['b1']), 'b1')).toBe(true);
+    expect(hasBranchGrant(new Set(['b2']), 'b1')).toBe(false);
+
+    expect(hasCompanyGrant('ALL', 'b1', ['b1', 'b2'])).toBe(true);
+    expect(hasCompanyGrant(new Set(['b2']), 'b1', ['b1', 'b2'])).toBe(false);
+    expect(hasCompanyGrant(new Set(['b2']), null, ['b1', 'b2'])).toBe(true);
+    expect(hasCompanyGrant(new Set(['b9']), 'b1', ['b1', 'b2'])).toBe(false);
   });
 });

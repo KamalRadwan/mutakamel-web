@@ -115,11 +115,11 @@ export interface UomConversionRevision {
   version: number;
   createdAt: string;
   updatedAt: string;
-  itemId: string;
-  itemCode: string;
-  itemNames: Record<string, string>;
-  fromUomCode: string;
-  toUomCode: string;
+  itemId: string | null;
+  itemCode: string | null;
+  itemNames: Record<string, string> | null;
+  fromUomCode: string | null;
+  toUomCode: string | null;
   publishReasonCode: string | null;
   retireReasonCode: string | null;
 }
@@ -167,8 +167,8 @@ export interface SerialUnit {
   currentLedgerEntryId: string | null;
   lastTransitionAt: string;
   version: number;
-  itemCode: string;
-  itemNames: Record<string, string>;
+  itemCode: string | null;
+  itemNames: Record<string, string> | null;
   currentNodeCode: string | null;
   currentNodeName: string | null;
   currentUomCode: string | null;
@@ -201,7 +201,7 @@ export interface SerialLifecycleEntry {
   nodeCode: string | null;
   nodeName: string | null;
   uomId: string;
-  uomCode: string;
+  uomCode: string | null;
   occurredAt: string;
 }
 
@@ -227,6 +227,17 @@ export type DecisionAggregateType =
   | 'INVENTORY_DELIVERY'
   | 'INVENTORY_DELIVERY_LINE';
 
+export interface DecisionPolicyVersionRef {
+  type: string;
+  policyKind: string;
+  definitionId: string;
+  definitionCode: string;
+  id: string;
+  version: number;
+  contentHash: string;
+  registryVersion: string;
+}
+
 export interface InventoryDecision {
   id: string;
   decisionType: DecisionType;
@@ -234,9 +245,9 @@ export interface InventoryDecision {
   aggregateId: string;
   companyId: string;
   branchId: string | null;
-  policyVersions: { policyKind: string; version: number }[];
+  policyVersions: DecisionPolicyVersionRef[];
   matchedRules: string[];
-  result: { outcome: string; selectedValue: string | null; explanationCode: string };
+  result: { outcome?: string; selectedValue: string | null; explanationCode?: string };
   explanation: string;
   evaluatedAt: string;
   correlationId: string;

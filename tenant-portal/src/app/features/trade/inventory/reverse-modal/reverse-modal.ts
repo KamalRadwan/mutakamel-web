@@ -19,6 +19,7 @@ import {
 } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
+import { ScopeState } from '../../../../core/scope/scope';
 import { Button } from '../../../../shared/ui/button/button';
 import { Checkbox } from '../../../../shared/ui/checkbox/checkbox';
 import { DateField } from '../../../../shared/ui/date-time/date-field';
@@ -31,7 +32,7 @@ import {
   type ReasonPickerValue,
   TradeReasonPicker,
 } from '../../shared/pickers/reason-picker/reason-picker';
-import { ApiError, errorCodeOf, newIdempotencyKey } from '../../shared/trade-api';
+import { ApiError, errorCodeOf, newIdempotencyKey, tradeContext } from '../../shared/trade-api';
 import { listReasons } from '../../shared/trade-foundation.api';
 import type { ReasonCode } from '../../shared/trade-foundation.model';
 import { getMovementSource, reverseMovementSource } from '../inventory.api';
@@ -43,7 +44,7 @@ import {
   type ReverseMovementInput,
   type SourceLine,
 } from '../inventory.model';
-import { errorKey, formatQuantity, itemName } from '../inventory.service';
+import { errorKey, formatQuantity, isForbiddenError, itemName } from '../inventory.service';
 import { InventoryConflict } from '../inventory-shared/inventory-conflict/inventory-conflict';
 
 const SCALE = 100_000_000n;
@@ -179,6 +180,7 @@ export class ReverseModal {
   private static nextId = 0;
   protected readonly uid = `reverse-modal-${++ReverseModal.nextId}`;
 
+  private readonly scope = inject(ScopeState);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
@@ -195,6 +197,7 @@ export class ReverseModal {
   readonly reversed = output<MovementSourceRecord>();
   readonly closed = output<void>();
   readonly openDecision = output<string>();
+  readonly forbidden = output<void>();
 
   protected readonly skeletonRows = SKELETON_ROWS;
 
@@ -636,6 +639,7 @@ export class ReverseModal {
         src.version,
         body,
         this.idempotencyKey,
+        tradeContext(this.scope, 'BRANCH'),
       );
       if (this.destroyed || !this.isOpen()) return;
 
@@ -695,6 +699,12 @@ export class ReverseModal {
   }
 
   private handleSubmitError(error: unknown): void {
+    if (isForbiddenError(error)) {
+      this.closeSilently();
+      this.forbidden.emit();
+      return;
+    }
+
     const code = errorCodeOf(error);
 
     if (code === 'TRADE.INVENTORY.PERIOD_CONFLICT') {
@@ -709,6 +719,54 @@ export class ReverseModal {
     ) {
       this.serverReasonError.set(this.transloco.translate(errorKey(error)));
       return;
+    }
+
+    if (code === 'TRADE.INVENTORY.INSUFFICIENT_AVAILABILITY') {
+      const lines = this.reversibleLines();
+      if (lines.length > 0) {
+        if (this.reverseAllRemaining()) {
+          this.reverseAllRemaining.set(false);
+        }
+        const errMap: Record<string, TranslatedError> = {};
+        for (const item of lines) {
+          const raw = this.lineQuantityValue(item.line.id).trim();
+          if (!raw || toMicros(raw) > 0n) {
+            errMap[item.line.id] = { key: errorKey(error) };
+          }
+        }
+        if (Object.keys(errMap).length === 0) {
+          errMap[lines[0].line.id] = { key: errorKey(error) };
+        }
+        this.serverLineQtyErrors.set(errMap);
+        return;
+      }
+    }
+
+    if (code === 'TRADE.INVENTORY.ITEM_TRACKING_CONFLICT') {
+      const lines = this.reversibleLines();
+      if (lines.length > 0) {
+        if (this.reverseAllRemaining()) {
+          this.reverseAllRemaining.set(false);
+        }
+        const serialized = lines.filter((item) => item.isSerialized);
+        const targets = serialized.length > 0 ? serialized : lines;
+        const errMap: Record<string, TranslatedError> = {};
+        for (const item of targets) {
+          const raw = this.lineQuantityValue(item.line.id).trim();
+          if (!raw || toMicros(raw) > 0n) {
+            errMap[item.line.id] = { key: errorKey(error) };
+          }
+        }
+        if (Object.keys(errMap).length === 0) {
+          errMap[targets[0].line.id] = { key: errorKey(error) };
+        }
+        if (serialized.length > 0) {
+          this.serverLineSerialErrors.set(errMap);
+        } else {
+          this.serverLineQtyErrors.set(errMap);
+        }
+        return;
+      }
     }
 
     if (code === 'TRADE.INVENTORY.REVERSAL_NOT_ALLOWED') {
@@ -764,7 +822,7 @@ export class ReverseModal {
   private async resolveReasonCode(reasonCodeId: string): Promise<string | null> {
     const cached = this.loadedReasons().find((r) => r.id === reasonCodeId);
     if (cached) return cached.code;
-    const fresh = await listReasons('INVENTORY_REVERSAL');
+    const fresh = await listReasons('INVENTORY_REVERSAL', undefined, tradeContext(this.scope, 'COMPANY'));
     if (this.destroyed || !this.isOpen()) return null;
     this.loadedReasons.set(fresh);
     return fresh.find((r) => r.id === reasonCodeId)?.code ?? null;
@@ -773,7 +831,7 @@ export class ReverseModal {
   private async loadReversalReasons(): Promise<void> {
     const seq = ++this.reasonsSeq;
     try {
-      const rows = await listReasons('INVENTORY_REVERSAL');
+      const rows = await listReasons('INVENTORY_REVERSAL', undefined, tradeContext(this.scope, 'COMPANY'));
       if (this.destroyed || seq !== this.reasonsSeq || !this.isOpen()) return;
       this.loadedReasons.set(rows);
     } catch {
@@ -785,7 +843,7 @@ export class ReverseModal {
   private async loadSource(kind: 'RECEIPT' | 'DELIVERY', sourceId: string): Promise<void> {
     const seq = ++this.sourceSeq;
     try {
-      const src = await getMovementSource(kind, sourceId);
+      const src = await getMovementSource(kind, sourceId, tradeContext(this.scope, 'BRANCH'));
       if (this.destroyed || seq !== this.sourceSeq || !this.isOpen()) return;
       this.source.set(src);
       this.sourceKind.set(src.kind);
@@ -793,6 +851,11 @@ export class ReverseModal {
     } catch (error) {
       if (this.destroyed || seq !== this.sourceSeq || !this.isOpen()) return;
       this.loadingSource.set(false);
+      if (isForbiddenError(error)) {
+        this.closeSilently();
+        this.forbidden.emit();
+        return;
+      }
       if (error instanceof ApiError && error.status === 404) {
         this.notify.error(this.transloco.translate(errorKey(error)));
         this.modal().close();

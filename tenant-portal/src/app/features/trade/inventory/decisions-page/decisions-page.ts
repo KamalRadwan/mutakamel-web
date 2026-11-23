@@ -1,9 +1,11 @@
 import {
   Component,
   DestroyRef,
+  Injector,
   computed,
   effect,
   inject,
+  runInInjectionContext,
   signal,
   untracked,
   viewChild,
@@ -23,9 +25,12 @@ import {
   ActionsMenu,
 } from '../../../../shared/ui/actions-menu/actions-menu';
 import { Button } from '../../../../shared/ui/button/button';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { Pagination } from '../../../../shared/ui/pagination/pagination';
 import { SettingsFrame } from '../../../../shared/ui/settings-frame/settings-frame';
 import { StepFilter, type StepOption } from '../../../../shared/ui/step-filter/step-filter';
+import { branchGrants } from '../../shared/trade-access';
+import { tradeContext } from '../../shared/trade-api';
 import { listDecisions } from '../inventory.api';
 import {
   type DecisionAggregateType,
@@ -33,7 +38,7 @@ import {
   type InventoryDecision,
   type PolicyKind,
 } from '../inventory.model';
-import { errorKey, formatDateTime, shortId } from '../inventory.service';
+import { errorKey, formatDateTime, hasCompanyGrant, isForbiddenError, shortId } from '../inventory.service';
 import { DecisionModal } from '../decision-modal/decision-modal';
 import { InventoryBadge } from '../inventory-shared/inventory-badge/inventory-badge';
 
@@ -95,6 +100,7 @@ function parsePageSize(raw: string | null): number {
     Pagination,
     ActionsMenu,
     Button,
+    FullState,
     InventoryBadge,
     DecisionModal,
   ],
@@ -108,6 +114,7 @@ function parsePageSize(raw: string | null): number {
 export class DecisionsPage {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly injector = inject(Injector);
   private readonly scope = inject(ScopeState);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
@@ -116,7 +123,7 @@ export class DecisionsPage {
 
   private readonly paramMap = toSignal(this.route.paramMap);
   private readonly queryParamMap = toSignal(this.route.queryParamMap);
-  private readonly decisionModal = viewChild.required(DecisionModal);
+  private readonly decisionModal = viewChild(DecisionModal);
 
   protected readonly skeletonRows = SKELETON_ROWS;
   protected readonly pageSizes = PAGE_SIZES;
@@ -137,6 +144,15 @@ export class DecisionsPage {
   protected readonly pageSize = computed(() =>
     parsePageSize(this.queryParamMap()?.get('size') ?? null),
   );
+
+  protected readonly forbidden = signal(false);
+  protected readonly canRead = computed(() => {
+    const grants = runInInjectionContext(this.injector, () => branchGrants('trade.inventory.read'));
+    const company = this.scope.company();
+    const companyBranchIds = company?.branches.map((b) => b.id) ?? [];
+    return hasCompanyGrant(grants, this.scope.branch()?.id ?? null, companyBranchIds);
+  });
+  protected readonly showForbidden = computed(() => !this.canRead() || this.forbidden());
 
   protected readonly searchDraft = signal('');
   protected readonly invalidRecordId = signal(false);
@@ -191,6 +207,7 @@ export class DecisionsPage {
   private listSeq = 0;
   private countsSeq = 0;
   private lastCountsAggregateId: string | null = null;
+  private lastCompanyId: string | null = null;
   private lastUrlAggregate: string | null = null;
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
   private openedModalId: string | null = null;
@@ -214,23 +231,45 @@ export class DecisionsPage {
     });
 
     effect(() => {
+      const companyId = this.scope.company()?.id ?? '';
       const aggregateId = this.validAggregateId();
       const policyKind = this.policyFilter();
       const page = this.page();
       const limit = this.pageSize();
+      const allowed = this.canRead();
+
+      if (this.lastCompanyId !== companyId) {
+        this.lastCompanyId = companyId;
+        this.forbidden.set(false);
+        this.lastCountsAggregateId = null;
+      }
+
+      if (!allowed) {
+        untracked(() => {
+          this.rows.set([]);
+          this.total.set(0);
+          this.counts.set(EMPTY_COUNTS);
+          this.loading.set(false);
+          this.loadFailed.set(false);
+        });
+        return;
+      }
 
       untracked(() => {
         void this.loadDecisions({ aggregateId, policyKind, page, limit });
-        if (aggregateId !== this.lastCountsAggregateId) {
-          this.lastCountsAggregateId = aggregateId;
+        const countsKey = `${companyId}|${aggregateId}`;
+        if (countsKey !== this.lastCountsAggregateId) {
+          this.lastCountsAggregateId = countsKey;
           void this.loadCounts(aggregateId);
         }
       });
     });
 
     effect(() => {
+      if (this.showForbidden()) return;
       const id = this.routeId();
       const modal = this.decisionModal();
+      if (!modal) return;
       if (id) {
         if (this.openedModalId !== id) {
           this.openedModalId = id;
@@ -251,6 +290,8 @@ export class DecisionsPage {
   }
 
   protected reload(): void {
+    if (!this.canRead()) return;
+    this.forbidden.set(false);
     const aggregateId = this.validAggregateId();
     void this.loadDecisions({
       aggregateId,
@@ -259,6 +300,14 @@ export class DecisionsPage {
       limit: this.pageSize(),
     });
     void this.loadCounts(aggregateId);
+  }
+
+  protected goHome(): void {
+    void this.router.navigate(['/']);
+  }
+
+  protected onForbidden(): void {
+    this.forbidden.set(true);
   }
 
   protected onFrameEnter(event: Event): void {
@@ -350,10 +399,12 @@ export class DecisionsPage {
     }
   }
 
-  protected outcomeBadgeValue(row: InventoryDecision): string {
-    return row.result.outcome === 'SELECT' && row.result.selectedValue
+  protected outcomeBadgeValue(row: InventoryDecision): string | null {
+    const outcome = row.result.outcome?.trim();
+    if (!outcome) return null;
+    return outcome === 'SELECT' && row.result.selectedValue
       ? row.result.selectedValue
-      : row.result.outcome;
+      : outcome;
   }
 
   protected explanationText(row: InventoryDecision): string {
@@ -366,14 +417,19 @@ export class DecisionsPage {
         return translated;
       }
     }
-    return row.explanation;
+    return row.explanation?.trim() || this.transloco.translate('tradeInventory.common.none');
   }
 
-  protected aggregateTypeLabel(type: DecisionAggregateType): string {
+  protected aggregateTypeLabel(type: DecisionAggregateType | string | null | undefined): string {
     this.i18n();
-    const key = `invEvidence.aggregateTypes.${type}`;
+    const clean = type?.trim();
+    if (!clean) return this.transloco.translate('tradeInventory.common.none');
+    const key = `invEvidence.aggregateTypes.${clean}`;
     const translated = this.transloco.translate(key);
-    return translated && translated !== key ? translated : type;
+    if (translated && translated !== key) {
+      return translated;
+    }
+    return this.transloco.translate('invEvidence.aggregateTypes.unknown');
   }
 
   protected shortId(id: string): string {
@@ -512,17 +568,24 @@ export class DecisionsPage {
     page: number;
     limit: number;
   }): Promise<void> {
+    if (!this.canRead()) {
+      this.loading.set(false);
+      return;
+    }
     const seq = ++this.listSeq;
     this.loading.set(true);
     this.loadFailed.set(false);
 
     try {
-      const res = await listDecisions({
-        aggregateId: params.aggregateId || undefined,
-        policyKind: params.policyKind || undefined,
-        page: params.page,
-        limit: params.limit,
-      });
+      const res = await listDecisions(
+        {
+          aggregateId: params.aggregateId || undefined,
+          policyKind: params.policyKind || undefined,
+          page: params.page,
+          limit: params.limit,
+        },
+        tradeContext(this.scope, 'COMPANY'),
+      );
       if (this.destroyed || seq !== this.listSeq) return;
       this.rows.set(res.items);
       this.total.set(res.total);
@@ -532,13 +595,20 @@ export class DecisionsPage {
       this.rows.set([]);
       this.total.set(0);
       this.loading.set(false);
+      if (isForbiddenError(error)) {
+        this.loadFailed.set(false);
+        this.forbidden.set(true);
+        return;
+      }
       this.loadFailed.set(true);
       this.errorMessageKey.set(errorKey(error));
     }
   }
 
   private async loadCounts(aggregateId: string): Promise<void> {
+    if (!this.canRead()) return;
     const seq = ++this.countsSeq;
+    const ctx = tradeContext(this.scope, 'COMPANY');
     const base = {
       aggregateId: aggregateId || undefined,
       page: 1,
@@ -547,10 +617,10 @@ export class DecisionsPage {
 
     try {
       const [all, reservation, negative, overReceipt] = await Promise.all([
-        listDecisions(base),
-        listDecisions({ ...base, policyKind: 'INVENTORY_RESERVATION' }),
-        listDecisions({ ...base, policyKind: 'INVENTORY_NEGATIVE' }),
-        listDecisions({ ...base, policyKind: 'INVENTORY_OVER_RECEIPT' }),
+        listDecisions(base, ctx),
+        listDecisions({ ...base, policyKind: 'INVENTORY_RESERVATION' }, ctx),
+        listDecisions({ ...base, policyKind: 'INVENTORY_NEGATIVE' }, ctx),
+        listDecisions({ ...base, policyKind: 'INVENTORY_OVER_RECEIPT' }, ctx),
       ]);
       if (this.destroyed || seq !== this.countsSeq) return;
       this.counts.set({
@@ -559,9 +629,13 @@ export class DecisionsPage {
         INVENTORY_NEGATIVE: negative.total,
         INVENTORY_OVER_RECEIPT: overReceipt.total,
       });
-    } catch {
+    } catch (error) {
       if (this.destroyed || seq !== this.countsSeq) return;
       this.counts.set(EMPTY_COUNTS);
+      if (isForbiddenError(error)) {
+        this.loadFailed.set(false);
+        this.forbidden.set(true);
+      }
     }
   }
 
