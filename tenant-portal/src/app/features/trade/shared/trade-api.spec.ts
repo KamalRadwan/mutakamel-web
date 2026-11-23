@@ -1,5 +1,56 @@
 import { describe, expect, it } from 'vitest';
-import { ApiError, assertBodyBooleans, contextHeaders, errorKey, ifMatch } from './trade-api';
+import arShared from '../../../../../public/i18n/trade-shared/ar.json';
+import enShared from '../../../../../public/i18n/trade-shared/en.json';
+import { ApiError as CoreApiError } from '../../../core/api/api-errors';
+import { ApiError, assertBodyBooleans, contextHeaders, errorKey, ifMatch, scopeFor, toTradeError } from './trade-api';
+
+describe('tradeApi', () => {
+  it('scopeFor builds headers per mode', () => {
+    const ctx = { companyId: 'company-a', branchId: 'branch-a' };
+    expect(scopeFor(ctx, 'NONE')).toBeUndefined();
+    expect(scopeFor({}, 'NONE')).toBeUndefined();
+    expect(scopeFor(ctx, 'COMPANY')).toEqual({ companyId: 'company-a' });
+    expect(scopeFor(ctx, 'BRANCH')).toEqual(ctx);
+    expect(scopeFor(ctx, 'OPTIONAL')).toEqual(ctx);
+    expect(scopeFor({}, 'OPTIONAL')).toEqual({});
+    expect(scopeFor({ companyId: 'company-a' }, 'OPTIONAL')).toEqual({ companyId: 'company-a' });
+    expect(scopeFor({ branchId: 'branch-a' }, 'OPTIONAL')).toEqual({ branchId: 'branch-a' });
+    expect(scopeFor({ companyId: '', branchId: '' }, 'OPTIONAL')).toEqual({});
+  });
+
+  it('scopeFor rejects a missing required id', () => {
+    for (const mode of ['COMPANY', 'BRANCH'] as const) {
+      for (const ctx of [{}, { branchId: 'branch-a' }, { companyId: '', branchId: 'branch-a' }]) {
+        expect(() => scopeFor(ctx, mode)).toThrowError(expect.objectContaining({ status: 400, code: 'TRADE.SCOPE.REQUIRED' }));
+      }
+    }
+    expect(() => scopeFor({ companyId: 'company-a' }, 'BRANCH')).toThrow(ApiError);
+  });
+
+  it('toTradeError normalises details', () => {
+    const source = new CoreApiError(422, 'TRADE.VALIDATION_FAILED', {
+      text: 'Required', strings: ['One', 'Two'], mixed: [1, null, true, { id: 1 }],
+      number: 7, bool: false, object: { expected: 'one' }, empty: null,
+    }, { correlationId: 'corr-one' });
+    expect(toTradeError(source)).toBeInstanceOf(ApiError);
+    expect(toTradeError(source)).toMatchObject({ status: 422, code: source.code, correlationId: 'corr-one', details: {
+      text: ['Required'], strings: ['One', 'Two'], mixed: ['1', 'null', 'true', '[object Object]'],
+      number: ['7'], bool: ['false'], object: ['{"expected":"one"}'], empty: ['null'],
+    } });
+    for (const details of [undefined, null, [], 'invalid']) {
+      expect((toTradeError(new CoreApiError(500, 'ERROR', details as never)) as ApiError).details).toBeUndefined();
+    }
+  });
+
+  it('toTradeError preserves non-core errors and existing constructor calls', () => {
+    const error = new ApiError(409, 'CONFLICT', { version: ['Stale'] });
+    for (const value of [error, new Error('offline'), null, undefined, 'aborted']) {
+      expect(toTradeError(value)).toBe(value);
+    }
+    expect(error.correlationId).toBeUndefined();
+    expect(new ApiError(403, 'DENIED', undefined, { correlationId: 'corr' }).correlationId).toBe('corr');
+  });
+});
 
 describe('errorKey', () => {
   it('maps a non-ApiError to the network key', () => {
@@ -36,6 +87,29 @@ describe('errorKey', () => {
     expect(errorKey(new ApiError(404, 'TRADE.CATALOG.ITEM_NOT_FOUND'))).toBe(
       'tradeShared.errors.TRADE_CATALOG_ITEM_NOT_FOUND',
     );
+  });
+
+  it('resolves every Foundation error code to a key with en and ar text', () => {
+    const enErrors: Readonly<Record<string, string>> = enShared.errors;
+    const arErrors: Readonly<Record<string, string>> = arShared.errors;
+    const foundationCodes = [
+      ['TRADE.ENTITLEMENT.PUBLICATION_UNAVAILABLE', 503],
+      ['TRADE.APPROVAL.REJECTED', 409],
+      ['TRADE.CATALOG.ITEM_IMAGE_PRINT_BUDGET_EXCEEDED', 422],
+      ['TRADE.AUTH.TARGET_INVALID', 422],
+      ['TRADE.CATALOG.ITEM_REFERENCE_INVALID', 422],
+      ['TRADE.CONTEXT.COMPANY_REQUIRED', 422],
+      ['TRADE.DEPENDENCY.NUMBERING_UNAVAILABLE', 422],
+      ['TRADE.ACCOUNT.BLOCKED', 409],
+    ] as const;
+
+    for (const [code, status] of foundationCodes) {
+      const normalized = code.replaceAll('.', '_');
+      expect(errorKey(new ApiError(status, code))).toBe(`tradeShared.errors.${normalized}`);
+      expect(enErrors[normalized]?.trim().length).toBeGreaterThan(0);
+      expect(arErrors[normalized]?.trim().length).toBeGreaterThan(0);
+    }
+    expect(Object.keys(enErrors).sort()).toEqual(Object.keys(arErrors).sort());
   });
 });
 

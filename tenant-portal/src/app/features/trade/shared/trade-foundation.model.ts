@@ -1,3 +1,5 @@
+import type { KnownReasonKind, ReasonLocalizedNames } from './reasons/reason-kinds';
+
 export type LocalizedNames = Record<string, string>;
 
 export interface Page<T> {
@@ -201,6 +203,7 @@ export interface Channel {
   channelType: ChannelType;
   status: ChannelStatus;
   configurationProfileVersionId: string | null;
+  activeBranchCount?: number;
   version: number;
   createdAt: string;
   updatedAt: string;
@@ -342,13 +345,13 @@ export interface CommercialAccountSummary extends CommercialAccount {
   partyName: string;
 }
 
-export type ReasonKind = string; // tenant-wide; kinds seeded in TRADE_FAKE_DB.reasons (Foundation, Documents, Inventory)
+export type ReasonKind = KnownReasonKind;
 
 export interface ReasonCode {
   id: string;
-  kind: ReasonKind;
+  kind: KnownReasonKind;
   code: string;
-  localizedNames: LocalizedNames;
+  localizedNames: ReasonLocalizedNames;
   requiresNote: boolean;
   isActive: boolean;
   sortOrder: number;

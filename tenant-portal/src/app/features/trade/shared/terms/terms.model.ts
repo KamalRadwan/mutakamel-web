@@ -64,10 +64,32 @@ export interface TermOptions {
 }
 
 export interface TermSelections {
-  paymentTermId: string | null;
-  deliveryTermId: string | null;
-  warrantyTermId: string | null;
-  clauseIds: string[];
+  paymentTermId?: string;
+  deliveryTermId?: string;
+  warrantyTermId?: string;
+  clauseIds?: string[];
+}
+
+export interface TermSelectionsInput {
+  paymentTermId?: string | null;
+  deliveryTermId?: string | null;
+  warrantyTermId?: string | null;
+  clauseIds?: readonly string[] | null;
+}
+
+/** Drops unset, null, or blank selection keys so document bodies never send null (backend 400). */
+export function termSelectionsBody(sel: TermSelectionsInput | null | undefined): TermSelections {
+  if (!sel) return {};
+  const body: TermSelections = {};
+  const paymentTermId = sel.paymentTermId?.trim();
+  if (paymentTermId) body.paymentTermId = paymentTermId;
+  const deliveryTermId = sel.deliveryTermId?.trim();
+  if (deliveryTermId) body.deliveryTermId = deliveryTermId;
+  const warrantyTermId = sel.warrantyTermId?.trim();
+  if (warrantyTermId) body.warrantyTermId = warrantyTermId;
+  const clauseIds = sel.clauseIds?.map((id) => id.trim()).filter((id) => id.length > 0);
+  if (clauseIds && clauseIds.length > 0) body.clauseIds = clauseIds;
+  return body;
 }
 
 export const TERM_SIDE_OF: Record<TermDocumentType, 'SALES' | 'PURCHASE'> = {

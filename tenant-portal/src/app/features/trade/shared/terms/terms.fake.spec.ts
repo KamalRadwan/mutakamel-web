@@ -1,255 +1,295 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { FAKE_COMPANIES } from '../../../../core/scope/scope.fake';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ApiError, newIdempotencyKey } from '../trade-api';
+import { bindTradeHttpForTest } from '../trade-http';
+import { TradeHttpStub } from '../testing/trade-http-testing';
 import {
-  fakeCountTerms,
-  fakeCreateTerm,
-  fakeDeleteTerm,
-  fakeGetTerm,
-  fakeListTermOptions,
-  fakeListTerms,
-  fakeMakeDefaultTerm,
-  fakeUpdateTerm,
-} from './terms.fake';
-import { TERM_LIMITS, TERM_TYPES, type TermInput } from './terms.model';
+  countTerms,
+  createTerm,
+  deleteTerm,
+  getTerm,
+  listAllTerms,
+  listTermOptions,
+  listTerms,
+  makeDefaultTerm,
+  termErrorKey,
+  updateTerm,
+} from './terms.api';
+import {
+  INCOTERMS,
+  TERM_LIMITS,
+  TERM_SIDES,
+  TERM_TYPES,
+  termSelectionsBody,
+  type TermCounts,
+  type TermInput,
+  type TermOptions,
+  type TermPage,
+  type TradeTerm,
+} from './terms.model';
 
-async function settle<T>(promise: Promise<T>): Promise<T> {
-  const caught = promise.catch((e: unknown) => e);
-  await vi.advanceTimersByTimeAsync(350);
-  const result = await caught;
-  if (result instanceof Error) throw result;
-  return result as T;
+function sampleTerm(over: Partial<TradeTerm> = {}): TradeTerm {
+  return {
+    id: '019a0000-0000-7000-8000-000000000001',
+    termType: 'PAYMENT',
+    side: 'SALES',
+    code: 'NET30',
+    displayName: 'Net 30',
+    localizedNames: { en: 'Net 30', ar: 'صافي 30 يومًا' },
+    localizedTexts: { en: 'Pay in 30 days', ar: 'الدفع خلال 30 يومًا' },
+    dueDays: 30,
+    incotermCode: null,
+    isDefault: false,
+    isActive: true,
+    sortOrder: 10,
+    version: 1,
+    updatedAt: '2026-11-23T00:00:00.000Z',
+    ...over,
+  };
 }
 
-async function settleError(promise: Promise<unknown>): Promise<ApiError> {
-  const caught = promise.then(
-    () => null,
-    (e: unknown) => e,
-  );
-  await vi.advanceTimersByTimeAsync(350);
-  const result = await caught;
-  expect(result).toBeInstanceOf(ApiError);
-  return result as ApiError;
-}
-
-let keySeq = 0;
-const nextKey = () => {
-  keySeq += 1;
-  return newIdempotencyKey();
-};
-
-function input(over: Partial<TermInput> = {}): TermInput {
+function sampleInput(over: Partial<TermInput> = {}): TermInput {
   return {
     termType: 'GENERAL',
     side: 'BOTH',
-    code: `SPEC${keySeq + 1}`,
-    localizedNames: { en: 'Spec term', ar: 'شرط اختبار' },
-    localizedTexts: { en: 'Spec text', ar: 'نص الاختبار' },
+    code: 'GEN1',
+    localizedNames: { en: 'General term', ar: 'شرط عام' },
+    localizedTexts: { en: 'General text', ar: 'نص عام' },
     sortOrder: 5,
     isActive: true,
     ...over,
   };
 }
 
-describe('terms.fake catalogue limits (§6)', () => {
+describe('terms.api (TradeHttpStub)', () => {
+  let stub: TradeHttpStub;
+  let restoreHttp: () => void;
+
   beforeEach(() => {
-    vi.useFakeTimers();
-    localStorage.removeItem('lang');
-    document.documentElement.lang = 'en';
+    stub = new TradeHttpStub();
+    restoreHttp = bindTradeHttpForTest(stub);
   });
 
   afterEach(() => {
-    vi.useRealTimers();
-    localStorage.removeItem('lang');
+    restoreHttp();
   });
 
-  it('defines textMax = 400 and maxClauses = 4', () => {
+  it('keeps backend-aligned enums and limits (Q-T1..Q-T6)', () => {
+    expect(TERM_TYPES).toEqual(['PAYMENT', 'DELIVERY', 'WARRANTY', 'RETURNS', 'GENERAL']);
+    expect(TERM_SIDES).toEqual(['SALES', 'PURCHASE', 'BOTH']);
+    expect(INCOTERMS).toEqual(['EXW', 'FCA', 'CPT', 'CIP', 'DAP', 'DPU', 'DDP', 'FAS', 'FOB', 'CFR', 'CIF']);
     expect(TERM_LIMITS.nameMax).toBe(120);
     expect(TERM_LIMITS.textMax).toBe(400);
     expect(TERM_LIMITS.maxClauses).toBe(4);
   });
 
-  it('keeps every seeded term text in en and ar at most 400 characters', async () => {
-    let checked = 0;
+  it('listTerms sends query names, OPTIONAL scope, and unwraps { items, total, page, limit }', async () => {
+    const page: TermPage = { items: [sampleTerm()], total: 1, page: 2, limit: 10 };
+    stub.register('GET', '/terms', page);
 
-    for (const company of FAKE_COMPANIES) {
-      for (const type of TERM_TYPES) {
-        const page = await settle(fakeListTerms(company.id, { type, limit: 100 }));
-        const terms = page.items;
+    const result = await listTerms(
+      { type: 'PAYMENT', side: 'SALES', active: true, search: 'NET', page: 2, limit: 10 },
+      { companyId: 'c1', branchId: 'b1' },
+    );
 
-        for (const term of terms) {
-          checked += 1;
-          const enText = term.localizedTexts['en'] ?? '';
-          const arText = term.localizedTexts['ar'] ?? '';
-          const enName = term.localizedNames['en'] ?? '';
-          const arName = term.localizedNames['ar'] ?? '';
-
-          expect(enText.length).toBeLessThanOrEqual(TERM_LIMITS.textMax);
-          expect(arText.length).toBeLessThanOrEqual(TERM_LIMITS.textMax);
-          expect(enName.length).toBeLessThanOrEqual(TERM_LIMITS.nameMax);
-          expect(arName.length).toBeLessThanOrEqual(TERM_LIMITS.nameMax);
-        }
-      }
-    }
-
-    expect(checked).toBeGreaterThan(0);
-  });
-
-  it('rejects creating a term with text exceeding 400 characters', async () => {
-    const createPromise = fakeCreateTerm(
-      FAKE_COMPANIES[0].id,
+    expect(result).toEqual(page);
+    expect(stub.recordedReads()).toEqual([
       {
-        termType: 'GENERAL',
-        side: 'BOTH',
-        code: 'TOOLONG401',
-        localizedNames: { en: 'Too long test', ar: 'اختبار طويل' },
-        localizedTexts: { en: 'a'.repeat(401), ar: 'ن'.repeat(20) },
-        sortOrder: 99,
-        isActive: true,
+        path: '/terms',
+        query: { type: 'PAYMENT', side: 'SALES', active: true, search: 'NET', page: 2, limit: 10 },
+        scope: { companyId: 'c1', branchId: 'b1' },
       },
-      newIdempotencyKey(),
-    );
+    ]);
 
-    const rejection = expect(createPromise).rejects.toMatchObject({
+    stub.reset();
+    await listTerms();
+    expect(stub.recordedReads()).toEqual([{ path: '/terms', query: undefined, scope: {} }]);
+  });
+
+  it('listAllTerms loops pages at maxLimit until all items are loaded', async () => {
+    const first = sampleTerm({ id: 't1', code: 'T1' });
+    stub.register('GET', '/terms', { items: [first], total: 1, page: 1, limit: 100 } satisfies TermPage);
+
+    const items = await listAllTerms({ type: 'PAYMENT' }, { companyId: 'c1' });
+    expect(items).toEqual([first]);
+    expect(stub.recordedReads()).toEqual([
+      { path: '/terms', query: { type: 'PAYMENT', page: 1, limit: 100 }, scope: { companyId: 'c1' } },
+    ]);
+  });
+
+  it('countTerms sends active query, OPTIONAL scope, and unwraps { total, byType }', async () => {
+    const counts: TermCounts = {
+      total: 3,
+      byType: { PAYMENT: 1, DELIVERY: 1, WARRANTY: 0, RETURNS: 0, GENERAL: 1 },
+    };
+    stub.register('GET', '/terms/counts', counts);
+
+    await expect(countTerms({ active: true }, { companyId: 'c1' })).resolves.toEqual(counts);
+    expect(stub.recordedReads()).toEqual([
+      { path: '/terms/counts', query: { active: true }, scope: { companyId: 'c1' } },
+    ]);
+  });
+
+  it('getTerm reads GET /terms/:id with OPTIONAL scope', async () => {
+    const term = sampleTerm();
+    stub.register('GET', `/terms/${term.id}`, term);
+
+    await expect(getTerm(term.id, { companyId: 'c1', branchId: 'b1' })).resolves.toEqual(term);
+    expect(stub.recordedReads()).toEqual([
+      { path: `/terms/${term.id}`, query: undefined, scope: { companyId: 'c1', branchId: 'b1' } },
+    ]);
+  });
+
+  it('createTerm requires COMPANY scope, sends x-idempotency-key, and preserves details on field error', async () => {
+    await expect(createTerm(sampleInput(), newIdempotencyKey(), {})).rejects.toMatchObject({
       status: 400,
-      code: 'TRADE.VALIDATION_FAILED',
+      code: 'TRADE.SCOPE.REQUIRED',
     });
-    await vi.advanceTimersByTimeAsync(350);
-    await rejection;
-  });
+    expect(stub.recordedWrites()).toEqual([]);
 
-  it('lists as { items, total, page, limit } with default limit 25, max 100 and the `active` filter', async () => {
-    const companyId = FAKE_COMPANIES[0].id;
-    const all = await settle(fakeListTerms(companyId));
-    expect(all.page).toBe(1);
-    expect(all.limit).toBe(25);
-    expect(all.items.length).toBe(Math.min(25, all.total));
-
-    const second = await settle(fakeListTerms(companyId, { page: 2, limit: 10 }));
-    expect(second.items.length).toBe(Math.min(10, Math.max(0, second.total - 10)));
-
-    const payment = await settle(fakeListTerms(companyId, { type: 'PAYMENT', limit: 100 }));
-    const inactive = await settle(fakeListTerms(companyId, { type: 'PAYMENT', active: false, limit: 100 }));
-    const active = await settle(fakeListTerms(companyId, { type: 'PAYMENT', active: true, limit: 100 }));
-    expect(inactive.items.every((t) => !t.isActive)).toBe(true);
-    expect(active.total + inactive.total).toBe(payment.total);
-    expect(payment.items.every((t) => !('companyId' in t))).toBe(true);
-
-    expect((await settleError(fakeListTerms(companyId, { limit: 101 }))).status).toBe(400);
-  });
-
-  it('counts as { total, byType }', async () => {
-    const companyId = FAKE_COMPANIES[0].id;
-    const counts = await settle(fakeCountTerms(companyId));
-    const activeOnly = await settle(fakeCountTerms(companyId, { active: true }));
-    expect(Object.keys(counts.byType).sort()).toEqual([...TERM_TYPES].sort());
-    expect(counts.total).toBe(Object.values(counts.byType).reduce((a, b) => a + b, 0));
-    expect(activeOnly.total).toBeLessThan(counts.total);
-  });
-
-  it('rejects null dueDays / incotermCode on types that do not use them (TYPE_FIELD_INVALID)', async () => {
-    const companyId = FAKE_COMPANIES[0].id;
-    for (const over of [{ dueDays: null }, { incotermCode: null }] as const) {
-      const error = await settleError(fakeCreateTerm(companyId, input(over), nextKey()));
-      expect(error).toMatchObject({ status: 422, code: 'TRADE.TERMS.TYPE_FIELD_INVALID' });
-    }
-    const created = await settle(fakeCreateTerm(companyId, input(), nextKey()));
-    expect(created).toMatchObject({ dueDays: null, incotermCode: null });
-    const patchError = await settleError(fakeUpdateTerm(companyId, created.id, `"${created.version}"`, { dueDays: null }, nextKey()));
-    expect(patchError.code).toBe('TRADE.TERMS.TYPE_FIELD_INVALID');
-
-    const payment = await settle(fakeCreateTerm(companyId, input({ termType: 'PAYMENT', dueDays: null }), nextKey()));
-    expect(payment.dueDays).toBeNull();
-  });
-
-  it('rejects a blank text even for an inactive term, allows an absent one', async () => {
-    const companyId = FAKE_COMPANIES[0].id;
-    const blank = await settleError(
-      fakeCreateTerm(companyId, input({ isActive: false, localizedTexts: { en: '', ar: 'نص' } }), nextKey()),
-    );
-    expect(blank).toMatchObject({ status: 400, code: 'TRADE.VALIDATION_FAILED' });
-
-    const missingActive = await settleError(
-      fakeCreateTerm(companyId, input({ localizedTexts: { ar: 'نص' } }), nextKey()),
-    );
-    expect(missingActive).toMatchObject({ status: 422, code: 'TRADE.TERMS.TEXT_REQUIRED' });
-
-    const inactive = await settle(fakeCreateTerm(companyId, input({ isActive: false, localizedTexts: {} }), nextKey()));
-    expect((await settle(fakeGetTerm(companyId, inactive.id))).localizedTexts).toEqual({});
-  });
-
-  it('validates idempotency keys like the backend: missing 400, not UUIDv7 422, mismatch 422, replay', async () => {
-    const companyId = FAKE_COMPANIES[0].id;
-    expect(await settleError(fakeCreateTerm(companyId, input(), ''))).toMatchObject({
+    await expect(createTerm(sampleInput(), '', { companyId: 'c1' })).rejects.toMatchObject({
       status: 400,
       code: 'TRADE.IDEMPOTENCY.KEY_MISSING',
     });
-    expect(await settleError(fakeCreateTerm(companyId, input(), 'not-a-uuid'))).toMatchObject({
-      status: 422,
-      code: 'TRADE.IDEMPOTENCY.KEY_REQUIRED',
-    });
-    const key = nextKey();
-    const body = input();
-    const first = await settle(fakeCreateTerm(companyId, body, key));
-    const again = await settle(fakeCreateTerm(companyId, body, key));
-    expect(again.id).toBe(first.id);
-    expect(await settleError(fakeCreateTerm(companyId, { ...body, sortOrder: 6 }, key))).toMatchObject({
-      status: 422,
-      code: 'TRADE.IDEMPOTENCY.MISMATCH',
+    expect(stub.recordedWrites()).toEqual([]);
+
+    const key = newIdempotencyKey();
+    const body = sampleInput({ code: 'CREATED1' });
+    const created = sampleTerm({ code: 'CREATED1', termType: 'GENERAL', side: 'BOTH', dueDays: null });
+    stub.register('POST', '/terms', created);
+
+    await expect(createTerm(body, key, { companyId: 'c1', branchId: 'b1' })).resolves.toEqual(created);
+    expect(stub.recordedWrites()).toEqual([
+      {
+        method: 'POST',
+        path: '/terms',
+        body,
+        key,
+        ifMatch: undefined,
+        scope: { companyId: 'c1' },
+        query: undefined,
+      },
+    ]);
+
+    stub.register('POST', '/terms', new ApiError(409, 'TRADE.TERMS.CODE_TAKEN', { field: ['code'] }));
+    await expect(createTerm(body, newIdempotencyKey(), { companyId: 'c1' })).rejects.toMatchObject({
+      status: 409,
+      code: 'TRADE.TERMS.CODE_TAKEN',
+      details: { field: ['code'] },
     });
   });
 
-  it('matches the code as sent (no upper-casing), defaults sortOrder 0 / isActive true, CODE_TAKEN with details', async () => {
-    const companyId = FAKE_COMPANIES[0].id;
-    expect(await settleError(fakeCreateTerm(companyId, input({ code: 'lower' }), nextKey()))).toMatchObject({
-      status: 400,
-      code: 'TRADE.VALIDATION_FAILED',
-    });
-    const { sortOrder: _s, isActive: _a, ...rest } = input({ code: 'DEFAULTS1' });
-    const created = await settle(fakeCreateTerm(companyId, rest, nextKey()));
-    expect(created).toMatchObject({ sortOrder: 0, isActive: true, isDefault: false, version: 1 });
-    const taken = await settleError(fakeCreateTerm(companyId, input({ code: 'DEFAULTS1' }), nextKey()));
-    expect(taken).toMatchObject({ status: 409, code: 'TRADE.TERMS.CODE_TAKEN', details: { field: ['code'] } });
-  });
+  it('updateTerm sends key + If-Match and COMPANY scope, and surfaces 409 conflict', async () => {
+    const term = sampleTerm({ id: 'term-1', sortOrder: 20, version: 4 });
+    const key = newIdempotencyKey();
+    stub.register('PATCH', '/terms/term-1', term);
 
-  it('reports TEXT_REQUIRED with details.field localizedTexts', async () => {
-    const error = await settleError(
-      fakeCreateTerm(FAKE_COMPANIES[0].id, input({ localizedTexts: { en: 'Only en' } }), nextKey()),
+    await expect(updateTerm('term-1', 3, { sortOrder: 20 }, { companyId: 'c1', branchId: 'b1' }, key)).resolves.toEqual(
+      term,
     );
-    expect(error).toMatchObject({ status: 422, details: { field: ['localizedTexts'] } });
-  });
+    expect(stub.recordedWrites()).toEqual([
+      {
+        method: 'PATCH',
+        path: '/terms/term-1',
+        body: { sortOrder: 20 },
+        key,
+        ifMatch: '"3"',
+        scope: { companyId: 'c1' },
+        query: undefined,
+      },
+    ]);
 
-  it('PATCH / make-default / DELETE need a key and If-Match; NOT_FOUND is 404, stale is 409', async () => {
-    const companyId = FAKE_COMPANIES[0].id;
-    const term = await settle(fakeCreateTerm(companyId, input(), nextKey()));
-    expect(await settleError(fakeUpdateTerm(companyId, term.id, '"1"', { sortOrder: 1 }, ''))).toMatchObject({
-      status: 400,
-      code: 'TRADE.IDEMPOTENCY.KEY_MISSING',
-    });
-    expect(await settleError(fakeUpdateTerm(companyId, term.id, '', { sortOrder: 1 }, nextKey()))).toMatchObject({
-      status: 400,
-      code: 'TRADE.CONCURRENCY.IF_MATCH_REQUIRED',
-    });
-    expect(await settleError(fakeUpdateTerm(companyId, 'missing', '"1"', {}, nextKey()))).toMatchObject({
-      status: 404,
-      code: 'TRADE.TERMS.NOT_FOUND',
-    });
-    expect(await settleError(fakeMakeDefaultTerm(companyId, term.id, '"9"', nextKey()))).toMatchObject({
+    stub.register('PATCH', '/terms/term-1', new ApiError(409, 'TRADE.CONCURRENCY.STALE_VERSION'));
+    await expect(updateTerm('term-1', 3, { sortOrder: 20 }, { companyId: 'c1' }, key)).rejects.toMatchObject({
       status: 409,
       code: 'TRADE.CONCURRENCY.STALE_VERSION',
     });
-    const updated = await settle(fakeUpdateTerm(companyId, term.id, '"1"', { sortOrder: 7 }, nextKey()));
-    expect(updated).toMatchObject({ sortOrder: 7, version: 2 });
-    const deleted = await settle(fakeDeleteTerm(companyId, term.id, '"2"', nextKey()));
-    expect(deleted).toMatchObject({ id: term.id, version: 3 });
-    expect((await settleError(fakeGetTerm(companyId, term.id))).status).toBe(404);
   });
 
-  it('options return active terms of the document side or BOTH with defaults', async () => {
-    const options = await settle(fakeListTermOptions(FAKE_COMPANIES[0].id, 'QUOTATION'));
-    expect(Object.keys(options.byType).sort()).toEqual([...TERM_TYPES].sort());
-    for (const rows of Object.values(options.byType)) {
-      expect(rows.every((t) => t.isActive && (t.side === 'SALES' || t.side === 'BOTH'))).toBe(true);
-    }
+  it('makeDefaultTerm sends POST /terms/:id/make-default with key + If-Match and COMPANY scope', async () => {
+    const term = sampleTerm({ id: 'term-1', isDefault: true, version: 2 });
+    const key = newIdempotencyKey();
+    stub.register('POST', '/terms/term-1/make-default', term);
+
+    await expect(makeDefaultTerm('term-1', 1, { companyId: 'c1', branchId: 'b1' }, key)).resolves.toEqual(term);
+    expect(stub.recordedWrites()).toEqual([
+      {
+        method: 'POST',
+        path: '/terms/term-1/make-default',
+        body: undefined,
+        key,
+        ifMatch: '"1"',
+        scope: { companyId: 'c1' },
+        query: undefined,
+      },
+    ]);
+  });
+
+  it('deleteTerm sends DELETE /terms/:id with key + If-Match and COMPANY scope', async () => {
+    const term = sampleTerm({ id: 'term-1', version: 5 });
+    const key = newIdempotencyKey();
+    stub.register('DELETE', '/terms/term-1', term);
+
+    await expect(deleteTerm('term-1', 4, { companyId: 'c1', branchId: 'b1' }, key)).resolves.toEqual(term);
+    expect(stub.recordedWrites()).toEqual([
+      {
+        method: 'DELETE',
+        path: '/terms/term-1',
+        body: undefined,
+        key,
+        ifMatch: '"4"',
+        scope: { companyId: 'c1' },
+        query: undefined,
+      },
+    ]);
+  });
+
+  it('listTermOptions sends documentType query with OPTIONAL scope', async () => {
+    const options: TermOptions = {
+      byType: { PAYMENT: [sampleTerm()], DELIVERY: [], WARRANTY: [], RETURNS: [], GENERAL: [] },
+      defaults: { PAYMENT: '019a0000-0000-7000-8000-000000000001' },
+    };
+    stub.register('GET', '/terms/options', options);
+
+    await expect(listTermOptions('QUOTATION', { companyId: 'c1', branchId: 'b1' })).resolves.toEqual(options);
+    expect(stub.recordedReads()).toEqual([
+      {
+        path: '/terms/options',
+        query: { documentType: 'QUOTATION' },
+        scope: { companyId: 'c1', branchId: 'b1' },
+      },
+    ]);
+  });
+
+  it('termSelectionsBody omits null, undefined, and empty clause lists (S-1)', () => {
+    expect(termSelectionsBody(null)).toEqual({});
+    expect(
+      termSelectionsBody({
+        paymentTermId: null,
+        deliveryTermId: '  ',
+        warrantyTermId: undefined,
+        clauseIds: [],
+      }),
+    ).toEqual({});
+    expect(
+      termSelectionsBody({
+        paymentTermId: ' pay-1 ',
+        deliveryTermId: null,
+        warrantyTermId: 'war-1',
+        clauseIds: [' cl-1 ', ''],
+      }),
+    ).toEqual({
+      paymentTermId: 'pay-1',
+      warrantyTermId: 'war-1',
+      clauseIds: ['cl-1'],
+    });
+  });
+
+  it('termErrorKey maps TRADE.CONTEXT.MISSING_COMPANY, TRADE.SCOPE.REQUIRED, and term codes (S-5)', () => {
+    expect(termErrorKey(new ApiError(400, 'TRADE.CONTEXT.MISSING_COMPANY'))).toBe(
+      'tset.errors.TRADE_CONTEXT_MISSING_COMPANY',
+    );
+    expect(termErrorKey(new ApiError(400, 'TRADE.SCOPE.REQUIRED'))).toBe('tset.errors.TRADE_SCOPE_REQUIRED');
+    expect(termErrorKey(new ApiError(409, 'TRADE.TERMS.CODE_TAKEN'))).toBe('tset.errors.TRADE_TERMS_CODE_TAKEN');
+    expect(termErrorKey(new Error('network'))).toBe('tset.errors.generic');
   });
 });

@@ -1,27 +1,42 @@
-<ui-tabs
-  class="mx-12 mt-12 shrink-0"
-  [tabs]="tabItems()"
-  [label]="'tterms.tabs.label' | transloco"
-  [active]="activeType()"
-  (activeChange)="onTypeChange($event)"
-/>
+@if (!canRead() || forbidden()) {
+  <ui-full-state
+    kind="forbidden"
+    [title]="'errors.forbidden.title' | transloco"
+    [text]="'errors.forbidden.text' | transloco"
+    [actionLabel]="'errors.notFound.action' | transloco"
+    (action)="goHome()"
+  />
+} @else if (missingCompany() || serverMissingCompany()) {
+  <ui-full-state
+    kind="not-found"
+    [title]="'tterms.states.chooseCompanyTitle' | transloco"
+    [text]="'tterms.states.chooseCompanyText' | transloco"
+  />
+} @else {
+  <ui-tabs
+    class="mx-12 mt-12 shrink-0"
+    [tabs]="tabItems()"
+    [label]="'tterms.tabs.label' | transloco"
+    [active]="activeType()"
+    (activeChange)="onTypeChange($event)"
+  />
 
-<div
-  role="tabpanel"
-  class="flex min-h-0 flex-1 flex-col"
-  [id]="tabPanelId(activeType())"
-  [attr.aria-labelledby]="tabButtonId(activeType())"
->
-  <app-settings-frame
-    [addLabel]="'tterms.new' | transloco"
-    [searchPlaceholder]="'tterms.search' | transloco"
-    [loading]="loading()"
-    [showAdd]="canManage"
-    [search]="searchInput()"
-    (searchChange)="onSearchChange($event)"
-    (add)="openCreate()"
-    (reload)="reloadAll()"
+  <div
+    role="tabpanel"
+    class="flex min-h-0 flex-1 flex-col"
+    [id]="tabPanelId(activeType())"
+    [attr.aria-labelledby]="tabButtonId(activeType())"
   >
+    <app-settings-frame
+      [addLabel]="'tterms.new' | transloco"
+      [searchPlaceholder]="'tterms.search' | transloco"
+      [loading]="loading()"
+      [showAdd]="canManage()"
+      [search]="searchInput()"
+      (searchChange)="onSearchChange($event)"
+      (add)="openCreate()"
+      (reload)="reloadAll()"
+    >
     <div notices class="flex flex-wrap items-center justify-between gap-8">
       <ui-field
         size="bare"
@@ -232,7 +247,7 @@
                   <span role="cell" class="text-12 text-text-muted">
                     {{ 'tterms.states.empty' | transloco: { type: activeTypeEmptyName() } }}
                   </span>
-                  @if (canManage) {
+                  @if (canManage()) {
                     <button type="button" uiButton variant="ghost" size="small" (click)="openCreate()">
                       {{ 'tterms.new' | transloco }}
                     </button>
@@ -247,13 +262,15 @@
 
     <p footer class="text-11 leading-16 text-text-muted">{{ 'tterms.footer' | transloco }}</p>
   </app-settings-frame>
-</div>
+  </div>
+}
 
 <app-term-modal
-  [canManage]="canManage"
+  [canManage]="canManage()"
   (saved)="onTermSaved($event)"
   (reloaded)="onTermReloaded($event)"
   (deleted)="onTermDeleted($event)"
+  (forbidden)="onForbidden()"
 />
 
 <ui-confirm-dialog

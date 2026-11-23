@@ -1,4 +1,15 @@
-import { Component, DestroyRef, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  Injector,
+  computed,
+  effect,
+  inject,
+  runInInjectionContext,
+  signal,
+  untracked,
+  viewChild,
+} from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
@@ -16,6 +27,7 @@ import {
 } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
+import { TenantScopeState } from '../../../../core/scope/tenant-scope';
 import { ActionItem, ActionSelection, ActionsMenu } from '../../../../shared/ui/actions-menu/actions-menu';
 import { Button } from '../../../../shared/ui/button/button';
 import { Field } from '../../../../shared/ui/field/field';
@@ -24,21 +36,21 @@ import { SettingsFrame } from '../../../../shared/ui/settings-frame/settings-fra
 import { StepFilter, StepOption } from '../../../../shared/ui/step-filter/step-filter';
 import { Switch } from '../../../../shared/ui/switch/switch';
 import { TabItem, Tabs, tabButtonId, tabPanelId } from '../../../../shared/ui/tabs/tabs';
-import { errorCodeOf } from '../../shared/trade-api';
-import type { ReasonCode, ReasonKind } from '../../shared/trade-foundation.model';
-import { REASON_AREAS, type ReasonArea } from '../../shared/reasons/reason-kinds';
+import { anyGrant, tenantWide } from '../../shared/trade-access';
+import { errorCodeOf, type TradeContext } from '../../shared/trade-api';
+import { REASON_AREAS, type KnownReasonKind, type ReasonArea } from '../../shared/reasons/reason-kinds';
 import {
+  type AdminReasonCode,
   type ReasonCounts,
   countReasons,
   listReasonsAdmin,
   updateReason,
 } from '../../shared/reasons/reasons-admin.api';
 import { ReasonModal } from './reason-modal/reason-modal';
-import { settingsErrorText } from '../settings-errors';
+import { isForbiddenError, isKnownReasonKind, optionalTradeContext, reasonErrorText } from './reason-errors';
 import { SettingsMutationKeys } from '../settings-mutation-keys';
 import { translationEvents } from '../../../../core/i18n/translation-events';
 
-const CAN_MANAGE = true; // later from the session permissions (trade.reasons.manage)
 const SORT_ORDER_MAX = 1_000_000;
 
 const AREA_TABS_META: readonly { id: ReasonArea; icon: string; labelKey: string }[] = [
@@ -58,7 +70,7 @@ function isReasonArea(raw: string | null | undefined): raw is ReasonArea {
 }
 
 function areaOfKind(kind: string | null | undefined): ReasonArea | null {
-  if (!kind) return null;
+  if (!isKnownReasonKind(kind)) return null;
   for (const meta of AREA_TABS_META) {
     if (REASON_AREAS[meta.id].includes(kind)) {
       return meta.id;
@@ -70,25 +82,25 @@ function areaOfKind(kind: string | null | undefined): ReasonArea | null {
 function parseAreaAndKind(
   areaRaw: string | null | undefined,
   kindRaw: string | null | undefined,
-): { area: ReasonArea; kind: ReasonKind } {
+): { area: ReasonArea; kind: KnownReasonKind } {
   const areaCandidate = areaRaw?.trim().toLowerCase();
   const kindCandidate = kindRaw?.trim().toUpperCase();
 
   if (isReasonArea(areaCandidate)) {
     const kinds = REASON_AREAS[areaCandidate];
-    const kind = kindCandidate && kinds.includes(kindCandidate) ? kindCandidate : kinds[0];
+    const kind = isKnownReasonKind(kindCandidate) && kinds.includes(kindCandidate) ? kindCandidate : kinds[0];
     return { area: areaCandidate, kind };
   }
 
   const owningArea = areaOfKind(kindCandidate);
-  if (owningArea && kindCandidate) {
+  if (owningArea && isKnownReasonKind(kindCandidate)) {
     return { area: owningArea, kind: kindCandidate };
   }
 
   return { area: 'documents', kind: REASON_AREAS.documents[0] };
 }
 
-function compareReasons(a: ReasonCode, b: ReasonCode): number {
+function compareReasons(a: AdminReasonCode, b: AdminReasonCode): number {
   return a.sortOrder - b.sortOrder || a.code.localeCompare(b.code);
 }
 
@@ -135,8 +147,10 @@ export class ReasonsPage {
 
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly injector = inject(Injector);
   private readonly destroyRef = inject(DestroyRef);
   private readonly notify = inject(Notify);
+  private readonly tenantScope = inject(TenantScopeState);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   protected readonly language = inject(LanguageState).current;
@@ -144,11 +158,19 @@ export class ReasonsPage {
 
   private readonly reasonModal = viewChild.required(ReasonModal);
 
-  protected readonly canManage = CAN_MANAGE;
+  protected readonly canRead = computed(() =>
+    runInInjectionContext(this.injector, () => anyGrant('trade.reasons.read')),
+  );
+  protected readonly canManage = computed(() =>
+    runInInjectionContext(this.injector, () => tenantWide('trade.reasons.manage')),
+  );
   protected readonly skeletonRows = [0, 1, 2, 3, 4];
   protected readonly tabButtonId = tabButtonId;
   protected readonly tabPanelId = tabPanelId;
-  protected readonly gridColumns = CAN_MANAGE ? GRID_COLUMNS : GRID_COLUMNS_READONLY;
+  protected readonly gridColumns = computed(() =>
+    this.canManage() ? GRID_COLUMNS : GRID_COLUMNS_READONLY,
+  );
+  private readonly readContext = computed<TradeContext>(() => optionalTradeContext(this.tenantScope));
 
   private readonly initialSelection = parseAreaAndKind(
     this.route.snapshot.queryParamMap.get('area'),
@@ -156,10 +178,11 @@ export class ReasonsPage {
   );
 
   protected readonly activeArea = signal<ReasonArea>(this.initialSelection.area);
-  protected readonly activeKind = signal<ReasonKind>(this.initialSelection.kind);
+  protected readonly activeKind = signal<KnownReasonKind>(this.initialSelection.kind);
   protected readonly counts = signal<ReasonCounts | null>(null);
-  protected readonly reasons = signal<ReasonCode[]>([]);
+  protected readonly reasons = signal<AdminReasonCode[]>([]);
   protected readonly loading = signal(true);
+  protected readonly forbidden = signal(false);
   protected readonly failed = signal(false);
   protected readonly search = signal('');
   protected readonly showInactive = signal(false);
@@ -167,9 +190,10 @@ export class ReasonsPage {
   private readonly mutationKeys = new SettingsMutationKeys();
 
   private lastUrlArea: ReasonArea = this.initialSelection.area;
-  private lastUrlKind: ReasonKind = this.initialSelection.kind;
+  private lastUrlKind: KnownReasonKind = this.initialSelection.kind;
   private initialLoaded = false;
-  private lastLoadedKind: ReasonKind | null = null;
+  private lastLoadedKind: KnownReasonKind | null = null;
+  private lastLoadedContextKey: string | null = null;
   private listSeq = 0;
   private countsSeq = 0;
   private destroyed = false;
@@ -202,15 +226,15 @@ export class ReasonsPage {
     }));
   });
 
-  protected readonly visibleReasons = computed<ReasonCode[]>(() => {
+  protected readonly visibleReasons = computed<AdminReasonCode[]>(() => {
     const term = this.search().trim().toLowerCase();
     const list = this.reasons();
     const filtered = term
       ? list.filter(
           (item) =>
             item.code.toLowerCase().includes(term) ||
-            (item.localizedNames['en']?.toLowerCase().includes(term) ?? false) ||
-            (item.localizedNames['ar']?.toLowerCase().includes(term) ?? false),
+            item.localizedNames.en.toLowerCase().includes(term) ||
+            item.localizedNames.ar.toLowerCase().includes(term),
         )
       : list;
     return filtered.slice().sort(compareReasons);
@@ -247,26 +271,39 @@ export class ReasonsPage {
     });
 
     effect(() => {
+      const canRead = this.canRead();
       const kind = this.activeKind();
       const includeInactive = this.showInactive();
+      const ctx = this.readContext();
+      const ctxKey = `${ctx.companyId ?? ''}:${ctx.branchId ?? ''}`;
       untracked(() => {
-        if (!this.initialLoaded) {
+        if (!canRead) {
+          this.listSeq += 1;
+          this.countsSeq += 1;
+          this.forbidden.set(true);
+          this.failed.set(false);
+          this.loading.set(false);
+          return;
+        }
+        this.forbidden.set(false);
+        if (!this.initialLoaded || ctxKey !== this.lastLoadedContextKey || this.counts() === null) {
           this.initialLoaded = true;
+          this.lastLoadedContextKey = ctxKey;
           this.lastLoadedKind = kind;
-          void this.loadAll(kind, includeInactive);
+          void this.loadAll(kind, includeInactive, ctx);
           return;
         }
         if (kind !== this.lastLoadedKind) {
           this.lastLoadedKind = kind;
           this.reasons.set([]);
         }
-        if (this.counts() === null) {
-          void this.loadAll(kind, includeInactive);
-          return;
-        }
-        void this.loadKind(kind, includeInactive);
+        void this.loadKind(kind, includeInactive, ctx);
       });
     });
+  }
+
+  protected goHome(): void {
+    void this.router.navigateByUrl('/');
   }
 
   protected selectArea(next: string): void {
@@ -290,7 +327,7 @@ export class ReasonsPage {
   protected selectKind(next: string): void {
     const area = this.activeArea();
     const kinds = REASON_AREAS[area];
-    if (!kinds.includes(next)) return;
+    if (!isKnownReasonKind(next) || !kinds.includes(next)) return;
     if (next === this.activeKind() && next === this.lastUrlKind) return;
     this.activeKind.set(next);
     this.lastUrlArea = area;
@@ -306,15 +343,21 @@ export class ReasonsPage {
   }
 
   protected reload(): void {
-    void this.loadAll(this.activeKind(), this.showInactive());
+    if (!this.canRead()) {
+      this.forbidden.set(true);
+      this.failed.set(false);
+      this.loading.set(false);
+      return;
+    }
+    void this.loadAll(this.activeKind(), this.showInactive(), this.readContext());
   }
 
   protected openCreate(): void {
-    if (!this.canManage) return;
+    if (!this.canManage()) return;
     this.reasonModal().openCreate(this.activeKind(), this.nextSortOrder());
   }
 
-  protected openEdit(reason: ReasonCode): void {
+  protected openEdit(reason: AdminReasonCode): void {
     this.reasonModal().openEdit(reason);
   }
 
@@ -322,13 +365,13 @@ export class ReasonsPage {
     this.search.set('');
   }
 
-  protected primaryName(reason: ReasonCode): string {
+  protected primaryName(reason: AdminReasonCode): string {
     const lang = this.language();
     const other = lang === 'ar' ? 'en' : 'ar';
     return reason.localizedNames[lang]?.trim() || reason.localizedNames[other]?.trim() || reason.code;
   }
 
-  protected secondaryName(reason: ReasonCode): string {
+  protected secondaryName(reason: AdminReasonCode): string {
     const lang = this.language();
     const other = lang === 'ar' ? 'en' : 'ar';
     const primary = this.primaryName(reason);
@@ -336,7 +379,7 @@ export class ReasonsPage {
     return secondary && secondary !== primary ? secondary : '';
   }
 
-  protected rowActions(reason: ReasonCode): ActionItem[] {
+  protected rowActions(reason: AdminReasonCode): ActionItem[] {
     this.i18n();
     const items: ActionItem[] = [
       {
@@ -347,7 +390,7 @@ export class ReasonsPage {
       },
     ];
 
-    if (!this.canManage) {
+    if (!this.canManage()) {
       return items;
     }
 
@@ -376,32 +419,33 @@ export class ReasonsPage {
       });
     }
 
-    items.push({
-      id: 'delete',
-      title: this.transloco.translate('treasons.actions.delete'),
-      icon: 'tablerTrash',
-      tile: 'bg-icon-red',
-      danger: true,
-      disabled: reason.isSystem,
-      reason: reason.isSystem ? this.transloco.translate('treasons.systemLockedDelete') : undefined,
-    });
+    if (!reason.isSystem) {
+      items.push({
+        id: 'delete',
+        title: this.transloco.translate('treasons.actions.delete'),
+        icon: 'tablerTrash',
+        tile: 'bg-icon-red',
+        danger: true,
+      });
+    }
 
     return items;
   }
 
-  protected async handleAction(reason: ReasonCode, selection: ActionSelection): Promise<void> {
+  protected async handleAction(reason: AdminReasonCode, selection: ActionSelection): Promise<void> {
     if (selection.id === 'open' || selection.id === 'edit') {
       this.openEdit(reason);
       return;
     }
 
     if (selection.id === 'delete') {
+      if (!this.canManage() || reason.isSystem) return;
       void this.reasonModal().confirmDelete(reason, false);
       return;
     }
 
     if (selection.id !== 'activate' && selection.id !== 'deactivate') return;
-    if (!this.canManage || (reason.isSystem && selection.id === 'deactivate') || this.busyIds().has(reason.id)) return;
+    if (!this.canManage() || (reason.isSystem && selection.id === 'deactivate') || this.busyIds().has(reason.id)) return;
 
     const nextActive = selection.id === 'activate';
     this.setBusy(reason.id, true);
@@ -434,42 +478,57 @@ export class ReasonsPage {
         void this.refreshCounts();
         return;
       }
-      this.notify.error(settingsErrorText(error, this.transloco));
+      this.notify.error(reasonErrorText(error, this.transloco));
     } finally {
       this.setBusy(reason.id, false);
     }
   }
 
-  protected onReasonSaved(reason: ReasonCode): void {
+  protected onReasonSaved(reason: AdminReasonCode): void {
     this.syncReason(reason);
     void this.refreshCounts();
   }
 
-  protected onReasonReloaded(reason: ReasonCode): void {
+  protected onReasonReloaded(reason: AdminReasonCode): void {
     this.syncReason(reason);
     void this.refreshCounts();
   }
 
-  protected onReasonDeleted(reason: ReasonCode): void {
+  protected onReasonDeleted(reason: AdminReasonCode): void {
     this.removeReason(reason.id);
     void this.refreshCounts();
   }
 
-  private async loadAll(kind: ReasonKind, includeInactive: boolean): Promise<void> {
+  private async loadAll(kind: KnownReasonKind, includeInactive: boolean, ctx: TradeContext): Promise<void> {
+    if (!this.canRead()) {
+      this.forbidden.set(true);
+      this.failed.set(false);
+      this.loading.set(false);
+      return;
+    }
     const seq = ++this.listSeq;
     const cSeq = ++this.countsSeq;
     this.loading.set(true);
+    this.forbidden.set(false);
     this.failed.set(false);
     try {
-      const [counts, items] = await Promise.all([countReasons(), listReasonsAdmin(kind, includeInactive)]);
+      const [counts, items] = await Promise.all([
+        countReasons(true, ctx),
+        listReasonsAdmin(kind, includeInactive, ctx),
+      ]);
       if (seq !== this.listSeq || this.destroyed) return;
       if (cSeq === this.countsSeq) {
         this.counts.set(counts);
       }
       this.reasons.set(items.slice().sort(compareReasons));
-    } catch {
+    } catch (error) {
       if (seq === this.listSeq && !this.destroyed) {
-        this.failed.set(true);
+        if (isForbiddenError(error)) {
+          this.forbidden.set(true);
+          this.failed.set(false);
+        } else {
+          this.failed.set(true);
+        }
       }
     } finally {
       if (seq === this.listSeq && !this.destroyed) {
@@ -478,17 +537,29 @@ export class ReasonsPage {
     }
   }
 
-  private async loadKind(kind: ReasonKind, includeInactive: boolean): Promise<void> {
+  private async loadKind(kind: KnownReasonKind, includeInactive: boolean, ctx: TradeContext): Promise<void> {
+    if (!this.canRead()) {
+      this.forbidden.set(true);
+      this.failed.set(false);
+      this.loading.set(false);
+      return;
+    }
     const seq = ++this.listSeq;
     this.loading.set(true);
+    this.forbidden.set(false);
     this.failed.set(false);
     try {
-      const items = await listReasonsAdmin(kind, includeInactive);
+      const items = await listReasonsAdmin(kind, includeInactive, ctx);
       if (seq !== this.listSeq || this.destroyed) return;
       this.reasons.set(items.slice().sort(compareReasons));
-    } catch {
+    } catch (error) {
       if (seq === this.listSeq && !this.destroyed) {
-        this.failed.set(true);
+        if (isForbiddenError(error)) {
+          this.forbidden.set(true);
+          this.failed.set(false);
+        } else {
+          this.failed.set(true);
+        }
       }
     } finally {
       if (seq === this.listSeq && !this.destroyed) {
@@ -498,9 +569,10 @@ export class ReasonsPage {
   }
 
   private async refreshCounts(): Promise<void> {
+    if (!this.canRead()) return;
     const seq = ++this.countsSeq;
     try {
-      const counts = await countReasons();
+      const counts = await countReasons(true, this.readContext());
       if (seq === this.countsSeq && !this.destroyed) {
         this.counts.set(counts);
       }
@@ -509,7 +581,7 @@ export class ReasonsPage {
     }
   }
 
-  private syncReason(reason: ReasonCode): void {
+  private syncReason(reason: AdminReasonCode): void {
     if (reason.kind !== this.activeKind()) return;
     if (!reason.isActive && !this.showInactive()) {
       this.removeReason(reason.id);

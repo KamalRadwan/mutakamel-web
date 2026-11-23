@@ -52,7 +52,9 @@
     "clearSearch": "Clear search",
     "clearFilter": "Show all",
     "loadFailed": "This page could not be loaded.",
-    "retry": "Retry"
+    "retry": "Retry",
+    "chooseCompanyTitle": "Choose a company",
+    "chooseCompanyText": "Choose a company in the top bar to view and manage terms."
   },
   "modal": {
     "newTitle": "New term",

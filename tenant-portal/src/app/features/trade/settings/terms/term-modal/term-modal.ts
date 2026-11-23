@@ -14,9 +14,9 @@ import { Modal } from '../../../../../shared/ui/modal/modal';
 import { Segmented, SegmentedOption } from '../../../../../shared/ui/segmented/segmented';
 import { Switch } from '../../../../../shared/ui/switch/switch';
 import { UnsavedDialog } from '../../../../../shared/ui/unsaved-dialog/unsaved-dialog';
-import { errorCodeOf } from '../../../shared/trade-api';
+import { ApiError, errorCodeOf } from '../../../shared/trade-api';
 import { createTerm, deleteTerm, getTerm, makeDefaultTerm, updateTerm } from '../../../shared/terms/terms.api';
-import { settingsErrorText } from '../../settings-errors';
+import { isForbiddenError, termErrorText } from '../term-errors';
 import { SettingsMutationKeys } from '../../settings-mutation-keys';
 import {
   INCOTERMS,
@@ -141,6 +141,56 @@ function computeEditPatch(base: TradeTerm, value: TermFormValue): TermPatch {
   return patch;
 }
 
+function mapServerFieldErrors(
+  error: ApiError,
+  formatError: (e: ApiError) => string,
+): Partial<Record<TermField, string>> {
+  const details = error.details;
+  if (!details) return {};
+  const mapped: Partial<Record<TermField, string>> = {};
+  const assign = (field: TermField, message: string) => {
+    if (!mapped[field]) mapped[field] = message;
+  };
+
+  for (const [key, messages] of Object.entries(details)) {
+    const first = Array.isArray(messages) ? messages[0] : undefined;
+    if (key === 'field' && Array.isArray(messages)) {
+      const fallback =
+        error.code === 'TRADE.TERMS.CODE_TAKEN' ? 'tset.errors.TRADE_TERMS_CODE_TAKEN' : formatError(error);
+      for (const target of messages) {
+        if (target === 'code') assign('code', fallback);
+        else if (target === 'dueDays') assign('dueDays', fallback);
+        else if (target === 'sortOrder') assign('sortOrder', fallback);
+        else if (target === 'localizedNames') {
+          assign('nameAr', fallback);
+          assign('nameEn', fallback);
+        } else if (target === 'localizedTexts') {
+          assign('textAr', fallback);
+          assign('textEn', fallback);
+        }
+      }
+      continue;
+    }
+    if (!first) continue;
+    if (key === 'code') assign('code', first);
+    else if (key === 'dueDays') assign('dueDays', first);
+    else if (key === 'sortOrder') assign('sortOrder', first);
+    else if (key === 'nameAr' || key === 'localizedNames.ar') assign('nameAr', first);
+    else if (key === 'nameEn' || key === 'localizedNames.en') assign('nameEn', first);
+    else if (key === 'textAr' || key === 'localizedTexts.ar') assign('textAr', first);
+    else if (key === 'textEn' || key === 'localizedTexts.en') assign('textEn', first);
+    else if (key === 'localizedNames') {
+      assign('nameAr', first);
+      assign('nameEn', first);
+    } else if (key === 'localizedTexts') {
+      assign('textAr', first);
+      assign('textEn', first);
+    }
+  }
+
+  return mapped;
+}
+
 @Component({
   selector: 'app-term-modal',
   imports: [
@@ -186,6 +236,7 @@ export class TermModal {
   readonly saved = output<TradeTerm>();
   readonly reloaded = output<TradeTerm>();
   readonly deleted = output<string>();
+  readonly forbidden = output<void>();
 
   protected readonly limits = TERM_LIMITS;
   protected readonly mode = signal<'create' | 'edit'>('create');
@@ -198,7 +249,7 @@ export class TermModal {
 
   private readonly touched = signal<Partial<Record<TermField, boolean>>>({});
   private readonly revealAllErrors = signal(false);
-  private readonly serverCodeErrorKey = signal<string | null>(null);
+  private readonly serverFieldErrors = signal<Partial<Record<TermField, string>>>({});
   private readonly pendingRowConflict = signal<RowConflictAction | null>(null);
 
   private defaultOrder = 10;
@@ -420,8 +471,11 @@ export class TermModal {
 
   protected errorText(field: TermField): string | null {
     this.i18n();
-    if (field === 'code' && this.serverCodeErrorKey()) {
-      return this.transloco.translate(this.serverCodeErrorKey()!);
+    const serverError = this.serverFieldErrors()[field];
+    if (serverError) {
+      return serverError.startsWith('tset.') || serverError.startsWith('tterms.')
+        ? this.transloco.translate(serverError)
+        : serverError;
     }
     const err = this.validationErrors()[field];
     if (!err) return null;
@@ -435,7 +489,7 @@ export class TermModal {
     const upper = target.value.toUpperCase();
     if (target.value !== upper) target.value = upper;
     this.form.update((current) => ({ ...current, code: upper }));
-    this.serverCodeErrorKey.set(null);
+    this.clearServerFieldError('code');
   }
 
   protected onFieldInput(
@@ -445,6 +499,7 @@ export class TermModal {
     if (!this.canManage()) return;
     const value = (event.target as HTMLInputElement | HTMLTextAreaElement).value;
     this.form.update((current) => ({ ...current, [field]: value }));
+    this.clearServerFieldError(field);
   }
 
   protected setSide(value: string | null): void {
@@ -619,13 +674,17 @@ export class TermModal {
       this.allowClose = true;
       this.modal().close();
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.handleForbidden();
+        return;
+      }
       const code = errorCodeOf(error);
       if (code === 'TRADE.CONCURRENCY.STALE_VERSION') {
         this.pendingRowConflict.set({ kind: 'delete' });
         this.conflictModal().open();
         return;
       }
-      this.notify.error(settingsErrorText(error, this.transloco));
+      this.notify.error(termErrorText(error, this.transloco));
       if (code === 'TRADE.TERMS.NOT_FOUND') {
         this.deleted.emit(base.id);
         this.allowClose = true;
@@ -661,8 +720,12 @@ export class TermModal {
       }
       this.reloaded.emit(fresh);
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.handleForbidden();
+        return;
+      }
       const code = errorCodeOf(error);
-      this.notify.error(settingsErrorText(error, this.transloco));
+      this.notify.error(termErrorText(error, this.transloco));
       if (code === 'TRADE.TERMS.NOT_FOUND') {
         this.conflictModal().close();
         this.pendingRowConflict.set(null);
@@ -733,11 +796,15 @@ export class TermModal {
         try {
           current = await this.makeDefault(current);
         } catch (defaultError) {
+          if (isForbiddenError(defaultError)) {
+            this.handleForbidden();
+            return;
+          }
           if (hadPatch) {
             this.baseTerm.set(current);
             this.saved.emit(current);
           }
-          this.notify.error(settingsErrorText(defaultError, this.transloco));
+          this.notify.error(termErrorText(defaultError, this.transloco));
           return;
         }
       }
@@ -752,8 +819,12 @@ export class TermModal {
       this.allowClose = true;
       this.modal().close();
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.handleForbidden();
+        return;
+      }
       const code = errorCodeOf(error);
-      this.notify.error(settingsErrorText(error, this.transloco));
+      this.notify.error(termErrorText(error, this.transloco));
       if (code === 'TRADE.TERMS.NOT_FOUND') {
         this.conflictModal().close();
         this.pendingRowConflict.set(null);
@@ -794,9 +865,13 @@ export class TermModal {
   }
 
   private handleSaveError(error: unknown): void {
+    if (isForbiddenError(error)) {
+      this.handleForbidden();
+      return;
+    }
     const code = errorCodeOf(error);
     if (code === 'TRADE.TERMS.CODE_TAKEN') {
-      this.serverCodeErrorKey.set('tset.errors.TRADE_TERMS_CODE_TAKEN');
+      this.serverFieldErrors.set({ code: 'tset.errors.TRADE_TERMS_CODE_TAKEN' });
       return;
     }
     if (code === 'TRADE.CONCURRENCY.STALE_VERSION') {
@@ -804,13 +879,37 @@ export class TermModal {
       this.conflictModal().open();
       return;
     }
-    this.notify.error(settingsErrorText(error, this.transloco));
+    if (error instanceof ApiError && error.details) {
+      const mapped = mapServerFieldErrors(error, (e) => termErrorText(e, this.transloco));
+      if (Object.keys(mapped).length > 0) {
+        this.serverFieldErrors.set(mapped);
+        return;
+      }
+    }
+    this.notify.error(termErrorText(error, this.transloco));
+  }
+
+  private handleForbidden(): void {
+    this.allowClose = true;
+    this.pendingRowConflict.set(null);
+    this.conflictModal().close();
+    this.modal().close();
+    this.forbidden.emit();
+  }
+
+  private clearServerFieldError(field: TermField): void {
+    if (!this.serverFieldErrors()[field]) return;
+    this.serverFieldErrors.update((current) => {
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
   }
 
   private resetValidation(): void {
     this.touched.set({});
     this.revealAllErrors.set(false);
-    this.serverCodeErrorKey.set(null);
+    this.serverFieldErrors.set({});
   }
 
   private async confirmModalClose(): Promise<void> {

@@ -1,6 +1,8 @@
 import { ApplicationConfig, inject, isDevMode, provideAppInitializer, provideBrowserGlobalErrorListeners } from '@angular/core';
 import { EnvironmentInjector } from '@angular/core';
 import { bindCrmHttp, CrmHttp, crmQueries } from './features/crm/shared/crm-http';
+import { bindTradeHttp, TradeHttp, tradeQueries } from './features/trade/shared/trade-http';
+import { CoreHttp } from './core/api/core-http';
 import { bindCrmInjector } from './features/crm/shared/crm-runtime';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { TitleStrategy, provideRouter, withComponentInputBinding } from '@angular/router';
@@ -65,7 +67,7 @@ export const appConfig: ApplicationConfig = {
       bindSeatPreviewApi(() => injector.get(SeatPreviewApi));
     }),
     provideAppInitializer(() => { const session = inject(AuthSession); bindAnalyticsPermissions(() => session.me()?.permissions ?? []); }),
-    provideAppInitializer(() => { const injector = inject(EnvironmentInjector); bindCrmHttp(inject(CrmHttp), crmQueries()); bindCrmInjector(() => injector); }),
+    provideAppInitializer(() => { const injector = inject(EnvironmentInjector); bindCrmHttp(inject(CrmHttp), crmQueries()); bindTradeHttp(inject(TradeHttp), tradeQueries(), inject(CoreHttp)); bindCrmInjector(() => injector); }),
     provideAppInitializer(() => {
       inject(LanguageState);
       inject(ThemeState);

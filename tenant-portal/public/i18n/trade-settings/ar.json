@@ -98,6 +98,8 @@
     "TRADE_CONCURRENCY_IF_MATCH_REQUIRED": "أعد تحميل السجل قبل حفظ تغييراتك.",
     "TRADE_IDEMPOTENCY_IN_FLIGHT": "لا يزال الطلب قيد المعالجة. أعد المحاولة بعد قليل.",
     "TRADE_AUTH_TARGET_DENIED": "لا تملك صلاحية الوصول إلى النطاق المحدد.",
+    "TRADE_CONTEXT_MISSING_COMPANY": "اختر شركة من الشريط العلوي.",
+    "TRADE_SCOPE_REQUIRED": "اختر شركة من الشريط العلوي.",
     "TRADE_TERMS_NOT_FOUND": "لم يعد هذا الشرط موجودًا.",
     "TRADE_TERMS_CODE_TAKEN": "هذا الرمز مستخدم بالفعل لهذا النوع من الشروط.",
     "TRADE_TERMS_TEXT_REQUIRED": "يجب إدخال النصين العربي والإنجليزي للشرط النشط.",
@@ -124,6 +126,12 @@
       },
       "AUTH": {
         "TARGET_DENIED": "لا تملك صلاحية الوصول إلى النطاق المحدد."
+      },
+      "CONTEXT": {
+        "MISSING_COMPANY": "اختر شركة من الشريط العلوي."
+      },
+      "SCOPE": {
+        "REQUIRED": "اختر شركة من الشريط العلوي."
       },
       "TERMS": {
         "NOT_FOUND": "لم يعد هذا الشرط موجودًا.",

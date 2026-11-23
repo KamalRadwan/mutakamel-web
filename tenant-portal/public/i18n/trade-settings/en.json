@@ -98,6 +98,8 @@
     "TRADE_CONCURRENCY_IF_MATCH_REQUIRED": "Reload the record before saving your changes.",
     "TRADE_IDEMPOTENCY_IN_FLIGHT": "This request is still being processed. Try again shortly.",
     "TRADE_AUTH_TARGET_DENIED": "You do not have access to the selected scope.",
+    "TRADE_CONTEXT_MISSING_COMPANY": "Choose a company in the top bar.",
+    "TRADE_SCOPE_REQUIRED": "Choose a company in the top bar.",
     "TRADE_TERMS_NOT_FOUND": "This term no longer exists.",
     "TRADE_TERMS_CODE_TAKEN": "This code is already used for this term type.",
     "TRADE_TERMS_TEXT_REQUIRED": "Both Arabic and English texts are required for an active term.",
@@ -124,6 +126,12 @@
       },
       "AUTH": {
         "TARGET_DENIED": "You do not have access to the selected scope."
+      },
+      "CONTEXT": {
+        "MISSING_COMPANY": "Choose a company in the top bar."
+      },
+      "SCOPE": {
+        "REQUIRED": "Choose a company in the top bar."
       },
       "TERMS": {
         "NOT_FOUND": "This term no longer exists.",

@@ -3,15 +3,17 @@ import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerAlertTriangle, tablerListCheck, tablerLock } from '@ng-icons/tabler-icons';
 import { Notify } from '../../../../../core/notify/notify';
+import { TenantScopeState } from '../../../../../core/scope/tenant-scope';
 import { Button } from '../../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { Switch } from '../../../../../shared/ui/switch/switch';
-import { errorCodeOf } from '../../../shared/trade-api';
-import type { ReasonCode, ReasonKind } from '../../../shared/trade-foundation.model';
-import { REASON_CODE_PATTERN, REASON_NAME_MAX } from '../../../shared/reasons/reason-kinds';
+import { ApiError, errorCodeOf } from '../../../shared/trade-api';
+import type { ReasonKind } from '../../../shared/trade-foundation.model';
+import { REASON_CODE_PATTERN, REASON_NAME_MAX, type KnownReasonKind } from '../../../shared/reasons/reason-kinds';
 import {
+  type AdminReasonCode,
   type CreateReasonInput,
   type UpdateReasonPatch,
   createReason,
@@ -19,11 +21,16 @@ import {
   listReasonsAdmin,
   updateReason,
 } from '../../../shared/reasons/reasons-admin.api';
-import { settingsErrorText } from '../../settings-errors';
+import { isKnownReasonKind, optionalTradeContext, reasonErrorText } from '../reason-errors';
 import { SettingsMutationKeys } from '../../settings-mutation-keys';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
 
 type ReasonField = 'code' | 'nameAr' | 'nameEn' | 'sortOrder';
+
+interface ReasonFieldError {
+  key: string;
+  params?: Record<string, number>;
+}
 
 interface ReasonFormValue {
   code: string;
@@ -48,15 +55,42 @@ function createEmptyForm(defaultOrder: number): ReasonFormValue {
   };
 }
 
-function reasonToForm(reason: ReasonCode): ReasonFormValue {
+function reasonToForm(reason: AdminReasonCode): ReasonFormValue {
   return {
     code: reason.code,
-    nameAr: reason.localizedNames['ar'] ?? '',
-    nameEn: reason.localizedNames['en'] ?? '',
+    nameAr: reason.localizedNames.ar ?? '',
+    nameEn: reason.localizedNames.en ?? '',
     sortOrder: String(reason.sortOrder),
     requiresNote: reason.requiresNote,
     isActive: reason.isActive,
   };
+}
+
+function mapValidationFieldErrors(details: Record<string, string[]> | undefined): Partial<Record<ReasonField, ReasonFieldError>> {
+  if (!details) return {};
+  const mapped: Partial<Record<ReasonField, ReasonFieldError>> = {};
+  const fieldHint = details['field'];
+
+  if ('code' in details || (Array.isArray(fieldHint) && fieldHint.includes('code'))) {
+    mapped.code = { key: 'treasons.validation.reasonCode' };
+  }
+  if ('localizedNames.ar' in details) {
+    mapped.nameAr = { key: 'treasons.validation.required' };
+  }
+  if ('localizedNames.en' in details) {
+    mapped.nameEn = { key: 'treasons.validation.required' };
+  }
+  if ('localizedNames' in details) {
+    if (!mapped.nameAr) mapped.nameAr = { key: 'treasons.validation.required' };
+    if (!mapped.nameEn) mapped.nameEn = { key: 'treasons.validation.required' };
+  }
+  if ('sortOrder' in details) {
+    mapped.sortOrder = {
+      key: 'treasons.validation.range',
+      params: { min: SORT_ORDER_MIN, max: SORT_ORDER_MAX },
+    };
+  }
+  return mapped;
 }
 
 @Component({
@@ -78,6 +112,7 @@ export class ReasonModal {
   protected readonly uid = `trade-reason-modal-${++ReasonModal.nextId}`;
 
   private readonly notify = inject(Notify);
+  private readonly tenantScope = inject(TenantScopeState);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly modal = viewChild.required<Modal>('reasonModal');
@@ -86,21 +121,21 @@ export class ReasonModal {
   private readonly deleteDialog = viewChild.required<ConfirmDialog>('deleteDialog');
 
   readonly canManage = input(true);
-  readonly saved = output<ReasonCode>();
-  readonly reloaded = output<ReasonCode>();
-  readonly deleted = output<ReasonCode>();
+  readonly saved = output<AdminReasonCode>();
+  readonly reloaded = output<AdminReasonCode>();
+  readonly deleted = output<AdminReasonCode>();
 
   protected readonly nameMax = REASON_NAME_MAX;
   protected readonly mode = signal<'create' | 'edit'>('create');
   protected readonly kind = signal<ReasonKind>('DOCUMENT_CANCEL');
-  protected readonly baseReason = signal<ReasonCode | null>(null);
+  protected readonly baseReason = signal<AdminReasonCode | null>(null);
   protected readonly form = signal<ReasonFormValue>(createEmptyForm(10));
   protected readonly saving = signal(false);
   protected readonly deleting = signal(false);
   protected readonly conflictBusy = signal(false);
   private readonly touched = signal<Partial<Record<ReasonField, boolean>>>({});
   private readonly revealAllErrors = signal(false);
-  private readonly serverCodeErrorKey = signal<string | null>(null);
+  private readonly serverFieldErrors = signal<Partial<Record<ReasonField, ReasonFieldError>>>({});
   private readonly pendingConflictPatch = signal<UpdateReasonPatch | null>(null);
   private readonly pendingConflictDelete = signal(false);
   private readonly conflictFromRow = signal(false);
@@ -112,6 +147,13 @@ export class ReasonModal {
 
   protected readonly isInventoryKind = computed(() => this.kind().startsWith('INVENTORY_'));
   protected readonly isSystemRow = computed(() => this.mode() === 'edit' && Boolean(this.baseReason()?.isSystem));
+  protected readonly kindLabel = computed(() => {
+    this.i18n();
+    const k = this.kind();
+    const key = `tset.kinds.${k}`;
+    const translated = this.transloco.translate(key);
+    return translated !== key ? translated : k;
+  });
 
   protected readonly validationErrors = computed<
     Partial<Record<ReasonField, { key: string; params?: Record<string, number> }>>
@@ -216,7 +258,7 @@ export class ReasonModal {
     );
   });
 
-  openCreate(kind: ReasonKind, nextOrder: number): void {
+  openCreate(kind: KnownReasonKind, nextOrder: number): void {
     this.mode.set('create');
     this.kind.set(kind);
     this.baseReason.set(null);
@@ -229,7 +271,7 @@ export class ReasonModal {
     this.modal().open();
   }
 
-  openEdit(reason: ReasonCode): void {
+  openEdit(reason: AdminReasonCode): void {
     this.mode.set('edit');
     this.kind.set(reason.kind);
     this.baseReason.set(reason);
@@ -241,7 +283,7 @@ export class ReasonModal {
     this.modal().open();
   }
 
-  openConflict(reason: ReasonCode, patch: UpdateReasonPatch): void {
+  openConflict(reason: AdminReasonCode, patch: UpdateReasonPatch): void {
     this.baseReason.set(reason);
     this.pendingConflictPatch.set(patch);
     this.pendingConflictDelete.set(false);
@@ -249,7 +291,7 @@ export class ReasonModal {
     this.conflictModal().open();
   }
 
-  async confirmDelete(reason: ReasonCode, fromModal = false): Promise<void> {
+  async confirmDelete(reason: AdminReasonCode, fromModal = false): Promise<void> {
     if (!this.canManage() || reason.isSystem || this.deleting() || this.saving()) return;
     const confirmed = await this.deleteDialog().open();
     if (!confirmed) return;
@@ -337,9 +379,9 @@ export class ReasonModal {
 
   protected errorText(field: ReasonField): string | null {
     this.i18n();
-    const serverKey = this.serverCodeErrorKey();
-    if (field === 'code' && serverKey) {
-      return this.transloco.translate(serverKey);
+    const serverErr = this.serverFieldErrors()[field];
+    if (serverErr) {
+      return this.transloco.translate(serverErr.key, serverErr.params);
     }
     const err = this.validationErrors()[field];
     if (!err) return null;
@@ -355,13 +397,14 @@ export class ReasonModal {
       target.value = upper;
     }
     this.form.update((current) => ({ ...current, code: upper }));
-    this.serverCodeErrorKey.set(null);
+    this.clearServerFieldError('code');
   }
 
   protected onFieldInput(field: 'nameAr' | 'nameEn' | 'sortOrder', event: Event): void {
     if (!this.canManage()) return;
     const value = (event.target as HTMLInputElement).value;
     this.form.update((current) => ({ ...current, [field]: value }));
+    this.clearServerFieldError(field);
   }
 
   protected setRequiresNote(checked: boolean): void {
@@ -387,9 +430,13 @@ export class ReasonModal {
     this.saving.set(true);
     try {
       if (this.mode() === 'create') {
+        const currentKind = this.kind();
+        if (!isKnownReasonKind(currentKind)) {
+          throw new ApiError(422, 'TRADE.REASON.KIND_INVALID', { field: ['kind'] });
+        }
         const value = this.form();
         const payload: CreateReasonInput = {
-          kind: this.kind(),
+          kind: currentKind,
           code: value.code.trim().toUpperCase(),
           localizedNames: {
             en: value.nameEn.trim(),
@@ -430,8 +477,15 @@ export class ReasonModal {
     } catch (error) {
       const code = errorCodeOf(error);
       if (code === 'TRADE.REASON.CODE_TAKEN') {
-        this.serverCodeErrorKey.set('tset.errors.TRADE_REASON_CODE_TAKEN');
+        this.serverFieldErrors.set({ code: { key: 'tset.errors.TRADE_REASON_CODE_TAKEN' } });
         return;
+      }
+      if (code === 'TRADE.VALIDATION_FAILED' && error instanceof ApiError) {
+        const mapped = mapValidationFieldErrors(error.details);
+        if (Object.keys(mapped).length > 0) {
+          this.serverFieldErrors.set(mapped);
+          return;
+        }
       }
       if (code === 'TRADE.CONCURRENCY.STALE_VERSION') {
         this.pendingConflictPatch.set(null);
@@ -458,7 +512,8 @@ export class ReasonModal {
     const fromRow = this.conflictFromRow();
     this.conflictBusy.set(true);
     try {
-      const list = await listReasonsAdmin(base.kind, true);
+      const kindFilter = isKnownReasonKind(base.kind) ? base.kind : undefined;
+      const list = await listReasonsAdmin(kindFilter, true, optionalTradeContext(this.tenantScope));
       const fresh = list.find((item) => item.id === base.id);
       this.conflictModal().close();
       this.clearPendingConflict();
@@ -494,7 +549,8 @@ export class ReasonModal {
 
     this.conflictBusy.set(true);
     try {
-      const list = await listReasonsAdmin(base.kind, true);
+      const kindFilter = isKnownReasonKind(base.kind) ? base.kind : undefined;
+      const list = await listReasonsAdmin(kindFilter, true, optionalTradeContext(this.tenantScope));
       const fresh = list.find((item) => item.id === base.id);
       if (!fresh) {
         this.conflictModal().close();
@@ -563,10 +619,19 @@ export class ReasonModal {
     this.conflictFromRow.set(false);
   }
 
+  private clearServerFieldError(field: ReasonField): void {
+    this.serverFieldErrors.update((current) => {
+      if (!current[field]) return current;
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+  }
+
   private resetValidation(): void {
     this.touched.set({});
     this.revealAllErrors.set(false);
-    this.serverCodeErrorKey.set(null);
+    this.serverFieldErrors.set({});
   }
 
   private async confirmModalClose(): Promise<void> {
@@ -583,6 +648,6 @@ export class ReasonModal {
   }
 
   private showErrorToast(error: unknown): void {
-    this.notify.error(settingsErrorText(error, this.transloco));
+    this.notify.error(reasonErrorText(error, this.transloco));
   }
 }

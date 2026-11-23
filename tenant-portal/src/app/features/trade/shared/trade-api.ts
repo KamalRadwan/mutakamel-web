@@ -1,16 +1,35 @@
 import type { ScopeState } from '../../../core/scope/scope';
+import { ApiError as CoreApiError } from '../../../core/api/api-errors';
 
 export const TRADE_API_BASE = '/api/tenant/trade/v1';
 
 export class ApiError extends Error {
+  readonly correlationId?: string;
+
   constructor(
     readonly status: number,
     readonly code: string,
     readonly details?: Record<string, string[]>,
+    options?: { correlationId?: string },
   ) {
     super(code);
     this.name = 'ApiError';
+    this.correlationId = options?.correlationId;
   }
+}
+
+/** Preserve the Trade error contract used by existing pages. */
+export function toTradeError(error: unknown): unknown {
+  if (!(error instanceof CoreApiError)) return error;
+  const raw = error.details;
+  let details: Record<string, string[]> | undefined;
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    details = Object.fromEntries(Object.entries(raw).map(([field, value]) => [field,
+      typeof value === 'string' ? [value]
+        : Array.isArray(value) ? value.map(String) : [JSON.stringify(value)],
+    ]));
+  }
+  return new ApiError(error.status, error.code, details, { correlationId: error.correlationId });
 }
 
 /** S1: body booleans must be real JSON booleans; "true"/"false" strings are a 400 (query params still accept them). */
@@ -60,6 +79,20 @@ export interface TradeContext {
   branchId?: string;
 }
 
+export type TradeScopeMode = 'NONE' | 'COMPANY' | 'BRANCH' | 'OPTIONAL';
+
+/** Missing required ids raise client-only 400 TRADE.SCOPE.REQUIRED before a request. */
+export function scopeFor(ctx: TradeContext, mode: TradeScopeMode): TradeContext | undefined {
+  if (mode === 'NONE') return undefined;
+  if ((mode === 'COMPANY' && !ctx.companyId) || (mode === 'BRANCH' && (!ctx.companyId || !ctx.branchId))) {
+    throw new ApiError(400, 'TRADE.SCOPE.REQUIRED');
+  }
+  return {
+    ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
+    ...(mode !== 'COMPANY' && ctx.branchId ? { branchId: ctx.branchId } : {}),
+  };
+}
+
 export function tradeContext(scope: ScopeState, target: 'TENANT' | 'COMPANY' | 'BRANCH'): TradeContext {
   if (target === 'TENANT') {
     return {};
@@ -88,6 +121,7 @@ const KNOWN_ERROR_KEYS: ReadonlySet<string> = new Set([
   'TRADE_AUTH_CONTEXT_REQUIRED',
   'TRADE_AUTH_CONTEXT_REQUIRED',
   'TRADE_AUTH_TARGET_DENIED',
+  'TRADE_AUTH_TARGET_INVALID',
   'TRADE_CONCURRENCY_STALE_VERSION',
   'TRADE_CONCURRENCY_IF_MATCH_REQUIRED',
   'TRADE_IDEMPOTENCY_KEY_MISSING',
@@ -102,15 +136,19 @@ const KNOWN_ERROR_KEYS: ReadonlySet<string> = new Set([
   'TRADE_CONTEXT_EXECUTION_TARGET_MISMATCH',
   'TRADE_CONTEXT_EXECUTION_TARGET_INVALID',
   'TRADE_CONTEXT_SCOPE_INACTIVE',
+  'TRADE_CONTEXT_COMPANY_REQUIRED',
   'TRADE_DEPENDENCY_TIMEOUT',
   'TRADE_DEPENDENCY_ENTITLEMENT_UNAVAILABLE',
+  'TRADE_DEPENDENCY_NUMBERING_UNAVAILABLE',
   'TRADE_ENTITLEMENT_FEATURE_REQUIRED',
+  'TRADE_ENTITLEMENT_PUBLICATION_UNAVAILABLE',
   'TRADE_MODULE_DISABLED',
   'TRADE_PROVISIONING_MAINTENANCE_ACTIVE',
   'TRADE_CATALOG_ITEM_NOT_FOUND',
   'TRADE_CATALOG_CODE_TAKEN',
   'TRADE_CATALOG_ITEM_IDENTITY_CONFLICT',
   'TRADE_CATALOG_ITEM_IDENTITY_INVALID',
+  'TRADE_CATALOG_ITEM_REFERENCE_INVALID',
   'TRADE_CATALOG_UOM_INVALID',
   'TRADE_CATALOG_UOM_CODE_TAKEN',
   'TRADE_CATALOG_UOM_RETIRE_REFERENCED',
@@ -134,6 +172,7 @@ const KNOWN_ERROR_KEYS: ReadonlySet<string> = new Set([
   'TRADE_CATALOG_ITEM_IMAGE_INVALID',
   'TRADE_CATALOG_ITEM_IMAGE_NOT_FOUND',
   'TRADE_CATALOG_ITEM_IMAGE_STORAGE_UNAVAILABLE',
+  'TRADE_CATALOG_ITEM_IMAGE_PRINT_BUDGET_EXCEEDED',
   'TRADE_CATALOG_CATEGORY_INVALID',
   'TRADE_CATALOG_CATEGORY_NOT_FOUND',
   'TRADE_CATALOG_CATEGORY_CODE_TAKEN',
@@ -158,6 +197,7 @@ const KNOWN_ERROR_KEYS: ReadonlySet<string> = new Set([
   'TRADE_ACCOUNT_BRANCH_RULE_ALREADY_EXISTS',
   'TRADE_ACCOUNT_BRANCH_RULE_NOT_FOUND',
   'TRADE_ACCOUNT_BRANCH_RULE_WEAKENS_POLICY',
+  'TRADE_ACCOUNT_BLOCKED',
   'TRADE_CREDIT_EXPOSURE_UNAVAILABLE',
   'TRADE_QUOTE_COMMERCIAL_ACCOUNT_BLOCKED',
   'TRADE_SALES_ORDER_COMMERCIAL_ACCOUNT_REQUIRED',
@@ -172,6 +212,7 @@ const KNOWN_ERROR_KEYS: ReadonlySet<string> = new Set([
   'TRADE_CONFIGURATION_DEFAULT_PRICE_BOOK_NOT_FOUND',
   'TRADE_CONFIGURATION_DEFAULT_PRICE_BOOK_INCOMPATIBLE',
   'TRADE_APPROVAL_MAKER_CHECKER_REQUIRED',
+  'TRADE_APPROVAL_REJECTED',
   'TRADE_DASHBOARD_NOT_FOUND',
   'TRADE_DASHBOARD_NAME_CONFLICT',
   'TRADE_DASHBOARD_DEFINITION_INVALID',

@@ -1,4 +1,4 @@
-import { Component, DestroyRef, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
+import { Component, DestroyRef, Injector, computed, effect, inject, runInInjectionContext, signal, untracked, viewChild } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
@@ -29,14 +29,14 @@ import { SettingsFrame } from '../../../../shared/ui/settings-frame/settings-fra
 import { Switch } from '../../../../shared/ui/switch/switch';
 import { TabItem, Tabs, tabButtonId, tabPanelId } from '../../../../shared/ui/tabs/tabs';
 import { errorCodeOf } from '../../shared/trade-api';
+import { branchGrants } from '../../shared/trade-access';
 import { countTerms, deleteTerm, listAllTerms, makeDefaultTerm, updateTerm } from '../../shared/terms/terms.api';
-import { settingsErrorText } from '../settings-errors';
+import { isForbiddenError, isMissingCompanyError, termErrorText } from './term-errors';
 import { SettingsMutationKeys } from '../settings-mutation-keys';
 import { TERM_TYPES, type Incoterm, type TermCounts, type TermSide, type TermType, type TradeTerm } from '../../shared/terms/terms.model';
 import { TermModal } from './term-modal/term-modal';
 import { translationEvents } from '../../../../core/i18n/translation-events';
 
-const CAN_MANAGE = true; // later from trade.terms.manage
 const SEARCH_DEBOUNCE_MS = 300;
 const SORT_ORDER_MAX = 1_000_000;
 
@@ -111,6 +111,7 @@ export class TermsPage {
 
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly injector = inject(Injector);
   private readonly destroyRef = inject(DestroyRef);
   private readonly notify = inject(Notify);
   private readonly scope = inject(ScopeState);
@@ -122,7 +123,12 @@ export class TermsPage {
   private readonly termModal = viewChild.required(TermModal);
   private readonly deleteDialog = viewChild.required<ConfirmDialog>('deleteDialog');
 
-  protected readonly canManage = CAN_MANAGE;
+  protected readonly forbidden = signal(false);
+  protected readonly serverMissingCompany = signal(false);
+  protected readonly companyId = computed(() => this.scope.company()?.id?.trim() || null);
+  protected readonly missingCompany = computed(() => !this.companyId());
+  protected readonly canRead = computed(() => this.hasCompanyGrant('trade.terms.read'));
+  protected readonly canManage = computed(() => !this.forbidden() && this.hasCompanyGrant('trade.terms.manage'));
   protected readonly skeletonRows = [0, 1, 2, 3, 4];
   protected readonly tabButtonId = tabButtonId;
   protected readonly tabPanelId = tabPanelId;
@@ -223,23 +229,37 @@ export class TermsPage {
     });
 
     effect(() => {
-      const companyId = this.scope.company().id;
+      const companyId = this.companyId();
+      const allowed = this.canRead();
       this.countsReloadTick();
       untracked(() => {
-        void companyId;
+        this.forbidden.set(false);
+        this.serverMissingCompany.set(false);
+        if (!allowed || !companyId) {
+          this.counts.set(null);
+          return;
+        }
         void this.fetchCounts();
       });
     });
 
     effect(() => {
-      const companyId = this.scope.company().id;
+      const companyId = this.companyId();
+      const allowed = this.canRead();
       const type = this.activeType();
       const side = this.sideFilter();
       const includeInactive = this.showInactive();
       const search = this.debouncedSearch();
       this.listReloadTick();
       untracked(() => {
-        void companyId;
+        this.forbidden.set(false);
+        this.serverMissingCompany.set(false);
+        if (!allowed || !companyId) {
+          this.loading.set(false);
+          this.failed.set(false);
+          this.terms.set([]);
+          return;
+        }
         const silent = this.silentNextList;
         this.silentNextList = false;
         void this.fetchTerms(type, side, includeInactive, search, silent);
@@ -306,9 +326,17 @@ export class TermsPage {
   }
 
   protected openCreate(): void {
-    if (!this.canManage) return;
+    if (!this.canManage()) return;
     const defaultSide: TermSide = this.sideFilter() === 'PURCHASE' ? 'PURCHASE' : 'SALES';
     this.termModal().openCreate(this.activeType(), this.nextSortOrder(), defaultSide);
+  }
+
+  protected goHome(): void {
+    void this.router.navigateByUrl('/workspace/home');
+  }
+
+  protected onForbidden(): void {
+    this.forbidden.set(true);
   }
 
   protected openTerm(term: TradeTerm): void {
@@ -354,7 +382,7 @@ export class TermsPage {
       },
     ];
 
-    if (!this.canManage) return items;
+    if (!this.canManage()) return items;
 
     items.push(
       {
@@ -400,7 +428,7 @@ export class TermsPage {
       this.openTerm(term);
       return;
     }
-    if (!this.canManage || this.busyIds().has(term.id)) return;
+    if (!this.canManage() || this.busyIds().has(term.id)) return;
 
     if (selection.id === 'makeDefault') {
       if (term.isDefault || !term.isActive) return;
@@ -459,11 +487,19 @@ export class TermsPage {
       this.notify.success(this.transloco.translate('tterms.toasts.madeDefault'));
       this.triggerSilentListRefresh();
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+        return;
+      }
+      if (isMissingCompanyError(error)) {
+        this.serverMissingCompany.set(true);
+        return;
+      }
       if (errorCodeOf(error) === 'TRADE.CONCURRENCY.STALE_VERSION') {
         this.termModal().openConflictFromRow(term, { kind: 'makeDefault' });
         return;
       }
-      this.notify.error(settingsErrorText(error, this.transloco));
+      this.notify.error(termErrorText(error, this.transloco));
     } finally {
       this.setBusy(term.id, false);
     }
@@ -484,11 +520,19 @@ export class TermsPage {
         this.transloco.translate(updated.isActive ? 'tterms.toasts.activated' : 'tterms.toasts.deactivated'),
       );
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+        return;
+      }
+      if (isMissingCompanyError(error)) {
+        this.serverMissingCompany.set(true);
+        return;
+      }
       if (errorCodeOf(error) === 'TRADE.CONCURRENCY.STALE_VERSION') {
         this.termModal().openConflictFromRow(term, { kind: 'active', isActive: nextActive });
         return;
       }
-      this.notify.error(settingsErrorText(error, this.transloco));
+      this.notify.error(termErrorText(error, this.transloco));
     } finally {
       this.setBusy(term.id, false);
     }
@@ -508,12 +552,20 @@ export class TermsPage {
       this.onTermDeleted(removed.id);
       this.notify.success(this.transloco.translate('tterms.toasts.deleted'));
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+        return;
+      }
+      if (isMissingCompanyError(error)) {
+        this.serverMissingCompany.set(true);
+        return;
+      }
       const code = errorCodeOf(error);
       if (code === 'TRADE.CONCURRENCY.STALE_VERSION') {
         this.termModal().openConflictFromRow(term, { kind: 'delete' });
         return;
       }
-      this.notify.error(settingsErrorText(error, this.transloco));
+      this.notify.error(termErrorText(error, this.transloco));
       if (code === 'TRADE.TERMS.NOT_FOUND') {
         this.onTermDeleted(term.id);
       }
@@ -528,8 +580,13 @@ export class TermsPage {
       const result = await countTerms({}, this.scope);
       if (seq !== this.countsSeq || this.destroyed) return;
       this.counts.set(result);
-    } catch {
-      // List load surfaces page-level failure state if unreachable.
+    } catch (error) {
+      if (seq !== this.countsSeq || this.destroyed) return;
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+      } else if (isMissingCompanyError(error)) {
+        this.serverMissingCompany.set(true);
+      }
     }
   }
 
@@ -565,8 +622,19 @@ export class TermsPage {
         const maxOrder = sorted.reduce((max, item) => (item.sortOrder > max ? item.sortOrder : max), 0);
         this.maxOrderByType.update((curr) => ({ ...curr, [type]: maxOrder }));
       }
-    } catch {
-      if (seq === this.listSeq && !this.destroyed && !silent) {
+    } catch (error) {
+      if (seq !== this.listSeq || this.destroyed) return;
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+        this.failed.set(false);
+        return;
+      }
+      if (isMissingCompanyError(error)) {
+        this.serverMissingCompany.set(true);
+        this.failed.set(false);
+        return;
+      }
+      if (!silent) {
         this.failed.set(true);
       }
     } finally {
@@ -574,6 +642,16 @@ export class TermsPage {
         this.loading.set(false);
       }
     }
+  }
+
+  private hasCompanyGrant(key: string): boolean {
+    const grants = runInInjectionContext(this.injector, () => branchGrants(key));
+    if (grants === 'ALL') return true;
+    const company = this.scope.company();
+    if (!company?.id) return grants.size > 0;
+    const branchId = company.branches.length > 0 ? this.scope.branch()?.id : undefined;
+    if (branchId && grants.has(branchId)) return true;
+    return !branchId && company.branches.some((branch) => grants.has(branch.id));
   }
 
   private triggerSilentListRefresh(): void {

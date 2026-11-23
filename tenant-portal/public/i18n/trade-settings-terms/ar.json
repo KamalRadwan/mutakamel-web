@@ -52,7 +52,9 @@
     "clearSearch": "مسح البحث",
     "clearFilter": "عرض الكل",
     "loadFailed": "تعذّر تحميل هذه الصفحة.",
-    "retry": "إعادة المحاولة"
+    "retry": "إعادة المحاولة",
+    "chooseCompanyTitle": "اختر شركة",
+    "chooseCompanyText": "اختر شركة من الشريط العلوي لعرض الشروط وإدارتها."
   },
   "modal": {
     "newTitle": "شرط جديد",

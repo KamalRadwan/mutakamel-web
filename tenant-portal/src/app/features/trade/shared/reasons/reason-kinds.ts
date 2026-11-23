@@ -28,9 +28,11 @@ export const REASON_KINDS = [
 
 export type KnownReasonKind = (typeof REASON_KINDS)[number];
 
+export type ReasonLocalizedNames = { en: string; ar: string };
+
 export type ReasonArea = 'documents' | 'inventory' | 'catalogue' | 'governance';
 
-export const REASON_AREAS: Record<ReasonArea, readonly string[]> = {
+export const REASON_AREAS: Record<ReasonArea, readonly KnownReasonKind[]> = {
   documents: [
     'DOCUMENT_CANCEL',
     'QUOTATION_REJECT',
