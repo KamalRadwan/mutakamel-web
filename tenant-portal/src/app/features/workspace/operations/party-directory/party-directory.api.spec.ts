@@ -6,7 +6,7 @@ import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TenantScopeState } from '../../../../core/scope/tenant-scope';
 import { PartyDirectoryApi, partyImageSrc } from './party-directory.api';
-import type { ListPartiesQuery } from './party-directory.model';
+import type { ListPartiesQuery, PartyRules } from './party-directory.model';
 
 
 const root = '/api/tenant/core/v1/directory';
@@ -137,9 +137,45 @@ describe('PartyDirectoryApi', () => {
     for (const imageUrl of ['https://example.invalid/image.png','/other/path']) expect(partyImageSrc({ imageUrl })).toBeNull();
   });
   it('getPartyRules reads the party rules route', async () => {
-    // The route is absent on Core main. The brief requires the marked fake until BE-DIR + BE-GW.
-    await expect(api.getPartyRules()).resolves.toMatchObject({ version: 1, maxContactMethodsPerParty: expect.any(Number) });
-    http.expectNone(`${root}/party-rules`);
+    const rules: PartyRules = { version: 7, duplicateScope: 'PARTY_ROLE', preventDuplicateEmail: false,
+      preventDuplicatePhone: true, preventDuplicateWhatsapp: false, maxContactMethodsPerParty: 47, maxAddressesPerParty: 31 };
+    const pending = api.getPartyRules();
+    const request = http.expectOne(`${root}/party-rules`);
+    expect(request.request.method).toBe('GET');
+    expect(request.request.withCredentials).toBe(true);
+    expect(request.request.params.keys()).toEqual([]);
+    request.flush({ success: true, data: rules });
+    await expect(pending).resolves.toEqual(rules);
+  });
+  it.each([
+    { status: 403, code: 'MISSING_REQUIRED_PERMISSIONS' },
+    { status: 503, code: 'ACCESS_POLICY_UNAVAILABLE' },
+    { status: 429, code: 'RATE_LIMITED' },
+  ])('getPartyRules preserves $status backend errors', async ({ status, code }) => {
+    const pending = api.getPartyRules();
+    http.expectOne(`${root}/party-rules`).flush({ success: false, errorCode: code }, { status, statusText: 'Error' });
+    await expect(pending).rejects.toMatchObject({ status, code });
+  });
+  it('getPartyRules rejects malformed envelopes and can retry', async () => {
+    const pending = api.getPartyRules();
+    http.expectOne(`${root}/party-rules`).flush({ data: {} });
+    await expect(pending).rejects.toMatchObject({ status: 502, code: 'COMMON.GENERIC.INTERNAL_ERROR' });
+    const retry = api.getPartyRules();
+    http.expectOne(`${root}/party-rules`).flush(null, { status: 0, statusText: 'Unknown Error' });
+    await expect(retry).rejects.toMatchObject({ status: 0, code: 'NETWORK_ERROR' });
+  });
+  it('directory writes invalidate an in-flight party rules query', async () => {
+    const pending = api.getPartyRules();
+    const rejection = expect(pending).rejects.toBeDefined();
+    const rulesRequest = http.expectOne(`${root}/party-rules`);
+    const write = api.updateParty('p', { displayName: 'New' });
+    http.expectOne(`${root}/parties/p`).flush({ success: true, data: { id: 'p' } });
+    await write;
+    await rejection;
+    rulesRequest.flush({ success: true, data: { version: 1 } });
+    const fresh = api.getPartyRules();
+    http.expectOne(`${root}/party-rules`).flush({ success: true, data: { version: 2 } });
+    await expect(fresh).resolves.toMatchObject({ version: 2 });
   });
 
 });

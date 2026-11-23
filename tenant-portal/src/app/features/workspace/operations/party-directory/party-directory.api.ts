@@ -2,7 +2,6 @@ import { inject, Service } from '@angular/core';
 import { QueryClient } from '@tanstack/angular-query';
 import { CoreHttp, type CoreQuery, type CoreWriteMethod } from '../../../../core/api/core-http';
 import { TenantScopeState } from '../../../../core/scope/tenant-scope';
-import { fakeGetPartyRules } from './party-directory.fake';
 import type {
   CreateAddressBody,
   CreateContactMethodBody,
@@ -59,8 +58,7 @@ export class PartyDirectoryApi {
   }
 
   getPartyRules(): Promise<PartyRules> {
-    // FAKE-ONLY until BE-DIR + BE-GW are merged: GET /api/tenant/core/v1/directory/party-rules
-    return this.read('party-rules', {}, () => fakeGetPartyRules());
+    return this.read('party-rules', {}, () => this.http.read<PartyRules>(`${DIRECTORY_PATH}/party-rules`));
   }
 
   createParty(body: CreatePartyBody): Promise<PartyDetail> {
