@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PHONE_DEV_ME_STORAGE_KEY, readPhoneDevMe } from './phone-dev-me';
 import { fakeGetMe, resetPhoneFake, setFakePhoneDelay } from './phone.fake';
 import { PhoneMe, PhoneServer } from './phone.model';
-import { FakeSipEngine } from './sip-engine.fake';
 import { JsSipEngine } from './sip-engine.jssip';
 import { PHONE_ENGINE_STORAGE_KEY, createSipEngine } from './sip-engine.provider';
 import { ICE_GATE_TIMEOUT_MS, JsSipLeg, createIceGate } from './sip-leg.jssip';
@@ -642,17 +641,17 @@ describe('JsSipEngine & JsSipLeg', () => {
     expect(received3).toEqual([stream3]);
   });
 
-  it('selects FakeSipEngine by default, JsSipEngine only when opted in via storage, and honors the dev-me override only in dev mode', async () => {
-    expect(createSipEngine()).toBeInstanceOf(FakeSipEngine);
+  it('always selects JsSipEngine and honors the fixture dev-me override only in dev mode', async () => {
+    expect(createSipEngine()).toBeInstanceOf(JsSipEngine);
 
     localStorage.setItem(PHONE_ENGINE_STORAGE_KEY, 'fake');
-    expect(createSipEngine()).toBeInstanceOf(FakeSipEngine);
+    expect(createSipEngine()).toBeInstanceOf(JsSipEngine);
 
     localStorage.setItem(PHONE_ENGINE_STORAGE_KEY, 'jssip');
     expect(createSipEngine()).toBeInstanceOf(JsSipEngine);
 
     localStorage.removeItem(PHONE_ENGINE_STORAGE_KEY);
-    expect(createSipEngine()).toBeInstanceOf(FakeSipEngine);
+    expect(createSipEngine()).toBeInstanceOf(JsSipEngine);
 
     const devMe = makeMe({ extension: '2009', sipUsername: '2009' });
     sessionStorage.setItem(PHONE_DEV_ME_STORAGE_KEY, JSON.stringify(devMe));

@@ -2,9 +2,9 @@ import { fakeChangeCustomerContact as changeCustomerContact } from './customers.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../settings/shared/settings-api';
 import {
-  listBranchOwners,
-  listCurrencies,
-} from './customers.api';
+  fakeListBranchOwners as listBranchOwners,
+  fakeListCurrencies as listCurrencies,
+} from './customers.fake';
 import { fakeGetCustomer as getCustomer, fakeCreateCustomer as createCustomer, fakePatchCustomer as patchCustomer } from './customers.fake';
 // These suites verify the retained fake's contract; live list transport has separate specs.
 import { fakeLoadBoard as loadBoard, fakeLoadStatusPage as loadStatusPage, fakeSearchCustomerProfiles as searchCustomers, fakeSetCustomerStatus as setCustomerStatus } from './customers.fake';

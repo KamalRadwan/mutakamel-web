@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../../core/api/api-errors';
-import { requestResetLink, resetPassword } from './reset-password.api';
+import { fakeRequestResetLink as requestResetLink, fakeResetPassword as resetPassword } from './reset-password.fake';
 import {
   FAKE_RATE_LIMITED_EMAIL,
   FAKE_RESET_TOKENS,

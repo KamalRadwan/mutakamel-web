@@ -27,6 +27,7 @@ import {
   fakeGetCustomerCapabilities,
   fakeListBranchOwners,
   fakePatchCustomer,
+  fakeSearchCustomers,
   fakeSetCustomerStatus,
 } from '../customers.fake';
 import { CustomerSearchBody, CustomerStatus, ManualCustomerStatus } from '../customers.model';
@@ -35,7 +36,6 @@ import {
   fromWireCustomerActivitySchedule,
   parseCustomerBulkActivitySchedule,
 } from './activity-modal/customer-bulk-schedule';
-import { fakeSelectCustomers } from './customer-bulk.api';
 import {
   CUSTOMERS_BULK_APP,
   CUSTOMERS_BULK_MODULE_ID,
@@ -43,7 +43,24 @@ import {
   CUSTOMER_SELECTION_LIMIT,
   CustomerBulkSort,
   SelectedCustomerRow,
+  CustomerSelectionResult,
 } from './customer-bulk.model';
+
+export async function fakeSelectCustomers(
+  body: CustomerSearchBody,
+  sort: CustomerBulkSort | undefined,
+  limit = CUSTOMER_SELECTION_LIMIT,
+): Promise<CustomerSelectionResult> {
+  if (!Number.isInteger(limit) || limit < 1 || limit > CUSTOMER_SELECTION_LIMIT) {
+    throw new ApiError(400, 'CUSTOMER_PROFILE_SELECTION_TOO_LARGE');
+  }
+  const page = await fakeSearchCustomers({ ...body, sort: sort ?? body.sort ?? 'createdAt:DESC' }, 1, limit);
+  return {
+    items: page.items.map(({ id, displayName, ownerUserId, status, updatedAt }) => ({ id, displayName, ownerUserId, status, updatedAt })),
+    total: page.total,
+    truncated: page.total > limit,
+  };
+}
 
 interface ResolvedCustomerItem {
   entityId: string;

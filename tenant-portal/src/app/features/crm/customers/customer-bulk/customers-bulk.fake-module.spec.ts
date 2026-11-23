@@ -13,7 +13,7 @@ import {
   DEFAULT_CUSTOMER_BRANCH_ID,
   fakeSearchCustomers,
 } from '../customers.fake';
-import { fakeSelectCustomers } from './customer-bulk.api';
+import { fakeSelectCustomers } from './customers-bulk.fake-module';
 import { CUSTOMERS_BULK_MODULE_ID, CUSTOMER_SELECTION_LIMIT } from './customer-bulk.model';
 import './customers-bulk.fake-module';
 

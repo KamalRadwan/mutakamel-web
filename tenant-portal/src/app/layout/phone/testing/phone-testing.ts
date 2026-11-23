@@ -7,8 +7,9 @@ import { TabBus } from '../../../core/tabs/tab-bus';
 import { TabLeader } from '../../../core/tabs/tab-leader';
 import { HandoverGuard, StandDownHook, TabRole } from '../../../core/tabs/tab-leader.model';
 import { PhoneState } from '../../../core/phone/phone';
-import { resetPhoneFake, setFakeCallLogsMode, setFakePhoneDelay } from '../../../core/phone/phone.fake';
-import { CallLeg, PhoneSyncedState } from '../../../core/phone/phone.model';
+import { fakeCreateCallLog, fakeGetMe, fakeListCallLogs, fakeLookupNumber, resetPhoneFake, setFakeCallLogsMode, setFakePhoneDelay } from '../../../core/phone/phone.fake';
+import { CallLeg, CreateCallLogInput, ListCallLogsQuery, PhoneSyncedState } from '../../../core/phone/phone.model';
+import { CoreHttp } from '../../../core/api/core-http';
 import { SIP_ENGINE_FACTORY } from '../../../core/phone/sip-engine';
 import { FakeSipEngine, resetFakeSipEngineState, setFakeSipTimings } from '../../../core/phone/sip-engine.fake';
 
@@ -254,6 +255,14 @@ export function setUpPhoneTest(): PhoneHarness {
       }),
       { provide: TabLeader, useValue: leader },
       { provide: TabBus, useValue: bus },
+      { provide: CoreHttp, useValue: {
+        read: (path: string, query?: ListCallLogsQuery & { number?: string }) => {
+          if (path.endsWith('/call-logs')) return fakeListCallLogs(query);
+          if (path.endsWith('/phone-lookup')) return fakeLookupNumber(query?.number ?? '');
+          return fakeGetMe();
+        },
+        write: async (_method: string, _path: string, body: CreateCallLogInput) => ({ data: await fakeCreateCallLog(body) }),
+      } },
       {
         provide: SIP_ENGINE_FACTORY,
         useValue: () => {

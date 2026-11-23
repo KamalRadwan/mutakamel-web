@@ -1,12 +1,14 @@
 import { Injectable } from '@angular/core';
+import { HttpClient, HttpResponse } from '@angular/common/http';
 import { type ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router, provideRouter } from '@angular/router';
 import { TranslocoLoader, provideTransloco } from '@jsverse/transloco';
-import { of } from 'rxjs';
+import { defer, of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../../../core/api/api-errors';
 import { AuthSession } from '../../../../core/auth/auth-session';
 import { AuthSessionApi } from '../../../../core/auth/auth-session.api';
+import { AuthTransport } from '../../../../core/auth/auth-transport';
 import { fakeGetMe, resetFakeSession } from '../../../../core/auth/auth-session.fake';
 import { Notify } from '../../../../core/notify/notify';
 import { ThemeState } from '../../../../core/theme/theme';
@@ -14,12 +16,14 @@ import { resetFakeChallenges } from '../../shared/mfa-challenge.fake';
 import { MfaPending } from '../../shared/mfa-pending';
 import {
   FAKE_INVITE_TOKENS,
+  fakeAcceptInvitation,
   fakeInviteCallCount,
   resetFakeInvitations,
   setFakeInviteError,
   setFakeInviteNext,
 } from '../invitation.fake';
 import { InvitationPage } from './invitation-page';
+
 
 @Injectable()
 class EmptyLoader implements TranslocoLoader {
@@ -74,6 +78,10 @@ beforeEach(() => {
 
   TestBed.configureTestingModule({
     providers: [
+      { provide: HttpClient, useValue: {
+        request: (_method: string, _url: string, { body }: { body: { token: string; newPassword: string } }) =>
+          defer(async () => new HttpResponse({ body: { success: true, data: await fakeAcceptInvitation(body.token, body.newPassword) } })),
+      } },
       { provide: AuthSessionApi, useValue: { getMe: fakeGetMe, hasCsrfCookie: () => true } },
       provideRouter([]),
       provideTransloco({
@@ -82,6 +90,8 @@ beforeEach(() => {
       }),
     ],
   });
+
+  TestBed.inject(AuthTransport);
 
   const notify = TestBed.inject(Notify);
   notifySuccess = vi.spyOn(notify, 'success').mockImplementation(() => undefined);

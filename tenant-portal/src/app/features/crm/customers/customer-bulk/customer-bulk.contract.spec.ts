@@ -8,7 +8,7 @@ import { BulkJobSubmit } from '../../../../shared/bulk-jobs/bulk-jobs.model';
 import { ApiError } from '../../settings/shared/settings-api';
 import { ACME_CUSTOMER_ID, DEFAULT_CUSTOMER_BRANCH_ID } from '../customers.fake';
 import { MANUAL_STATUSES } from '../customer-statuses';
-import { fakeSelectCustomers } from './customer-bulk.api';
+import { fakeSelectCustomers } from './customers-bulk.fake-module';
 import {
   CUSTOMERS_BULK_APP,
   CUSTOMERS_BULK_MODULE_ID,

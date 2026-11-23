@@ -3,7 +3,7 @@ import { ApiError } from '../../../core/api/api-errors';
 import { resetFakeSession } from '../../../core/auth/auth-session.fake';
 import { isMfaStep } from '../../../core/auth/auth-session.model';
 import { FAKE_MFA_CODE, fakeVerifyChallenge, resetFakeChallenges } from '../shared/mfa-challenge.fake';
-import { acceptInvitation } from './invitation.api';
+import { fakeAcceptInvitation as acceptInvitation } from './invitation.fake';
 import { FAKE_INVITE_TOKENS, resetFakeInvitations, setFakeInviteNext } from './invitation.fake';
 
 const STRONG_PASSWORD = 'Valid#Password2026';

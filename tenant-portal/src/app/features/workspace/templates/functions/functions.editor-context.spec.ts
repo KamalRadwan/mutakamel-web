@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { FAKE_TEMPLATE_IDS, TemplateApiError, getDataSourceSchema, getDraft, getTemplate } from '../templates.api';
-import { getFunctionEditorContext, listFunctionVersions, listFunctions } from './functions.api';
+import {
+  fakeGetFunctionEditorContext as getFunctionEditorContext,
+  fakeListFunctionVersions as listFunctionVersions,
+  fakeListFunctions as listFunctions,
+} from './functions.fake';
 import type { FunctionEditorContextRequestDto } from './functions.model';
 
 async function currentRequest(
@@ -35,7 +39,7 @@ async function rejection(promise: Promise<unknown>): Promise<TemplateApiError> {
   throw new Error('Expected the call to reject.');
 }
 
-describe('functions.api getFunctionEditorContext (POST templates/functions/editor-context)', () => {
+describe('functions fake editor-context contract', () => {
   it('returns a closed source-bound context valid for 30 seconds', async () => {
     const functions = await listFunctions({ limit: 100 });
     const withVersion = functions.items.find((f) => f.publishedVersionId && f.status === 'ACTIVE');

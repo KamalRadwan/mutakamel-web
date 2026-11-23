@@ -32,6 +32,7 @@ describe('Invitation API', () => {
   const recoverRequest = vi.fn();
 
   beforeEach(() => {
+    TestBed.resetTestingModule();
     vi.clearAllMocks();
     TestBed.configureTestingModule({ providers: [
       provideHttpClient(withInterceptors([acceptLanguageInterceptor, sessionRecoveryInterceptor])),
@@ -47,7 +48,7 @@ describe('Invitation API', () => {
     http = TestBed.inject(HttpTestingController);
   });
 
-  afterEach(() => { http.verify(); vi.restoreAllMocks(); });
+  afterEach(() => { http.verify(); vi.restoreAllMocks(); TestBed.resetTestingModule(); });
 
   it.each([session, step])('returns the real cookie session or MFA step unchanged', async data => {
     // Deliberately outside runInInjectionContext, like the existing page submit callback.

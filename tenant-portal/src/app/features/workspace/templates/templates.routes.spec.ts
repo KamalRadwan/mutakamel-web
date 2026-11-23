@@ -53,7 +53,7 @@ describe('templates routes', () => {
   it('every template page needs templates.read', async () => {
     expect(pages.map((page) => page.path)).toEqual([
       'template-platform', 'template-platform/:id/:tab', 'template-platform/:id',
-      'template-assets', 'template-assignments',
+      'template-assets', 'template-assignments', 'template-functions',
     ]);
     expect(templatesRoutes[0].providers).toEqual([provideTranslocoScope('templates')]);
     for (const page of pages) {

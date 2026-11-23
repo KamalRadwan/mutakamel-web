@@ -7,6 +7,7 @@ import { of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../../../../../core/api/api-errors';
 import { Notify } from '../../../../../../core/notify/notify';
+import { PhoneState } from '../../../../../../core/phone/phone';
 import { TenantScopeState } from '../../../../../../core/scope/tenant-scope';
 import { WorkspaceLookups } from '../../../../../../shared/widgets/workspace-lookups/workspace-lookups.api';
 import { PartyDirectoryApi } from '../../party-directory.api';
@@ -58,7 +59,7 @@ describe('PartyContactsTab', () => {
       provideTransloco({ config: { availableLangs: ['en', 'ar'], defaultLang: 'en', missingHandler: { logMissingKey: false } }, loader: EmptyLoader }),
       { provide: PartyDirectoryApi, useValue: api }, { provide: WorkspaceLookups, useValue: lookups },
       { provide: TenantScopeState, useValue: { me, selection: signal(null) } }, { provide: Notify, useValue: notify },
-      
+      { provide: PhoneState, useValue: { connection: signal('idle'), visible: signal(false), configured: signal(false) } },
     ] });
     vi.spyOn(TestBed.inject(TranslocoService), 'translate').mockImplementation(translation as never);
     HTMLDialogElement.prototype.showModal = function () { this.open = true; };

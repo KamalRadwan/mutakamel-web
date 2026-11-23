@@ -1,19 +1,24 @@
 import { Component, Injectable } from '@angular/core';
+import { HttpClient, HttpResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { TranslocoLoader, provideTransloco, provideTranslocoScope } from '@jsverse/transloco';
-import { of } from 'rxjs';
+import { defer, of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthSession } from '../../../../core/auth/auth-session';
+import { AuthTransport } from '../../../../core/auth/auth-transport';
 import { resetFakeSession } from '../../../../core/auth/auth-session.fake';
 import {
   FAKE_RESET_TOKENS,
   FAKE_RESET_USER,
+  fakeRequestResetLink,
+  fakeResetPassword,
   fakeResetCallCounts,
   resetFakeResetPassword,
 } from '../reset-password.fake';
 import { ResetPasswordPage } from './reset-password-page';
+
 
 @Injectable()
 class ResetTestLoader implements TranslocoLoader {
@@ -32,6 +37,15 @@ class ResetTestLoader implements TranslocoLoader {
 @Component({ template: '<p>login</p>' })
 class DummyLoginPage {}
 
+const resetTestHttp = {
+  request: (_method: string, url: string, { body }: { body: { email: string; token: string; newPassword: string } }) =>
+    defer(async () => {
+      if (url.endsWith('/forgot-password')) await fakeRequestResetLink(body.email);
+      else await fakeResetPassword(body.token, body.newPassword);
+      return new HttpResponse({ status: 204 });
+    }),
+};
+
 function setInputValue(input: HTMLInputElement, value: string): void {
   input.value = value;
   input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -49,6 +63,7 @@ describe('ResetPasswordPage', () => {
     resetFakeResetPassword();
     TestBed.configureTestingModule({
       providers: [
+        { provide: HttpClient, useValue: resetTestHttp },
         provideRouter([
           {
             path: 'reset-password',
@@ -71,6 +86,7 @@ describe('ResetPasswordPage', () => {
         }),
       ],
     });
+    TestBed.inject(AuthTransport);
   });
 
   afterEach(() => {
@@ -133,6 +149,7 @@ describe('ResetPasswordPage', () => {
       TestBed.resetTestingModule();
       TestBed.configureTestingModule({
         providers: [
+          { provide: HttpClient, useValue: resetTestHttp },
           provideRouter([
             {
               path: 'reset-password',
@@ -148,6 +165,7 @@ describe('ResetPasswordPage', () => {
         ],
       });
 
+      TestBed.inject(AuthTransport);
       const harness = await RouterTestingHarness.create('/reset-password');
       await flushMicrotasks();
       harness.detectChanges();

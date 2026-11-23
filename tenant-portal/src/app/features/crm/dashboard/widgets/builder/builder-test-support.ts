@@ -105,12 +105,13 @@ export class WidgetHttpStub extends CrmHttpStub {
 
   constructor() {
     super({ '/widgets/catalog': widgetCatalog, [`/widgets/${widgetId}`]: widgetDetail(),
-      [`/widgets/${widgetId}/draft`]: widgetDraft() });
+      [`/widgets/${widgetId}/draft`]: widgetDraft(), '/static-data': { enumOptions: {} } });
   }
 
   override async read<T>(path: string, query?: CoreQuery, options?: CrmReadOptions): Promise<T> {
     await super.read(path, query, options);
     if (this.readFailures.has(path)) throw this.readFailures.get(path);
+    if (path === '/static-data') return { enumOptions: {} } as T;
     if (path.endsWith('/draft')) return structuredClone(this.draft) as T;
     if (path === `/widgets/${widgetId}`) {
       const detail = structuredClone(this.detail);

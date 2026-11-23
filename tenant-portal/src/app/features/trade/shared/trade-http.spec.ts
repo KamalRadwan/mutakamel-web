@@ -19,6 +19,7 @@ describe('TradeHttp', () => {
   let http: HttpTestingController;
 
   beforeEach(() => {
+    TestBed.resetTestingModule();
     TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
     const doc = TestBed.inject(DOCUMENT);
     const name = doc.location.protocol === 'https:' ? '__Host-mutakamel-tenant-csrf' : 'mutakamel-http-tenant-csrf';
@@ -30,6 +31,7 @@ describe('TradeHttp', () => {
   afterEach(() => {
     http.verify();
     vi.restoreAllMocks();
+    TestBed.resetTestingModule();
   });
 
   it('read unwraps under /api/tenant/trade/v1', async () => {

@@ -1,15 +1,18 @@
 import { Injectable } from '@angular/core';
+import { HttpClient, HttpResponse } from '@angular/common/http';
 import { type ComponentFixture, TestBed } from '@angular/core/testing';
 import { TranslocoLoader, provideTransloco } from '@jsverse/transloco';
-import { of } from 'rxjs';
+import { defer, of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   FAKE_RESET_TOKENS,
+  fakeResetPassword,
   fakeResetCallCounts,
   resetFakeResetPassword,
   setFakeResetNext,
 } from '../reset-password.fake';
 import { NewPasswordForm } from './new-password-form';
+import { AuthTransport } from '../../../../core/auth/auth-transport';
 
 @Injectable()
 class EmptyLoader implements TranslocoLoader {
@@ -44,12 +47,20 @@ beforeEach(() => {
   resetFakeResetPassword();
   TestBed.configureTestingModule({
     providers: [
+      { provide: HttpClient, useValue: {
+        request: (_method: string, _url: string, { body }: { body: { token: string; newPassword: string } }) =>
+          defer(async () => {
+            await fakeResetPassword(body.token, body.newPassword);
+            return new HttpResponse({ status: 204 });
+          }),
+      } },
       provideTransloco({
         config: { availableLangs: ['ar', 'en'], defaultLang: 'en', missingHandler: { logMissingKey: false } },
         loader: EmptyLoader,
       }),
     ],
   });
+  TestBed.inject(AuthTransport);
   fixture = TestBed.createComponent(NewPasswordForm);
   component = fixture.componentInstance;
   fixture.componentRef.setInput('token', FAKE_RESET_TOKENS.valid);

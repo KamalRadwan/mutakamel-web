@@ -49,6 +49,7 @@ describe('PrintDialog default template assignment', () => {
   let dialog: DialogInternals;
 
   beforeEach(async () => {
+    TestBed.resetTestingModule();
     vi.useFakeTimers();
     localStorage.removeItem('lang');
     document.documentElement.lang = 'en';
@@ -79,6 +80,7 @@ describe('PrintDialog default template assignment', () => {
   afterEach(() => {
     dialog.onModalClosed();
     fixture.destroy();
+    TestBed.resetTestingModule();
     fakeSetPrintDefaultAssignment('purchase-order', true);
     vi.useRealTimers();
     localStorage.removeItem('lang');

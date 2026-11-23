@@ -29,8 +29,8 @@ import enUiPagination from '../../../../../../public/i18n/ui-pagination/en.json'
 import enUiPhone from '../../../../../../public/i18n/ui-phone/en.json';
 import enUiTagPicker from '../../../../../../public/i18n/ui-tag-picker/en.json';
 import { FAKE_COMPANIES } from '../../../../core/scope/scope.fake';
-import { listActivities } from '../../../../shared/widgets/activities/activities.api';
-import { fakeCreate, resetActivitiesFake, setFakeActivitiesDelay } from '../../../../shared/widgets/activities/activities.fake';
+import { ActivitiesApi } from '../../../../shared/widgets/activities/activities.api';
+import { fakeCreate, fakeList, resetActivitiesFake, setFakeActivitiesDelay } from '../../../../shared/widgets/activities/activities.fake';
 import type { CustomerDraft } from '../customer-form/customer-draft';
 import { CustomerForm } from '../customer-form/customer-form';
 import { ACME_CUSTOMER_ID, fakeGetCustomer, fakePatchCustomer, fakeGetCustomerCapabilities } from '../customers.fake';
@@ -192,7 +192,7 @@ describe('CustomerPage', { timeout: 60_000 }, () => {
         { provide: RecordHistoryApi, useValue: { listRecordHistory: async () => structuredClone(CUSTOMER_HISTORY) } },
         { provide: TenantScopeState, useValue: { me: () => null, selection: () => ({ companyId: TEST_COMPANY_ID, branchId: TEST_BRANCH_ID }), branchCompanies: () => new Map([[TEST_BRANCH_ID, TEST_COMPANY_ID]]) } },
         { provide: WorkspaceLookups, useValue: { allBranches: async () => [{ id: TEST_BRANCH_ID, companyId: TEST_COMPANY_ID, name: FAKE_COMPANIES[0].branches[0].nameEn }], allCompanies: async () => [{ id: TEST_COMPANY_ID, name: FAKE_COMPANIES[0].nameEn }] } },
-        { provide: CoreHttp, useValue: { read: async () => ({ items: [] }) } },
+        { provide: CoreHttp, useValue: { read: async () => ({ items: [] }), readPage: (_path: string, query: import('../../../../shared/widgets/activities/activities.model').ActivityListParams) => fakeList(query) } },
         provideRouter([
           { path: 'crm/customers/:id', component: CustomerPage },
           { path: 'crm/customers', component: StubPage },
@@ -468,7 +468,7 @@ describe('CustomerPage', { timeout: 60_000 }, () => {
         );
       }
       const query = await settle(
-        listActivities({
+        TestBed.inject(ActivitiesApi).listActivities({
           targetApp: 'CRM',
           targetType: 'CUSTOMER_PROFILE',
           targetId: ACME_CUSTOMER_ID,

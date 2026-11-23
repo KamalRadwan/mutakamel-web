@@ -274,6 +274,8 @@ for (const lang of ['en', 'ar'] as const) for (const theme of ['light', 'dark'] 
       harness = await RouterTestingHarness.create();
       const page = await harness.navigateByUrl(`/crm/customers/${id}`, CustomerPage) as unknown as PageState;
       await until(() => !page.loading() && !page.showSkeleton());
+      await harness.fixture.whenStable();
+      harness.detectChanges();
       return page;
     }
 
@@ -556,6 +558,7 @@ for (const lang of ['en', 'ar'] as const) for (const theme of ['light', 'dark'] 
       };
       modal.openCustomer(transport.record.id, null);
       for (let n = 0; n < 100 && (modal.loading() || !modal.detail()); n++) { fixture.detectChanges(); await new Promise((resolve) => setTimeout(resolve, 10)); }
+      await fixture.whenStable();
       fixture.detectChanges();
       modal.draft.update((draft) => ({ ...draft, description: 'Modal edit' }));
       transport.writeError = new ApiError(409, 'CRM.CUSTOMER_PROFILE.CONCURRENT_UPDATE');

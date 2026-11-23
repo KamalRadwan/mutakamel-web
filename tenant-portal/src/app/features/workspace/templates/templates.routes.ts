@@ -55,6 +55,7 @@ export const templatesRoutes: Routes = [
         ? [
             {
               path: 'template-functions',
+              canActivate: [requirePermission('templates.read')],
               loadComponent: () =>
                 import('./functions/functions-page/functions-page').then((m) => m.FunctionsPage),
             },
