@@ -1,4 +1,5 @@
 import { Component, DestroyRef, computed, inject, signal, viewChild } from '@angular/core';
+import { ApiError, errorMessage } from '../../../../../../core/api/api-errors';
 import { translationEvents } from '../../../../../../core/i18n/translation-events';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
@@ -208,8 +209,9 @@ export class ImagePicker {
     void this.fetchAssets(false);
   }
 
-  protected formatMime(mimeType: string): 'PNG' | 'JPEG' {
+  protected formatMime(mimeType: string): 'PNG' | 'JPEG' | 'WEBP' {
     const lower = mimeType.toLowerCase();
+    if (lower.includes('webp')) return 'WEBP';
     return lower.includes('jpeg') || lower.includes('jpg') ? 'JPEG' : 'PNG';
   }
 
@@ -362,14 +364,18 @@ export class ImagePicker {
       for (const asset of page.items) {
         void this.ensureBlob(asset.assetId);
       }
-    } catch {
+    } catch (error) {
       if (seq !== this.fetchSeq) return;
+      if (!reset && error instanceof ApiError && error.code === 'CORE.TEMPLATE.CURSOR.INVALID') {
+        void this.fetchAssets(true);
+        return;
+      }
       if (reset) {
         this.items.set([]);
         this.hasNextPage.set(false);
         this.loadError.set(true);
       } else {
-        this.notify.error(this.transloco.translate('tplTools.image.loadFailed'));
+        this.notify.error(this.resolveLoadError(error));
       }
     } finally {
       if (seq === this.fetchSeq) {
@@ -377,6 +383,14 @@ export class ImagePicker {
         this.loadingMore.set(false);
       }
     }
+  }
+
+  private resolveLoadError(error: unknown): string {
+    const msg = errorMessage(error, 'templates', this.transloco);
+    if (msg && !msg.startsWith('settings.errors.') && !msg.startsWith('apiErrors.')) {
+      return msg;
+    }
+    return this.transloco.translate('tplTools.image.loadFailed');
   }
 
   private async ensureBlob(assetId: string): Promise<void> {

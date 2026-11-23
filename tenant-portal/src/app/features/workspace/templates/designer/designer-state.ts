@@ -1,8 +1,11 @@
 import { DestroyRef, Injectable, Signal, WritableSignal, computed, effect, inject, signal } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
+import { isRetryableWriteError, writeErrorMessage } from '../../../../core/api/api-errors';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
+import { AssetsApi } from '../assets/assets.api';
 import {
+  TemplatesApi,
   TemplateBindingFormat,
   TemplateDataSourceKey,
   TemplateDataSourceSchemaDto,
@@ -15,12 +18,7 @@ import {
   TemplateNode,
   TemplatePageConfig,
   TemplateSchemaField,
-  getAssetContent,
-  getDataSourceSchema,
-  getDraft,
-  getTemplate,
-  getVersion,
-  patchDraft,
+  newTemplateIdempotencyKey,
 } from '../templates.api';
 import { buildDraftSaveIfMatch } from '../shared/draft-save-precondition';
 import { TemplatePageService, errorDetailsOf } from '../template-page/template-page.service';
@@ -111,6 +109,8 @@ function humanizePathSegment(path: string): string {
 @Injectable()
 export class DesignerState {
   private readonly destroyRef = inject(DestroyRef);
+  private readonly templatesApi = inject(TemplatesApi);
+  private readonly assetsApi = inject(AssetsApi);
   private readonly pageService = inject(TemplatePageService);
   private readonly transloco = inject(TranslocoService);
   private readonly notify = inject(Notify);
@@ -143,7 +143,14 @@ export class DesignerState {
   private initializedTemplateId: string | null = null;
   private commandSeq = 0;
   private loadSeq = 0;
-  private pendingSaveIntent: { payloadJson: string; idempotencyKey: string; clientMutationId: string } | null = null;
+  private assetEpoch = 0;
+  private destroyed = false;
+  private pendingSaveIntent: {
+    payloadJson: string;
+    ifMatch: string;
+    idempotencyKey: string;
+    clientMutationId: string;
+  } | null = null;
 
   readonly loading = this._loading.asReadonly();
   readonly loadError = this._loadError.asReadonly();
@@ -228,6 +235,9 @@ export class DesignerState {
     effect(() => {
       const latestDraft = this.pageService.draft();
       if (latestDraft && !this.dirty() && latestDraft.templateId === this._templateId()) {
+        if (latestDraft.etag !== this.draftEtag || latestDraft.revision !== this.draftRevision) {
+          this.pendingSaveIntent = null;
+        }
         this.draftEtag = latestDraft.etag;
         this.draftRevision = latestDraft.revision;
         if (
@@ -256,6 +266,7 @@ export class DesignerState {
     });
 
     this.destroyRef.onDestroy(() => {
+      this.destroyed = true;
       this.pageService.registerDraftEditor(null);
       this.revokeAllAssets();
     });
@@ -297,6 +308,7 @@ export class DesignerState {
     this.draftRevision = 1;
     this.draftContentChecksum = '';
     this.pendingSaveIntent = null;
+    this.schemaCache.clear();
     this.revokeAllAssets();
   }
 
@@ -321,6 +333,8 @@ export class DesignerState {
   async reload(): Promise<void> {
     const id = this._templateId();
     if (!id) return;
+    this.schemaCache.clear();
+    this.clearFailedAssets();
     await this.load(id);
   }
 
@@ -336,27 +350,29 @@ export class DesignerState {
     this.pendingSaveIntent = null;
 
     try {
-      const def = await getTemplate(templateId);
-      if (seq !== this.loadSeq) return;
+      const def = await this.templatesApi.getTemplate(templateId);
+      if (this.destroyed || seq !== this.loadSeq) return;
 
       this._definition.set(def);
       this.pageService.syncFromDefinition(def, this.pageService.overviewDirty());
 
-      let loadedDoc: TemplateDocumentV1 | null = null;
+      let draftDoc: TemplateDocumentV1 | null = null;
+      let loadedSchemaVersion: 1 | 2 = def.dataSourceSchemaVersion === 2 ? 2 : 1;
+      let expectedSchemaChecksum = def.dataSourceSchemaChecksum;
       const canEditDraft = def.capabilities.update.state === 'ENABLED' && !this.pageService.draftAccessForbidden();
 
       if (canEditDraft) {
         try {
-          const draft = await getDraft(templateId);
-          if (seq !== this.loadSeq) return;
+          const draft = await this.templatesApi.getDraft(templateId);
+          if (this.destroyed || seq !== this.loadSeq) return;
           this._versionReadOnly.set(false);
           this.draftRevision = draft.revision;
           this.draftEtag = draft.etag;
           this.draftContentChecksum = draft.contentChecksum;
           this.pageService.setDraft(draft);
-          loadedDoc = structuredClone(draft.editorDocument);
+          draftDoc = structuredClone(draft.editorDocument);
         } catch (draftError) {
-          if (seq !== this.loadSeq) return;
+          if (this.destroyed || seq !== this.loadSeq) return;
           const { status, code } = errorDetailsOf(draftError);
           if (status === 403 || code === 'CORE.TEMPLATE.PERMISSION.DENIED') {
             this.pageService.draftAccessForbidden.set(true);
@@ -366,7 +382,10 @@ export class DesignerState {
         }
       }
 
-      if (!loadedDoc) {
+      let resolvedDoc: TemplateDocumentV1;
+      if (draftDoc) {
+        resolvedDoc = draftDoc;
+      } else {
         this._versionReadOnly.set(true);
         if (!def.currentPublishedVersion) {
           this._noPublished.set(true);
@@ -374,19 +393,21 @@ export class DesignerState {
           this._document.set(null);
           return;
         }
-        const version = await getVersion(templateId, def.currentPublishedVersion.templateVersionId);
-        if (seq !== this.loadSeq) return;
-        loadedDoc = structuredClone(version.editorDocument);
+        const version = await this.templatesApi.getVersion(templateId, def.currentPublishedVersion.templateVersionId);
+        if (this.destroyed || seq !== this.loadSeq) return;
+        loadedSchemaVersion = version.dataSourceSchemaVersion === 2 ? 2 : 1;
+        expectedSchemaChecksum = version.dataSourceSchemaChecksum;
+        resolvedDoc = structuredClone(version.editorDocument);
       }
 
-      this._base.set(structuredClone(loadedDoc));
-      this._document.set(loadedDoc);
+      this._base.set(structuredClone(resolvedDoc));
+      this._document.set(resolvedDoc);
       this.pageIndex.set(0);
       this.zoomMode.set('FIT_WIDTH');
 
-      await this.loadSchemaFor(def, loadedDoc.dataSourceKey, seq);
+      await this.loadSchemaFor(def, resolvedDoc.dataSourceKey, loadedSchemaVersion, expectedSchemaChecksum, seq);
     } catch (error) {
-      if (seq !== this.loadSeq) return;
+      if (this.destroyed || seq !== this.loadSeq) return;
       const { status, code, correlationId } = errorDetailsOf(error);
       this._loadCorrelationId.set(correlationId);
       if (status === 403 || code === 'CORE.TEMPLATE.PERMISSION.DENIED') {
@@ -397,7 +418,7 @@ export class DesignerState {
         this._loadError.set('loadFailed');
       }
     } finally {
-      if (seq === this.loadSeq) {
+      if (!this.destroyed && seq === this.loadSeq) {
         this._loading.set(false);
       }
     }
@@ -406,11 +427,12 @@ export class DesignerState {
   private async loadSchemaFor(
     def: TemplateDefinitionDetail,
     dataSourceKey: TemplateDataSourceKey,
+    schemaVersion: 1 | 2,
+    expectedSchemaChecksum: string,
     seq: number,
   ): Promise<void> {
-    const schemaVersion = (def.dataSourceSchemaVersion === 2 ? 2 : 1) as 1 | 2;
     const companyId = def.scope.type === 'COMPANY' ? def.scope.companyId : undefined;
-    const cacheKey = `${dataSourceKey}:${def.scope.type}:${companyId ?? ''}:${schemaVersion}`;
+    const cacheKey = `${dataSourceKey}:${def.scope.type}:${companyId ?? ''}:${schemaVersion}:${expectedSchemaChecksum}`;
 
     const cached = this.schemaCache.get(cacheKey);
     if (cached) {
@@ -420,17 +442,17 @@ export class DesignerState {
     }
 
     try {
-      const schema = await getDataSourceSchema(dataSourceKey, {
+      const schema = await this.templatesApi.getDataSourceSchema(dataSourceKey, {
         scopeType: def.scope.type,
-        companyId,
+        ...(companyId !== undefined ? { companyId } : {}),
         schemaVersion,
       });
-      if (seq !== this.loadSeq) return;
+      if (this.destroyed || seq !== this.loadSeq) return;
       this.schemaCache.set(cacheKey, schema);
       this._schema.set(schema);
       this._schemaFailed.set(false);
     } catch {
-      if (seq !== this.loadSeq) return;
+      if (this.destroyed || seq !== this.loadSeq) return;
       this._schema.set(null);
       this._schemaFailed.set(true);
     }
@@ -736,10 +758,12 @@ export class DesignerState {
   }
 
   requestAsset(assetId: string): void {
-    if (!assetId || this.requestedAssets.has(assetId)) return;
+    if (!assetId || this.destroyed || this.requestedAssets.has(assetId)) return;
     this.requestedAssets.add(assetId);
+    const epoch = this.assetEpoch;
 
     queueMicrotask(() => {
+      if (this.destroyed || epoch !== this.assetEpoch) return;
       if (!this.assetCache()[assetId]) {
         this.assetCache.update((map) => ({
           ...map,
@@ -747,8 +771,14 @@ export class DesignerState {
         }));
       }
 
-      void getAssetContent(assetId)
+      void this.assetsApi
+        .getAssetContent(assetId)
         .then((blob) => {
+          if (this.destroyed || epoch !== this.assetEpoch) return;
+          const previousUrl = this.assetCache()[assetId]?.url;
+          if (previousUrl) {
+            URL.revokeObjectURL(previousUrl);
+          }
           const url = URL.createObjectURL(blob);
           this.assetCache.update((map) => ({
             ...map,
@@ -756,6 +786,7 @@ export class DesignerState {
           }));
         })
         .catch(() => {
+          if (this.destroyed || epoch !== this.assetEpoch) return;
           this.assetCache.update((map) => ({
             ...map,
             [assetId]: { status: 'ERROR', url: null },
@@ -775,7 +806,8 @@ export class DesignerState {
     return buildDraftSaveIfMatch({
       plainEtag: this.draftEtag || this.pageService.draft()?.etag || `"${this.draftRevision}"`,
       revision: this.draftRevision,
-      dataSourceKey: this._definition()?.dataSourceKey,
+      dataSourceKey:
+        (this._definition() ?? this.pageService.definition())?.dataSourceKey ?? this._document()?.dataSourceKey,
       schema: this._schema(),
     });
   }
@@ -788,20 +820,25 @@ export class DesignerState {
 
     const payloadDoc = structuredClone(current);
     const payloadJson = stableStringify(payloadDoc);
+    const ifMatch = this.draftSaveIfMatch();
 
-    if (!this.pendingSaveIntent || this.pendingSaveIntent.payloadJson !== payloadJson) {
+    if (
+      !this.pendingSaveIntent ||
+      this.pendingSaveIntent.payloadJson !== payloadJson ||
+      this.pendingSaveIntent.ifMatch !== ifMatch
+    ) {
       this.pendingSaveIntent = {
         payloadJson,
-        idempotencyKey: newDesignerUuid(),
+        ifMatch,
+        idempotencyKey: newTemplateIdempotencyKey(),
         clientMutationId: newDesignerUuid(),
       };
     }
 
     const { idempotencyKey, clientMutationId } = this.pendingSaveIntent;
-    const ifMatch = this.draftSaveIfMatch();
 
     try {
-      const res = await patchDraft(
+      const writeRes = await this.templatesApi.patchDraft(
         templateId,
         {
           editorDocument: payloadDoc,
@@ -810,29 +847,36 @@ export class DesignerState {
         ifMatch,
         idempotencyKey,
       );
+      if (this.destroyed || this._templateId() !== templateId) return false;
+
+      const res = writeRes.data;
+      const savedDraft: TemplateDraftDto = {
+        ...res.draft,
+        etag: writeRes.etag ?? res.draft.etag,
+      };
 
       this.pendingSaveIntent = null;
-      this.draftRevision = res.draft.revision;
-      this.draftEtag = res.draft.etag;
-      this.draftContentChecksum = res.draft.contentChecksum;
-      this.pageService.setDraft(res.draft);
+      this.draftRevision = savedDraft.revision;
+      this.draftEtag = savedDraft.etag;
+      this.draftContentChecksum = savedDraft.contentChecksum;
+      this.pageService.setDraft(savedDraft);
 
-      const currentDef = this.pageService.definition();
+      const currentDef = this.pageService.definition() ?? this._definition();
       if (currentDef) {
         const updatedDef: TemplateDefinitionDetail = {
           ...currentDef,
           thumbnail: res.thumbnail,
           currentDraft: {
-            draftId: res.draft.draftId,
-            revision: res.draft.revision,
-            contentChecksum: res.draft.contentChecksum,
-            validationState: res.draft.validation.state,
-            etag: res.draft.etag,
+            draftId: savedDraft.draftId,
+            revision: savedDraft.revision,
+            contentChecksum: savedDraft.contentChecksum,
+            validationState: savedDraft.validation.state,
+            etag: savedDraft.etag,
           },
           capabilities: {
             ...currentDef.capabilities,
             publish:
-              res.draft.validation.state === 'PASSED'
+              savedDraft.validation.state === 'PASSED'
                 ? currentDef.capabilities.publish
                 : { state: 'DISABLED', reason: 'VALIDATION_REQUIRED' },
           },
@@ -841,7 +885,7 @@ export class DesignerState {
         this.pageService.syncFromDefinition(updatedDef, this.pageService.overviewDirty());
       }
 
-      const normalized = structuredClone(res.draft.editorDocument);
+      const normalized = structuredClone(savedDraft.editorDocument);
       this._base.set(normalized);
 
       if (this.docJson() === payloadJson) {
@@ -854,6 +898,7 @@ export class DesignerState {
 
       return true;
     } catch (error) {
+      if (this.destroyed || this._templateId() !== templateId) return false;
       const { status, code, correlationId } = errorDetailsOf(error);
       if (status === 409 && code === 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION') {
         this.pendingSaveIntent = null;
@@ -862,11 +907,12 @@ export class DesignerState {
       }
       if (status === 409 && code === 'CORE.TEMPLATE.CONCURRENCY.SCHEMA_CHANGED') {
         this.pendingSaveIntent = null;
+        this.schemaCache.clear();
         this.notify.warning(this.transloco.translate('tplDesigner.errors.schemaChanged'));
         void this.load(templateId);
         return false;
       }
-      if (status === 422 && code === 'CORE.TEMPLATE.SCHEMA.INVALID') {
+      if ((status === 422 || status === 400) && code === 'CORE.TEMPLATE.SCHEMA.INVALID') {
         this.pendingSaveIntent = null;
         const msg = this.transloco.translate('tplDesigner.errors.saveInvalid');
         const ref = correlationId ? this.transloco.translate('tplDesigner.state.reference', { id: correlationId }) : '';
@@ -879,7 +925,10 @@ export class DesignerState {
         return false;
       }
 
-      this.notify.error(this.pageService.translateError(this.transloco, error));
+      if (!(isRetryableWriteError(error) || status === 401 || status === 429)) {
+        this.pendingSaveIntent = null;
+      }
+      this.notify.error(this.saveErrorMessage(error));
       return false;
     }
   }
@@ -894,7 +943,46 @@ export class DesignerState {
     this.pendingSaveIntent = null;
   }
 
+  private saveErrorMessage(error: unknown): string {
+    const { code } = errorDetailsOf(error);
+    if (code) {
+      const tplKey = `templates.errors.${code}`;
+      const tplTranslated = this.transloco.translate(tplKey);
+      if (tplTranslated && tplTranslated !== tplKey) {
+        return tplTranslated;
+      }
+      const pageKey = `templatesPage.errors.${code}`;
+      const pageTranslated = this.transloco.translate(pageKey);
+      if (pageTranslated && pageTranslated !== pageKey) {
+        return pageTranslated;
+      }
+    }
+    const shared = writeErrorMessage(error, 'templates', this.transloco);
+    if (shared && !shared.startsWith('settings.errors.') && !shared.startsWith('apiErrors.')) {
+      return shared;
+    }
+    return this.pageService.translateError(this.transloco, error);
+  }
+
+  private clearFailedAssets(): void {
+    const current = this.assetCache();
+    let changed = false;
+    const next: Record<string, AssetCacheEntry> = {};
+    for (const [assetId, entry] of Object.entries(current)) {
+      if (entry.status === 'ERROR') {
+        this.requestedAssets.delete(assetId);
+        changed = true;
+      } else {
+        next[assetId] = entry;
+      }
+    }
+    if (changed) {
+      this.assetCache.set(next);
+    }
+  }
+
   private revokeAllAssets(): void {
+    this.assetEpoch++;
     const entries = Object.values(this.assetCache());
     for (const entry of entries) {
       if (entry.url) {
