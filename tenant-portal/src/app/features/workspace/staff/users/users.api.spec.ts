@@ -19,6 +19,7 @@ const body: InviteUserBody = {
 
 describe('Workspace Users API', () => {
   const can = vi.fn();
+  const scopeRevision = vi.fn();
   let api: StaffUsersApi;
   let requests: HttpTestingController;
   let csrfCookie: string;
@@ -27,10 +28,11 @@ describe('Workspace Users API', () => {
     csrfCookie = location.protocol === 'https:' ? '__Host-mutakamel-tenant-csrf' : 'mutakamel-http-tenant-csrf';
     document.cookie = `${csrfCookie}=staff-test-proof; path=/${location.protocol === 'https:' ? '; Secure' : ''}`;
     can.mockReset().mockReturnValue(true);
+    scopeRevision.mockReset().mockReturnValue('staff-scope');
     TestBed.configureTestingModule({ providers: [
       provideHttpClient(),
       provideHttpClientTesting(),
-      { provide: StaffSession, useValue: { scopeRevision: () => 'staff-scope', can,
+      { provide: StaffSession, useValue: { scopeRevision, can,
         me: () => ({ permissions: can() ? ['users.user.invite'] : [] }) } },
     ] });
     api = TestBed.inject(StaffUsersApi);
@@ -211,6 +213,11 @@ describe('Workspace Users API', () => {
       call: (key: string, cascade = false) => api.resendInvite(user.id, key) },
   ];
 
+  async function settleTarget() {
+    await Promise.resolve();
+    await Promise.resolve();
+  }
+
   async function loadTarget() {
     const pending = api.getUser(user.id);
     requests.expectOne(`${usersPath}/${user.id}`).flush({ success: true, data: user });
@@ -224,7 +231,7 @@ describe('Workspace Users API', () => {
       const invalidate = vi.spyOn(api['queries'], 'invalidateQueries');
       const key = newIdempotencyKey();
       const pending = write.call(key);
-      await Promise.resolve();
+      await settleTarget();
       const request = requests.expectOne({ method: write.method, url: `${usersPath}/${user.id}${write.suffix}` });
       expect(request.request.headers.get('x-idempotency-key')).toMatch(/^[a-f0-9]{8}-[a-f0-9]{4}-7[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/);
       expect(request.request.headers.get('x-idempotency-key')).toBe(key);
@@ -257,7 +264,7 @@ describe('Workspace Users API', () => {
     it(`${write.name}: preserves gateway error and correlation id`, async () => {
       await loadTarget();
       const rejected = expect(write.call(newIdempotencyKey())).rejects.toMatchObject({ code: 'GW.IDEM.MISMATCH', correlationId: 'proof' });
-      await Promise.resolve();
+      await settleTarget();
       requests.expectOne((request) => request.method === write.method).flush(
         { code: 'GW.IDEM.MISMATCH', errors: { _: ['changed'] }, correlationId: 'proof' }, { status: 422, statusText: 'Unprocessable' });
       await rejected;
@@ -266,15 +273,23 @@ describe('Workspace Users API', () => {
     it(`${write.name}: rejects a malformed 2xx envelope`, async () => {
       await loadTarget();
       const rejected = expect(write.call(newIdempotencyKey())).rejects.toMatchObject({ code: 'COMMON.GENERIC.INTERNAL_ERROR' });
-      await Promise.resolve();
+      await settleTarget();
       requests.expectOne((request) => request.method === write.method).flush({ data: user }, { status: write.status === 204 ? 200 : write.status, statusText: 'OK' });
+      await rejected;
+    });
+
+    it(`${write.name}: rejects an invalid success payload`, async () => {
+      await loadTarget();
+      const rejected = expect(write.call(newIdempotencyKey())).rejects.toMatchObject({ status: 502 });
+      await settleTarget();
+      requests.expectOne((request) => request.method === write.method).flush({ success: true, data: {} });
       await rejected;
     });
 
     if (['suspend', 'activate', 'delete'].includes(write.name)) it(`${write.name}: adds the cascade flag only on confirmation`, async () => {
       await loadTarget();
       const pending = write.call(newIdempotencyKey(), true);
-      await Promise.resolve();
+      await settleTarget();
       const request = requests.expectOne(`${usersPath}/${user.id}${write.suffix}?confirmAddonCascade=true`);
       request.flush(write.status === 204 ? null : { success: true, data: user }, { status: write.status, statusText: 'OK' });
       await pending;
@@ -286,6 +301,125 @@ describe('Workspace Users API', () => {
     can.mockImplementation((_permission: string, target?: { branchId?: string }) => target?.branchId !== 'new-branch');
     await expect(api.updateUser(user.id, { branchId: 'new-branch' }, newIdempotencyKey())).rejects.toMatchObject({ status: 403 });
     requests.expectNone((request) => request.method === 'PATCH');
+  });
+
+  it('passes the backend invitation fields and explicit cascade confirmation', async () => {
+    const payload: InviteUserBody = {
+      ...body, employeeCode: null, jobTitle: null, partyId: 'party',
+      roleAssignments: [{ branchId: body.branchId, roleId: 'role' }],
+      teamMemberships: [{ teamId: 'team', role: 'MEMBER', isPrimary: true }],
+    };
+    const pending = api.inviteUser(payload, newIdempotencyKey(), { confirmAddonCascade: true });
+    const request = requests.expectOne(`${usersPath}?confirmAddonCascade=true`);
+    expect(request.request.body).toEqual(payload);
+    const saved = { ...user, status: 'INVITED' };
+    request.flush({ success: true, data: saved });
+    await expect(pending).resolves.toEqual(saved);
+  });
+
+  it('passes nullable update fields and team memberships without inventing values', async () => {
+    await loadTarget();
+    const patch = { employeeCode: null, jobTitle: null, teamId: null, managerId: null,
+      teamMemberships: [{ teamId: 'team' }] };
+    const pending = api.updateUser(user.id, patch, newIdempotencyKey());
+    await settleTarget();
+    const request = requests.expectOne({ method: 'PATCH', url: `${usersPath}/${user.id}` });
+    expect(request.request.body).toEqual(patch);
+    request.flush({ success: true, data: user });
+    await pending;
+  });
+
+  it('checks a company-only list filter against the read grant', async () => {
+    const pending = api.listUsers({ companyId: body.companyId });
+    expect(can).toHaveBeenCalledWith('users.user.read', { companyId: body.companyId });
+    requests.expectOne(`${usersPath}?companyId=${body.companyId}`).flush({ success: true, data: [],
+      meta: { page: 1, limit: 20, total: 0, totalPages: 0, hasNext: false, hasPrev: false } });
+    await pending;
+  });
+
+  it.each(['list', 'detail'] as const)('discards an in-flight %s after the scope changes', async (read) => {
+    const rejected = expect(read === 'list' ? api.listUsers() : api.getUser(user.id))
+      .rejects.toMatchObject({ status: 403, code: 'COMMON.GENERIC.FORBIDDEN' });
+    const request = requests.expectOne(read === 'list' ? usersPath : `${usersPath}/${user.id}`);
+    scopeRevision.mockReturnValue('new-scope');
+    request.flush({ success: true, data: read === 'list' ? [user] : user,
+      meta: { page: 1, limit: 20, total: 1, totalPages: 1, hasNext: false, hasPrev: false } });
+    await rejected;
+    expect(api['targets'].size).toBe(0);
+  });
+
+  it('does not write using a target resolved under an old scope', async () => {
+    await loadTarget();
+    const rejected = expect(api.updateUser(user.id, { firstName: 'Changed' }, newIdempotencyKey()))
+      .rejects.toMatchObject({ status: 403 });
+    scopeRevision.mockReturnValue('new-scope');
+    await rejected;
+    requests.expectNone((request) => request.method !== 'GET');
+  });
+
+  it('discards a completed write after the scope changes', async () => {
+    const rejected = expect(api.inviteUser(body, newIdempotencyKey())).rejects.toMatchObject({ status: 403 });
+    const request = requests.expectOne(usersPath);
+    scopeRevision.mockReturnValue('new-scope');
+    request.flush({ success: true, data: { ...user, status: 'INVITED' } });
+    await rejected;
+    expect(api['targets'].size).toBe(0);
+  });
+
+  it.each([null, {}, [], { id: '', companyId: body.companyId, branchId: body.branchId },
+    { ...user, companyId: null }, { ...user, branchId: null },
+  ])('rejects malformed detail and list records: %s', async (data) => {
+    const detail = expect(api.getUser(user.id)).rejects.toMatchObject({ status: 502 });
+    requests.expectOne(`${usersPath}/${user.id}`).flush({ success: true, data });
+    await detail;
+    const list = expect(api.listUsers()).rejects.toMatchObject({ status: 502 });
+    requests.expectOne(usersPath).flush({ success: true, data: [data],
+      meta: { page: 1, limit: 20, total: 1, totalPages: 1, hasNext: false, hasPrev: false } });
+    await list;
+    expect(api['targets'].size).toBe(0);
+  });
+
+  it.each([{ page: 0 }, { page: 1.5 }, { limit: 0 }, { limit: '20' }, { total: -1 },
+    { totalPages: null }, { hasNext: null }, { hasPrev: undefined },
+  ])('rejects malformed list metadata: %s', async (patch) => {
+    const pending = expect(api.listUsers()).rejects.toMatchObject({ status: 502 });
+    requests.expectOne(usersPath).flush({ success: true, data: [],
+      meta: { page: 1, limit: 20, total: 0, totalPages: 0, hasNext: false, hasPrev: false, ...patch } });
+    await pending;
+  });
+
+  it.each([null, {}, { deliveryStatus: 'SENT' }])('rejects malformed resend receipts: %s', async (data) => {
+    await loadTarget();
+    const pending = expect(api.resendInvite(user.id, newIdempotencyKey())).rejects.toMatchObject({ status: 502 });
+    await settleTarget();
+    requests.expectOne(`${usersPath}/${user.id}/resend-invite`).flush({ success: true, data });
+    await pending;
+  });
+
+  it.each([null, {}, { ...user, status: 'ACTIVE' }])('rejects malformed invitation results: %s', async (data) => {
+    const pending = expect(api.inviteUser(body, newIdempotencyKey())).rejects.toMatchObject({ status: 502 });
+    requests.expectOne(usersPath).flush({ success: true, data });
+    await pending;
+    expect(api['targets'].size).toBe(0);
+  });
+
+  it.each([
+    { status: 409, code: 'ADDON_ASSIGNMENTS_EXIST' },
+    { status: 409, code: 'INVALID_STATUS_TRANSITION' },
+    { status: 422, code: 'PLACEMENT_INCONSISTENT' },
+    { status: 429, code: 'COMMON.RATE_LIMITED' },
+    { status: 503, code: 'APPLICATION_ALLOWANCE_UNAVAILABLE' },
+  ])('preserves backend errors without an automatic retry: $code', async ({ status, code }) => {
+    await loadTarget();
+    const details = { reason: 'backend evidence' };
+    const pending = expect(api.suspendUser(user.id, newIdempotencyKey())).rejects.toMatchObject({
+      status, code, details, correlationId: 'staff-proof',
+    });
+    await settleTarget();
+    requests.expectOne(`${usersPath}/${user.id}/suspend`).flush(
+      { errorCode: code, details, correlationId: 'staff-proof' }, { status, statusText: 'Rejected' });
+    await pending;
+    requests.expectNone((request) => request.method !== 'GET');
   });
 
 });

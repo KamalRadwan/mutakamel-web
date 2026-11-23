@@ -4,11 +4,17 @@ import { ApiError } from '../../../../core/api/api-errors';
 import type { CorePage } from '../../../../core/api/core-page';
 import { StaffHttp, type StaffEnvelope, type StaffWriteMethod } from '../shared/staff-http';
 import type { SeatUsage } from '../../seats/seats.model';
-import type { ConfirmAddonCascadeOptions, ListQuery, TenantUser } from '../shared/staff.model';
+import type { ConfirmAddonCascadeOptions, ListQuery, MembershipRole, TenantUser } from '../shared/staff.model';
 import { StaffSession } from '../shared/staff-session';
 
 const USERS_PATH = '/api/tenant/core/v1/users';
 const USERS_QUERY_KEY = 'staff-users';
+
+interface UserTeamMembershipBody {
+  teamId: string;
+  role?: MembershipRole;
+  isPrimary?: boolean;
+}
 
 export interface UpdateUserBody {
   firstName?: string;
@@ -20,6 +26,7 @@ export interface UpdateUserBody {
   teamId?: string | null;
   managerId?: string | null;
   jobTitle?: string | null;
+  teamMemberships?: UserTeamMembershipBody[];
 }
 
 export interface InviteUserBody {
@@ -31,9 +38,11 @@ export interface InviteUserBody {
   departmentId: string;
   teamId?: string;
   managerId?: string;
-  employeeCode?: string;
-  jobTitle?: string;
+  partyId?: string;
+  employeeCode?: string | null;
+  jobTitle?: string | null;
   roleAssignments?: { branchId: string; roleId: string }[];
+  teamMemberships?: UserTeamMembershipBody[];
 }
 
 export interface CreateImportBatchBody {
@@ -72,7 +81,9 @@ export class StaffUsersApi {
   async listUsers(query: ListQuery = {}): Promise<CorePage<TenantUser>> {
     const { data, meta } = await this.read<TenantUser[]>(USERS_PATH, query);
     if (!Array.isArray(data) || !meta || !Number.isSafeInteger(meta.total) || meta.total < 0 ||
-        !Number.isSafeInteger(meta.totalPages) || meta.totalPages < 0 || typeof meta.hasNext !== 'boolean') {
+        !Number.isSafeInteger(meta.totalPages) || meta.totalPages < 0 || typeof meta.hasNext !== 'boolean' ||
+        !Number.isSafeInteger(meta.page) || meta.page < 1 || !Number.isSafeInteger(meta.limit) || meta.limit < 1 ||
+        typeof meta.hasPrev !== 'boolean') {
       throw new ApiError(502, 'COMMON.GENERIC.INTERNAL_ERROR');
     }
     const users = data.map((user) => this.normalizeUser(user));
@@ -94,8 +105,8 @@ export class StaffUsersApi {
     return usage;
   }
 
-  async inviteUser(body: InviteUserBody, key: string): Promise<TenantUser> {
-    return this.write<TenantUser>('POST', USERS_PATH, body, key, 'users.user.invite', body, undefined, true);
+  async inviteUser(body: InviteUserBody, key: string, opts?: ConfirmAddonCascadeOptions): Promise<TenantUser> {
+    return this.write<TenantUser>('POST', USERS_PATH, body, key, 'users.user.invite', body, opts, true);
   }
 
   async createImportBatch(body: CreateImportBatchBody, key: string): Promise<ImportBatchCreated> {
@@ -164,6 +175,10 @@ export class StaffUsersApi {
   }
 
   private normalizeUser(user: TenantUser): TenantUser {
+    if (!user || typeof user !== 'object' || typeof user.id !== 'string' || !user.id ||
+        typeof user.companyId !== 'string' || !user.companyId || typeof user.branchId !== 'string' || !user.branchId) {
+      throw new ApiError(502, 'COMMON.GENERIC.INTERNAL_ERROR');
+    }
     return { ...user, seats: Array.isArray(user.seats) ? user.seats : [] };
   }
 
@@ -171,8 +186,11 @@ export class StaffUsersApi {
     this.targets.set(`${this.session.scopeRevision()}:${user.id}`, this.normalizeUser(user));
   }
 
-  private targetFor(id: string): Promise<TenantUser> {
-    return Promise.resolve(this.targets.get(`${this.session.scopeRevision()}:${id}`) ?? this.getUser(id));
+  private async targetFor(id: string): Promise<TenantUser> {
+    const scope = this.session.scopeRevision();
+    const target = await (this.targets.get(`${scope}:${id}`) ?? this.getUser(id));
+    if (scope !== this.session.scopeRevision()) throw new ApiError(403, 'COMMON.GENERIC.FORBIDDEN');
+    return target;
   }
 
   private async write<T extends TenantUser | { deliveryStatus: 'QUEUED' } | void>(method: StaffWriteMethod, path: string, body: unknown, key: string,
@@ -183,6 +201,15 @@ export class StaffUsersApi {
       throw new ApiError(403, 'COMMON.GENERIC.FORBIDDEN');
     }
     const result = await this.http.write<T>(method, path, body, { key, ...opts });
+    if (method === 'DELETE') {
+      if (result !== undefined) throw new ApiError(502, 'COMMON.GENERIC.INTERNAL_ERROR');
+    } else if (path.endsWith('/resend-invite')) {
+      if (!result || typeof result !== 'object' || !('deliveryStatus' in result) || result.deliveryStatus !== 'QUEUED') {
+        throw new ApiError(502, 'COMMON.GENERIC.INTERNAL_ERROR');
+      }
+    } else {
+      this.normalizeUser(result as TenantUser);
+    }
     if (invite && (!(result as TenantUser)?.id || (result as TenantUser).status !== 'INVITED')) {
       throw new ApiError(502, 'COMMON.GENERIC.INTERNAL_ERROR');
     }
@@ -196,12 +223,16 @@ export class StaffUsersApi {
 
   private async read<T>(path: string, query: ListQuery = {}): Promise<StaffEnvelope<T>> {
     const scope = this.session.scopeRevision();
-    if (!scope || !this.session.can('users.user.read', query.branchId ? query : undefined)) {
+    if (!scope || !this.session.can('users.user.read', query.companyId || query.branchId ? query : undefined)) {
       throw new ApiError(403, 'COMMON.GENERIC.FORBIDDEN');
     }
     return this.queries.fetchQuery({
       queryKey: [USERS_QUERY_KEY, scope, path, query],
-      queryFn: () => this.http.read<T>(path, query),
+      queryFn: async () => {
+        const response = await this.http.read<T>(path, query);
+        if (scope !== this.session.scopeRevision()) throw new ApiError(403, 'COMMON.GENERIC.FORBIDDEN');
+        return response;
+      },
     });
   }
 }
