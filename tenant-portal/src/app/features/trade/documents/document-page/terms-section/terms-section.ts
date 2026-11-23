@@ -161,7 +161,7 @@ export class TermsSection {
     () => this.isConvert() && Boolean(this.lockedSelections()?.warrantyTermId),
   );
   protected readonly clausesLocked = computed(
-    () => this.isConvert() && (this.lockedSelections()?.clauseIds.length ?? 0) > 0,
+    () => this.isConvert() && (this.lockedSelections()?.clauseIds?.length ?? 0) > 0,
   );
   protected readonly notesLocked = computed(() => this.isReadonly() || (this.isConvert() && this.sourceNotesLocked()));
   protected readonly notesLength = computed(() => [...this.notes()].length);
@@ -187,7 +187,7 @@ export class TermsSection {
     this.toOptions(this.termOptions()?.byType.WARRANTY ?? []),
   );
   protected readonly availableClauseOptions = computed<DropdownOption<string | null>[]>(() => {
-    const selected = new Set(this.termSelections().clauseIds);
+    const selected = new Set(this.termSelections().clauseIds ?? []);
     const opts = this.termOptions();
     const list = [...(opts?.byType.RETURNS ?? []), ...(opts?.byType.GENERAL ?? [])].filter(
       (term) => !selected.has(term.id),
@@ -208,7 +208,7 @@ export class TermsSection {
   });
 
   protected readonly maxClauses = TERM_LIMITS.maxClauses;
-  protected readonly clausesAtMax = computed(() => this.termSelections().clauseIds.length >= TERM_LIMITS.maxClauses);
+  protected readonly clausesAtMax = computed(() => (this.termSelections().clauseIds ?? []).length >= TERM_LIMITS.maxClauses);
 
   readonly valid = computed<boolean>(() => {
     if (this.isReadonly()) return true;
@@ -287,15 +287,15 @@ export class TermsSection {
     this.notes.set((event.target as HTMLTextAreaElement).value);
   }
 
-  protected setSingleSlot(slot: 'paymentTermId' | 'deliveryTermId' | 'warrantyTermId', id: string | null): void {
+  protected setSingleSlot(slot: 'paymentTermId' | 'deliveryTermId' | 'warrantyTermId', id: string | null | undefined): void {
     if (this.isReadonly()) return;
-    this.termSelections.update((curr) => ({ ...curr, [slot]: id }));
+    this.termSelections.update((curr) => ({ ...curr, [slot]: id ?? undefined }));
   }
 
   protected addClause(clauseId: string | null): void {
     if (!clauseId || this.isReadonly() || this.clausesAtMax()) return;
     this.termSelections.update((curr) =>
-      curr.clauseIds.includes(clauseId) ? curr : { ...curr, clauseIds: [...curr.clauseIds, clauseId] },
+      (curr.clauseIds ?? []).includes(clauseId) ? curr : { ...curr, clauseIds: [...(curr.clauseIds ?? []), clauseId] },
     );
     this.clausePick.set(null);
   }
@@ -304,7 +304,7 @@ export class TermsSection {
     if (this.isReadonly() || this.clausesLocked()) return;
     this.termSelections.update((curr) => ({
       ...curr,
-      clauseIds: curr.clauseIds.filter((_, idx) => idx !== index),
+      clauseIds: (curr.clauseIds ?? []).filter((_, idx) => idx !== index),
     }));
   }
 

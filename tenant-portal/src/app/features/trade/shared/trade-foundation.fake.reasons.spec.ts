@@ -3,6 +3,8 @@ import { REASON_AREAS, REASON_CODE_PATTERN, REASON_KINDS, REASON_NAME_MAX } from
 import { ApiError, newIdempotencyKey } from './trade-api';
 import { TRADE_FAKE_DB, fakeCountReasonCodes, fakeListReasonCodes } from './trade-foundation.fake';
 import { countReasons, createReason, deleteReason, listReasonsAdmin, updateReason } from './reasons/reasons-admin.api';
+import { bindTradeHttpForTest } from './trade-http';
+import { TradeHttpStub } from './testing/trade-http-testing';
 
 // Snapshot of the Foundation seed before any feature module can append its own kinds.
 const SEEDED = TRADE_FAKE_DB.reasons.slice();
@@ -152,8 +154,17 @@ async function settleError(promise: Promise<unknown>): Promise<ApiError> {
 }
 
 describe('reason-codes endpoints (backend TradeReasonsController / TradeReasonsAdminService)', () => {
-  beforeEach(() => vi.useFakeTimers());
-  afterEach(() => vi.useRealTimers());
+  let stub: TradeHttpStub;
+  let dispose: () => void;
+  beforeEach(() => {
+    vi.useFakeTimers();
+    stub = new TradeHttpStub();
+    dispose = bindTradeHttpForTest(stub);
+  });
+  afterEach(() => {
+    dispose();
+    vi.useRealTimers();
+  });
 
   it('GET /reason-codes returns { items }, active only by default, ordered by sortOrder, code, kind', () => {
     const body = fakeListReasonCodes({ kind: 'DOCUMENT_HOLD' });
@@ -165,6 +176,7 @@ describe('reason-codes endpoints (backend TradeReasonsController / TradeReasonsA
 
   it('GET /reason-codes with an unknown kind is 422 KIND_INVALID with details.field kind', () => {
     try {
+      // @ts-expect-error Exercise invalid runtime input outside the contract union.
       fakeListReasonCodes({ kind: 'NOPE' });
       throw new Error('expected an error');
     } catch (error) {
@@ -178,46 +190,71 @@ describe('reason-codes endpoints (backend TradeReasonsController / TradeReasonsA
     expect(counts.total).toBe(Object.values(counts.byKind).reduce((a, b) => a + b, 0));
   });
 
-  it('POST validates the DTO first, then the key (400 KEY_MISSING / 422 KEY_REQUIRED), then the kind', async () => {
+  it('POST propagates DTO, kind and conflict errors and validates the request key locally', async () => {
     const names = { en: 'Spec', ar: 'اختبار' };
+    stub.register('POST', '/reason-codes', new ApiError(400, 'TRADE.VALIDATION_FAILED'));
     expect(await settleError(createReason({ kind: 'DOCUMENT_HOLD', code: 'lower', localizedNames: names }, newIdempotencyKey())))
       .toMatchObject({ status: 400, code: 'TRADE.VALIDATION_FAILED' });
     expect(await settleError(createReason({ kind: 'DOCUMENT_HOLD', code: 'SPEC_A', localizedNames: names }, '')))
       .toMatchObject({ status: 400, code: 'TRADE.IDEMPOTENCY.KEY_MISSING' });
     expect(await settleError(createReason({ kind: 'DOCUMENT_HOLD', code: 'SPEC_A', localizedNames: names }, 'k1')))
       .toMatchObject({ status: 422, code: 'TRADE.IDEMPOTENCY.KEY_REQUIRED' });
+    stub.register('POST', '/reason-codes', new ApiError(422, 'TRADE.REASON.KIND_INVALID', { field: ['kind'] }));
+    // @ts-expect-error Exercise invalid runtime input outside the contract union.
     expect(await settleError(createReason({ kind: 'NOPE', code: 'SPEC_A', localizedNames: names }, newIdempotencyKey())))
       .toMatchObject({ status: 422, code: 'TRADE.REASON.KIND_INVALID', details: { field: ['kind'] } });
+    stub.register('POST', '/reason-codes', new ApiError(409, 'TRADE.REASON.CODE_TAKEN', { field: ['code'] }));
     expect(await settleError(createReason({ kind: 'DOCUMENT_HOLD', code: 'OTHER', localizedNames: names }, newIdempotencyKey())))
       .toMatchObject({ status: 409, code: 'TRADE.REASON.CODE_TAKEN', details: { field: ['code'] } });
   });
 
-  it('POST defaults requiresNote false, isActive true, sortOrder 0, replays the same key, then PATCH and DELETE', async () => {
+  it('POST receives server defaults, preserves the replay key, then PATCHes and DELETEs with concurrency headers', async () => {
     const key = newIdempotencyKey();
-    const input = { kind: 'DOCUMENT_HOLD', code: 'SPEC_B', localizedNames: { en: ' Spec B ', ar: 'اختبار' } };
+    const input = { kind: 'DOCUMENT_HOLD' as const, code: 'SPEC_B', localizedNames: { en: ' Spec B ', ar: 'اختبار' } };
+    stub.register('POST', '/reason-codes', {
+      ...input, id: 'spec-b', localizedNames: { en: 'Spec B', ar: 'اختبار' },
+      requiresNote: false, isActive: true, sortOrder: 0, isSystem: false, version: 1,
+      updatedAt: '2026-11-23T10:00:00.000Z',
+    });
     const created = await settle(createReason(input, key));
+    expect(stub.recordedWrites()[0]).toMatchObject({ body: input, key });
     expect(created).toMatchObject({ requiresNote: false, isActive: true, sortOrder: 0, isSystem: false, version: 1 });
     expect(created.localizedNames).toEqual({ en: 'Spec B', ar: 'اختبار' });
     expect((await settle(createReason(input, key))).id).toBe(created.id);
+    expect(stub.recordedWrites().map((write) => write.key)).toEqual([key, key]);
+    stub.register('POST', '/reason-codes', new ApiError(422, 'TRADE.IDEMPOTENCY.MISMATCH'));
     expect(await settleError(createReason({ ...input, sortOrder: 5 }, key)))
       .toMatchObject({ status: 422, code: 'TRADE.IDEMPOTENCY.MISMATCH' });
 
+    stub.register('PATCH', `/reason-codes/${created.id}`, new ApiError(400, 'TRADE.CONCURRENCY.IF_MATCH_REQUIRED'));
     expect(await settleError(updateReason(created.id, 0, { sortOrder: 1 })))
       .toMatchObject({ status: 400, code: 'TRADE.CONCURRENCY.IF_MATCH_REQUIRED' });
+    stub.register('PATCH', `/reason-codes/${created.id}`, new ApiError(409, 'TRADE.CONCURRENCY.STALE_VERSION'));
     expect(await settleError(updateReason(created.id, 9, { sortOrder: 1 })))
       .toMatchObject({ status: 409, code: 'TRADE.CONCURRENCY.STALE_VERSION' });
+    stub.register('PATCH', '/reason-codes/missing', new ApiError(422, 'TRADE.REASON.NOT_FOUND', { field: ['id'] }));
     expect(await settleError(updateReason('missing', 1, {})))
       .toMatchObject({ status: 422, code: 'TRADE.REASON.NOT_FOUND', details: { field: ['id'] } });
+    stub.register('PATCH', `/reason-codes/${created.id}`, { ...created, sortOrder: 10, version: 2 });
     const updated = await settle(updateReason(created.id, 1, { sortOrder: 10 }));
+    expect(stub.recordedWrites().at(-1)).toMatchObject({ method: 'PATCH', ifMatch: '"1"', body: { sortOrder: 10 } });
     expect(updated).toMatchObject({ sortOrder: 10, version: 2 });
 
+    stub.register('DELETE', `/reason-codes/${created.id}`, { ...updated, isActive: false, version: 3 });
+    stub.register('GET', '/reason-codes', { items: [] });
     const deleted = await settle(deleteReason(created.id, 2));
+    expect(stub.recordedWrites().at(-1)).toMatchObject({ method: 'DELETE', ifMatch: '"2"' });
     expect(deleted).toMatchObject({ id: created.id, version: 3 });
     expect((await settle(listReasonsAdmin('DOCUMENT_HOLD', true))).some((r) => r.id === created.id)).toBe(false);
   });
 
   it('system reasons cannot be turned off or deleted: 409 SYSTEM_IMMUTABLE with details.field isSystem', async () => {
-    const other = TRADE_FAKE_DB.reasons.find((r) => r.kind === 'DOCUMENT_HOLD' && r.code === 'OTHER')!;
+    const other = TRADE_FAKE_DB.reasons.find((r) => r.kind === 'DOCUMENT_HOLD' && r.code === 'OTHER');
+    if (!other) throw new Error('Missing DOCUMENT_HOLD/OTHER fixture');
+    const immutable = new ApiError(409, 'TRADE.REASON.SYSTEM_IMMUTABLE', { field: ['isSystem'] });
+    stub.register('PATCH', `/reason-codes/${other.id}`, immutable);
+    stub.register('DELETE', `/reason-codes/${other.id}`, immutable);
+    stub.register('GET', '/reason-codes/counts', fakeCountReasonCodes());
     expect(await settleError(updateReason(other.id, other.version, { isActive: false })))
       .toMatchObject({ status: 409, code: 'TRADE.REASON.SYSTEM_IMMUTABLE', details: { field: ['isSystem'] } });
     expect(await settleError(deleteReason(other.id, other.version)))

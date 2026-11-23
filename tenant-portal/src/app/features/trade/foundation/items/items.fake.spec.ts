@@ -1,6 +1,8 @@
 import { ApiError, newIdempotencyKey } from '../../shared/trade-api';
 import { TRADE_FAKE_DB } from '../../shared/trade-foundation.fake';
 import { countItemsByStatus } from './items.api';
+import { bindTradeHttpForTest } from '../../shared/trade-http';
+import { TradeHttpStub } from '../../shared/testing/trade-http-testing';
 import {
   fakeCountItemsByStatus,
   fakeCreateItem,
@@ -104,8 +106,16 @@ describe('items fake contract', () => {
       code: 'TRADE.VALIDATION_FAILED',
       details: { sort: ['invalid'] },
     });
-    const counts = countItemsByStatus({}, { sort: 'name', direction: 'asc' });
-    await expect(run(counts)).resolves.toMatchObject({ ALL: expect.any(Number) });
+    const expected = await run(fakeCountItemsByStatus({}, {}));
+    const stub = new TradeHttpStub({ 'GET /items/status-counts': expected });
+    const dispose = bindTradeHttpForTest(stub);
+    try {
+      const { total, ...byStatus } = expected;
+      await expect(countItemsByStatus({}, { sort: 'name', direction: 'asc' })).resolves.toEqual({ ...byStatus, ALL: total });
+      expect(stub.recordedReads()[0]?.query).toBeUndefined();
+    } finally {
+      dispose();
+    }
   });
 
   it('item detail has no list eligibility projection', async () => {

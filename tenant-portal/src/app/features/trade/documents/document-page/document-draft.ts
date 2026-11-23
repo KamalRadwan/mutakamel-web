@@ -99,18 +99,13 @@ export function currencyDecimalPlacesOf(currencyCode: string): number {
 
 export function emptyTermSelections(): TermSelections {
   return {
-    paymentTermId: null,
-    deliveryTermId: null,
-    warrantyTermId: null,
     clauseIds: [],
   };
 }
 
 export function cloneTermSelections(sel: TermSelections): TermSelections {
   return {
-    paymentTermId: sel.paymentTermId ?? null,
-    deliveryTermId: sel.deliveryTermId ?? null,
-    warrantyTermId: sel.warrantyTermId ?? null,
+    ...sel,
     clauseIds: [...(sel.clauseIds ?? [])],
   };
 }
@@ -167,7 +162,7 @@ export function extractTermSelections(snapshot: TermsSnapshot | null | undefined
       result.warrantyTermId = id;
     } else if (!clauseSet.has(id)) {
       clauseSet.add(id);
-      result.clauseIds.push(id);
+      (result.clauseIds ??= []).push(id);
     }
   }
 

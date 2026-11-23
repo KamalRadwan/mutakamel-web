@@ -263,7 +263,7 @@
                 [value]="clausePick()"
                 (valueChange)="addClause($event)"
               />
-              @if (termSelections().clauseIds.length > 0) {
+              @if ((termSelections().clauseIds?.length ?? 0) > 0) {
                 <div class="flex flex-wrap gap-4">
                   @for (cid of termSelections().clauseIds; track cid; let idx = $index) {
                     <span class="inline-flex h-chip items-center gap-4 rounded-6 bg-brand-soft px-6 text-11 font-medium text-on-brand-soft">

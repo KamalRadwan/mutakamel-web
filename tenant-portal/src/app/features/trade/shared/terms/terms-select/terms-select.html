@@ -246,7 +246,7 @@
     [label]="'tset.select.clausesLabel' | transloco"
     [for]="fieldId('clauses')"
     [hint]="'tset.select.clausesHint' | transloco"
-    [count]="value().clauseIds.length"
+    [count]="(value().clauseIds?.length ?? 0)"
     [max]="maxClauses"
     [error]="clausesErrorKey() ? (clausesErrorKey()! | transloco) : null"
   >
@@ -309,7 +309,7 @@
         [disabled]="disabled()"
         [readOnly]="clausesAtMax()"
         [attr.title]="!disabled() && clausesAtMax() ? ('tset.select.maxReached' | transloco: { max: maxClauses }) : null"
-        [placeholder]="!disabled() && value().clauseIds.length === 0 ? ('tset.select.clausesPlaceholder' | transloco) : ''"
+        [placeholder]="!disabled() && (value().clauseIds?.length ?? 0) === 0 ? ('tset.select.clausesPlaceholder' | transloco) : ''"
         [value]="clausesQuery()"
         (input)="onClausesInput($event)"
         (keydown)="onClausesKeydown($event)"
@@ -494,7 +494,7 @@
 <!-- Small chip reorder menu -->
 @if (chipMenu(); as menu) {
   @let isFirst = menu.index === 0;
-  @let isLast = menu.index >= value().clauseIds.length - 1;
+  @let isLast = menu.index >= (value().clauseIds?.length ?? 0) - 1;
   <div
     #chipMenu
     role="menu"

@@ -445,9 +445,6 @@ describe('document-draft', () => {
       expect(qt.lines[0].itemId).toBeNull();
       expect(qt.pricing).toEqual({ mode: 'NONE' });
       expect(qt.termSelections).toEqual({
-        paymentTermId: null,
-        deliveryTermId: null,
-        warrantyTermId: null,
         clauseIds: [],
       });
 
@@ -572,7 +569,7 @@ describe('document-draft', () => {
         validUntil: loaded.validUntil,
         notes: loaded.notes,
         termSelections: {
-          clauseIds: [...loaded.termSelections.clauseIds],
+          clauseIds: [...(loaded.termSelections.clauseIds ?? [])],
           warrantyTermId: loaded.termSelections.warrantyTermId,
           deliveryTermId: loaded.termSelections.deliveryTermId,
           paymentTermId: loaded.termSelections.paymentTermId,

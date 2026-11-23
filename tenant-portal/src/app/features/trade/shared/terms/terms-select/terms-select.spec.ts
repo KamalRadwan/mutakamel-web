@@ -1,10 +1,12 @@
-import { Component, Injectable, signal } from '@angular/core';
+import { Component, Injectable, signal, viewChild } from '@angular/core';
 import { type ComponentFixture, TestBed } from '@angular/core/testing';
 import { TranslocoLoader, type Translation, provideTransloco } from '@jsverse/transloco';
 import { of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TERM_LIMITS, type TermSelections } from '../terms.model';
 import { TradeTermsSelect } from './terms-select';
+import { bindTradeHttpForTest } from '../../trade-http';
+import { TradeFoundationFixtures } from '../../testing/trade-foundation-fixtures';
 
 const TSET_EN: Translation = {
   select: {
@@ -57,6 +59,7 @@ class TestTranslocoLoader implements TranslocoLoader {
   `,
 })
 class Host {
+  readonly select = viewChild.required(TradeTermsSelect);
   readonly value = signal<TermSelections>({
     paymentTermId: 'term-c1-payment-net30',
     deliveryTermId: 'term-c1-delivery-site14',
@@ -72,24 +75,13 @@ class Host {
 
 describe('TradeTermsSelect max clauses enforcement (§6)', () => {
   const fixtures: ComponentFixture<Host>[] = [];
+  let dispose: () => void;
 
   beforeEach(() => {
     vi.useFakeTimers();
+    dispose = bindTradeHttpForTest(new TradeFoundationFixtures());
     localStorage.removeItem('lang');
     document.documentElement.lang = 'en';
-  });
-
-  afterEach(() => {
-    while (fixtures.length > 0) {
-      fixtures.pop()!.destroy();
-    }
-    vi.useRealTimers();
-    localStorage.removeItem('lang');
-  });
-
-  it('caps clauses at 4, sets the maxReached tooltip, and disables adding a 5th clause', async () => {
-    expect(TERM_LIMITS.maxClauses).toBe(4);
-
     TestBed.configureTestingModule({
       providers: [
         provideTransloco({
@@ -98,6 +90,19 @@ describe('TradeTermsSelect max clauses enforcement (§6)', () => {
         }),
       ],
     });
+  });
+
+  afterEach(() => {
+    while (fixtures.length > 0) {
+      fixtures.pop()!.destroy();
+    }
+    dispose();
+    vi.useRealTimers();
+    localStorage.removeItem('lang');
+  });
+
+  it('caps clauses at 4, sets the maxReached tooltip, and disables adding a 5th clause', async () => {
+    expect(TERM_LIMITS.maxClauses).toBe(4);
 
     const fixture = TestBed.createComponent(Host);
     fixtures.push(fixture);
@@ -131,7 +136,7 @@ describe('TradeTermsSelect max clauses enforcement (§6)', () => {
     // Dropping back to 3 clauses re-enables unselected options so a 4th can be added.
     fixture.componentInstance.value.update((curr) => ({
       ...curr,
-      clauseIds: curr.clauseIds.slice(0, 3),
+      clauseIds: (curr.clauseIds ?? []).slice(0, 3),
     }));
     fixture.detectChanges();
 
@@ -143,5 +148,42 @@ describe('TradeTermsSelect max clauses enforcement (§6)', () => {
     reenabledOption.click();
     fixture.detectChanges();
     expect(fixture.componentInstance.value().clauseIds).toHaveLength(4);
+  });
+
+  it('handles omitted selections and clauses through adding, removing, defaults and clearing', async () => {
+    const fixture = TestBed.createComponent(Host);
+    fixtures.push(fixture);
+    fixture.componentInstance.value.set({});
+    fixture.detectChanges();
+    await vi.advanceTimersByTimeAsync(350);
+    fixture.detectChanges();
+    expect(fixture.componentInstance.select().valid()).toBe(true);
+
+    const el = fixture.nativeElement as HTMLElement;
+    const input = el.querySelector<HTMLInputElement>('#test-terms-clauses');
+    if (!input?.parentElement) throw new Error('Missing clauses field');
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true }));
+    input.parentElement.click();
+    fixture.detectChanges();
+    await vi.advanceTimersByTimeAsync(50);
+    fixture.detectChanges();
+    const option = el.querySelector<HTMLElement>('ul[aria-multiselectable="true"] li[role="option"]');
+    if (!option) throw new Error('Missing clause option');
+    option.click();
+    fixture.detectChanges();
+    expect(fixture.componentInstance.value().clauseIds).toHaveLength(1);
+
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true }));
+    fixture.detectChanges();
+    expect(fixture.componentInstance.value().clauseIds).toEqual([]);
+    fixture.componentInstance.select().applyDefaults();
+    fixture.detectChanges();
+    expect(fixture.componentInstance.value().paymentTermId).toBeTruthy();
+    const clear = el.querySelector<HTMLButtonElement>('button[aria-label="Clear"]');
+    if (!clear) throw new Error('Missing payment clear button');
+    clear.click();
+    fixture.detectChanges();
+    expect(fixture.componentInstance.value().paymentTermId).toBeUndefined();
+    expect(JSON.parse(JSON.stringify(fixture.componentInstance.value()))).not.toHaveProperty('paymentTermId');
   });
 });

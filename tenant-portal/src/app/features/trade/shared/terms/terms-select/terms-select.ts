@@ -197,7 +197,7 @@ export class TradeTermsSelect {
     ...this.filteredGeneral(),
   ]);
 
-  protected readonly clausesAtMax = computed(() => this.value().clauseIds.length >= TERM_LIMITS.maxClauses);
+  protected readonly clausesAtMax = computed(() => (this.value().clauseIds ?? []).length >= TERM_LIMITS.maxClauses);
 
   protected readonly selectedPaymentTerm = computed(() => this.lookupTerm(this.value().paymentTermId));
   protected readonly selectedDeliveryTerm = computed(() => this.lookupTerm(this.value().deliveryTermId));
@@ -207,7 +207,7 @@ export class TradeTermsSelect {
   protected readonly deliveryInactive = computed(() => this.isSelectionInactive(this.value().deliveryTermId));
   protected readonly warrantyInactive = computed(() => this.isSelectionInactive(this.value().warrantyTermId));
   protected readonly anyClauseInactive = computed(() =>
-    this.value().clauseIds.some((id) => this.isSelectionInactive(id)),
+    (this.value().clauseIds ?? []).some((id) => this.isSelectionInactive(id)),
   );
 
   protected readonly paymentErrorKey = computed<string | null>(() => {
@@ -233,14 +233,14 @@ export class TradeTermsSelect {
   readonly valid = computed<boolean>(() => {
     const sel = this.value();
     if (this.paymentRequired() && !sel.paymentTermId) return false;
-    if (sel.clauseIds.length > TERM_LIMITS.maxClauses) return false;
+    if ((sel.clauseIds ?? []).length > TERM_LIMITS.maxClauses) return false;
     const opts = this.options();
     if (!opts) return true;
     const active = this.activeTermById();
     if (sel.paymentTermId && !active.has(sel.paymentTermId)) return false;
     if (sel.deliveryTermId && !active.has(sel.deliveryTermId)) return false;
     if (sel.warrantyTermId && !active.has(sel.warrantyTermId)) return false;
-    if (sel.clauseIds.some((id) => !active.has(id))) return false;
+    if ((sel.clauseIds ?? []).some((id) => !active.has(id))) return false;
     return true;
   });
 
@@ -261,7 +261,7 @@ export class TradeTermsSelect {
       const _lang = this.lang.current();
       if (!opts) return;
 
-      const ids = [sel.paymentTermId, sel.deliveryTermId, sel.warrantyTermId, ...sel.clauseIds].filter(
+      const ids = [sel.paymentTermId, sel.deliveryTermId, sel.warrantyTermId, ...(sel.clauseIds ?? [])].filter(
         (id): id is string => Boolean(id),
       );
       const active = this.activeTermById();
@@ -326,11 +326,11 @@ export class TradeTermsSelect {
     }
     this.pendingApplyDefaults = false;
     this.value.update((curr) => ({
-      paymentTermId: curr.paymentTermId ?? opts.defaults.PAYMENT ?? null,
-      deliveryTermId: curr.deliveryTermId ?? opts.defaults.DELIVERY ?? null,
-      warrantyTermId: curr.warrantyTermId ?? opts.defaults.WARRANTY ?? null,
+      paymentTermId: curr.paymentTermId ?? opts.defaults.PAYMENT,
+      deliveryTermId: curr.deliveryTermId ?? opts.defaults.DELIVERY,
+      warrantyTermId: curr.warrantyTermId ?? opts.defaults.WARRANTY,
       clauseIds:
-        curr.clauseIds.length > 0
+        (curr.clauseIds ?? []).length > 0
           ? curr.clauseIds
           : opts.defaults.GENERAL
             ? [opts.defaults.GENERAL]
@@ -364,7 +364,7 @@ export class TradeTermsSelect {
     this.expandedPreviews.update((curr) => ({ ...curr, [slot]: !curr[slot] }));
   }
 
-  protected isSelectionInactive(id: string | null): boolean {
+  protected isSelectionInactive(id: string | null | undefined): boolean {
     if (!id || this.loading() || this.loadError()) return false;
     const opts = this.options();
     if (!opts) return false;
@@ -372,7 +372,7 @@ export class TradeTermsSelect {
   }
 
   protected isClauseSelected(id: string): boolean {
-    return this.value().clauseIds.includes(id);
+    return (this.value().clauseIds ?? []).includes(id);
   }
 
   protected clauseChipLabel(id: string): string {
@@ -426,9 +426,9 @@ export class TradeTermsSelect {
 
   protected singleValueId(slot: SingleTermSlot): string | null {
     const sel = this.value();
-    if (slot === 'payment') return sel.paymentTermId;
-    if (slot === 'delivery') return sel.deliveryTermId;
-    return sel.warrantyTermId;
+    if (slot === 'payment') return sel.paymentTermId ?? null;
+    if (slot === 'delivery') return sel.deliveryTermId ?? null;
+    return sel.warrantyTermId ?? null;
   }
 
   protected toggleSingleDropdown(slot: SingleTermSlot): void {
@@ -457,9 +457,9 @@ export class TradeTermsSelect {
     }
     this.value.update((curr) => ({
       ...curr,
-      paymentTermId: slot === 'payment' ? id : curr.paymentTermId,
-      deliveryTermId: slot === 'delivery' ? id : curr.deliveryTermId,
-      warrantyTermId: slot === 'warranty' ? id : curr.warrantyTermId,
+      paymentTermId: slot === 'payment' ? id ?? undefined : curr.paymentTermId,
+      deliveryTermId: slot === 'delivery' ? id ?? undefined : curr.deliveryTermId,
+      warrantyTermId: slot === 'warranty' ? id ?? undefined : curr.warrantyTermId,
     }));
     this.expandedPreviews.update((curr) => ({ ...curr, [slot]: false }));
     this.closeDropdown(true);
@@ -473,9 +473,9 @@ export class TradeTermsSelect {
     }
     this.value.update((curr) => ({
       ...curr,
-      paymentTermId: slot === 'payment' ? null : curr.paymentTermId,
-      deliveryTermId: slot === 'delivery' ? null : curr.deliveryTermId,
-      warrantyTermId: slot === 'warranty' ? null : curr.warrantyTermId,
+      paymentTermId: slot === 'payment' ? undefined : curr.paymentTermId,
+      deliveryTermId: slot === 'delivery' ? undefined : curr.deliveryTermId,
+      warrantyTermId: slot === 'warranty' ? undefined : curr.warrantyTermId,
     }));
     this.expandedPreviews.update((curr) => ({ ...curr, [slot]: false }));
     this.singleTriggerEl(slot)?.focus();
@@ -615,8 +615,8 @@ export class TradeTermsSelect {
         break;
       }
       case 'Backspace': {
-        if (this.clausesQuery() === '' && this.value().clauseIds.length > 0) {
-          this.value.update((curr) => ({ ...curr, clauseIds: curr.clauseIds.slice(0, -1) }));
+        if (this.clausesQuery() === '' && (this.value().clauseIds ?? []).length > 0) {
+          this.value.update((curr) => ({ ...curr, clauseIds: (curr.clauseIds ?? []).slice(0, -1) }));
           if (this.openDropdown() === 'clauses') {
             this.schedulePopoverPlace('clauses');
           }
@@ -641,17 +641,17 @@ export class TradeTermsSelect {
 
   protected toggleClause(term: TradeTerm): void {
     if (this.disabled()) return;
-    const currentIds = this.value().clauseIds;
+    const currentIds = this.value().clauseIds ?? [];
     if (currentIds.includes(term.id)) {
       this.value.update((curr) => ({
         ...curr,
-        clauseIds: curr.clauseIds.filter((id) => id !== term.id),
+        clauseIds: (curr.clauseIds ?? []).filter((id) => id !== term.id),
       }));
     } else {
       if (currentIds.length >= TERM_LIMITS.maxClauses) return;
       this.value.update((curr) => ({
         ...curr,
-        clauseIds: [...curr.clauseIds, term.id],
+        clauseIds: [...(curr.clauseIds ?? []), term.id],
       }));
     }
     this.clausesQuery.set('');
@@ -671,7 +671,7 @@ export class TradeTermsSelect {
     this.closeChipMenu();
     this.value.update((curr) => ({
       ...curr,
-      clauseIds: curr.clauseIds.filter((_, i) => i !== index),
+      clauseIds: (curr.clauseIds ?? []).filter((_, i) => i !== index),
     }));
   }
 
@@ -706,7 +706,7 @@ export class TradeTermsSelect {
   protected moveClause(index: number, delta: -1 | 1): void {
     if (this.disabled()) return;
     const target = index + delta;
-    const ids = this.value().clauseIds;
+    const ids = this.value().clauseIds ?? [];
     if (index < 0 || index >= ids.length || target < 0 || target >= ids.length) return;
     const next = ids.slice();
     const [moved] = next.splice(index, 1);
@@ -802,7 +802,7 @@ export class TradeTermsSelect {
     return this.warrantyTrigger()?.nativeElement;
   }
 
-  private lookupTerm(id: string | null): TradeTerm | null {
+  private lookupTerm(id: string | null | undefined): TradeTerm | null {
     if (!id) return null;
     const active = this.activeTermById().get(id);
     if (active) return active;

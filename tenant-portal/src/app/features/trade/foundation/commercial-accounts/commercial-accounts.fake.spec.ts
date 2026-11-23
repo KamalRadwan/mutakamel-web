@@ -1,6 +1,8 @@
 import { ApiError, ifMatch, newIdempotencyKey } from '../../shared/trade-api';
 import { TRADE_FAKE_DB } from '../../shared/trade-foundation.fake';
 import { listBranchRules } from './commercial-accounts.api';
+import { bindTradeHttpForTest } from '../../shared/trade-http';
+import { TradeHttpStub } from '../../shared/testing/trade-http-testing';
 import { fakeCountAccounts, fakeListAccounts, fakeListBranchRules, fakeUpdateAccount } from './commercial-accounts.fake';
 import type { ListAccountsQuery } from './commercial-accounts.model';
 
@@ -81,7 +83,13 @@ describe('commercial accounts fake contract', () => {
     const list = await run(fakeListBranchRules(company, 'acc-c1-c-01'));
     expect(list.items.length).toBeGreaterThan(0);
     expect(list.items[0]).toMatchObject({ branchName: expect.any(String), branchNameAr: null });
-    const rules = await run(listBranchRules({ companyId: 'c1' }, 'acc-c1-c-01'));
-    expect(rules.map((rule) => rule.id)).toEqual(list.items.map((rule) => rule.id));
+    const stub = new TradeHttpStub({ 'GET /commercial-accounts/acc-c1-c-01/branch-rules': list });
+    const dispose = bindTradeHttpForTest(stub);
+    try {
+      const rules = await listBranchRules({ companyId: 'c1' }, 'acc-c1-c-01');
+      expect(rules.map((rule) => rule.id)).toEqual(list.items.map((rule) => rule.id));
+    } finally {
+      dispose();
+    }
   });
 });

@@ -61,8 +61,6 @@ class Host {
   readonly kind = signal<DocumentKind>('quotation');
   readonly selections = signal<TermSelections>({
     paymentTermId: 'term-c1-payment-net30',
-    deliveryTermId: null,
-    warrantyTermId: null,
     clauseIds: [],
   });
   readonly notes = signal('');
@@ -112,9 +110,7 @@ describe('TermsSection notes max length (§3)', () => {
     for (const kind of kinds) {
       fixture.componentInstance.kind.set(kind);
       fixture.componentInstance.selections.set({
-        paymentTermId: kind === 'quotation' ? 'term-c1-payment-net30' : null,
-        deliveryTermId: null,
-        warrantyTermId: null,
+        paymentTermId: kind === 'quotation' ? 'term-c1-payment-net30' : undefined,
         clauseIds: [],
       });
       fixture.componentInstance.notes.set('x'.repeat(800));

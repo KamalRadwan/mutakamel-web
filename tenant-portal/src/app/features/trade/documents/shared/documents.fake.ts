@@ -1211,7 +1211,7 @@ function buildTermsSnapshotFromSelections(
   requirePayment: boolean,
 ): TermsSnapshotV2 {
   const byId = new Map(allTerms.map((t) => [t.id, t]));
-  const pickTerm = (id: string | null): TradeTerm | null => (id ? (byId.get(id) ?? null) : null);
+  const pickTerm = (id: string | undefined): TradeTerm | null => (id ? (byId.get(id) ?? null) : null);
 
   const payment = pickTerm(selections.paymentTermId);
   if (requirePayment && !payment) {

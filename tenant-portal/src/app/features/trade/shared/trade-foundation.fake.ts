@@ -1115,7 +1115,7 @@ export function fakeCountReasonCodes(query: { includeInactive?: boolean } = {}):
   byKind: Record<ReasonKind, number>;
 } {
   const includeInactive = query.includeInactive ?? true;
-  const byKind: Record<ReasonKind, number> = Object.fromEntries(REASON_KINDS.map((kind) => [kind, 0]));
+  const byKind: Record<ReasonKind, number> = Object.fromEntries(REASON_KINDS.map((kind) => [kind, 0])) as Record<ReasonKind, number>;
   for (const row of TRADE_FAKE_DB.reasons) {
     if (!includeInactive && !row.isActive) continue;
     if (row.kind in byKind) byKind[row.kind] += 1;

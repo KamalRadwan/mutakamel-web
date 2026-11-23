@@ -2,6 +2,8 @@ import { Component, Injectable, signal, viewChild } from '@angular/core';
 import { type ComponentFixture, TestBed } from '@angular/core/testing';
 import { TranslocoLoader, provideTransloco } from '@jsverse/transloco';
 import { of } from 'rxjs';
+import { bindTradeHttpForTest } from '../../../shared/trade-http';
+import { TradeFoundationFixtures } from '../../../shared/testing/trade-foundation-fixtures';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TradeReasonPicker, type ReasonPickerValue } from '../../../shared/pickers/reason-picker/reason-picker';
 import type { DiscountPolicy } from '../../shared/documents.api';
@@ -49,6 +51,7 @@ const OTHER = 'rsn-document_discount-other';
 
 describe('PricingPanel discount reason (picker host)', () => {
   const fixtures: ComponentFixture<Host>[] = [];
+  let dispose: () => void;
 
   async function mount(): Promise<ComponentFixture<Host>> {
     TestBed.configureTestingModule({
@@ -71,11 +74,13 @@ describe('PricingPanel discount reason (picker host)', () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
+    dispose = bindTradeHttpForTest(new TradeFoundationFixtures());
     localStorage.removeItem('lang');
   });
 
   afterEach(() => {
     while (fixtures.length > 0) fixtures.pop()!.destroy();
+    dispose();
     vi.useRealTimers();
     localStorage.removeItem('lang');
   });

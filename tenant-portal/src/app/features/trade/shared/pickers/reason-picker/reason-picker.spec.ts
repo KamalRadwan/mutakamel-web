@@ -2,6 +2,8 @@ import { Component, Injectable, signal, viewChild } from '@angular/core';
 import { type ComponentFixture, TestBed } from '@angular/core/testing';
 import { TranslocoLoader, type Translation, provideTransloco } from '@jsverse/transloco';
 import { of } from 'rxjs';
+import { bindTradeHttpForTest } from '../../trade-http';
+import { TradeFoundationFixtures } from '../../testing/trade-foundation-fixtures';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TRADE_FAKE_DB } from '../../trade-foundation.fake';
 import type { ReasonCode, ReasonKind } from '../../trade-foundation.model';
@@ -72,6 +74,7 @@ const OTHER_REVERSAL = 'rsn-inventory_reversal-other';
 
 describe('TradeReasonPicker', () => {
   const fixtures: ComponentFixture<Host>[] = [];
+  let dispose: () => void;
 
   async function mount(kind: ReasonKind = 'DOCUMENT_CANCEL'): Promise<ComponentFixture<Host>> {
     TestBed.configureTestingModule({
@@ -109,11 +112,13 @@ describe('TradeReasonPicker', () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
+    dispose = bindTradeHttpForTest(new TradeFoundationFixtures());
     localStorage.removeItem('lang');
   });
 
   afterEach(() => {
     while (fixtures.length > 0) fixtures.pop()!.destroy();
+    dispose();
     vi.useRealTimers();
     localStorage.removeItem('lang');
   });
@@ -248,7 +253,10 @@ describe('TradeReasonPicker', () => {
   });
 
   it('shows a disabled "none" option for a kind with no reasons and no required error', async () => {
-    const fixture = await mount('UNSEEDED_KIND');
+    const removed = TRADE_FAKE_DB.reasons.filter((r) => r.kind === 'DOCUMENT_CANCEL');
+    TRADE_FAKE_DB.reasons = TRADE_FAKE_DB.reasons.filter((r) => r.kind !== 'DOCUMENT_CANCEL');
+    const fixture = await mount('DOCUMENT_CANCEL');
+    TRADE_FAKE_DB.reasons.push(...removed);
     fixture.componentInstance.showErrors.set(true);
     fixture.detectChanges();
     expect(internals(fixture).dropdownOptions()).toEqual([

@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../shared/trade-api';
 import { TRADE_FAKE_DB } from '../../shared/trade-foundation.fake';
+import { bindTradeHttpForTest } from '../../shared/trade-http';
+import { TradeFoundationFixtures } from '../../shared/testing/trade-foundation-fixtures';
 import { KIND_CONFIG } from './document-kinds';
 import { TERMS_NOTES_MAX_LENGTH, type DocumentKind, type TermsSnapshot } from './document.model';
 import {
@@ -30,6 +32,12 @@ import {
   fakeUpdateSalesOrder,
   validateDiscountReason,
 } from './documents.fake';
+
+let disposeFoundationFixtures: () => void;
+beforeEach(() => {
+  disposeFoundationFixtures = bindTradeHttpForTest(new TradeFoundationFixtures());
+});
+afterEach(() => disposeFoundationFixtures());
 
 async function resolveFake<T>(promise: Promise<T>): Promise<T> {
   await vi.advanceTimersByTimeAsync(2000);
@@ -201,14 +209,10 @@ describe('documents.fake P8 terms notes ≤ 800', () => {
   const NOTE_801 = 'n'.repeat(TERMS_NOTES_MAX_LENGTH + 1);
   const SALES_TERMS = {
     paymentTermId: 'term-c1-payment-net30',
-    deliveryTermId: null,
-    warrantyTermId: null,
     clauseIds: [] as string[],
   };
   const PURCHASE_TERMS = {
     paymentTermId: 'term-c1-payment-sup60',
-    deliveryTermId: null,
-    warrantyTermId: null,
     clauseIds: [] as string[],
   };
 
@@ -614,8 +618,6 @@ describe('documents.fake discount reason (DOCUMENT_DISCOUNT, reasonCode + reason
 describe('documents.fake backend b-commands and f-print alignment', () => {
   const SALES_TERMS = {
     paymentTermId: 'term-c1-payment-net30',
-    deliveryTermId: null,
-    warrantyTermId: null,
     clauseIds: [] as string[],
   };
 
