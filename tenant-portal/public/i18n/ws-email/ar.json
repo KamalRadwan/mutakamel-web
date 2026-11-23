@@ -112,7 +112,8 @@
   "smtp": {
     "passwordPlaceholder": "اتركها فارغة للإبقاء عليها",
     "test": "اختبار الاتصال",
-    "testNeedsSave": "احفظ تغييراتك أولًا، فالاختبار يستخدم المحفوظ."
+    "testNeedsSave": "احفظ تغييراتك أولًا، فالاختبار يستخدم المحفوظ.",
+    "passwordSaved": "محفوظة"
   },
   "probe": {
     "ok": "نجح الاتصال",
@@ -197,6 +198,21 @@
     "TENANT_EMAIL_CONFIG_VERIFICATION_FAILED": "لم ينجح التحقق من نطاق الإرسال عبر DNS.",
     "TENANT_EMAIL_CONFIG_DKIM_PROOF_NOT_REGISTERED": "لا يوجد سجل DKIM لهذا النطاق والمحدد. تواصل مع مسؤولك.",
     "TENANT_SMTP_CONNECTION_FAILED": "تعذر الاتصال بخادم SMTP. تحقق من الخادم والمنفذ وبيانات الدخول.",
-    "TENANT_EMAIL_CONFIG_DEPENDENCY_UNAVAILABLE": "خدمة البريد غير متاحة مؤقتًا. حاول لاحقًا."
-  }
+    "TENANT_EMAIL_CONFIG_DEPENDENCY_UNAVAILABLE": "خدمة البريد غير متاحة مؤقتًا. حاول لاحقًا.",
+    "TENANT_EMAIL_CONFIG_SECRET_REF_INVALID": "مرجع بيانات اعتماد المزود المحفوظ غير صالح. تواصل مع الدعم.",
+    "TENANT_EMAIL_CONFIG_VERIFY_BODY_FORBIDDEN": "تعذر إرسال طلب التحقق. حاول مجددًا.",
+    "TENANT_EMAIL_CONFIG_PLAN_QUOTA_INVALID": "حدود البريد الإلكتروني للخطة غير متاحة. حاول لاحقًا.",
+    "EMAIL_PROVIDER_NOT_ALLOWED": "اختر المزود المشترك أو SMTP.",
+    "EMAIL_TEST_RATE_LIMITED": "انتظر قبل إرسال اختبار آخر",
+    "TENANT_SMTP_CONNECTION_VERIFICATION_UNAVAILABLE": "اختبار اتصال SMTP غير متاح. حاول لاحقًا."
+  },
+  "managedBySupport": "تديره خدمة الدعم",
+  "suspendConfirm": "يتوقف الإرسال حتى تتحقق مجددًا",
+  "turnOnPrompt": "هل تريد تفعيل الإرسال الآن؟",
+  "sendTest": "إرسال رسالة اختبار",
+  "sendTestDone": "أُرسلت رسالة اختبار إلى {{email}}",
+  "needsTenantWide": "يتطلب صلاحية على مستوى مساحة العمل",
+  "notSaved": "لم تُحفظ التغييرات. حاول مجددًا",
+  "discard": "تجاهل التغييرات",
+  "discardDraft": "هل تريد تجاهل التغييرات غير المحفوظة؟"
 }

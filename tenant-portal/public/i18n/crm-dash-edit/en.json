@@ -40,5 +40,26 @@
   "newSize": "New size",
   "newSizeHint": "The widget box will be resized to fit the selected version's chart requirements.",
   "save": "Save",
-  "loading": "Loading"
+  "loading": "Loading",
+  "errors": {
+    "notSaved": "Not saved. Try again.",
+    "reloadRequired": "The request changed. Reload before trying again.",
+    "moduleDisabled": "This module is turned off for this company.",
+    "rateLimited": "Too many requests. Try again shortly.",
+    "rateLimitedIn": "Too many requests. Try again in {{seconds}} s.",
+    "reference": "{{message}} (Reference: {{id}})",
+    "CRM_DASHBOARD_LAYOUT_OVERLAP": "These widget boxes overlap. Move them and save again.",
+    "CRM_DASHBOARD_LAYOUT_LOCKED": "This layout is locked. Reload the dashboard.",
+    "CRM_DASHBOARD_PLACEMENT_LAYOUT_LIMIT": "This layout has reached its placement limit.",
+    "CRM_DASHBOARD_LAYOUT_SIZE_INVALID": "A widget box has an invalid size.",
+    "CRM_DASHBOARD_LAYOUT_POSITION_INVALID": "A widget box has an invalid position.",
+    "CRM_DASHBOARD_BREAKPOINT_UNKNOWN": "This layout breakpoint is unavailable. Reload the dashboard.",
+    "CRM_DASHBOARD_PLACEMENT_LIMIT": "This dashboard has reached its placement limit.",
+    "CRM_DASHBOARD_WIDGET_LIMIT": "This dashboard has reached its widget limit.",
+    "readOnly": "This workspace is read-only. Your changes were not saved."
+  },
+  "loadFailed": "Could not load this content",
+  "openReadiness": "Open data readiness",
+  "layoutValidation": "Review the highlighted widget box.",
+  "invalidVersion": "Choose a valid version"
 }

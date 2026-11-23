@@ -33,6 +33,7 @@
   },
   "errors": {
     "NOTIFICATION_NOT_FOUND": "لم يعد هذا الإشعار متاحًا.",
-    "NOTIFICATION_USER_NOT_FOUND": "لا يمكن لحسابك تلقّي الإشعارات حاليًا."
+    "NOTIFICATION_USER_NOT_FOUND": "لا يمكن لحسابك تلقّي الإشعارات حاليًا.",
+    "notSaved": "لم يُحفَظ. حاول مرة أخرى."
   }
 }

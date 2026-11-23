@@ -64,5 +64,11 @@
   "emptyDashboardTitle": "No widgets yet",
   "emptyDashboardText": "Add widgets in layout edit mode to build this dashboard.",
   "crossFilterLimit": "Too many chart selections are active. Remove one before adding another.",
-  "crossFilterValueInvalid": "This chart value cannot be used as a selection."
+  "crossFilterValueInvalid": "This chart value cannot be used as a selection.",
+  "retryAfter": "Too many requests. Try again in {{seconds}} s.",
+  "tooManyRequests": "Too many requests. Try again later.",
+  "requestId": "Request ID: {{id}}",
+  "provisioningTitle": "This data is not ready yet",
+  "openReadiness": "View data readiness",
+  "requestAccess": "Request access"
 }

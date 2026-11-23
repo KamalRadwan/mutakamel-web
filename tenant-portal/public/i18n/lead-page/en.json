@@ -35,5 +35,11 @@
       "DISQUALIFIED": "Disqualified",
       "CONVERTED": "Converted"
     }
-  }
+  },
+  "notFound": "This lead was not found.",
+  "chooseBranch": "Choose a branch in the top bar to see leads.",
+  "loadReference": "Reference: {{id}}",
+  "customFieldsDenied": "You do not have access to this list. Ask your administrator.",
+  "customFieldsFailed": "Could not load custom fields. Try again.",
+  "writeUnavailable": "Lead creation will be available in a later release."
 }

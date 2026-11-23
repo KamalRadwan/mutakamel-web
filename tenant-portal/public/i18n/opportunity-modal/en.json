@@ -31,5 +31,7 @@
     "text": "Its notes, attachments and tags are deleted too. A linked lead is unlinked.",
     "confirm": "Delete",
     "cancel": "Cancel"
-  }
+  },
+  "notAvailable": "This opportunity is not available",
+  "forbidden": "You do not have access to this opportunity"
 }

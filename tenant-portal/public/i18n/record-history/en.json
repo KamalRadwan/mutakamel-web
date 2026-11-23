@@ -215,5 +215,8 @@
     "text": "Your role cannot view the change history. Ask an administrator for audit access."
   },
   "loadFailed": "Could not load the history.",
-  "retry": "Try again"
+  "retry": "Try again",
+  "redacted": "Hidden (sensitive)",
+  "truncated": "Shortened",
+  "supportRef": "Support reference"
 }

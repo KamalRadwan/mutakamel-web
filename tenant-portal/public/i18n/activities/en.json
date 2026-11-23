@@ -92,7 +92,8 @@
     "saveAndAdd": "Save and add another",
     "cancel": "Cancel",
     "close": "Close",
-    "unsaved": "Unsaved changes"
+    "unsaved": "Unsaved changes",
+    "retryAssignees": "Could not load assignees. Retry"
   },
   "hints": {
     "type": "Choose the kind of activity to show the matching schedule, location, link, or direction fields.",
@@ -176,15 +177,18 @@
     "ACTIVITY_INVALID": "Check the activity details and try again",
     "ACTIVITY_VERSION_CONFLICT": "This activity was changed by someone else",
     "ACTIVITY_TERMINAL": "A completed or cancelled activity cannot be changed",
-    "ACTIVITY_NOT_FOUND": "This activity no longer exists",
+    "ACTIVITY_NOT_FOUND": "No longer available to you",
     "ACTIVITY_ACCESS_DENIED": "You do not have permission for this activity",
     "ACTIVITY_VERSION_REQUIRED": "Reload the activity and try again",
     "ACTIVITY_IDEMPOTENCY_KEY_INVALID": "The request could not be repeated safely.",
-    "ACTIVITY_IDEMPOTENCY_MISMATCH": "The request could not be repeated safely.",
-    "ACTIVITY_IDEMPOTENCY_IN_FLIGHT": "This request is already being processed.",
+    "ACTIVITY_IDEMPOTENCY_MISMATCH": "Already sent with different values. Reload.",
+    "ACTIVITY_IDEMPOTENCY_IN_FLIGHT": "Still saving. Try again.",
     "ACTIVITY_TARGET_RESOLVER_UNAVAILABLE": "The record's app is not responding right now.",
     "CORE_VALIDATION_FAILED": "The submitted data is not valid.",
-    "generic": "The activity could not be saved"
+    "generic": "The activity could not be saved",
+    "MISSING_REQUIRED_PERMISSIONS": "You do not have permission for this activity",
+    "ACCESS_POLICY_BLOCKED": "Access to this activity is blocked",
+    "ACCESS_POLICY_UNAVAILABLE": "Access check unavailable, try again"
   },
   "meta": {
     "created": "Created {{date}} by {{name}}",

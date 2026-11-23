@@ -17,7 +17,8 @@
     "placeholder": "Choose a user…",
     "searchPlaceholder": "Search by name or email…",
     "clear": "Clear user",
-    "noResults": "No matching users."
+    "noResults": "No matching users.",
+    "readAccessRequired": "Searching users needs user read access"
   },
   "toolbar": {
     "reload": "Reload"
@@ -64,12 +65,14 @@
       "addonDenied": "This add-on is blocked by your workspace access policy.",
       "parentDenied": "{{app}} is blocked by your workspace access policy.",
       "adoptionPending": "An add-on version update is waiting to be adopted.",
-      "capacityChangePending": "A seat capacity change is in progress.",
+      "capacityChangePending": "A capacity change is pending",
       "addonNotReady": "This add-on is not ready for seat assignment yet.",
       "addonBlocked": "This add-on is blocked and cannot be assigned.",
       "parentNotReady": "{{app}} is not ready yet.",
-      "parentBlocked": "{{app}} is blocked."
-    }
+      "parentBlocked": "{{app}} is blocked.",
+      "noFreeSeats": "No free seats"
+    },
+    "seatsUsed": "seats used"
   },
   "assignments": {
     "title": "Current add-on seats",
@@ -106,12 +109,14 @@
     "ASSIGNMENT_ALREADY_GONE": "This add-on seat assignment no longer exists.",
     "REVISION_STALE": "This changed since you opened it. The list was refreshed.",
     "APPLICATION_ALLOWANCE_NOT_READY": "This add-on is not ready right now.",
-    "IDEMPOTENCY_BODY_MISMATCH": "This request no longer matches an earlier attempt. Try again.",
     "INVALID_IDEMPOTENCY_KEY": "The request key is invalid. Try again.",
     "ADDON_OPERATION_UNCERTAIN": "The previous operation did not confirm. Reload and check before trying again.",
-    "ACCESS_POLICY_BLOCKED": "You don't have permission for this action.",
+    "ACCESS_POLICY_BLOCKED": "This action is blocked by your workspace access policy.",
     "ACCESS_POLICY_UNAVAILABLE": "Access policy is temporarily unavailable. Try again shortly.",
     "TENANT_USER_NOT_FOUND": "This user could not be found.",
-    "generic": "Something went wrong. Try again."
+    "generic": "Something went wrong. Try again.",
+    "MISSING_REQUIRED_PERMISSIONS": "You need permission to manage add-on seats.",
+    "APP_SEAT_LIMIT_REACHED": "The app seat limit is reached. The {{addon}} seat could not be assigned.",
+    "GW.IDEM.IN_FLIGHT": "Still saving"
   }
 }

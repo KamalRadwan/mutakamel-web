@@ -35,7 +35,8 @@
       "actions": "Actions"
     },
     "empty": "No states for this country.",
-    "count": "States: {{count}}"
+    "count": "States: {{count}}",
+    "countryUnavailable": "Country not available"
   },
   "actions": {
     "viewStates": "View states",
@@ -49,6 +50,9 @@
   "loadFailed": "Could not load the list.",
   "retry": "Try again",
   "errors": {
-    "GEO_COUNTRY_NOT_FOUND": "This country no longer exists."
-  }
+    "GEO_COUNTRY_NOT_FOUND": "This country no longer exists.",
+    "TENANT_WIDE_PERMISSION_REQUIRED": "Needs workspace-wide access"
+  },
+  "needsTenantWide": "Needs workspace-wide access",
+  "notSaved": "Not saved. Try again"
 }

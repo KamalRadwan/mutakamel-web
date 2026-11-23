@@ -70,11 +70,13 @@
     "loadFailed": "Could not load branch overrides.",
     "branchLoadFailed": "Could not load",
     "forbidden": "You don't have permission to view branches for this company.",
-    "toastSaved": "Branch setting updated."
+    "toastSaved": "Branch setting updated.",
+    "noAccess": "No access"
   },
   "toast": {
     "turnedOn": "{{name}} turned on.",
-    "turnedOff": "{{name}} turned off."
+    "turnedOff": "{{name}} turned off.",
+    "alreadyInState": "Already in that state"
   },
   "rejected": {
     "SOURCE_CHANGED": "The purchase changed while applying. Try again.",
@@ -84,15 +86,21 @@
   "errors": {
     "companyNotFound": "The company in the link is not available to you. Showing another company.",
     "addonNotAvailable": "This add-on is not available to turn on yet.",
-    "APPLICATION_ALLOWANCE_NOT_READY": "{{name}} is not ready to turn on. Check the subscription or try again later.",
+    "APPLICATION_ALLOWANCE_NOT_READY": "{{name}} — Not ready: the purchase or subscription is not active yet",
     "APPLICATION_ACTIVATION_REVISION_STALE": "This changed since you opened it. The list was refreshed.",
     "ADDON_REVISION_STALE": "This changed since you opened it. The list was refreshed.",
-    "ADDON_CONFIGURATION_INVALID": "Set up this add-on's settings before turning it on.",
+    "ADDON_CONFIGURATION_INVALID": "Configuration needs attention",
     "ADDON_OPERATION_UNCERTAIN": "A previous change has no confirmed result yet. Refresh and try again.",
     "ACCESS_POLICY_UNAVAILABLE": "Subscription access policy is temporarily unavailable. Try again shortly.",
     "ACCESS_POLICY_BLOCKED": "You do not have permission for this action.",
-    "IDEMPOTENCY_BODY_MISMATCH": "This request conflicts with an earlier submission. Try again.",
-    "CORE_VALIDATION_FAILED": "Check the reason and try again."
+    "IDEMPOTENCY_BODY_MISMATCH": "Already sent with different values. Reload.",
+    "CORE_VALIDATION_FAILED": "Check the reason and try again.",
+    "APPLICATION_NOT_FOUND": "Not purchased",
+    "ADDON_NOT_FOUND": "Not purchased",
+    "TENANT_MAINTENANCE_ACTIVE": "The workspace is under maintenance",
+    "TENANT_MAINTENANCE_RELEASE_REQUIRED": "The workspace is under maintenance",
+    "GW.IDEM.MISMATCH": "Already sent with different values. Reload.",
+    "GW.IDEM.IN_FLIGHT": "Still saving"
   },
   "apps": {
     "accounting": "Accounting",

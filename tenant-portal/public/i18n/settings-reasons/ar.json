@@ -105,6 +105,7 @@
     "CRM_SUBSCRIPTION_BLOCKED": "لا يسمح اشتراكك بإجراء تغييرات حاليًا.",
     "CRM_REASON_CODE_TAKEN": "هذا الرمز مستخدم بالفعل في هذا النوع.",
     "CRM_REASON_KIND_MISMATCH": "الأثر ونوع النشاط متاحان فقط لنتائج الأنشطة.",
+    "CRM_DASHBOARD_REVISION_MISMATCH": "تغيّر هذا السبب. أعد تحميله قبل الحفظ.",
     "CRM_REASON_SYSTEM_IMMUTABLE": "لا يمكن إيقاف الأسباب الخاصة بالنظام.",
     "CRM_REASON_REVISION_STALE": "عدّل مستخدم آخر هذا السبب.",
     "CRM_REASON_NOT_FOUND": "لم يعد هذا السبب موجودًا.",

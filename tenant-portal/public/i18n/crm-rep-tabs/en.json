@@ -116,5 +116,10 @@
   },
   "datePreset": {
     "YESTERDAY": "Yesterday"
-  }
+  },
+  "notSaved": "Not saved. Try again.",
+  "rateLimited": "Too many requests. Try again in {{seconds}} s.",
+  "moduleDisabled": "This module is turned off for this company.",
+  "readOnly": "Changes are unavailable while your subscription or seat is read-only.",
+  "readinessLink": "View data readiness"
 }

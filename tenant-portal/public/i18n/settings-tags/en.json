@@ -80,9 +80,14 @@
   },
   "delete": {
     "title": "Delete tag?",
-    "text": "Delete “{{name}}”? It is removed from every lead, customer and opportunity that carries it.",
-    "blockedTitle": "Cannot delete tag yet",
-    "blockedText": "{{count}} leads carry this tag. Remove it from leads until 100 or fewer carry it, then delete it."
+    "text": "Delete “{{name}}”? This tag will be removed from every record that carries it.",
+    "deleting": "Deleting",
+    "incomplete": "Deletion incomplete",
+    "report": "View report"
+  },
+  "job": {
+    "delete": "Delete tag",
+    "detached": "Records detached: {{n}}"
   },
   "toasts": {
     "created": "Tag created",
@@ -95,7 +100,7 @@
     "CRM_TAG_LIMIT_EXCEEDED": "You have reached the maximum number of tags.",
     "CRM_TAG_UPDATE_EMPTY": "No changes to save.",
     "CRM_TAG_NOT_FOUND": "This tag no longer exists.",
-    "CRM_TAG_DETACH_LIMIT_EXCEEDED": "Too many leads carry this tag to delete it at once.",
+    "CRM_TAG_DELETE_LINKS_REMAINING": "Some records still carry this tag. Retry the failed items to finish deleting it.",
     "CRM_TAG_NAME_INVALID": "Enter a valid tag name up to 60 characters.",
     "CRM_TAG_COLOR_INVALID": "Enter valid #RRGGBB hex colours.",
     "CRM_VALIDATION_FAILED": "Some values are not valid. Check them and try again."

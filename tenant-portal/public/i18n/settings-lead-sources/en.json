@@ -72,6 +72,8 @@
     "CRM_ACQUISITION_SOURCE_ICON_TYPE_UNSUPPORTED": "Only PNG, JPEG and ICO icon files are supported.",
     "CRM_ACQUISITION_SOURCE_ICON_EXTENSION_UNSUPPORTED": "The file extension does not match the icon format (PNG, JPEG or ICO).",
     "CRM_ACQUISITION_SOURCE_ICON_EMPTY": "The selected icon file is empty.",
+    "CRM_ACQUISITION_SOURCE_ICON_REQUIRED": "Choose an icon file to upload.",
+    "CRM_ACQUISITION_SOURCE_ICON_CONTENT_INVALID": "The file content does not match its icon format.",
     "CRM_ACQUISITION_SOURCE_ICON_TOO_LARGE": "The icon file must not exceed 2 MB."
   }
 }

@@ -4,7 +4,7 @@
     "branch": "Branch",
     "branchHint": "Select the branch whose working calendar you want to view or publish.",
     "year": "Year",
-    "yearHint": "Select the calendar year (2025 to 2027).",
+    "yearHint": "Select last year, this year, or one of the next two years.",
     "workingDaysCount": "Working days",
     "workingDaysCountHint": "Total working days configured across the selected year.",
     "holidaysCount": "Days off and holidays",
@@ -19,7 +19,9 @@
     "discardTitle": "Discard unsaved changes?",
     "discardText": "You have unpublished changes to this working calendar. Switching now will discard them.",
     "discardConfirm": "Discard changes",
-    "discardKeep": "Stay here"
+    "discardKeep": "Stay here",
+    "yourBranch": "Your branch",
+    "branchPermission": "Ask your administrator for the View branches permission to choose a branch."
   },
   "week": {
     "workingDays": "Weekly working days",
@@ -37,7 +39,8 @@
   "yearGrid": {
     "sectionLabel": "Annual calendar grid",
     "dayWorking": "Working day",
-    "dayOff": "Day off"
+    "dayOff": "Day off",
+    "sectionHint": "Choose individual working days for the selected year. Publish to apply your changes."
   },
   "windows": {
     "sectionTitle": "Time windows",
@@ -74,7 +77,8 @@
     "prevMonth": "Previous month",
     "nextMonth": "Next month",
     "deleteTitle": "Delete time window?",
-    "deleteText": "Remove this time window from the draft calendar? Publish to apply the change."
+    "deleteText": "Remove this time window from the draft calendar? Publish to apply the change.",
+    "sectionHint": "Dated working-hour overrides for this year. Windows in the same layer cannot overlap."
   },
   "validation": {
     "hoursOrder": "Start time must be earlier than end time.",
@@ -85,6 +89,15 @@
     "daysRequired": "Select at least one weekday.",
     "windowOverlap": "This window overlaps another window in the same layer on a shared weekday and time.",
     "labelMax": "Must be at most {{max}} characters.",
-    "windowsMax": "A calendar can hold at most {{max}} windows."
+    "windowsMax": "A calendar can hold at most {{max}} windows.",
+    "timeZoneRequired": "Select a time zone."
+  },
+  "errors": {
+    "CRM_WORKING_CALENDAR_REVISION_CONFLICT": "The calendar changed. Reload or keep your changes.",
+    "CRM_WORKING_CALENDAR_INVALID": "Check the working days and time windows for this year.",
+    "CRM_CALENDAR_HOURS_INVALID": "Check the start and end times of the working hours and windows.",
+    "CRM_CALENDAR_TIME_ZONE_INVALID": "Select a valid region time zone. Use the same zone for every calendar of this branch.",
+    "CRM_CALENDAR_WINDOW_OVERLAP": "Time windows in the same layer overlap. Check their dates, weekdays and hours.",
+    "BRANCH_PERMISSION_DENIED": "You do not have permission to access this branch calendar."
   }
 }

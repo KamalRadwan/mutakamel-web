@@ -135,14 +135,15 @@
     "contactsMin": "Add at least one contact.",
     "contactsMax": "You can add up to 20 contacts.",
     "primaryOne": "Choose one primary contact.",
-    "valueInvalid": "Enter a positive amount with up to 3 decimals.",
+    "valueInvalid": "Enter a nonnegative amount with up to 16 integer digits and 8 decimal places.",
     "valueCurrencyRequired": "Choose the currency for this amount.",
     "currencyValueRequired": "Enter the amount for this currency.",
     "cfNumber": "Enter a number.",
     "cfUrl": "Enter a link that starts with https://.",
     "cfEmail": "Enter a valid email.",
     "cfPhone": "Enter 7 to 15 digits.",
-    "cfDate": "Enter a valid date."
+    "cfDate": "Enter a valid date.",
+    "invalid": "Check this value."
   },
   "server": {
     "LEAD_INDIVIDUAL_FIELDS_FORBIDDEN": "For a company, phones and emails belong to its contacts.",
@@ -152,7 +153,7 @@
     "LEAD_EXISTING_COMPANY_FIELDS_FORBIDDEN": "An existing company keeps its own details. Remove the company details or pick a new company.",
     "LEAD_EXISTING_COMPANY_OUTSIDE_BRANCH": "This company belongs to another branch.",
     "LEAD_EXISTING_COMPANY_INVALID": "The selected company must be an active organization.",
-    "LEAD_OPEN_EXISTS": "This company already has an open lead in this branch.",
+    "LEAD_OPEN_EXISTS": "An open lead already exists for this contact or company in this branch.",
     "LEAD_PHONE_INVALID": "A phone number needs at least 5 digits.",
     "LEAD_CONTACT_PRIMARY_INVALID": "Only one contact can be primary.",
     "LEAD_CONTACT_NAME_REQUIRED": "Each new contact needs a name.",
@@ -179,6 +180,36 @@
     "GW.IDEM.IN_FLIGHT": "This lead is still being saved. Wait a moment.",
     "generic": "Could not save the lead. Try again.",
     "LEAD_ADDRESS_GEO_INCOMPLETE": "Choose the country, then the governorate, then the city before the levels under them.",
-    "LEAD_ADDRESS_GEO_INVALID": "The address location is not valid or no longer active. Choose it again."
+    "LEAD_ADDRESS_GEO_INVALID": "The address location is not valid or no longer active. Choose it again.",
+    "LEAD_PARTY_MANAGE_REQUIRED": "This company is shared; you cannot change its details.",
+    "LEAD_PRIMARY_PHONE_CONFLICT": "Change phone numbers or the primary phone in one save, not both.",
+    "LEAD_PRIMARY_CONTACT_REQUIRED": "Choose a primary contact.",
+    "CUSTOM_FIELD_INVALID": "The custom field “{{field}}” is unavailable.",
+    "CUSTOM_FIELD_LIMIT_EXCEEDED": "Too many custom fields. Check the form and try again.",
+    "CRM_CONTACT_CHANGE_CONFLICT": "Contact changes stopped. Reload the lead and review the remaining changes."
+  },
+  "write": {
+    "mismatch": "The save request changed. Reload before trying again.",
+    "notSaved": "Not saved. Try again.",
+    "rateLimited": "Too many requests. Try again later.",
+    "rateLimitedIn": "Too many requests, try again in {{seconds}} s.",
+    "catalogueDenied": "You do not have access to this list. Ask your administrator.",
+    "tagsFailed": "Lead saved; tag changes were not applied.",
+    "contactsStopped": "Contact changes stopped. Unsaved changes are kept in the form.",
+    "contactsSaved": "Saved contact changes: {{saved}}.",
+    "noneSaved": "none",
+    "customFieldsInvalid": "Check the custom fields and try again.",
+    "contactOperation": {
+      "REMOVE": "Removed {{name}}",
+      "UPDATE": "Updated {{name}}",
+      "ADD": "Added {{name}}",
+      "SET_PRIMARY": "Set {{name}} as primary"
+    },
+    "duplicate": {
+      "COMPANY": "Already used by another record in this company.",
+      "BRANCH": "Already used by another record in this branch.",
+      "USER": "Already used by another record assigned to this user.",
+      "SAME_OWNER": "Already used by another record with the same owner."
+    }
   }
 }

@@ -1,11 +1,13 @@
 {
   "summary": {
     "on": "Phone is on · {{servers}} servers · Phone seats {{occupied}} of {{allowed}}",
-    "off": "Phone is off until a server is enabled"
+    "off": "Phone is off until a server is enabled",
+    "enabled": "Phone is on",
+    "seats": "Phone seats {{occupied}} of {{allowed}} · {{available}} available"
   },
   "toolbar": {
     "add": "Add server",
-    "limitHint": "Up to 10 servers",
+    "limitHint": "Up to 50 servers",
     "reload": "Reload"
   },
   "table": {
@@ -43,7 +45,10 @@
     "notPurchasedLine": "Enable the Phone add-on in your subscription to configure SIP servers.",
     "viewPlans": "View plans",
     "provisioningTitle": "Phone is being set up for your workspace",
-    "provisioningLine": "Your phone service is still provisioning. Try again in a moment."
+    "provisioningLine": "Your phone service is still provisioning. Try again in a moment.",
+    "configLoadFailed": "Could not load phone configuration.",
+    "seatsLoadFailed": "Could not load phone seats.",
+    "serversLoadFailed": "Could not load phone servers."
   },
   "delete": {
     "title": "Delete {{name}}?",
@@ -146,12 +151,6 @@
       "text": "You have unsaved changes to this phone server. Discard them?",
       "confirm": "Discard",
       "cancel": "Keep editing"
-    },
-    "conflict": {
-      "title": "Server settings changed",
-      "text": "Someone else updated this server while you were editing. Reload the latest version or keep your changes.",
-      "reload": "Reload",
-      "keepMine": "Keep my changes"
     }
   },
   "validation": {
@@ -161,8 +160,8 @@
     "websocketUrlPattern": "Must start with ws:// or wss://",
     "sipDomainRequired": "SIP domain is required",
     "sipDomainPattern": "Enter a valid domain (letters, digits, dots, optional :port)",
-    "sipUriPattern": "Must start with sip: or sips:",
-    "contactUriPattern": "Cannot contain spaces",
+    "sipUriPattern": "Use a sip: address",
+    "contactUriPattern": "Use a sip: address",
     "callerIdPattern": "Digits and a leading + only",
     "registerExpiresRange": "Must be a whole number from 30 to 86400",
     "timeoutRange": "Must be a whole number from 3 to 120",
@@ -172,7 +171,8 @@
     "turnUsernameRequired": "Username is required when a credential is set",
     "turnCredentialRequired": "Credential is required when a username is set",
     "stunNoAuth": "STUN servers cannot have a username or credential",
-    "relayWithoutTurn": "Relay only needs at least one enabled TURN server."
+    "relayWithoutTurn": "Relay only needs at least one enabled TURN server.",
+    "callerIdMax": "Use up to 64 characters"
   },
   "toasts": {
     "saved": "Phone server saved",
@@ -185,7 +185,7 @@
   },
   "errors": {
     "WEBPHONE_SERVER_NOT_FOUND": "This phone server no longer exists. Reload the list.",
-    "WEBPHONE_SERVER_LIMIT_REACHED": "You can configure up to 10 phone servers.",
+    "WEBPHONE_SERVER_LIMIT_REACHED": "Up to 50 servers",
     "WEBPHONE_SERVER_ORDER_INVALID": "Could not update the server order. Reload and try again.",
     "WEBPHONE_RELAY_WITHOUT_TURN": "Relay only needs at least one enabled TURN server.",
     "WEBPHONE_ICE_SERVER_NOT_FOUND": "An ICE entry no longer exists. Reload and try again.",
@@ -193,6 +193,19 @@
     "WEBPHONE_MODULE_INACTIVE": "Your Phone subscription is suspended. Changes are paused.",
     "WEBPHONE_PROVISIONING_PENDING": "Phone is still being set up for your workspace.",
     "stillProcessing": "Your previous change is still being processed. Wait a moment, then try again.",
-    "generic": "Something went wrong. Try again."
-  }
+    "generic": "Something went wrong. Try again.",
+    "WEBPHONE_ICE_CREDENTIALS_INVALID": "TURN username and credential must both be set or both be empty.",
+    "WEBPHONE_SCOPE_MISMATCH": "This phone server is outside your workspace.",
+    "MISSING_REQUIRED_PERMISSIONS": "You do not have permission to perform this action.",
+    "TENANT_WIDE_PERMISSION_REQUIRED": "Needs workspace-wide access",
+    "notSaved": "Not saved. Try again"
+  },
+  "limitReached": "Up to {{limit}} servers",
+  "defaultTimeoutHint": "Default 10 s",
+  "defaultRetriesHint": "Default 2 retries",
+  "sipOnly": "Use a sip: address",
+  "overCapacitySince": "Over capacity since {{date}}",
+  "graceUntil": "Grace period until {{date}}",
+  "moduleInactiveNotice": "Your Phone subscription is suspended. Changes are paused until reload.",
+  "needsTenantWide": "Needs workspace-wide access"
 }

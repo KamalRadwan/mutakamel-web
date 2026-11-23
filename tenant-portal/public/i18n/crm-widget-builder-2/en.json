@@ -166,7 +166,14 @@
     "scopeHint": "Record visibility rules applied when viewing this widget.",
     "filterRules": "Filter rules",
     "filterRulesHint": "Record field rules stored on this widget and applied before aggregation.",
-    "filterRulesCountPlural": {"zero": "No rules", "one": "{{n}} rule", "two": "{{n}} rules", "few": "{{n}} rules", "many": "{{n}} rules", "other": "{{n}} rules"},
+    "filterRulesCountPlural": {
+      "zero": "No rules",
+      "one": "{{n}} rule",
+      "two": "{{n}} rules",
+      "few": "{{n}} rules",
+      "many": "{{n}} rules",
+      "other": "{{n}} rules"
+    },
     "comparison": "Comparison",
     "comparisonHint": "The baseline or target compared against the primary values.",
     "chartKind": "Chart kind",
@@ -219,6 +226,23 @@
     "validUntilHint": "Publish must be confirmed before this impact preview expires.",
     "validUntilValue": "Valid until {{time}}",
     "cancel": "Cancel",
-    "none": "None"
+    "none": "None",
+    "dashboardCount": "Dashboards",
+    "dashboardCountHint": "Number of dashboards reported in this widget’s usage.",
+    "placementCount": "Placements",
+    "placementCountHint": "Total active placements using this widget.",
+    "hiddenPlacementCount": "Hidden placements",
+    "hiddenPlacementCountHint": "Placements on dashboards you cannot see."
+  },
+  "requests": {
+    "notSaved": "Not saved. Try again.",
+    "reloadRequired": "The request could not be matched. Reload before trying again.",
+    "moduleOff": "This module is turned off for this company.",
+    "rateLimited": "Too many requests. Try again in {{seconds}} s.",
+    "correlation": "Reference: {{id}}",
+    "readiness": "Open data readiness",
+    "requestAccess": "Request access",
+    "provisioningTitle": "Data is not ready",
+    "ownerLimit": "You can own at most 500 widgets."
   }
 }

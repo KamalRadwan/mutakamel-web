@@ -18,7 +18,8 @@
       "scopeAll": "كل النطاقات",
       "templateLabel": "القالب",
       "templateAll": "اختر قالباً",
-      "sortLabel": "الترتيب"
+      "sortLabel": "الترتيب",
+      "templateSearchHint": "ابحث عن القالب بالاسم، ثم اختر إحدى النتائج."
     }
   },
   "scopes": {
@@ -59,7 +60,8 @@
   "actions": {
     "open": "فتح",
     "retire": "إيقاف",
-    "alreadyRetiredReason": "هذا الأصل موقوف بالفعل."
+    "alreadyRetiredReason": "هذا الأصل موقوف بالفعل.",
+    "loadMore": "تحميل المزيد"
   },
   "uploadModal": {
     "title": "رفع أصل",
@@ -107,7 +109,8 @@
     "updatedHint": "تاريخ إنشاء هذا الأصل أو آخر تعديل عليه.",
     "checksumLabel": "بصمة SHA-256",
     "checksumHint": "البصمة الرقمية SHA-256 لمحتوى الأصل المخزن.",
-    "previewUnavailable": "المعاينة غير متاحة للأصل الموقوف"
+    "previewUnavailable": "المعاينة غير متاحة للأصل الموقوف",
+    "noLongerAvailable": "لم يعد متاحًا"
   },
   "retireConfirm": {
     "title": "إيقاف الأصل؟",
@@ -123,7 +126,7 @@
     "confirmPublicRequired": "أكّد التسليم العام للبريد الإلكتروني قبل الرفع.",
     "fileRequired": "اختر ملف صورة لرفعه.",
     "fileType": "يُدعم فقط ملفات الصور بصيغة PNG وJPEG.",
-    "fileSize": "يجب ألا يتجاوز حجم الملف 5 ميجابايت."
+    "fileSize": "الحد الأقصى 5 ميغابايت"
   },
   "toasts": {
     "uploaded": "تم رفع الأصل",
@@ -138,14 +141,21 @@
       "title": "تعذّر تحميل الأصول",
       "description": "حدث خطأ غير متوقع أثناء تحميل أصول القوالب."
     },
-    "backToHome": "العودة إلى الرئيسية"
+    "backToHome": "العودة إلى الرئيسية",
+    "featureDisabled": {
+      "title": "مصمم القوالب غير مشمول في خطتك"
+    }
   },
   "errors": {
     "CORE.TEMPLATE.ASSET.IN_USE": "هذا الأصل مستخدم في إصدار منشور ولا يمكن إيقافه.",
     "CORE.TEMPLATE.ASSET.UPLOAD_INVALID": "طلب رفع الأصل غير صالح.",
     "CORE.TEMPLATE.ASSET.EMAIL_PUBLIC_NOT_ALLOWED": "يجب تأكيد التسليم العام للبريد الإلكتروني للأصول العامة.",
     "CORE.TEMPLATE.ASSET.CHECKSUM_MISMATCH": "لم تتطابق بصمة الملف. اختر الملف وحاول مرة أخرى.",
-    "CORE.TEMPLATE.ASSET.INVALID": "تعذّرت معالجة ملف الصورة.",
-    "CORE.TEMPLATE.ASSET.STORAGE_UNAVAILABLE": "خدمة تخزين الأصول غير متاحة مؤقتاً."
+    "CORE.TEMPLATE.ASSET.INVALID": "استخدم صورة ثابتة بصيغة PNG أو JPEG لا تتجاوز 25 ميغابكسل",
+    "CORE.TEMPLATE.ASSET.STORAGE_UNAVAILABLE": "خدمة الرفع مشغولة، حاول مجددًا",
+    "ASSET_FILE_NAME_INVALID": "استخدم اسم ملف لا يتجاوز 255 حرفًا دون فواصل المسار.",
+    "ASSET_FILE_TYPE_INVALID": "تُقبل صور PNG وJPEG فقط.",
+    "CORE.TEMPLATE.IDEMPOTENCY.IN_FLIGHT": "لا يزال الرفع جاريًا",
+    "GW.IDEM.IN_FLIGHT": "لا يزال الرفع جاريًا"
   }
 }

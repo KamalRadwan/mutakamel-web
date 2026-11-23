@@ -42,5 +42,12 @@
   "empty": "No exports yet",
   "forbiddenTitle": "Access denied",
   "forbiddenText": "You do not have permission to view exports.",
-  "reload": "Reload"
+  "reload": "Reload",
+  "correlation": "Reference: {{id}}",
+  "writeErrors": {
+    "notSaved": "Not saved. Try again.",
+    "moduleOff": "This module is turned off for this company.",
+    "reloadRequired": "Reload before trying again. The request could not be safely repeated.",
+    "rateLimited": "Too many requests, try again in {{seconds}} s."
+  }
 }

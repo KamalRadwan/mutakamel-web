@@ -13,7 +13,7 @@
     "showAll": "All events",
     "showDeleted": "Deleted records",
     "deletedPrefix": "Record name starts with",
-    "deletedPrefixHint": "Matches the beginning of the deleted record's name.",
+    "deletedPrefixHint": "Starts with, exact letters",
     "deletedPrefixPlaceholder": "For example Nile",
     "app": "App",
     "appHint": "Filter by the application or service that emitted the event.",
@@ -37,12 +37,14 @@
     "actionHint": "The exact action code, for example LEAD_STAGE_CHANGED",
     "actionPlaceholder": "For example LEAD_STAGE_CHANGED",
     "includeRequests": "Include request records",
-    "includeRequestsHint": "Shows the raw request evidence that is hidden by default.",
+    "includeRequestsHint": "Also shows the raw requests behind each change",
     "correlationChipLabel": "Related correlation:",
     "clearCorrelation": "Clear correlation filter",
     "apply": "Apply",
     "clear": "Clear filters",
-    "reload": "Reload"
+    "reload": "Reload",
+    "comingSoon": "Coming soon",
+    "userReadRequired": "Needs user read access"
   },
   "validation": {
     "rangeRequired": "Choose a date range to view the audit log.",
@@ -124,7 +126,9 @@
       "field": "Field",
       "before": "Before",
       "after": "After",
-      "empty": "No field changes recorded."
+      "empty": "No field changes recorded.",
+      "redacted": "Hidden (sensitive)",
+      "truncated": "Shortened"
     },
     "technical": {
       "title": "Technical details",

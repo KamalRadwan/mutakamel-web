@@ -74,7 +74,8 @@
     "addFirstContact": "Add contact method",
     "roles": "Roles",
     "rolesHint": "Optional roles assigned when creating this party.",
-    "rolesPlaceholder": "Select roles"
+    "rolesPlaceholder": "Select roles",
+    "ownerReadRequired": "Requires user read access"
   },
   "contacts": {
     "empty": "No contact methods added yet.",
@@ -97,7 +98,10 @@
     "added": "Contact method added.",
     "saved": "Contact method saved.",
     "deleted": "Contact method deleted.",
-    "primaryUpdated": "Primary contact method updated."
+    "primaryUpdated": "Primary contact method updated.",
+    "duplicateNumber": "This number is already used by another party",
+    "duplicateEmail": "This email is already used by another party",
+    "duplicateWhatsapp": "This WhatsApp number is already used by another party"
   },
   "addresses": {
     "empty": "No addresses added yet.",
@@ -210,7 +214,7 @@
     "setInactive": "Party status set to inactive."
   },
   "errors": {
-    "PARTY_NOT_FOUND": "Party not found.",
+    "PARTY_NOT_FOUND": "This party is no longer available.",
     "PARTY_CONTACT_METHOD_NOT_FOUND": "Party contact method not found.",
     "PARTY_ADDRESS_NOT_FOUND": "Party address not found.",
     "PARTY_ROLE_NOT_FOUND": "Party role not found.",
@@ -220,7 +224,7 @@
     "PARTY_CONTACT_VALUE_INVALID": "Contact value must match its method type.",
     "PARTY_IMAGE_INVALID": "The party image is not a safe PNG, JPEG or WebP file.",
     "PARTY_IMAGE_TOO_LARGE": "The party image must not exceed 2 MB.",
-    "PARTY_IMAGE_STORAGE_UNAVAILABLE": "Party image storage is unavailable.",
+    "PARTY_IMAGE_STORAGE_UNAVAILABLE": "Image storage is unavailable. Try again.",
     "PARTY_DUPLICATE_CONTACT_METHOD": "This value is already used by another party.",
     "PARTY_ROLE_ALREADY_EXISTS": "This party role already exists in the same scope.",
     "PARTY_ROLE_MANAGED_BY_APP": "This party role is managed by another application and cannot be deleted here.",
@@ -228,13 +232,19 @@
     "PARTY_RELATIONSHIP_ALREADY_EXISTS": "This relationship already exists.",
     "PARTY_CONTACT_METHOD_LIMIT_EXCEEDED": "Party contact method limit exceeded.",
     "PARTY_ADDRESS_LIMIT_EXCEEDED": "Party address limit exceeded.",
-    "PARTY_ROLE_LIMIT_EXCEEDED": "Party role limit exceeded.",
-    "PARTY_CHILD_BATCH_INVALID": "Party child collections are invalid.",
+    "PARTY_ROLE_LIMIT_EXCEEDED": "The maximum number of roles has been reached.",
+    "PARTY_CHILD_BATCH_INVALID": "Some nested records are invalid.",
     "PARTY_FIELDS_INVALID": "Party fields must match the party type.",
     "PARTY_RELATIONSHIP_INVALID": "Party relationship is invalid.",
     "PARTY_BRANCH_INVALID": "Branch must exist and be active.",
     "PARTY_OWNER_INVALID": "Party owner must be an active user in the party scope.",
-    "BRANCH_PERMISSION_DENIED": "Required permission is not granted for this branch.",
-    "PERMISSION_SCOPE_UNAVAILABLE": "Permission scope resolution is unavailable."
-  }
+    "BRANCH_PERMISSION_DENIED": "You do not have access to this branch.",
+    "PERMISSION_SCOPE_UNAVAILABLE": "Permission scope resolution is unavailable.",
+    "TENANT_WIDE_PERMISSION_REQUIRED": "This action requires workspace-wide access.",
+    "PARTY_ROLE_METADATA_INVALID": "Role metadata is invalid.",
+    "DIRECTORY_PARTY_CHILD_AUTHORITY_EXCEEDED": "Too many related records. Narrow the search and try again.",
+    "PARTY_ADDRESS_GEO_INVALID": "The address location is invalid.",
+    "PARTY_ADDRESS_GEO_INCOMPLETE": "Complete the address location."
+  },
+  "noAccess": "No access to this party."
 }

@@ -22,7 +22,9 @@
   "assets": {
     "title": "Visual assets",
     "immediate": "Uploads apply immediately without saving branding.",
-    "noRemove": "Images can be replaced but not removed."
+    "remove": "Remove",
+    "removeConfirm": "Remove this image? The workspace will use its default appearance.",
+    "removed": "Removed"
   },
   "fields": {
     "appName": "App name",
@@ -112,7 +114,9 @@
     "CORE_VALIDATION_FAILED": "Check the values and try again.",
     "network": "Can't reach the server. Check your connection and try again.",
     "generic": "Something went wrong. Try again in a moment.",
-    "IDEMPOTENCY_REQUEST_PROCESSING": "This request is still being processed. Wait a moment, then reload.",
-    "IDEMPOTENCY_BODY_MISMATCH": "This request no longer matches the earlier attempt. Try again."
-  }
+    "BRANDING_IDEMPOTENCY_CONFLICT": "This upload was already sent with another file. Choose the file again",
+    "BRANDING_ASSET_NOT_FOUND": "The image could not be found. Refresh and try again."
+  },
+  "needsTenantWide": "Needs workspace-wide access",
+  "notSaved": "Not saved. Try again"
 }

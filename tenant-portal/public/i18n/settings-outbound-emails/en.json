@@ -12,7 +12,7 @@
     "suspended": "Suspended",
     "domainVerified": "Domain verified",
     "domainUnverified": "Domain not verified",
-    "notReadyWarning": "CRM emails cannot be sent until the sender is active, the domain is verified and a delivery provider other than SMTP is set.",
+    "notReadyWarning": "CRM emails require an active sender, a verified domain, configured provider credentials and the CRM feedback profile.",
     "notReadyHint": "Complete the sender setup before sending CRM emails.",
     "openSettings": "Open email settings"
   },
@@ -35,7 +35,8 @@
     "nextMonth": "Next month",
     "clear": "Clear filters",
     "invalidRange": "From date must be on or before To date.",
-    "rangeTooLong": "Date range cannot exceed 366 days."
+    "rangeTooLong": "Date range cannot exceed 366 days.",
+    "utcHint": "Dates are in UTC"
   },
   "table": {
     "label": "Outbound emails",
@@ -167,12 +168,13 @@
     "recipientLabel": "Recipient",
     "recipientHint": "Choose which approved contact email address on this record receives the message.",
     "templateLabel": "Template",
-    "templateHint": "Choose the published email template version to render for this record.",
+    "templateHint": "Use the assigned template, or choose a published template version for this record.",
     "noApprovedRecipient": "No approved or unsuppressed recipient email address is available for this record.",
     "noCompatibleTemplate": "No compatible email template is available for this record type.",
     "next": "Next",
     "back": "Back",
-    "send": "Send"
+    "send": "Send",
+    "assignedTemplate": "Use the assigned template"
   },
   "toasts": {
     "queued": "Email queued",
@@ -195,8 +197,20 @@
         "SOURCE_INELIGIBLE": "Emails cannot be sent for this record in its current state.",
         "SEND_RATE_LIMITED": "Sending limit reached. Try again in {{minutes}} min.",
         "DEPENDENCY_UNAVAILABLE": "The email delivery service is temporarily unavailable. Try again shortly.",
-        "IDEMPOTENCY_MISMATCH": "This request was already sent with different details. Reload the page and try again."
+        "IDEMPOTENCY_MISMATCH": "This email may already have been sent. Check the send log."
+      }
+    },
+    "notSent": "Not sent. Try again later.",
+    "notSaved": "Not saved. Try again.",
+    "GW": {
+      "IDEM": {
+        "MISMATCH": "Already sent with different values. Reload."
       }
     }
+  },
+  "source": {
+    "branch": "Branch",
+    "branchHint": "Search records within this branch. Changing the branch clears the selected record.",
+    "noBranchHint": "Choose a branch in the top bar to search records."
   }
 }

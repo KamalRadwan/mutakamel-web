@@ -198,6 +198,25 @@
     "BULK_SELECTION_TOO_LARGE": "Too many customers selected. Select at most {{max}}.",
     "CUSTOMER_PROFILE_SELECTION_TOO_LARGE": "Select at most 10,000 customers.",
     "BULK_JOB_PARAMS_INVALID": "Some batch settings are not valid. Check your choices and try again.",
+    "BRANCH_CONTEXT_REQUIRED": "Choose a branch in the top bar to see customers.",
+    "BRANCH_SCOPE_MISMATCH": "The selection belongs to another branch. Select customers in the current branch.",
+    "BRANCH_PERMISSION_DENIED": "You do not have permission in this branch.",
+    "BRANCH_ACCESS_DENIED": "You do not have access to this branch.",
+    "CRM_CUSTOMERS_DISABLED": "This module is turned off for this company.",
+    "CRM_LEADS_DISABLED": "This module is turned off for this company.",
+    "CRM_SUBSCRIPTION_READ_ONLY": "Your subscription allows viewing only.",
+    "SEAT_OVER_CAPACITY_READ_ONLY": "Your account allows viewing only because the seat limit was exceeded.",
+    "BULK_JOB_ACTOR_ACCESS_REVOKED": "Permission changed while this job was running.",
+    "BULK_JOB_ACTIVE": "A bulk job is already running. Follow its progress in the jobs tracker.",
+    "UNCHANGED": "Already set.",
+    "BLACKLISTED": "Blacklisted customer.",
+    "GW": {"IDEM": {"MISMATCH": "The request changed. Reload before trying again."}},
     "generic": "Couldn't be completed."
-  }
+  },
+  "catalogueDenied": "You do not have access to this list. Ask your administrator.",
+  "notSaved": "Not saved. Try again.",
+  "rateLimited": "Too many requests, try again in {{retryAfter}} s.",
+  "loadFailure": "Could not load this data.",
+  "retry": "Retry",
+  "correlation": "Reference: {{id}}"
 }

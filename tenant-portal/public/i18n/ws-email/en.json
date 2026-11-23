@@ -112,7 +112,8 @@
   "smtp": {
     "passwordPlaceholder": "Leave blank to keep it",
     "test": "Test connection",
-    "testNeedsSave": "Save your changes first. The test uses saved settings."
+    "testNeedsSave": "Save your changes first. The test uses saved settings.",
+    "passwordSaved": "Saved"
   },
   "probe": {
     "ok": "Connection succeeded",
@@ -197,6 +198,21 @@
     "TENANT_EMAIL_CONFIG_VERIFICATION_FAILED": "DNS verification for the sender domain did not pass.",
     "TENANT_EMAIL_CONFIG_DKIM_PROOF_NOT_REGISTERED": "No DKIM record is registered for this domain and selector. Contact your administrator.",
     "TENANT_SMTP_CONNECTION_FAILED": "Could not connect to the SMTP server. Check the host, port and login.",
-    "TENANT_EMAIL_CONFIG_DEPENDENCY_UNAVAILABLE": "The email service is temporarily unavailable. Try again later."
-  }
+    "TENANT_EMAIL_CONFIG_DEPENDENCY_UNAVAILABLE": "The email service is temporarily unavailable. Try again later.",
+    "TENANT_EMAIL_CONFIG_SECRET_REF_INVALID": "The saved provider credential reference is invalid. Contact support.",
+    "TENANT_EMAIL_CONFIG_VERIFY_BODY_FORBIDDEN": "Verification could not be submitted. Try again.",
+    "TENANT_EMAIL_CONFIG_PLAN_QUOTA_INVALID": "The plan email limits are unavailable. Try again later.",
+    "EMAIL_PROVIDER_NOT_ALLOWED": "Choose the shared provider or SMTP.",
+    "EMAIL_TEST_RATE_LIMITED": "Wait before sending another test",
+    "TENANT_SMTP_CONNECTION_VERIFICATION_UNAVAILABLE": "The SMTP connection test is unavailable. Try again later."
+  },
+  "managedBySupport": "Managed by support",
+  "suspendConfirm": "Sending stops until you verify again",
+  "turnOnPrompt": "Turn sending on now?",
+  "sendTest": "Send test email",
+  "sendTestDone": "A test email was sent to {{email}}",
+  "needsTenantWide": "Needs workspace-wide access",
+  "notSaved": "Not saved. Try again",
+  "discard": "Discard changes",
+  "discardDraft": "Discard your unsaved changes?"
 }

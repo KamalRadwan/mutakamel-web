@@ -27,7 +27,10 @@
     "retry": "Retry",
     "manualLabel": "Currency code",
     "manualHint": "Three letters, for example EGP. It must be one of your active currencies.",
-    "invalidCode": "Enter a three-letter code."
+    "invalidCode": "Enter a three-letter code.",
+    "changeInCurrencies": "Change in Currencies",
+    "changeDefault": "Change default currency",
+    "setDefaultConfirm": "All exchange rates will be recalculated against {{code}}"
   },
   "timezone": {
     "title": "Time zone",
@@ -107,6 +110,14 @@
     "IDEM_IN_FLIGHT": "Your previous save is still being processed. Wait a moment, then try again.",
     "permission": "You do not have permission for this action.",
     "network": "Could not reach the server. Check your connection.",
-    "generic": "Something went wrong. Try again."
-  }
+    "generic": "Something went wrong. Try again.",
+    "ACCESS_POLICY_BLOCKED": "Your plan is read-only right now",
+    "CURRENCY_INACTIVE_DEFAULT": "Activate this currency before making it the default.",
+    "CURRENCY_NOT_FOUND": "This currency no longer exists. Reload the page."
+  },
+  "generalTitle": "General settings",
+  "needsTenantWide": "Needs workspace-wide access",
+  "planReadOnly": "Your plan is read-only right now",
+  "notSaved": "Not saved. Try again",
+  "confirm": "Confirm"
 }

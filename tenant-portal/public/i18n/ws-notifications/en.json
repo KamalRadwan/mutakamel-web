@@ -33,6 +33,7 @@
   },
   "errors": {
     "NOTIFICATION_NOT_FOUND": "This notification is no longer available.",
-    "NOTIFICATION_USER_NOT_FOUND": "Your account cannot receive notifications right now."
+    "NOTIFICATION_USER_NOT_FOUND": "Your account cannot receive notifications right now.",
+    "notSaved": "Not saved. Try again."
   }
 }

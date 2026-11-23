@@ -1,5 +1,23 @@
 {
   "failedTitle": "Could not load your session",
   "failedText": "We could not load your account details, so this page cannot check what you can do. Try again.",
-  "retry": "Retry"
+  "retry": "Retry",
+  "ownerOnly": "Only the workspace owner can change session lifetimes",
+  "needsTenantWide": "Needs workspace-wide access",
+  "planReadOnly": "Your plan is read-only right now",
+  "notSaved": "Not saved. Try again",
+  "restoreDefaults": "Restore defaults",
+  "restoreDefaultsConfirm": "Restore the default session lifetimes? This replaces the current overrides.",
+  "defaultHint": "Default: {{default}} seconds.",
+  "saved": "Session lifetimes saved",
+  "saveFailed": "Could not save session lifetimes",
+  "errors": {
+    "SESSION_POLICY_LIMIT_EXCEEDED": "Enter a value between {{range}}",
+    "SESSION_POLICY_IDLE_EXCEEDS_ABSOLUTE": "Idle timeout cannot be longer than the session lifetime",
+    "SESSION_POLICY_PRECONDITION_FAILED": "Session lifetimes changed. Reload or keep your changes.",
+    "SESSION_POLICY_IDEMPOTENCY_CONFLICT": "This save conflicts with an earlier attempt. Reload or keep your changes.",
+    "SESSION_POLICY_PRECONDITION_REQUIRED": "Could not save. Reload the page and try again",
+    "SESSION_POLICY_INVALID_ETAG": "Could not save. Reload the page and try again",
+    "ACCESS_POLICY_BLOCKED": "Your plan is read-only right now"
+  }
 }

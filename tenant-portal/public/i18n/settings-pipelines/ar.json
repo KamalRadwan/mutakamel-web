@@ -197,7 +197,7 @@
     "PIPELINE_DEFAULT_INACTIVE": "فعِّل هذا المسار أولًا قبل جعله المسار الافتراضي",
     "PIPELINE_DEFAULT_RESTRICTED": "يجب أن يكون المسار الافتراضي متاحًا للجميع",
     "PIPELINE_RESET_DEFAULT_ONLY": "لا تمكن استعادة المراحل القياسية إلا في المسار الافتراضي",
-    "PIPELINE_RESET_BLOCKED": "انقل الفرص من المراحل الإضافية قبل الاستعادة",
+    "PIPELINE_RESET_BLOCKED": "انقل فرص البيع من المراحل الإضافية أولًا",
     "OPPORTUNITY_STAGE_NOT_FOUND": "لم تعد هذه المرحلة متاحة",
     "PIPELINE_STAGE_ALREADY_ASSIGNED": "هذه المرحلة مضافة بالفعل إلى المسار",
     "PIPELINE_STAGE_SEMANTIC_DUPLICATE": "يُسمح بمرحلة واحدة فقط من كل من جديدة ومكسوبة وخاسرة في المسار",
@@ -215,6 +215,7 @@
     "PIPELINE_ASSIGNMENT_USERS_INVALID": "أحد المستخدمين المختارين غير نشط أو ليس لديه مقعد في إدارة علاقات العملاء",
     "PIPELINE_ASSIGNMENT_TEAMS_INVALID": "أحد الفرق المختارة لم يعد نشطًا",
     "PIPELINE_RESET_CATALOG_MISSING": "إحدى المراحل القياسية مفقودة، لذا تتعذر استعادة المسار",
-    "PIPELINE_DEFAULT_MISSING": "لا يوجد مسار افتراضي محدد. أعد التحميل وحاول مرة أخرى."
+    "PIPELINE_DEFAULT_MISSING": "لا يوجد مسار افتراضي محدد. أعد التحميل وحاول مرة أخرى.",
+    "PIPELINE_READ_AUTHORITY_INVALID": "بيانات مسارات البيع غير متاحة. حاول مجددًا أو تواصل مع المسؤول."
   }
 }

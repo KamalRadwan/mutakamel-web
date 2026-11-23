@@ -126,5 +126,23 @@
       "statusChanged": "Status changed",
       "statusChangedHint": "When this data source last transitioned to its current status."
     }
+  },
+  "reasons": {
+    "CAPTURE_NOT_DEPLOYED": "Data capture is not deployed yet.",
+    "NO_ACTIVE_POLICY": "No active policy is configured.",
+    "CALENDAR_HOURS_MISSING": "Working calendar hours are missing.",
+    "CONFIG_NOT_DESIGNED": "Configuration is not available yet.",
+    "MODULE_NOT_RELEASED": "This module is not released yet.",
+    "READ_MODEL_NOT_DEPLOYED": "The read model is not deployed yet.",
+    "EVENT_NOT_INGESTED": "The event has not been ingested yet.",
+    "VIEW_NOT_RELEASED": "This view is not released yet.",
+    "TRIGGER_NOT_RELEASED": "This trigger is not released yet.",
+    "PROVIDER_WEBHOOK_MISSING": "The provider webhook is not configured.",
+    "NO_SPEND_SOURCE": "No spending data source is connected.",
+    "NO_TOUCH_SOURCE": "No interaction data source is connected.",
+    "UNKNOWN": "Not available yet"
+  },
+  "errors": {
+    "CRM_READINESS_SOURCE_UNKNOWN": "This data source was not found."
   }
 }

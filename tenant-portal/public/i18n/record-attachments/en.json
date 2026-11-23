@@ -62,6 +62,15 @@
     "GW.IDEM.BAD_VALUE": "The upload could not be sent safely. Try again.",
     "GW.IDEM.MISMATCH": "This upload was already sent with a different file. Remove it and add the file again.",
     "GW.IDEM.IN_FLIGHT": "This upload is still being processed.",
-    "generic": "Something went wrong. Try again."
-  }
+    "generic": "Something went wrong. Try again.",
+    "notSaved": "Not saved. Try again.",
+    "rateLimited": "Too many requests. Try again shortly.",
+    "rateLimitedIn": "Too many requests, try again in {{seconds}} s.",
+    "idempotencyMismatch": "This request was already sent with different data. Reload before trying again.",
+    "moduleDisabled": "This module is turned off for this company.",
+    "SEAT_OVER_CAPACITY_READ_ONLY": "Your account is read-only because the seat limit has been exceeded."
+  },
+  "uploadLabel": "Upload a file",
+  "chooseBranch": "Choose a branch in the top bar to see attachments.",
+  "correlation": "Reference: {{id}}"
 }

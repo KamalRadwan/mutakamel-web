@@ -102,6 +102,14 @@
     "INVALID_IDEMPOTENCY_KEY": "The request could not be sent safely. Reload the page and try again.",
     "IDEMPOTENCY_REQUEST_PROCESSING": "This request is still being processed. Wait a moment, then reload.",
     "IDEMPOTENCY_BODY_MISMATCH": "This request no longer matches the earlier attempt. Try again.",
-    "PERMISSION_SCOPE_UNAVAILABLE": "Your permissions could not be checked right now. Try again in a moment."
-  }
+    "PERMISSION_SCOPE_UNAVAILABLE": "Your permissions could not be checked right now. Try again in a moment.",
+    "INVALID_FIELD": "Choose a supported field.",
+    "ACCESS_POLICY_BLOCKED": "Your access policy blocks this action."
+  },
+  "peekNeedsTenantWide": "Preview needs workspace-wide access",
+  "peekCompanyInactive": "Company is not active",
+  "scopedNote": "Workspace-wide sequences are visible to workspace-wide users",
+  "futureOnly": "Changes affect only future numbers.",
+  "companyFallback": "Company {{id}}",
+  "notSaved": "Not saved. Try again"
 }

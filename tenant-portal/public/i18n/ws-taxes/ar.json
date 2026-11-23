@@ -55,7 +55,8 @@
     "inclusiveHint": "فعّله إذا كانت الأسعار تتضمن هذه الضريبة أصلًا، وأوقفه إذا كانت الضريبة تُضاف فوق السعر.",
     "active": "نشطة",
     "activeHint": "لا تُعرض الضرائب غير النشطة في المستندات الجديدة، ولا يمكن تفعيل ضريبة شركة ما دامت الشركة غير نشطة.",
-    "workspaceWide": "على مستوى مساحة العمل"
+    "workspaceWide": "على مستوى مساحة العمل",
+    "rateEditHint": "تسري التغييرات على المستندات الجديدة فقط"
   },
   "validation": {
     "scopeRequired": "اختر النطاق.",
@@ -97,6 +98,15 @@
     "INVALID_IDEMPOTENCY_KEY": "تعذّر إرسال الطلب بأمان، فأعد تحميل الصفحة وحاول مرة أخرى.",
     "IDEMPOTENCY_REQUEST_PROCESSING": "لا يزال هذا الطلب قيد المعالجة، فانتظر قليلًا ثم أعد التحميل.",
     "IDEMPOTENCY_BODY_MISMATCH": "لم يعد هذا الطلب مطابقًا للمحاولة السابقة، فحاول مرة أخرى.",
-    "MISSING_REQUIRED_PERMISSIONS": "ليست لديك صلاحية لتنفيذ هذا الإجراء."
-  }
+    "MISSING_REQUIRED_PERMISSIONS": "ليست لديك صلاحية لتنفيذ هذا الإجراء.",
+    "INVALID_FIELD": "الحقل المحدد غير صالح.",
+    "ACCESS_POLICY_BLOCKED": "تمنع سياسة الوصول تنفيذ هذا الإجراء.",
+    "COMPANY_INVALID_CREATE": "الشركة غير نشطة",
+    "COMPANY_INVALID_ON_REACTIVATE": "أعد تفعيل الشركة أولًا"
+  },
+  "emptyScoped": "لا توجد ضرائب يمكنك عرضها",
+  "showInactiveCompanies": "عرض الشركات غير النشطة",
+  "showInactiveCompaniesHint": "تضمين الضرائب التابعة للشركات غير النشطة.",
+  "companyFallback": "الشركة {{id}}",
+  "notSaved": "لم يتم الحفظ. حاول مرة أخرى"
 }

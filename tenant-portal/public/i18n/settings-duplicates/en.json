@@ -70,7 +70,7 @@
     "keep": "Keep my change"
   },
   "saved": "Saved.",
-  "resetsDone": "{{n}} overrides went back to inheriting.",
+  "resetsDone": "{{n}} overrides went back to inheriting: {{names}}.",
   "legend1": "Allowing duplicates inside a branch also needs them allowed across branches and across companies.",
   "legend2": "Between two branches or two companies, both sides must allow it. These rules apply to new and changed contact details in CRM only.",
   "truncated": "Only the first 500 branches are shown.",
@@ -83,6 +83,8 @@
     "CRM_COMPANY_NOT_FOUND": "This company no longer exists or is inactive.",
     "CRM_BRANCH_NOT_FOUND": "This branch no longer exists or is inactive.",
     "CRM_SUBSCRIPTION_READ_ONLY": "Your subscription is read-only, so changes cannot be saved.",
-    "CRM_VALIDATION_FAILED": "Some values are not valid."
+    "CRM_VALIDATION_FAILED": "Some values are not valid.",
+    "CRM_DUPLICATE_POLICY_STALE": "Someone else changed the duplicate rules. Reload or keep your changes.",
+    "CRM_DUPLICATE_POLICY_RESETS_REQUIRED": "Confirm removing the affected overrides before saving."
   }
 }

@@ -23,8 +23,8 @@
     },
     "emailLabel": "Block duplicate emails",
     "emailHint": "Stops saving an email address that is already used by another party in the selected scope.",
-    "phoneLabel": "Block duplicate phone numbers",
-    "phoneHint": "Covers phone and mobile numbers.",
+    "phoneLabel": "Phone numbers (phone and mobile are checked together)",
+    "phoneHint": "Stops saving a phone or mobile number already used by another party in the selected scope. Phone and mobile numbers are compared together.",
     "whatsappLabel": "Block duplicate WhatsApp numbers",
     "whatsappHint": "Stops saving a WhatsApp number that is already used by another party in the selected scope.",
     "crmNote": "CRM leads and customers follow their own duplicate rules in CRM settings.",
@@ -41,7 +41,8 @@
   },
   "validation": {
     "required": "This field is required.",
-    "range": "Enter a whole number between {{min}} and {{max}}."
+    "range": "Enter a whole number between {{min}} and {{max}}.",
+    "invalid": "Check this value."
   },
   "toast": {
     "saved": "Directory settings saved."
@@ -66,6 +67,10 @@
     "DIRECTORY_SETTINGS_INVALID": "Directory settings are invalid.",
     "TENANT_WIDE_PERMISSION_REQUIRED": "You need the permission to manage directory settings for the whole workspace.",
     "BRANCH_PERMISSION_DENIED": "You do not have permission for this action.",
-    "PERMISSION_SCOPE_UNAVAILABLE": "Permission scope resolution is unavailable. Try again."
+    "PERMISSION_SCOPE_UNAVAILABLE": "Permission scope resolution is unavailable. Try again.",
+    "DIRECTORY_SETTINGS_VERSION_REQUIRED": "The settings version is missing. Reload and try again."
+  },
+  "notice": {
+    "stricterChanges": "Stricter duplicate rules and lower limits apply only to new and edited parties. Existing data is not changed."
   }
 }

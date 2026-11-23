@@ -64,5 +64,11 @@
   "emptyDashboardTitle": "لا توجد عناصر بعد",
   "emptyDashboardText": "أضف عناصر من وضع تعديل التخطيط لبناء هذه اللوحة.",
   "crossFilterLimit": "تم بلوغ الحد الأقصى للتحديدات النشطة. أزل تحديدًا قبل إضافة آخر.",
-  "crossFilterValueInvalid": "لا يمكن استخدام قيمة الرسم هذه للتحديد."
+  "crossFilterValueInvalid": "لا يمكن استخدام قيمة الرسم هذه للتحديد.",
+  "retryAfter": "طلبات كثيرة. أعد المحاولة بعد {{seconds}} ث.",
+  "tooManyRequests": "طلبات كثيرة. أعد المحاولة لاحقًا.",
+  "requestId": "معرّف الطلب: {{id}}",
+  "provisioningTitle": "هذه البيانات غير جاهزة بعد",
+  "openReadiness": "عرض جاهزية البيانات",
+  "requestAccess": "طلب الوصول"
 }

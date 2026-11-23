@@ -113,13 +113,14 @@
     "donePlural": {
       "one": "Role assigned to {{n}} user.",
       "other": "Role assigned to {{n}} users."
-    }
+    },
+    "updated": "Role assigned"
   },
   "import": {
     "button": "Import users",
     "title": "Import users",
     "file": "CSV file",
-    "fileHint": "Up to 500 rows and 1 MB. Use the template columns.",
+    "fileHint": "Up to 5,000 rows and 1 MB. Use the template columns.",
     "template": "Download template",
     "parseError": "Row {{n}}: {{message}}",
     "unknownCode": "Unknown {{field}} \"{{value}}\"",
@@ -138,7 +139,10 @@
     "donePlural": {
       "one": "{{n}} user imported.",
       "other": "{{n}} users imported."
-    }
+    },
+    "created": "Imported",
+    "counts": "Total: {{total}} · Valid: {{valid}} · Invalid: {{invalid}}",
+    "recheck": "The import batch is no longer available. Check the file again before importing."
   },
   "seatsShort": "Not enough seats for this change.",
   "fields": {
@@ -200,7 +204,28 @@
   },
   "errors": {
     "USER_UNAVAILABLE": "No longer available",
-    "cycle": "This would create a reporting loop."
+    "cycle": "This would create a reporting loop.",
+    "TENANT_USER_NOT_FOUND": "This user no longer exists.",
+    "USER_SELF_FORBIDDEN": "You can't perform this action on your own account.",
+    "SEAT_CAPACITY_INSUFFICIENT": "Not enough seats for this change.",
+    "SEAT_LIMIT_REACHED": "Seat limit reached for this application.",
+    "SEAT_ADDON_CASCADE_REQUIRED": "This change removes add-on seats. Confirm to continue.",
+    "SEAT_RELEASE_NOT_ALLOWED": "Seats can be released only for suspended users.",
+    "SEAT_MIGRATION_NOT_READY": "Role holders exceed the purchased seats. Resolve the shortfall first.",
+    "SEAT_PREVIEW_TOO_LARGE": "Too many changes to preview at once.",
+    "SEAT_DOWNGRADE_FREE_UP_REQUIRED": "Free enough seats before lowering the seat count.",
+    "SEAT_KEEP_LIST_TOO_LARGE": "You chose more users than the new seat count.",
+    "SEAT_USAGE_STALE": "Seat usage changed. Reload and review again.",
+    "SEAT_MODULE_HOLDERS_EXCEED_PURCHASE": "Some users already hold roles for this application. Buy enough seats for them or remove their roles first.",
+    "SEAT_SWAP_INVALID": "Choose a read-only user to keep and an active user to release.",
+    "SEAT_OVER_CAPACITY_READ_ONLY": "Your access to this application is read-only because the workspace has more users than seats.",
+    "APPLICATION_CAPACITY_EXCEEDED": "The seat limit was reached. Reload and try again.",
+    "TENANT_EMAIL_TAKEN": "This email address is already in use.",
+    "IMPORT_BATCH_NOT_FOUND": "Import batch not found. Check the file again.",
+    "IMPORT_BATCH_EXPIRED": "Import batch expired. Check the file again.",
+    "IMPORT_BATCH_ALREADY_SUBMITTED": "This batch has already been submitted. Check again to prepare a new batch.",
+    "IMPORT_BATCH_NO_VALID_ROWS": "This batch has no valid rows to import.",
+    "IMPORT_ROW_DUPLICATE_IN_BATCH": "This row duplicates another row in the batch."
   },
   "common": {
     "save": "Save",

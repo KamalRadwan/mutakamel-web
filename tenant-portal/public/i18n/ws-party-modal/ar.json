@@ -74,7 +74,8 @@
     "addFirstContact": "إضافة وسيلة تواصل",
     "roles": "الأدوار",
     "rolesHint": "أدوار اختيارية تُعيَّن عند إنشاء هذا الطرف.",
-    "rolesPlaceholder": "اختر الأدوار"
+    "rolesPlaceholder": "اختر الأدوار",
+    "ownerReadRequired": "يتطلب صلاحية قراءة المستخدمين"
   },
   "contacts": {
     "empty": "لم تُضف وسائل تواصل بعد.",
@@ -97,7 +98,10 @@
     "added": "تمت إضافة وسيلة التواصل.",
     "saved": "تم حفظ وسيلة التواصل.",
     "deleted": "تم حذف وسيلة التواصل.",
-    "primaryUpdated": "تم تحديث وسيلة التواصل الأساسية."
+    "primaryUpdated": "تم تحديث وسيلة التواصل الأساسية.",
+    "duplicateNumber": "هذا الرقم مستخدم بالفعل لدى طرف آخر",
+    "duplicateEmail": "هذا البريد الإلكتروني مستخدم بالفعل لدى طرف آخر",
+    "duplicateWhatsapp": "رقم واتساب هذا مستخدم بالفعل لدى طرف آخر"
   },
   "addresses": {
     "empty": "لم تُضف عناوين بعد.",
@@ -210,7 +214,7 @@
     "setInactive": "تم تعيين حالة الطرف إلى غير نشط."
   },
   "errors": {
-    "PARTY_NOT_FOUND": "لم يتم العثور على الطرف.",
+    "PARTY_NOT_FOUND": "لم يعد هذا الطرف متاحًا.",
     "PARTY_CONTACT_METHOD_NOT_FOUND": "لم يتم العثور على وسيلة التواصل.",
     "PARTY_ADDRESS_NOT_FOUND": "لم يتم العثور على العنوان.",
     "PARTY_ROLE_NOT_FOUND": "لم يتم العثور على دور الطرف.",
@@ -220,7 +224,7 @@
     "PARTY_CONTACT_VALUE_INVALID": "يجب أن تتوافق قيمة التواصل مع نوعها.",
     "PARTY_IMAGE_INVALID": "صورة الطرف ليست ملف PNG أو JPEG أو WebP صالحًا.",
     "PARTY_IMAGE_TOO_LARGE": "يجب ألا يتجاوز حجم صورة الطرف 2 ميجابايت.",
-    "PARTY_IMAGE_STORAGE_UNAVAILABLE": "خدمة تخزين صور الأطراف غير متاحة حاليًا.",
+    "PARTY_IMAGE_STORAGE_UNAVAILABLE": "تخزين الصور غير متاح. حاول مجددًا.",
     "PARTY_DUPLICATE_CONTACT_METHOD": "هذه القيمة مستخدمة بالفعل لدى طرف آخر.",
     "PARTY_ROLE_ALREADY_EXISTS": "دور الطرف هذا موجود بالفعل في النطاق نفسه.",
     "PARTY_ROLE_MANAGED_BY_APP": "يُدار هذا الدور بواسطة تطبيق آخر ولا يمكن حذفه من هنا.",
@@ -228,13 +232,19 @@
     "PARTY_RELATIONSHIP_ALREADY_EXISTS": "هذه العلاقة موجودة بالفعل.",
     "PARTY_CONTACT_METHOD_LIMIT_EXCEEDED": "تم تجاوز الحد الأقصى لوسائل التواصل.",
     "PARTY_ADDRESS_LIMIT_EXCEEDED": "تم تجاوز الحد الأقصى للعناوين.",
-    "PARTY_ROLE_LIMIT_EXCEEDED": "تم تجاوز الحد الأقصى للأدوار.",
-    "PARTY_CHILD_BATCH_INVALID": "مجموعات العناصر التابعة للطرف غير صالحة.",
+    "PARTY_ROLE_LIMIT_EXCEEDED": "تم بلوغ الحد الأقصى للأدوار.",
+    "PARTY_CHILD_BATCH_INVALID": "بعض السجلات الفرعية غير صالحة.",
     "PARTY_FIELDS_INVALID": "يجب أن تتطابق حقول الطرف مع نوعه.",
     "PARTY_RELATIONSHIP_INVALID": "علاقة الطرف غير صالحة.",
     "PARTY_BRANCH_INVALID": "يجب أن يكون الفرع موجودًا ونشطًا.",
     "PARTY_OWNER_INVALID": "يجب أن يكون المسؤول مستخدمًا نشطًا ضمن نطاق الطرف.",
-    "BRANCH_PERMISSION_DENIED": "الصلاحية المطلوبة غير ممنوحة لهذا الفرع.",
-    "PERMISSION_SCOPE_UNAVAILABLE": "تعذّر تحديد نطاق الصلاحيات حاليًا."
-  }
+    "BRANCH_PERMISSION_DENIED": "ليست لديك صلاحية على هذا الفرع.",
+    "PERMISSION_SCOPE_UNAVAILABLE": "تعذّر تحديد نطاق الصلاحيات حاليًا.",
+    "TENANT_WIDE_PERMISSION_REQUIRED": "يتطلب هذا الإجراء صلاحية على مستوى مساحة العمل.",
+    "PARTY_ROLE_METADATA_INVALID": "بيانات الدور غير صالحة.",
+    "DIRECTORY_PARTY_CHILD_AUTHORITY_EXCEEDED": "عدد السجلات المرتبطة كبير. ضيّق نطاق البحث وحاول مجددًا.",
+    "PARTY_ADDRESS_GEO_INVALID": "موقع العنوان غير صالح.",
+    "PARTY_ADDRESS_GEO_INCOMPLETE": "أكمل بيانات موقع العنوان."
+  },
+  "noAccess": "ليست لديك صلاحية للوصول إلى هذا الطرف."
 }

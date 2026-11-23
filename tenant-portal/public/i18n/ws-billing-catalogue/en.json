@@ -16,6 +16,8 @@
     "title": "Add-ons"
   },
   "price": {
+    "startingAt": "Starting at {{price}}",
+    "notSet": "Price not set yet",
     "fromPrefix": "From",
     "perUserMonth": "/ user / month",
     "perUserYear": "/ user / year",
@@ -28,7 +30,11 @@
     "prices": "Prices"
   },
   "empty": {
+    "none": "Nothing to buy right now",
     "title": "No applications are available yet"
+  },
+  "errors": {
+    "tooLarge": "The catalogue is too large to show."
   },
   "modal": {
     "title": "{{app}} · {{item}} prices",

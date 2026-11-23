@@ -1,7 +1,6 @@
 {
   "title": "Targets",
   "new": "New target",
-  "search": "Search targets",
   "empty": "No targets yet",
   "forbiddenTitle": "Access denied",
   "forbiddenText": "You do not have permission to view targets.",
@@ -103,7 +102,9 @@
     "targetValueLockedHint": "Submitted targets cannot be edited while awaiting approval.",
     "targetValuePlaceholder": "Enter target value",
     "reviewNote": "Review note",
-    "reviewNoteHint": "Feedback recorded by the reviewer when approving or rejecting this target."
+    "reviewNoteHint": "Feedback recorded by the reviewer when approving or rejecting this target.",
+    "subjectSearch": "Find users or teams",
+    "subjectSearchHint": "Search active users and teams in the available branches."
   },
   "months": {
     "1": "January",
@@ -198,7 +199,8 @@
     "valueRateMax": "Rate targets cannot exceed 100.",
     "valueMax": "Value exceeds the maximum allowed limit.",
     "rejectNoteRequired": "Rejection note is required.",
-    "correctionReasonRequired": "Correction reason is required."
+    "correctionReasonRequired": "Correction reason is required.",
+    "valuePrecision": "Use no more than two decimal places."
   },
   "delete": {
     "title": "Delete target?",
@@ -219,5 +221,47 @@
     "approved": "Target approved",
     "rejected": "Target returned to Draft",
     "corrected": "Target correction saved"
+  },
+  "errors": {
+    "CRM_TARGET_METRIC_NOT_TARGETABLE": "Targets cannot be set on this metric.",
+    "CRM_TARGET_CURRENCY_INVALID": "Select a valid currency for this target.",
+    "CRM_TARGET_VALUE_INVALID": "Enter a valid target amount.",
+    "CRM_TARGET_PERIOD_INVALID": "Choose a valid target period.",
+    "CRM_TARGET_SUBJECT_INVALID": "Choose a valid user, team, or branch for this target.",
+    "CRM_TARGET_MEASURE_INVALID": "The selected target measure is invalid.",
+    "CRM_TARGET_TEAM_SET_INVALID": "Check the teams included in this target.",
+    "CRM_TARGET_CORRECTION_REASON_REQUIRED": "Enter a reason for this target correction.",
+    "CRM_TARGET_REJECT_NOTE_REQUIRED": "Enter a rejection note before rejecting this target.",
+    "CRM_TARGET_NOT_FOUND": "This target no longer exists.",
+    "CRM_TARGET_DUPLICATE": "A target already exists for this metric, subject, and period.",
+    "CRM_TARGET_NOT_DRAFT": "Only draft targets can be deleted.",
+    "CRM_TARGET_LOCKED_SUBMITTED": "This target is submitted and awaiting approval.",
+    "CRM_TARGET_NOT_SUBMITTED": "Only submitted targets can be approved or rejected.",
+    "CRM_TARGET_PERIOD_CLOSED": "This target period is already closed.",
+    "CRM_TARGET_PERIOD_OPEN": "Corrections are allowed only after the period closes.",
+    "CRM_TARGET_SECOND_CURRENCY_AFTER_R2": "Additional currencies cannot be added after initial approval.",
+    "CRM_TARGET_REVISION_CONFLICT": "Someone updated this target first.",
+    "CRM_TARGET_SOURCE_NOT_READY": "Targets are not ready yet. Try again later.",
+    "CRM_TARGET_CORRECTION_VALUE_UNCHANGED": "Enter a value different from the approved target.",
+    "CRM_VALIDATION_FAILED": "Check the value in this field.",
+    "SUBJECT_OPTIONS_FAILED": "Could not load subjects. Try again.",
+    "BRANCH_PERMISSION_DENIED": "You do not have permission for this branch.",
+    "CRM_PERMISSION_DENIED": "You do not have permission for this action.",
+    "CRM_MODULE_DISABLED": "CRM is not available for your account.",
+    "CRM_SUBSCRIPTION_READ_ONLY": "Your plan is read-only. Changes are not saved.",
+    "SEAT_OVER_CAPACITY_READ_ONLY": "Your plan is read-only. Changes are not saved.",
+    "CRM_SUBSCRIPTION_BLOCKED": "CRM is not available for your account.",
+    "CRM_MODULE_SEAT_REQUIRED": "CRM is not available for your account.",
+    "CRM_FEATURE_DISABLED": "CRM is not available for your account.",
+    "MISSING_REQUIRED_PERMISSIONS": "You do not have permission for this."
+  },
+  "yourBranch": "Your branch",
+  "askAdministrator": "Ask your administrator for the View branches permission to choose a branch.",
+  "metricsUnavailable": "Metrics could not be loaded. Try again.",
+  "subjectsUnavailable": "User and team options could not be loaded for this branch. Check your permission or try again.",
+  "currenciesUnavailable": "Currencies are unavailable. Try again before saving a money target.",
+  "approvedEdit": {
+    "title": "Edit approved target?",
+    "text": "Saving returns this target to Draft and requires approval again."
   }
 }

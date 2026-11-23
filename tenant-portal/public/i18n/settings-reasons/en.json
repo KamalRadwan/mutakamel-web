@@ -105,6 +105,7 @@
     "CRM_SUBSCRIPTION_BLOCKED": "Your subscription does not allow changes right now.",
     "CRM_REASON_CODE_TAKEN": "This code is already used in this reason kind.",
     "CRM_REASON_KIND_MISMATCH": "Polarity and activity type are only allowed for activity outcomes.",
+    "CRM_DASHBOARD_REVISION_MISMATCH": "This reason changed. Reload it before saving.",
     "CRM_REASON_SYSTEM_IMMUTABLE": "System reasons cannot be deactivated.",
     "CRM_REASON_REVISION_STALE": "This reason was modified by someone else.",
     "CRM_REASON_NOT_FOUND": "This reason no longer exists.",

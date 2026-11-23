@@ -52,6 +52,7 @@
     "deviceOnly": "حُفظ على هذا الجهاز فقط، وتعذّر حفظه في حسابك."
   },
   "errors": {
+    "notSaved": "لم يُحفَظ. حاول مرة أخرى.",
     "generic": "تعذّر الحفظ. حاول مرة أخرى.",
     "CORE_VALIDATION_FAILED": "تحقّق من حقول الاسم.",
     "PARTY_IMAGE_INVALID": "اختر صورة بصيغة PNG أو JPEG أو WebP.",

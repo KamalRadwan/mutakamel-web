@@ -64,14 +64,18 @@
     "makeDefault": "Make default",
     "makeDefaultHint": "A new default recalculates every other rate.",
     "firstCurrency": "This is the first currency, so it becomes the default with a rate of 1.",
-    "rebaseWarning": "Every stored rate is recalculated against this currency. Issued documents are not changed."
+    "rebaseWarning": "Every stored rate is recalculated against this currency. Issued documents are not changed.",
+    "rateUnits": "Units of this currency for 1 {{code}}",
+    "rateUnitsHint": "Units of this currency for 1 {{code}}. Up to 8 decimals."
   },
   "validation": {
     "codeFormat": "Use a supported currency code of three letters, A to Z.",
     "nameRequired": "Enter a name.",
     "nameMax": "Use at most {{max}} characters.",
     "symbolMax": "Use at most {{max}} characters.",
-    "rateInvalid": "Enter a number above 0 and up to 1,000,000,000, with at most 8 decimals."
+    "rateInvalid": "Enter a number above 0 and up to 1,000,000,000, with at most 8 decimals.",
+    "unsupportedCode": "This code is not supported",
+    "rateRangeInvalid": "Enter a number above 0 and up to 10,000,000,000, with at most 8 decimals."
   },
   "setDefault": {
     "title": "Set {{code}} as the default currency?",
@@ -97,6 +101,15 @@
       "CURRENCY_DEFAULT_DELETE": "Set another currency as default first.",
       "CURRENCY_IN_USE": "Choose another default currency in General settings, then try again.",
       "CURRENCY_COMPANY_IN_USE": "Move every active company that uses this currency to another currency first, then try again."
+    },
+    "companies": "Used by these companies",
+    "more": {
+      "zero": "and {{count}} more",
+      "one": "and {{count}} more",
+      "two": "and {{count}} more",
+      "few": "and {{count}} more",
+      "many": "and {{count}} more",
+      "other": "and {{count}} more"
     }
   },
   "toast": {
@@ -132,6 +145,11 @@
     "INVALID_IDEMPOTENCY_KEY": "The request could not be sent safely. Reload the page and try again.",
     "IDEMPOTENCY_REQUEST_PROCESSING": "This request is still being processed. Wait a moment, then reload.",
     "IDEMPOTENCY_BODY_MISMATCH": "This request no longer matches the earlier attempt. Try again.",
-    "MISSING_REQUIRED_PERMISSIONS": "You do not have permission for this action."
-  }
+    "MISSING_REQUIRED_PERMISSIONS": "You do not have permission for this action.",
+    "ACCESS_POLICY_BLOCKED": "Your access policy does not allow this action.",
+    "INVALID_FIELD": "Check the selected field and try again.",
+    "notSaved": "Not saved. Try again."
+  },
+  "readOnly": "You have read-only access to currencies.",
+  "addFirst": "Add your first currency"
 }

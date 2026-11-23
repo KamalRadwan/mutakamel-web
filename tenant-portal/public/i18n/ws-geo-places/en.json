@@ -104,7 +104,6 @@
   "noResults": "No matches.",
   "clearSearch": "Clear search",
   "errors": {
-    "GEO_NAME_TOO_LONG": "Up to 120 characters.",
     "generic": "Something went wrong. Try again.",
     "CORE_VALIDATION_FAILED": "Some fields are not valid. Check them and try again.",
     "INVALID_IDEMPOTENCY_KEY": "The request could not be sent safely. Reload the page and try again.",
@@ -118,12 +117,17 @@
     "GEO_DISTRICT_NAME_TAKEN": "A village or district with this name already exists in this city.",
     "GEO_CITY_IN_USE": "This city is used by addresses, villages and districts, or a zone.",
     "GEO_DISTRICT_IN_USE": "Addresses use this village or district.",
-    "GEO_PARENT_INACTIVE": "The area it belongs to is inactive. Activate it first."
+    "GEO_PARENT_INACTIVE": "The area it belongs to is inactive. Activate it first.",
+    "TENANT_WIDE_PERMISSION_REQUIRED": "Needs workspace-wide access"
   },
   "usedBy": {
     "addresses": "addresses",
     "districts": "villages and districts",
     "zones": "a zone",
     "separator": ", "
-  }
+  },
+  "needsTenantWide": "Needs workspace-wide access",
+  "notSaved": "Not saved. Try again",
+  "districtsStayActive": "Its districts stay active.",
+  "deactivateTitle": "Deactivate this city?"
 }

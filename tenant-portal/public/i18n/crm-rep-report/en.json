@@ -77,5 +77,12 @@
   "backToCatalogue": "Back to catalogue",
   "forbidden": "Access denied",
   "forbiddenText": "You do not have permission to view this report.",
-  "loadFailed": "Could not load report"
+  "loadFailed": "Could not load report",
+  "notSaved": "Not saved. Try again.",
+  "rateLimited": "Too many requests. Try again in {{seconds}} s.",
+  "moduleDisabled": "This module is turned off for this company.",
+  "readOnly": "Changes are unavailable while your subscription or seat is read-only.",
+  "readinessLink": "View data readiness",
+  "requestAccess": "Request access",
+  "datesTimeZone": "Dates are in {{timeZone}}."
 }

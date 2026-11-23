@@ -55,7 +55,8 @@
     "inclusiveHint": "On when prices already contain this tax. Off when the tax is added on top.",
     "active": "Active",
     "activeHint": "Inactive taxes are not offered on new documents. A company tax can't be active while its company is inactive.",
-    "workspaceWide": "Workspace-wide"
+    "workspaceWide": "Workspace-wide",
+    "rateEditHint": "Changes apply to new documents only"
   },
   "validation": {
     "scopeRequired": "Choose a scope.",
@@ -97,6 +98,15 @@
     "INVALID_IDEMPOTENCY_KEY": "The request could not be sent safely. Reload the page and try again.",
     "IDEMPOTENCY_REQUEST_PROCESSING": "This request is still being processed. Wait a moment, then reload.",
     "IDEMPOTENCY_BODY_MISMATCH": "This request no longer matches the earlier attempt. Try again.",
-    "MISSING_REQUIRED_PERMISSIONS": "You do not have permission for this action."
-  }
+    "MISSING_REQUIRED_PERMISSIONS": "You do not have permission for this action.",
+    "INVALID_FIELD": "The selected field is not valid.",
+    "ACCESS_POLICY_BLOCKED": "Your access policy blocks this action.",
+    "COMPANY_INVALID_CREATE": "Company is not active",
+    "COMPANY_INVALID_ON_REACTIVATE": "Reactivate the company first"
+  },
+  "emptyScoped": "No taxes you can see",
+  "showInactiveCompanies": "Show inactive companies",
+  "showInactiveCompaniesHint": "Include taxes belonging to inactive companies.",
+  "companyFallback": "Company {{id}}",
+  "notSaved": "Not saved. Try again"
 }

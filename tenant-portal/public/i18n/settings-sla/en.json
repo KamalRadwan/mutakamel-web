@@ -261,6 +261,17 @@
     "minutesRange": "Enter a whole number from 1 to {{max}}."
   },
   "errors": {
-    "qualifierUnknown": "One of the selected activity types, directions or touch sources is not recognised. Reload the page and try again."
+    "qualifierUnknown": "One of the selected activity types, directions or touch sources is not recognised. Reload the page and try again.",
+    "CRM_SLA_POLICY_SHAPE_INVALID": "Check the policy fields and try again.",
+    "CRM_SLA_QUALIFIER_UNKNOWN": "A selected activity type, direction or touch source is not recognised. Reload and try again.",
+    "CRM_SLA_BACKDATED": "Effective date cannot be in the past.",
+    "CRM_SLA_POLICY_STALE": "A newer policy version exists. Reload or keep your changes.",
+    "CRM_SLA_CLOCK_RANGE_EXCEEDED": "The clock range exceeds the supported limits.",
+    "BRANCH_PERMISSION_DENIED": "You cannot publish a policy for this branch or tenant scope.",
+    "CRM_DASHBOARD_RESOURCE_NOT_FOUND": "This policy version is no longer available. Reload the list.",
+    "CRM_DASHBOARD_LIST_CURSOR_INVALID": "The policy list has changed. Reload the list.",
+    "branchLookupUnavailable": "Ask your administrator for access to the branch list.",
+    "openCalendars": "Open calendars",
+    "noPoliciesYet": "No policies yet."
   }
 }

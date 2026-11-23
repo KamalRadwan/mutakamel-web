@@ -25,12 +25,10 @@
     }
   },
   "due": {
-    "title": "Amount due",
     "outstanding": "Outstanding",
     "invoiceNumber": "Invoice",
     "dueDate": "Due date",
-    "viewInvoice": "View invoice",
-    "nothingToPay": "Nothing to pay right now"
+    "viewInvoice": "View invoice"
   },
   "tabs": {
     "label": "Billing activity",
@@ -49,8 +47,8 @@
     },
     "openInvoice": "Open invoice",
     "empty": "No payments yet",
-    "loadFailed": "We could not load payments.",
-    "pagination": "Payments pagination"
+    "pagination": "Payments pagination",
+    "offline": "Offline payment"
   },
   "ledger": {
     "cols": {
@@ -62,7 +60,6 @@
       "note": "Note"
     },
     "empty": "No wallet activity yet",
-    "loadFailed": "We could not load wallet activity.",
     "pagination": "Wallet activity pagination"
   },
   "topup": {
@@ -77,10 +74,21 @@
     "continue": "Continue to payment",
     "done": "Done",
     "waiting": "Waiting for the payment to finish…",
-    "openPaymentPage": "Open payment page",
     "popupBlockedTitle": "Payment window was blocked",
     "popupBlockedText": "Use \"Open payment page\" in the dialog to continue.",
-    "successToast": "Wallet topped up",
-    "timeoutToast": "We have not received the payment yet. The balance updates when it arrives."
+    "limitsHint": "About {{min}} to {{max}}. The final check is made when you pay.",
+    "openCheckout": "Open the payment page",
+    "succeeded": "Wallet topped up.",
+    "failed": "The payment failed.",
+    "expired": "The payment expired. Start a new top-up.",
+    "review": "The payment is under review."
+  },
+  "cards": {
+    "dueNow": "Invoice due now",
+    "allInvoices": "All invoices"
+  },
+  "empty": {
+    "noSubscription": "No subscription yet",
+    "browseCatalogue": "Browse the catalogue"
   }
 }

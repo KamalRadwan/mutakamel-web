@@ -72,6 +72,8 @@
     "CRM_ACQUISITION_SOURCE_ICON_TYPE_UNSUPPORTED": "لا تُقبل إلا ملفات الأيقونات بصيغة PNG أو JPEG أو ICO.",
     "CRM_ACQUISITION_SOURCE_ICON_EXTENSION_UNSUPPORTED": "امتداد الملف لا يطابق صيغة الأيقونة (PNG أو JPEG أو ICO).",
     "CRM_ACQUISITION_SOURCE_ICON_EMPTY": "ملف الأيقونة المحدد فارغ.",
+    "CRM_ACQUISITION_SOURCE_ICON_REQUIRED": "اختر ملف أيقونة لرفعه.",
+    "CRM_ACQUISITION_SOURCE_ICON_CONTENT_INVALID": "محتوى الملف لا يطابق صيغة الأيقونة.",
     "CRM_ACQUISITION_SOURCE_ICON_TOO_LARGE": "يجب ألا يتجاوز حجم ملف الأيقونة 2 ميجابايت."
   }
 }

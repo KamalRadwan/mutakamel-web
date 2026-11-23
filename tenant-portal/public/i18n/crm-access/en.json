@@ -60,13 +60,13 @@
   },
   "inactive": "Inactive",
   "actions": {
-    "requestAccess": "Request access",
     "cancel": "Cancel",
     "decide": "Decide",
     "review": "Review",
     "view": "View",
     "loadMore": "Load more",
-    "clearDate": "Clear date"
+    "clearDate": "Clear date",
+    "readiness": "Data readiness"
   },
   "fields": {
     "requester": "Requester",
@@ -97,12 +97,17 @@
     "loadTitle": "Could not load access requests",
     "forbiddenTitle": "Access restricted",
     "forbiddenText": "You do not have permission to view this section.",
-    "resourceRequired": "Select a dashboard or widget.",
+    "resourceRequired": "Open a dashboard or widget to request access.",
     "purposeRequired": "Enter the reason for requesting access.",
     "noteRequired": "Enter a note explaining the rejection.",
     "ownerRequired": "Select an active user.",
     "reasonRequired": "Enter a reason for transferring ownership.",
-    "maxLength": "Must not exceed {{max}} characters."
+    "maxLength": "Must not exceed {{max}} characters.",
+    "notSaved": "Not saved. Try again.",
+    "moduleDisabled": "This module is turned off for this company.",
+    "reloadRequired": "Reload before trying again. The request key did not match.",
+    "rateLimited": "Too many requests, try again in {{seconds}} s.",
+    "ownerTargetsUnavailable": "Dashboard transfer targets are unavailable. An existing proposal can still be transferred."
   },
   "confirmCancelRequest": {
     "title": "Cancel access request?",
@@ -131,12 +136,6 @@
   },
   "request": {
     "title": "Request access",
-    "resourceType": "Resource type",
-    "resourceTypeHint": "Choose whether you need access to a dashboard or a widget.",
-    "resource": "Resource",
-    "resourceHint": "Select a dashboard or widget you currently cannot open or edit.",
-    "resourcePlaceholder": "Select resource",
-    "searchResource": "Search resources",
     "level": "Access level",
     "levelHint": "View opens read-only; Edit allows modifying layout or settings.",
     "expires": "Access until",
@@ -167,7 +166,7 @@
     "proposedOwnerPlaceholder": "Select new owner",
     "searchOwner": "Search users",
     "reason": "Reason",
-    "reasonHintPropose": "Optional context when proposing an owner, up to 500 characters.",
+    "reasonHintPropose": "Required reason for proposing a new owner, up to 500 characters.",
     "reasonHintTransfer": "Required audit reason for executing ownership transfer, up to 500 characters.",
     "reasonPlaceholder": "Explain ownership transfer decision",
     "propose": "Propose",

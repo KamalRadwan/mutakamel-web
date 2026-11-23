@@ -12,9 +12,9 @@
       "title": "Telephony",
       "desc": "Calling from CRM records and logging calls as activities."
     },
-    "reports": {
-      "title": "Reports",
-      "desc": "Settings used by CRM dashboards and reports."
+    "phone": {
+      "title": "Workspace phone",
+      "desc": "Phone servers and seats managed in the workspace."
     }
   },
   "modules": {
@@ -55,16 +55,14 @@
     "conflict": {
       "title": "Company settings changed",
       "text": "Someone changed the company settings. Reload to see the latest, or keep yours and save again."
-    }
+    },
+    "defaultPipelineHint": "The pipeline used by default for new opportunities.",
+    "confirmDefaultOffWaveA": "The {{module}} pages will be hidden and new records cannot be added. Existing records stay saved."
   },
   "email": {
     "retention": "Keep email content for",
     "retentionHint": "Between 30 and 2555 days. After that the message text is removed and only the sending record stays.",
     "days": "days"
-  },
-  "reports": {
-    "timeZone": "Analytics time zone",
-    "timeZoneHint": "Set by the platform. Dates in dashboards and reports use this zone."
   },
   "retention": {
     "title": "Email content retention",
@@ -75,7 +73,9 @@
     "conflict": {
       "title": "Retention setting changed",
       "text": "Someone changed this setting. Reload to see the latest value, or keep yours and save again."
-    }
+    },
+    "confirmTitle": "Reduce email content retention?",
+    "confirmText": "Reduce retention from {{old}} to {{next}} days? Older email content will be permanently removed."
   },
   "telephony": {
     "summary": "Phone servers: {{servers}} · Phone seats: {{occupied}} of {{allowed}}",
@@ -86,7 +86,8 @@
     "clickToCall": "Click-to-call from CRM records",
     "clickToCallHint": "When on, a phone icon next to a number calls it from the built-in phone. When off, it opens your computer's calling app.",
     "logCalls": "Log calls as CRM activities",
-    "logCallsHint": "Adds a Call activity to the lead or customer after each call made from or matched to their record."
+    "logCallsHint": "Adds a Call activity to the lead or customer after each call made from or matched to their record.",
+    "provisioning": "The phone is being set up."
   },
   "conflict": {
     "reload": "Reload",
@@ -124,6 +125,7 @@
     "CRM_IDEMPOTENCY_KEY_INVALID": "The request idempotency key is invalid.",
     "CRM_IDEMPOTENCY_KEY_REUSED": "This request key was already used with different data.",
     "CRM_IDEMPOTENCY_KEY_IN_FLIGHT": "The same request is already being processed.",
-    "CRM_DASHBOARD_REVISION_MISMATCH": "Someone else updated these settings. Reload and try again."
+    "CRM_DASHBOARD_REVISION_MISMATCH": "Someone else updated these settings. Reload and try again.",
+    "notSaved": "Not saved. Try again."
   }
 }

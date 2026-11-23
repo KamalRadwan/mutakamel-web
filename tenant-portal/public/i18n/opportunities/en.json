@@ -180,7 +180,12 @@
     "pipelinesLoading": "Loading pipelines…",
     "pipelinesFailed": "Pipelines could not be loaded.",
     "loadFailed": "Opportunities could not be loaded.",
-    "boardRefreshed": "The board was refreshed."
+    "boardRefreshed": "The board was refreshed.",
+    "viewUnavailable": "This view is not available yet.",
+    "switchToTable": "Switch to table",
+    "chooseBranch": "Choose a branch in the top bar to see opportunities.",
+    "forbidden": "You do not have permission to view opportunities.",
+    "reload": "Reload"
   },
   "search": {
     "advanced": "Advanced",
@@ -469,6 +474,7 @@
         "label": "Lost on",
         "hint": "Dates use the workspace time zone."
       }
-    }
+    },
+    "listRestricted": "You do not have access to this list. Ask your administrator."
   }
 }

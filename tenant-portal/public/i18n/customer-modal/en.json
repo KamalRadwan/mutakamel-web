@@ -23,7 +23,7 @@
   },
   "delete": {
     "title": "Delete {{name}}?",
-    "bodyReopensLead": "The lead this customer came from will be reopened.",
+    "bodyReopensLead": "The lead this customer was most recently converted from will be reopened. Any older converted leads will be disqualified.",
     "bodyPermanent": "This can't be undone.",
     "reasonLabel": "Reason",
     "reasonHint": "Optional note explaining why this customer is being deleted, up to 500 characters.",
@@ -34,5 +34,7 @@
     "title": "Blacklist {{name}}?",
     "body": "No new work can be added to a blacklisted customer, and it cannot be deleted.",
     "confirm": "Blacklist"
-  }
+  },
+  "notFound": "This customer was not found.",
+  "forbidden": "You do not have permission to view this customer."
 }

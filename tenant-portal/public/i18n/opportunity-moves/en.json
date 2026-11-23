@@ -33,7 +33,8 @@
     "stageRequired": "Pick a stage.",
     "noteHint": "Optional. Up to 1000 characters.",
     "submit": "Move",
-    "ownerIneligible": "The owner cannot work on the target pipeline. Change the owner first."
+    "ownerIneligible": "The owner cannot work on the target pipeline. Change the owner first.",
+    "unchanged": "Choose another pipeline"
   },
   "reopen": {
     "title": "Reopen this opportunity?",

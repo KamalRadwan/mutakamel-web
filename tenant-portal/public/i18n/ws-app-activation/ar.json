@@ -74,11 +74,13 @@
     "loadFailed": "تعذّر تحميل استثناءات الفروع.",
     "branchLoadFailed": "تعذّر التحميل",
     "forbidden": "ليست لديك صلاحية عرض فروع هذه الشركة.",
-    "toastSaved": "تم تحديث إعداد الفرع."
+    "toastSaved": "تم تحديث إعداد الفرع.",
+    "noAccess": "لا توجد صلاحية"
   },
   "toast": {
     "turnedOn": "تم تفعيل {{name}}.",
-    "turnedOff": "تم إيقاف {{name}}."
+    "turnedOff": "تم إيقاف {{name}}.",
+    "alreadyInState": "بالفعل في هذه الحالة"
   },
   "rejected": {
     "SOURCE_CHANGED": "تغيّر الاشتراك أثناء التطبيق. حاول مرة أخرى.",
@@ -88,15 +90,21 @@
   "errors": {
     "companyNotFound": "الشركة المذكورة في الرابط غير متاحة لك. تُعرض شركة أخرى.",
     "addonNotAvailable": "هذه الإضافة غير متاحة للتفعيل بعد.",
-    "APPLICATION_ALLOWANCE_NOT_READY": "{{name}} غير جاهز للتفعيل حاليًا. تحقّق من الاشتراك أو حاول لاحقًا.",
+    "APPLICATION_ALLOWANCE_NOT_READY": "{{name}} — غير جاهز: لم يتم تفعيل الشراء أو الاشتراك بعد",
     "APPLICATION_ACTIVATION_REVISION_STALE": "تغيّرت هذه البيانات منذ فتحها. تم تحديث القائمة.",
     "ADDON_REVISION_STALE": "تغيّرت هذه البيانات منذ فتحها. تم تحديث القائمة.",
-    "ADDON_CONFIGURATION_INVALID": "أعدّ إعدادات هذه الإضافة قبل تفعيلها.",
+    "ADDON_CONFIGURATION_INVALID": "الإعدادات تحتاج إلى مراجعة",
     "ADDON_OPERATION_UNCERTAIN": "تغيير سابق لم تتأكد نتيجته بعد. أعد التحميل وحاول مرة أخرى.",
     "ACCESS_POLICY_UNAVAILABLE": "سياسة الوصول للاشتراك غير متاحة مؤقتًا. حاول مرة أخرى بعد قليل.",
     "ACCESS_POLICY_BLOCKED": "ليست لديك صلاحية لهذا الإجراء.",
-    "IDEMPOTENCY_BODY_MISMATCH": "يتعارض هذا الطلب مع إرسال سابق. حاول مرة أخرى.",
-    "CORE_VALIDATION_FAILED": "تحقّق من السبب وحاول مرة أخرى."
+    "IDEMPOTENCY_BODY_MISMATCH": "تم الإرسال بقيم مختلفة. أعد التحميل.",
+    "CORE_VALIDATION_FAILED": "تحقّق من السبب وحاول مرة أخرى.",
+    "APPLICATION_NOT_FOUND": "لم يتم شراؤه",
+    "ADDON_NOT_FOUND": "لم يتم شراؤه",
+    "TENANT_MAINTENANCE_ACTIVE": "مساحة العمل قيد الصيانة",
+    "TENANT_MAINTENANCE_RELEASE_REQUIRED": "مساحة العمل قيد الصيانة",
+    "GW.IDEM.MISMATCH": "تم الإرسال بقيم مختلفة. أعد التحميل.",
+    "GW.IDEM.IN_FLIGHT": "جارٍ الحفظ"
   },
   "apps": {
     "accounting": "المحاسبة",

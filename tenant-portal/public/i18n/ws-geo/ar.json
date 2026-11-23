@@ -35,7 +35,8 @@
       "actions": "الإجراءات"
     },
     "empty": "لا توجد محافظات لهذه الدولة.",
-    "count": "عدد المحافظات: {{count}}"
+    "count": "عدد المحافظات: {{count}}",
+    "countryUnavailable": "الدولة غير متاحة"
   },
   "actions": {
     "viewStates": "عرض المحافظات",
@@ -49,6 +50,9 @@
   "loadFailed": "تعذّر تحميل القائمة.",
   "retry": "حاول مرة أخرى",
   "errors": {
-    "GEO_COUNTRY_NOT_FOUND": "لم تعد هذه الدولة موجودة."
-  }
+    "GEO_COUNTRY_NOT_FOUND": "لم تعد هذه الدولة موجودة.",
+    "TENANT_WIDE_PERMISSION_REQUIRED": "يتطلب صلاحية على مستوى مساحة العمل"
+  },
+  "needsTenantWide": "يتطلب صلاحية على مستوى مساحة العمل",
+  "notSaved": "لم يتم الحفظ. حاول مرة أخرى"
 }

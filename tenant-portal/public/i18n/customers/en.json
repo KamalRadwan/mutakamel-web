@@ -75,7 +75,8 @@
       "edit": "Edit",
       "color": "Change colour",
       "delete": "Delete",
-      "deleteBlacklistedReason": "A blacklisted customer can't be deleted."
+      "deleteBlacklistedReason": "A blacklisted customer can't be deleted.",
+      "editDenied": "You do not have permission to edit this customer."
     }
   },
   "details": {
@@ -104,7 +105,7 @@
   "delete": {
     "title": "Delete {{name}}?",
     "text": "This can't be undone.",
-    "textFromLead": "The lead this customer came from will be reopened.",
+    "textFromLead": "The lead this customer was most recently converted from will be reopened. Any older converted leads will be disqualified.",
     "done": "Customer deleted.",
     "failed": "The customer could not be deleted."
   },
@@ -216,7 +217,8 @@
         "label": "Converted from a lead",
         "hint": "Yes = created by converting a lead. No = added directly as a customer."
       }
-    }
+    },
+    "catalogueDenied": "You do not have access to this list. Ask your administrator."
   },
   "errors": {
     "CUSTOMER_PROFILE_NOT_FOUND": "This customer no longer exists.",
@@ -228,7 +230,7 @@
     "CUSTOMER_PROFILE_CORPORATE_FIELDS_FORBIDDEN": "Company details cannot be saved for an individual customer.",
     "CUSTOMER_PROFILE_BLACKLISTED": "Blacklisted customers cannot be deleted.",
     "CUSTOMER_PROFILE_STATUS_MANAGE_REQUIRED": "You do not have permission to change a customer's status.",
-    "CUSTOMER_PROFILE_ACTIVATION_REQUIRES_WON": "A customer becomes active automatically when an opportunity is won.",
+    "CUSTOMER_PROFILE_ACTIVATION_REQUIRES_WON": "A customer becomes Active when one of its opportunities is won.",
     "CUSTOMER_PROFILE_PRIMARY_CONTACT_FORBIDDEN": "Direct primary contact identity applies to individual customers only.",
     "CUSTOMER_PROFILE_CONTACT_NAME_REQUIRED": "Each contact needs a name.",
     "CUSTOMER_PROFILE_CONTACT_PRIMARY_INVALID": "Choose exactly one primary contact.",
@@ -266,6 +268,22 @@
     "INVALID_FIELD": "This filter or sort field is not supported.",
     "INVALID_OPERATOR_VALUE": "A filter value is not valid. Check the filter and try again.",
     "CRM_LEADS_DISABLED": "Leads are turned off for this company.",
-    "LEAD_PHONE_INVALID": "Enter a phone number with at least 5 digits."
+    "LEAD_PHONE_INVALID": "Enter a phone number with at least 5 digits.",
+    "notSaved": "Not saved. Try again.",
+    "rateLimited": "Too many requests, try again in {{seconds}} s.",
+    "CRM_SUBSCRIPTION_READ_ONLY": "Your subscription currently allows viewing only.",
+    "SEAT_OVER_CAPACITY_READ_ONLY": "The seat limit has been exceeded. Viewing only.",
+    "GW": {
+      "IDEM": {
+        "MISMATCH": "This action could not be verified. Reload before trying again."
+      }
+    }
+  },
+  "states": {
+    "chooseBranch": "Choose a branch in the top bar to see customers.",
+    "forbidden": "You do not have permission to view customers."
+  },
+  "dates": {
+    "utcHint": "Dates are shown in UTC because the workspace time zone is unavailable."
   }
 }

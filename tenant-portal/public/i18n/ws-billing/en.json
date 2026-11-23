@@ -100,6 +100,8 @@
     "supportRef": "Support reference: {{id}}"
   },
   "errors": {
+    "notSaved": "Not saved. Try again.",
+    "ACCESS_POLICY_BLOCKED": "Your subscription status does not allow this now.",
     "generic": "Something went wrong. Please try again.",
     "network": "Could not reach the billing service. Check your connection and try again.",
     "TENANT_OWNER_REQUIRED": "Only the workspace owner can view or manage billing.",
@@ -157,6 +159,15 @@
     "COMMERCIAL_RECOVERY_REVISION_STALE": "This change was updated elsewhere. Reload to see its latest state.",
     "COMMERCIAL_COMMAND_UNAVAILABLE": "The billing service is temporarily unavailable. Try again shortly.",
     "TENANT_OPERATION_NOT_FOUND": "This pending plan change could not be found."
+  },
+  "poll": {
+    "stillProcessing": "Still processing. We'll keep the status here.",
+    "checkNow": "Check now"
+  },
+  "badges": {
+    "access": {
+      "READ_ONLY": "Read-only: renew to make changes"
+    }
   },
   "names": {
     "apps": {

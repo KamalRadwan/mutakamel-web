@@ -12,8 +12,6 @@
   "allStatuses": "جميع الحالات",
   "name": "الاسم",
   "kind": "النوع",
-  "usedOn": "مستخدم في",
-  "usedOnCount": "اللوحات المستخدم فيها: {{count}}",
   "updated": "آخر تحديث",
   "tableLabel": "قائمة العناصر",
   "tabsLabel": "تبويبات نطاق العناصر",
@@ -22,6 +20,12 @@
   "loadMore": "تحميل المزيد",
   "clearFilters": "مسح عوامل التصفية",
   "loadFailedTitle": "تعذر تحميل العناصر",
+  "forbiddenTitle": "ليس لديك صلاحية الوصول إلى العناصر",
+  "notFoundTitle": "لم يُعثر على العناصر",
+  "notReadyTitle": "بيانات العناصر غير جاهزة بعد",
+  "backHome": "العودة إلى الرئيسية",
+  "correlationId": "المرجع: {{id}}",
+  "rateLimited": "طلبات كثيرة جدًا. أعد المحاولة بعد {{seconds}} ثانية.",
   "views": {
     "table": "جدول",
     "cards": "بطاقات"
@@ -41,7 +45,8 @@
     "opportunities": "الفرص",
     "activities": "الأنشطة",
     "customer_profiles": "ملفات العملاء",
-    "targets": "المستهدفات"
+    "targets": "المستهدفات",
+    "unclassified": "غير مصنف"
   },
   "actions": {
     "menu": "إجراءات العنصر",

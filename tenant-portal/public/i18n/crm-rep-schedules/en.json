@@ -199,5 +199,12 @@
       "NO_DELIVERY_ADDRESS": "No delivery address on file for this recipient.",
       "GENERIC": "Delivery was skipped."
     }
+  },
+  "correlation": "Reference: {{id}}",
+  "writeErrors": {
+    "notSaved": "Not saved. Try again.",
+    "moduleOff": "This module is turned off for this company.",
+    "reloadRequired": "Reload before trying again. The request could not be safely repeated.",
+    "rateLimited": "Too many requests, try again in {{seconds}} s."
   }
 }

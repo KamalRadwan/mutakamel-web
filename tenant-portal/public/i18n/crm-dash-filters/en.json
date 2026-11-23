@@ -177,5 +177,34 @@
     "PLANNED": "Planned",
     "CANCELLED": "Cancelled",
     "UNKNOWN": "Other"
+  },
+  "retryAfter": "Too many requests. Try again in {{seconds}} s.",
+  "tooManyRequests": "Too many requests. Try again later.",
+  "requestId": "Request ID: {{id}}",
+  "provisioningTitle": "This data is not ready yet",
+  "openReadiness": "View data readiness",
+  "datesInUtc": "Dates are in UTC.",
+  "datesInZone": "Dates are in {{zone}}.",
+  "currency": "Currency",
+  "currencyHint": "Choose one currency for the records behind this amount.",
+  "currencyUnavailable": "You do not have access to this currency list. Ask your administrator. Only the saved currency is available.",
+  "refresh": "Refresh",
+  "receipts": "Execution receipts",
+  "receiptsHint": "Stored evidence for the numbers in this run. Open an explanation to see how a number was calculated.",
+  "receiptsEmpty": "No execution receipts are available for this run.",
+  "receiptColumns": {
+    "metricKey": "Metric",
+    "resultStatus": "Result",
+    "executedAt": "Executed at",
+    "explain": "Explanation"
+  },
+  "receiptStatus": {
+    "OK": "Ready",
+    "EMPTY": "No data",
+    "PARTIAL": "Partial data",
+    "UNAVAILABLE": "Unavailable",
+    "DENIED": "Access denied",
+    "DEADLINE_EXCEEDED": "Timed out",
+    "ERROR": "Failed"
   }
 }

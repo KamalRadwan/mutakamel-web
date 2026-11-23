@@ -46,6 +46,12 @@
     "allEnded": "You were signed out everywhere"
   },
   "errors": {
-    "generic": "Something went wrong. Try again."
+    "generic": "Something went wrong. Try again.",
+    "COMMON": {
+      "VALIDATION": {
+        "UUID_V7_INVALID": "Could not end this session."
+      }
+    },
+    "TOO_MANY_REQUESTS": "Too many requests. Try again in {{seconds}} s."
   }
 }

@@ -67,5 +67,11 @@
   "loadFailed": "Could not load this lead.",
   "leadGone": "That lead no longer exists. Moved to the next one.",
   "leadGonePrev": "That lead no longer exists. Moved to the previous one.",
-  "newTitle": "New lead"
+  "newTitle": "New lead",
+  "notFound": "This lead was not found.",
+  "scopeDenied": "You do not have permission to view this lead.",
+  "chooseBranch": "Choose a branch in the top bar to see leads.",
+  "loadReference": "Reference: {{id}}",
+  "customFieldsDenied": "You do not have access to this list. Ask your administrator.",
+  "customFieldsFailed": "Could not load custom fields. Try again."
 }

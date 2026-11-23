@@ -7,7 +7,7 @@
   "scopeDenied": "You do not have permission to view this opportunity.",
   "navGone": "That opportunity is no longer available.",
   "notFound": {
-    "text": "This opportunity does not exist or you cannot open it."
+    "text": "This opportunity is not available"
   },
   "errors": {
     "customerCannotCreate": "This customer cannot get a new opportunity."
@@ -104,7 +104,8 @@
     "denied": {
       "title": "Stage history is not available",
       "text": "You do not have access to view stage changes for this opportunity."
-    }
+    },
+    "integrityFailed": "Stage history could not be verified. Reload to try again."
   },
   "quotations": {
     "new": "New quotation",

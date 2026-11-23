@@ -18,7 +18,8 @@
     "previous": "Previous",
     "saveDraft": "Save draft",
     "save": "Save",
-    "refreshPreview": "Refresh preview"
+    "refreshPreview": "Refresh preview",
+    "reload": "Reload"
   },
   "definitionLabel": "What this widget counts",
   "definitionHint": "Plain-language summary of the active metric, time basis, grouping, and period.",
@@ -234,11 +235,23 @@
     "forbiddenText": "You do not have permission to edit this widget.",
     "failedTitle": "Could not load widget",
     "failedText": "Something went wrong while loading the builder.",
-    "retry": "Try again"
+    "retry": "Try again",
+    "provisioningTitle": "Data is not ready"
   },
   "toasts": {
     "draftSaved": "Draft saved.",
     "conflictReloaded": "Reloaded the latest draft.",
     "conflictKept": "Your changes were kept. Save again to replace the other version."
+  },
+  "requests": {
+    "notSaved": "Not saved. Try again.",
+    "reloadRequired": "The request could not be matched. Reload before trying again.",
+    "moduleOff": "This module is turned off for this company.",
+    "rateLimited": "Too many requests. Try again in {{seconds}} s.",
+    "correlation": "Reference: {{id}}",
+    "readiness": "Open data readiness",
+    "requestAccess": "Request access",
+    "provisioningTitle": "Data is not ready",
+    "ownerLimit": "You can own at most 500 widgets."
   }
 }

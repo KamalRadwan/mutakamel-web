@@ -27,5 +27,11 @@
   "loadMore": "Load more",
   "empty": "No reports match this filter",
   "loadFailed": "Could not load reports",
-  "searchTooLong": "Search text must be 120 characters or fewer"
+  "searchTooLong": "Search text must be 120 characters or fewer",
+  "notSaved": "Not saved. Try again.",
+  "rateLimited": "Too many requests. Try again in {{seconds}} s.",
+  "moduleDisabled": "This module is turned off for this company.",
+  "readOnly": "Changes are unavailable while your subscription or seat is read-only.",
+  "readinessLink": "View data readiness",
+  "forbidden": "You do not have permission to view reports."
 }

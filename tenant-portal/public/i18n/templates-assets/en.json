@@ -18,7 +18,8 @@
       "scopeAll": "All scopes",
       "templateLabel": "Template",
       "templateAll": "Select template",
-      "sortLabel": "Sort"
+      "sortLabel": "Sort",
+      "templateSearchHint": "Search templates by name, then select a result."
     }
   },
   "scopes": {
@@ -59,7 +60,8 @@
   "actions": {
     "open": "Open",
     "retire": "Retire",
-    "alreadyRetiredReason": "This asset is already retired."
+    "alreadyRetiredReason": "This asset is already retired.",
+    "loadMore": "Load more"
   },
   "uploadModal": {
     "title": "Upload asset",
@@ -107,7 +109,8 @@
     "updatedHint": "Date when this asset was created or last modified.",
     "checksumLabel": "SHA-256 checksum",
     "checksumHint": "Cryptographic SHA-256 digest of the stored asset.",
-    "previewUnavailable": "Preview unavailable for retired asset"
+    "previewUnavailable": "Preview unavailable for retired asset",
+    "noLongerAvailable": "No longer available"
   },
   "retireConfirm": {
     "title": "Retire asset?",
@@ -123,7 +126,7 @@
     "confirmPublicRequired": "Confirm public email delivery before uploading.",
     "fileRequired": "Select an image file to upload.",
     "fileType": "Only PNG and JPEG images are supported.",
-    "fileSize": "File size must not exceed 5 MB."
+    "fileSize": "Max 5 MB"
   },
   "toasts": {
     "uploaded": "Asset uploaded",
@@ -138,14 +141,21 @@
       "title": "Could not load assets",
       "description": "An unexpected error occurred while loading template assets."
     },
-    "backToHome": "Back to home"
+    "backToHome": "Back to home",
+    "featureDisabled": {
+      "title": "The template designer is not part of your plan"
+    }
   },
   "errors": {
     "CORE.TEMPLATE.ASSET.IN_USE": "This asset is used by a published version and cannot be retired.",
     "CORE.TEMPLATE.ASSET.UPLOAD_INVALID": "The uploaded asset request is invalid.",
     "CORE.TEMPLATE.ASSET.EMAIL_PUBLIC_NOT_ALLOWED": "Public email delivery must be confirmed for email-public assets.",
     "CORE.TEMPLATE.ASSET.CHECKSUM_MISMATCH": "The file checksum did not match. Select the file and try again.",
-    "CORE.TEMPLATE.ASSET.INVALID": "The image file could not be processed.",
-    "CORE.TEMPLATE.ASSET.STORAGE_UNAVAILABLE": "Asset storage is temporarily unavailable."
+    "CORE.TEMPLATE.ASSET.INVALID": "Use a still PNG or JPEG up to 25 megapixels",
+    "CORE.TEMPLATE.ASSET.STORAGE_UNAVAILABLE": "Upload service busy, try again",
+    "ASSET_FILE_NAME_INVALID": "Use a file name up to 255 characters without path separators.",
+    "ASSET_FILE_TYPE_INVALID": "Only PNG and JPEG images are supported.",
+    "CORE.TEMPLATE.IDEMPOTENCY.IN_FLIGHT": "Still uploading",
+    "GW.IDEM.IN_FLIGHT": "Still uploading"
   }
 }

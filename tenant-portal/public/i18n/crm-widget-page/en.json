@@ -55,7 +55,7 @@
     "placements": "Placements",
     "placementsHint": "Total active widget placements across dashboards.",
     "hiddenPlacements": "Hidden placements",
-    "hiddenPlacementsHint": "Placements currently hidden on dashboards.",
+    "hiddenPlacementsHint": "Placements on dashboards you cannot see.",
     "activeShares": "Active shares",
     "activeSharesHint": "Current user and team share grants for this widget.",
     "tableLabel": "Dashboards using this widget",
@@ -165,5 +165,16 @@
     "discardTitle": "Discard unsaved edits?",
     "discardText": "The builder has changes that are not saved. Restoring replaces them with the selected version.",
     "discardConfirm": "Discard and restore"
+  },
+  "requests": {
+    "notSaved": "Not saved. Try again.",
+    "reloadRequired": "The request could not be matched. Reload before trying again.",
+    "moduleOff": "This module is turned off for this company.",
+    "rateLimited": "Too many requests. Try again in {{seconds}} s.",
+    "correlation": "Reference: {{id}}",
+    "readiness": "Open data readiness",
+    "requestAccess": "Request access",
+    "provisioningTitle": "Data is not ready",
+    "ownerLimit": "You can own at most 500 widgets."
   }
 }

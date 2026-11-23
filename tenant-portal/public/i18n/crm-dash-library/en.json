@@ -97,6 +97,29 @@
     "startFromHint": "Start with a blank grid or adopt an available template.",
     "blank": "Blank dashboard",
     "create": "Create",
-    "cancel": "Cancel"
-  }
+    "cancel": "Cancel",
+    "blueprintDescriptionHint": "Blueprint descriptions are defined by the template. Choose a blank dashboard to enter a description.",
+    "sourceUnavailable": "This template is no longer available. Choose another source."
+  },
+  "currentBranch": "Selected branch in the top bar",
+  "branchRequired": "Choose a branch.",
+  "fromTemplates": "Choose a template",
+  "provisioningTitle": "Templates are not ready yet",
+  "notFoundTitle": "Dashboard not found",
+  "readiness": "View data readiness",
+  "reload": "Reload",
+  "correlation": " Reference: {{id}}",
+  "ownerLimitTitle": "Dashboard limit reached",
+  "templatesFailedTitle": "Could not load templates",
+  "errors": {
+    "CRM_DASHBOARD_NAME_CONFLICT": "A dashboard with this name already exists.",
+    "CRM_DASHBOARD_OWNER_LIMIT": "You can own up to 50 dashboards. Delete one before creating another.",
+    "reloadRequired": "This request does not match its saved key. Reload before trying again.",
+    "notSaved": "Not saved. Try again.",
+    "rateLimitedIn": "Too many requests, try again in {{seconds}} s.",
+    "rateLimited": "Too many requests. Try again later.",
+    "moduleDisabled": "This module is turned off for this company.",
+    "subscriptionReadOnly": "Your subscription is read-only. Changes are paused."
+  },
+  "requestAccess": "Request access"
 }

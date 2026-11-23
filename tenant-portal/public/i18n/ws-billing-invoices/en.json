@@ -44,7 +44,9 @@
       "settlementTax": "Settlement tax",
       "settlementTotal": "Settlement total",
       "paid": "Paid"
-    }
+    },
+    "historyUnavailable": "Details are not available for this older invoice.",
+    "offlineOnly": "Paid offline only"
   },
   "lines": {
     "tableLabel": "Invoice line items",
@@ -89,7 +91,8 @@
     "checking": "Checking the payment…",
     "checkAgain": "Check again",
     "underReview": "The payment is under review. We will update the invoice when it is confirmed.",
-    "expiresAt": "Expires at {{time}}"
+    "expiresAt": "Expires at {{time}}",
+    "quoteExpired": "The quote expired, get a new one."
   },
   "toast": {
     "paid": "Invoice paid",
@@ -99,5 +102,11 @@
     "expired": "The payment page expired. Get a new amount.",
     "stillWaiting": "We are still waiting for the payment. Check again later.",
     "quoteChanged": "The amount changed. Get a new amount."
+  },
+  "empty": {
+    "none": "No invoices yet"
+  },
+  "payments": {
+    "offline": "Offline payment"
   }
 }

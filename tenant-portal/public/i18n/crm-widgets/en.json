@@ -12,8 +12,6 @@
   "allStatuses": "All statuses",
   "name": "Name",
   "kind": "Kind",
-  "usedOn": "Used on",
-  "usedOnCount": "Used on {{count}} dashboards",
   "updated": "Updated",
   "tableLabel": "Widgets list",
   "tabsLabel": "Widget scope tabs",
@@ -22,6 +20,12 @@
   "loadMore": "Load more",
   "clearFilters": "Clear filters",
   "loadFailedTitle": "Could not load widgets",
+  "forbiddenTitle": "You do not have access to widgets",
+  "notFoundTitle": "Widgets not found",
+  "notReadyTitle": "Widget data is not ready yet",
+  "backHome": "Back to home",
+  "correlationId": "Reference: {{id}}",
+  "rateLimited": "Too many requests. Try again in {{seconds}} s.",
   "views": {
     "table": "Table",
     "cards": "Cards"
@@ -41,7 +45,8 @@
     "opportunities": "Opportunities",
     "activities": "Activities",
     "customer_profiles": "Customer profiles",
-    "targets": "Targets"
+    "targets": "Targets",
+    "unclassified": "Unclassified"
   },
   "actions": {
     "menu": "Widget actions",

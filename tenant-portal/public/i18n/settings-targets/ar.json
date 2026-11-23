@@ -1,7 +1,6 @@
 {
   "title": "المستهدفات",
   "new": "مستهدف جديد",
-  "search": "البحث في المستهدفات",
   "empty": "لا توجد مستهدفات بعد",
   "forbiddenTitle": "ليست لديك صلاحية",
   "forbiddenText": "ليست لديك صلاحية للاطلاع على المستهدفات.",
@@ -103,7 +102,9 @@
     "targetValueLockedHint": "لا يمكن تعديل المستهدفات المُرسلة للاعتماد أثناء انتظار المراجعة.",
     "targetValuePlaceholder": "أدخل قيمة المستهدف",
     "reviewNote": "ملاحظة المراجعة",
-    "reviewNoteHint": "الملاحظة المسجلة من المراجع عند اعتماد المستهدف أو رفضه."
+    "reviewNoteHint": "الملاحظة المسجلة من المراجع عند اعتماد المستهدف أو رفضه.",
+    "subjectSearch": "البحث عن المستخدمين أو الفرق",
+    "subjectSearchHint": "ابحث عن المستخدمين والفرق النشطة في الفروع المتاحة."
   },
   "months": {
     "1": "يناير",
@@ -198,7 +199,8 @@
     "valueRateMax": "مستهدفات النسبة لا يمكن أن تتجاوز 100.",
     "valueMax": "القيمة تتجاوز الحد الأقصى المسموح به.",
     "rejectNoteRequired": "ملاحظة الرفض مطلوبة.",
-    "correctionReasonRequired": "سبب التصحيح مطلوب."
+    "correctionReasonRequired": "سبب التصحيح مطلوب.",
+    "valuePrecision": "استخدم منزلتين عشريتين على الأكثر."
   },
   "delete": {
     "title": "حذف المستهدف؟",
@@ -219,5 +221,47 @@
     "approved": "تم اعتماد المستهدف",
     "rejected": "تمت إعادة المستهدف إلى المسودة",
     "corrected": "تم حفظ تصحيح المستهدف"
+  },
+  "errors": {
+    "CRM_TARGET_METRIC_NOT_TARGETABLE": "لا يمكن تعيين مستهدفات على هذا المقياس.",
+    "CRM_TARGET_CURRENCY_INVALID": "اختر عملة صالحة لهذا المستهدف.",
+    "CRM_TARGET_VALUE_INVALID": "أدخل قيمة مستهدفة صالحة.",
+    "CRM_TARGET_PERIOD_INVALID": "اختر فترة صالحة للمستهدف.",
+    "CRM_TARGET_SUBJECT_INVALID": "اختر مستخدمًا أو فريقًا أو فرعًا صالحًا لهذا المستهدف.",
+    "CRM_TARGET_MEASURE_INVALID": "قياس المستهدف المحدد غير صالح.",
+    "CRM_TARGET_TEAM_SET_INVALID": "راجع الفرق المضمنة في هذا المستهدف.",
+    "CRM_TARGET_CORRECTION_REASON_REQUIRED": "أدخل سببًا لتصحيح المستهدف.",
+    "CRM_TARGET_REJECT_NOTE_REQUIRED": "أدخل ملاحظة الرفض قبل رفض المستهدف.",
+    "CRM_TARGET_NOT_FOUND": "لم يعد هذا المستهدف موجودًا.",
+    "CRM_TARGET_DUPLICATE": "يوجد مستهدف بالفعل لهذا المقياس والجهة والفترة.",
+    "CRM_TARGET_NOT_DRAFT": "يمكن حذف الأهداف التي في حالة مسودة فقط.",
+    "CRM_TARGET_LOCKED_SUBMITTED": "تم إرسال هذا المستهدف وهو بانتظار الاعتماد.",
+    "CRM_TARGET_NOT_SUBMITTED": "يمكن اعتماد أو رفض المستهدفات المرسلة فقط.",
+    "CRM_TARGET_PERIOD_CLOSED": "فترة هذا المستهدف مغلقة بالفعل.",
+    "CRM_TARGET_PERIOD_OPEN": "يُسمح بالتصحيحات فقط بعد إغلاق الفترة.",
+    "CRM_TARGET_SECOND_CURRENCY_AFTER_R2": "لا يمكن إضافة عملات إضافية بعد الاعتماد الأولي.",
+    "CRM_TARGET_REVISION_CONFLICT": "حدّث مستخدم آخر هذا المستهدف قبلك.",
+    "CRM_TARGET_SOURCE_NOT_READY": "الأهداف غير جاهزة بعد. أعد المحاولة لاحقًا.",
+    "CRM_TARGET_CORRECTION_VALUE_UNCHANGED": "أدخل قيمة تختلف عن قيمة الهدف المعتمد.",
+    "CRM_VALIDATION_FAILED": "تحقق من القيمة في هذا الحقل.",
+    "SUBJECT_OPTIONS_FAILED": "تعذر تحميل الجهات المستهدفة. أعد المحاولة.",
+    "BRANCH_PERMISSION_DENIED": "ليست لديك صلاحية لهذا الفرع.",
+    "CRM_PERMISSION_DENIED": "ليست لديك صلاحية لتنفيذ هذا الإجراء.",
+    "CRM_MODULE_DISABLED": "إدارة علاقات العملاء غير متاحة لحسابك.",
+    "CRM_SUBSCRIPTION_READ_ONLY": "خطتك تتيح القراءة فقط. لم تُحفظ التغييرات.",
+    "SEAT_OVER_CAPACITY_READ_ONLY": "خطتك تتيح القراءة فقط. لم تُحفظ التغييرات.",
+    "CRM_SUBSCRIPTION_BLOCKED": "إدارة علاقات العملاء غير متاحة لحسابك.",
+    "CRM_MODULE_SEAT_REQUIRED": "إدارة علاقات العملاء غير متاحة لحسابك.",
+    "CRM_FEATURE_DISABLED": "إدارة علاقات العملاء غير متاحة لحسابك.",
+    "MISSING_REQUIRED_PERMISSIONS": "ليست لديك صلاحية لذلك."
+  },
+  "yourBranch": "فرعك",
+  "askAdministrator": "اطلب من المسؤول منحك صلاحية عرض الفروع لاختيار فرع.",
+  "metricsUnavailable": "تعذر تحميل المقاييس. أعد المحاولة.",
+  "subjectsUnavailable": "تعذر تحميل المستخدمين والفرق لهذا الفرع. تحقق من صلاحياتك أو أعد المحاولة.",
+  "currenciesUnavailable": "العملات غير متاحة. أعد المحاولة قبل حفظ هدف مالي.",
+  "approvedEdit": {
+    "title": "تعديل الهدف المعتمد؟",
+    "text": "سيعود الهدف إلى حالة المسودة عند الحفظ، وسيتطلب اعتماده مجددًا."
   }
 }

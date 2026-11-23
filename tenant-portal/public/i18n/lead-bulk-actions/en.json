@@ -81,11 +81,17 @@
     "LEAD_OPEN_EXISTS": "Another open lead exists for this contact in this branch",
     "LEAD_CONVERSION_REQUIRED": "Use Convert for the converted stage",
     "CRM_REASON_REQUIRED": "A disqualification reason is required",
-    "CRM_SCOPED_PERMISSION_DENIED": "This owner can't be assigned here",
+    "CRM_SCOPED_PERMISSION_DENIED": "You do not have permission to perform this action.",
     "BRANCH_SCOPE_MISMATCH": "These leads are outside the current branch. Refresh the list and try again.",
     "LEAD_SELECTION_TOO_LARGE": "Too many leads selected. Narrow the search to 10,000 or fewer.",
     "LEAD_BULK_START_IN_PAST": "Choose a time in the future.",
-    "CRM_LEADS_DISABLED": "Leads are turned off for this company",
-    "generic": "Couldn't be changed"
-  }
+    "CRM_LEADS_DISABLED": "This module is turned off for this company.",
+    "generic": "Couldn't be changed",
+    "BULK_SELECTION_TOO_LARGE": "Select at most {{max}} leads.",
+    "BRANCH_REQUIRED": "Choose a branch in the top bar to see leads."
+  },
+  "catalogueUnavailable": "You do not have access to this list. Ask your administrator.",
+  "invalidValue": "Check this value.",
+  "retry": "Retry",
+  "reference": "Reference: {{id}}"
 }

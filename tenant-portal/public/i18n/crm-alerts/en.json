@@ -224,5 +224,13 @@
     "cohort": "Cohort",
     "reason": "Reason",
     "empty": "No evaluations found in this period."
-  }
+  },
+  "errors": {
+    "notSaved": "Not saved. Try again.",
+    "moduleDisabled": "This module is turned off for this company.",
+    "readOnly": "Your subscription or seat limit allows viewing only.",
+    "reloadRequired": "This action could not be safely repeated. Reload before trying again.",
+    "rateLimited": "Too many requests. Try again in {{seconds}} s."
+  },
+  "readiness": "Data readiness"
 }

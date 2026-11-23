@@ -30,7 +30,8 @@
     "rating": "Rating",
     "ratingHint": "Rate the opportunity from 1 to 3 stars. Click the active star to clear.",
     "color": "Colour",
-    "colorHint": "Optional colour stripe shown on the opportunity card."
+    "colorHint": "Optional colour stripe shown on the opportunity card.",
+    "currencyRestricted": "You can use only this record’s currency. A new amount needs currency-list access."
   },
   "deal": {
     "title": "Title",
@@ -97,7 +98,9 @@
     "tagsFailed": "Tags could not be loaded.",
     "contactsFailed": "Contacts could not be loaded.",
     "customFieldsBlocked": "Custom fields could not be loaded. Retry before saving.",
-    "customFieldsLoading": "Custom fields are still loading."
+    "customFieldsLoading": "Custom fields are still loading.",
+    "denied": "You do not have access to this list. Ask your administrator.",
+    "chooseBranch": "Choose a branch in the top bar to see opportunities."
   },
   "errors": {
     "required": "This field is required.",
@@ -117,6 +120,15 @@
     "cfDate": "Enter a valid date.",
     "cfInvalid": "This value does not match the field type.",
     "cfUnavailable": "This field is no longer available.",
-    "invalid": "Check this value."
-  }
+    "invalid": "Check this value.",
+    "cannotClear": "This field cannot be emptied yet",
+    "OPPORTUNITY_AMOUNT_SCALE_INVALID": "Amount precision is invalid",
+    "GW": {
+      "IDEM": {
+        "MISMATCH": "Request changed. Reload before saving again."
+      }
+    },
+    "OPPORTUNITY_CREATE_IDEMPOTENCY_MISMATCH": "Request changed. Reload before saving again."
+  },
+  "savedWithoutTags": "Opportunity saved; tags were not added"
 }

@@ -40,5 +40,26 @@
   "newSize": "الحجم الجديد",
   "newSizeHint": "سيتم تعديل حجم إطار العنصر ليتناسب مع متطلبات الرسم في الإصدار المختار.",
   "save": "حفظ",
-  "loading": "جارٍ التحميل"
+  "loading": "جارٍ التحميل",
+  "errors": {
+    "notSaved": "لم يتم الحفظ. حاول مرة أخرى.",
+    "reloadRequired": "تغيّر الطلب. أعد التحميل قبل المحاولة مجددًا.",
+    "moduleDisabled": "هذه الوحدة غير مفعّلة لهذه الشركة.",
+    "rateLimited": "طلبات كثيرة. حاول مرة أخرى بعد قليل.",
+    "rateLimitedIn": "طلبات كثيرة. حاول مجددًا بعد {{seconds}} ثانية.",
+    "reference": "{{message}} (المرجع: {{id}})",
+    "CRM_DASHBOARD_LAYOUT_OVERLAP": "تتداخل مربعات العناصر. حرّكها ثم احفظ مجددًا.",
+    "CRM_DASHBOARD_LAYOUT_LOCKED": "هذا التخطيط مقفل. أعد تحميل لوحة المعلومات.",
+    "CRM_DASHBOARD_PLACEMENT_LAYOUT_LIMIT": "بلغ هذا التخطيط الحد الأقصى لمواضع العناصر.",
+    "CRM_DASHBOARD_LAYOUT_SIZE_INVALID": "حجم أحد مربعات العناصر غير صالح.",
+    "CRM_DASHBOARD_LAYOUT_POSITION_INVALID": "موضع أحد مربعات العناصر غير صالح.",
+    "CRM_DASHBOARD_BREAKPOINT_UNKNOWN": "نقطة التوقف لهذا التخطيط غير متاحة. أعد تحميل لوحة المعلومات.",
+    "CRM_DASHBOARD_PLACEMENT_LIMIT": "بلغت لوحة المعلومات الحد الأقصى لمواضع العناصر.",
+    "CRM_DASHBOARD_WIDGET_LIMIT": "بلغت لوحة المعلومات الحد الأقصى للعناصر.",
+    "readOnly": "مساحة العمل للقراءة فقط. لم تُحفظ تغييراتك."
+  },
+  "loadFailed": "تعذّر تحميل هذا المحتوى",
+  "openReadiness": "فتح جاهزية البيانات",
+  "layoutValidation": "راجع مربع العنصر المحدّد.",
+  "invalidVersion": "اختر إصدارًا صالحًا"
 }

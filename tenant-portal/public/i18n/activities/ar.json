@@ -92,7 +92,8 @@
     "saveAndAdd": "حفظ وإضافة آخر",
     "cancel": "إلغاء",
     "close": "إغلاق",
-    "unsaved": "تغييرات غير محفوظة"
+    "unsaved": "تغييرات غير محفوظة",
+    "retryAssignees": "تعذر تحميل المسؤولين. أعد المحاولة"
   },
   "hints": {
     "type": "اختر نوع النشاط لإظهار حقول الجدولة أو الموقع أو الرابط أو الاتجاه المناسبة له.",
@@ -173,18 +174,21 @@
     "cancelled": "تم إلغاء النشاط"
   },
   "errors": {
-    "ACTIVITY_INVALID": "تحقق من بيانات النشاط وحاول مرة أخرى",
+    "ACTIVITY_INVALID": "تحقق من تفاصيل النشاط وحاول مرة أخرى",
     "ACTIVITY_VERSION_CONFLICT": "تم تعديل هذا النشاط من قِبل شخص آخر",
     "ACTIVITY_TERMINAL": "لا يمكن تعديل نشاط مكتمل أو ملغى",
-    "ACTIVITY_NOT_FOUND": "هذا النشاط لم يعد موجودًا",
+    "ACTIVITY_NOT_FOUND": "لم يعد هذا النشاط متاحا لك",
     "ACTIVITY_ACCESS_DENIED": "ليست لديك صلاحية الوصول إلى هذا النشاط",
     "ACTIVITY_VERSION_REQUIRED": "أعد تحميل النشاط وحاول مرة أخرى",
     "ACTIVITY_IDEMPOTENCY_KEY_INVALID": "تعذّر تكرار الطلب بأمان.",
-    "ACTIVITY_IDEMPOTENCY_MISMATCH": "تعذّر تكرار الطلب بأمان.",
-    "ACTIVITY_IDEMPOTENCY_IN_FLIGHT": "هذا الطلب قيد المعالجة بالفعل.",
+    "ACTIVITY_IDEMPOTENCY_MISMATCH": "أرسل هذا الطلب مسبقا بقيم مختلفة. أعد التحميل.",
+    "ACTIVITY_IDEMPOTENCY_IN_FLIGHT": "لا يزال الحفظ جاريا. حاول مرة أخرى.",
     "ACTIVITY_TARGET_RESOLVER_UNAVAILABLE": "تطبيق السجل لا يستجيب حاليًا.",
     "CORE_VALIDATION_FAILED": "البيانات المرسلة غير صالحة.",
-    "generic": "تعذّر حفظ النشاط"
+    "generic": "تعذّر حفظ النشاط",
+    "MISSING_REQUIRED_PERMISSIONS": "ليس لديك إذن للوصول إلى هذا النشاط",
+    "ACCESS_POLICY_BLOCKED": "الوصول إلى هذا النشاط محظور",
+    "ACCESS_POLICY_UNAVAILABLE": "تعذر التحقق من صلاحية الوصول. حاول مرة أخرى"
   },
   "meta": {
     "created": "أُنشئ في {{date}} بواسطة {{name}}",

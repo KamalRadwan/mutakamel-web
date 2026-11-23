@@ -142,7 +142,9 @@
     "statusLabel": "Status",
     "statusHint": "Whether this assignment is currently active or inactive.",
     "noEligibleTemplates": "No published templates eligible for assignment",
-    "noPublishedVersions": "No published versions available"
+    "noPublishedVersions": "No published versions available",
+    "overlapError": "Another default assignment overlaps this period.",
+    "fieldInvalid": "Check this value."
   },
   "testModal": {
     "title": "Test selection",
@@ -163,7 +165,7 @@
     "matchExact": "Exact match",
     "matchDefault": "Default (All languages)",
     "candidateCount": "Candidate count",
-    "noMatchTitle": "No matching assignment",
+    "noMatchTitle": "No template would be selected",
     "noMatchDescription": "No active default assignment matches this scope, document, language, and time."
   },
   "confirmDeactivate": {
@@ -196,7 +198,9 @@
   "toasts": {
     "created": "Assignment created.",
     "saved": "Assignment updated.",
-    "deactivated": "Assignment deactivated."
+    "deactivated": "Assignment deactivated.",
+    "impactNow": "Effective now; {{count}} selectors affected.",
+    "impactLater": "Scheduled; {{count}} selectors affected."
   },
   "states": {
     "emptyTitle": "No assignments for this scope",
@@ -209,7 +213,9 @@
     "forbiddenTitle": "Access denied",
     "forbiddenDescription": "You do not have permission to view template assignments.",
     "featureDisabledTitle": "Template Designer unavailable",
-    "featureDisabledDescription": "Template Designer is unavailable for this workspace."
+    "featureDisabledDescription": "The template designer is not part of your plan.",
+    "scopeEmptyTitle": "Nothing you can see in this scope",
+    "scopeEmptyDescription": "Choose another scope to view its assignments."
   },
   "errors": {
     "generic": "Something went wrong. Try again.",
@@ -222,7 +228,13 @@
     "CORE.TEMPLATE.FEATURE.DISABLED": "Template Designer is unavailable for this workspace.",
     "CORE.TEMPLATE.NOT_FOUND": "This assignment no longer exists or is outside your scope.",
     "CORE.TEMPLATE.DEPENDENCY.UNAVAILABLE": "The template service is temporarily unavailable.",
-    "CORE.TEMPLATE.ASSIGNMENT.OWNER_RUNTIME_UNAVAILABLE": "This document cannot be assigned yet because its owning app is not available to render it."
+    "CORE.TEMPLATE.ASSIGNMENT.OWNER_RUNTIME_UNAVAILABLE": "This document cannot be assigned yet because its owning app is not available to render it.",
+    "ASSIGNMENT.VERSION_INCOMPATIBLE": "The selected version is not published or is incompatible with this document.",
+    "ASSIGNMENT.SCOPE_INVALID": "Company templates can only be assigned to that company or its branches.",
+    "ASSIGNMENT.OWNER_RUNTIME_UNAVAILABLE": "This document cannot be assigned yet because its owning app is not available to render it.",
+    "DEPENDENCY.UNAVAILABLE": "The template service is temporarily unavailable.",
+    "SCHEMA.INVALID": "Check the entered values.",
+    "CORE.TEMPLATE.SCHEMA.INVALID": "Check the entered values."
   },
   "disabledReasons": {
     "OWNER_RUNTIME_UNAVAILABLE": "Not available yet"

@@ -48,7 +48,7 @@
   "emptyHint": "Reload to check the CRM reference catalogue again.",
   "loadFailed": "Could not load the static data catalogue.",
   "retry": "Try again",
-  "stale": "Could not refresh the catalogue. The last loaded version is still shown.",
+  "stale": "Could not refresh",
   "noAccess": "You do not have permission to view the static data catalogue.",
   "advertisedPolicy": "Attachment limits are shown for reference. Each upload is checked before it is accepted.",
   "groups": {

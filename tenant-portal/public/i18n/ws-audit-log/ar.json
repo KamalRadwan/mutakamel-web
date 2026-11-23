@@ -13,7 +13,7 @@
     "showAll": "جميع الأحداث",
     "showDeleted": "السجلات المحذوفة",
     "deletedPrefix": "اسم السجل يبدأ بـ",
-    "deletedPrefixHint": "يطابق بداية اسم السجل المحذوف.",
+    "deletedPrefixHint": "يبدأ بالنص مع مطابقة الحروف تمامًا",
     "deletedPrefixPlaceholder": "على سبيل المثال: النيل",
     "app": "التطبيق",
     "appHint": "التصفية حسب التطبيق أو الخدمة التي أصدرت الحدث.",
@@ -37,12 +37,14 @@
     "actionHint": "رمز الإجراء المطابق تمامًا، على سبيل المثال LEAD_STAGE_CHANGED",
     "actionPlaceholder": "على سبيل المثال: LEAD_STAGE_CHANGED",
     "includeRequests": "تضمين سجلات الطلبات",
-    "includeRequestsHint": "يعرض أدلة الطلبات الأولية المخفية افتراضيًا.",
+    "includeRequestsHint": "يعرض أيضًا الطلبات الأصلية وراء كل تغيير",
     "correlationChipLabel": "الارتباط المحدد:",
     "clearCorrelation": "مسح تصفية الارتباط",
     "apply": "تطبيق",
     "clear": "مسح التصفية",
-    "reload": "إعادة التحميل"
+    "reload": "إعادة التحميل",
+    "comingSoon": "متاح قريبًا",
+    "userReadRequired": "يتطلب صلاحية قراءة المستخدمين"
   },
   "validation": {
     "rangeRequired": "اختر نطاقًا زمنيًا لعرض سجل التدقيق.",
@@ -124,7 +126,9 @@
       "field": "الحقل",
       "before": "قبل",
       "after": "بعد",
-      "empty": "لم تُسجّل تغييرات في الحقول."
+      "empty": "لم تُسجّل تغييرات في الحقول.",
+      "redacted": "مخفي (حساس)",
+      "truncated": "مختصر"
     },
     "technical": {
       "title": "التفاصيل التقنية",

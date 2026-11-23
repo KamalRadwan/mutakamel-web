@@ -74,6 +74,7 @@
     "keep": "Keep editing"
   },
   "validation": {
+    "duplicateName": "Another stage has this name",
     "required": "This field is required.",
     "maxLength": "Enter at most {{max}} characters."
   },

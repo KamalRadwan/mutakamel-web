@@ -198,5 +198,33 @@
       "pollTimeout": "Preparing your change took longer than expected. Please try reviewing again.",
       "prefillSkipped": "The pre-selected item is no longer available for this change."
     }
+  },
+  "empty": {
+    "none": "No subscription"
+  },
+  "dunning": {
+    "settleFirst": "Settle the overdue invoice first"
+  },
+  "row": {
+    "downgradeNotAllowed": "Lowering is not available in self-service",
+    "holdersExceed": "{{holders}} users hold roles in this app, but you chose {{seats}} seats.",
+    "freeUpSeats": "Free up seats"
+  },
+  "notice": {
+    "cancelled": "This subscription is cancelled.",
+    "provisioning": "Your workspace is still being set up.",
+    "collection": "A payment is in progress for this subscription. Try again when it ends."
+  },
+  "operation": {
+    "review": "Under review by support",
+    "startAgain": "Start again",
+    "recover": "Recover"
+  },
+  "preview": {
+    "pricesChanged": "Prices changed, preview again.",
+    "topUp": "Top up {{amount}}"
+  },
+  "receipt": {
+    "settingUp": "Setting up your apps"
   }
 }

@@ -5,5 +5,19 @@
   "pdf": "PDF",
   "pdfNotAvailable": "Not available yet",
   "queued": "Export queued",
-  "findIt": "Find it in Exports"
+  "findIt": "Find it in Exports",
+  "pdfRendererUnavailable": "PDF rendering is unavailable",
+  "refresh": "Refresh",
+  "loadFailed": "Could not load export formats",
+  "forbidden": "You do not have permission to access exports",
+  "queueLimit": "Wait for your current exports to finish",
+  "notSaved": "Not saved. Try again.",
+  "moduleDisabled": "This module is turned off for this company.",
+  "hints": {
+    "export": "Choose a file format to queue an export of the current view.",
+    "CSV": "Queue a CSV file using the current filters and period.",
+    "XLSX": "Queue an Excel file using the current filters and period.",
+    "PDF": "Queue a PDF file using the current filters and period.",
+    "refresh": "Reload export formats and PDF availability. Export jobs run on the server."
+  }
 }

@@ -1,11 +1,13 @@
 {
   "summary": {
     "on": "الهاتف مفعّل · {{servers}} خوادم · مقاعد الهاتف {{occupied}} من {{allowed}}",
-    "off": "الهاتف متوقف حتى يُفعَّل خادم"
+    "off": "الهاتف متوقف حتى يُفعَّل خادم",
+    "enabled": "الهاتف مفعّل",
+    "seats": "مقاعد الهاتف {{occupied}} من {{allowed}} · المتاح {{available}}"
   },
   "toolbar": {
     "add": "إضافة خادم",
-    "limitHint": "حتى 10 خوادم",
+    "limitHint": "ما يصل إلى 50 خادمًا",
     "reload": "إعادة التحميل"
   },
   "table": {
@@ -43,7 +45,10 @@
     "notPurchasedLine": "فعّل إضافة الهاتف في اشتراكك لتهيئة خوادم SIP.",
     "viewPlans": "عرض الخطط",
     "provisioningTitle": "يجري إعداد الهاتف لمساحة العمل",
-    "provisioningLine": "لا يزال إعداد خدمة الهاتف جارياً. حاول مرة أخرى بعد قليل."
+    "provisioningLine": "لا يزال إعداد خدمة الهاتف جارياً. حاول مرة أخرى بعد قليل.",
+    "configLoadFailed": "تعذّر تحميل إعدادات الهاتف.",
+    "seatsLoadFailed": "تعذّر تحميل مقاعد الهاتف.",
+    "serversLoadFailed": "تعذّر تحميل خوادم الهاتف."
   },
   "delete": {
     "title": "حذف {{name}}؟",
@@ -146,12 +151,6 @@
       "text": "لديك تغييرات غير محفوظة على خادم الهاتف هذا. هل تريد تجاهلها؟",
       "confirm": "تجاهل",
       "cancel": "متابعة التعديل"
-    },
-    "conflict": {
-      "title": "تغيّرت إعدادات الخادم",
-      "text": "حدّث شخص آخر هذا الخادم أثناء تعديلك. أعد تحميل أحدث نسخة أو احتفظ بتغييراتك.",
-      "reload": "إعادة التحميل",
-      "keepMine": "الاحتفاظ بتغييراتي"
     }
   },
   "validation": {
@@ -161,8 +160,8 @@
     "websocketUrlPattern": "يجب أن يبدأ بـ ws:// أو wss://",
     "sipDomainRequired": "نطاق SIP مطلوب",
     "sipDomainPattern": "أدخل نطاقاً صالحاً (حروف وأرقام ونقاط و:منفذ اختياري)",
-    "sipUriPattern": "يجب أن يبدأ بـ sip: أو sips:",
-    "contactUriPattern": "لا يجوز أن يحتوي على مسافات",
+    "sipUriPattern": "استخدم عنوانًا يبدأ بـ sip:",
+    "contactUriPattern": "استخدم عنوانًا يبدأ بـ sip:",
     "callerIdPattern": "أرقام وعلامة + في البداية فقط",
     "registerExpiresRange": "يجب أن يكون عدداً صحيحاً من 30 إلى 86400",
     "timeoutRange": "يجب أن يكون عدداً صحيحاً من 3 إلى 120",
@@ -172,7 +171,8 @@
     "turnUsernameRequired": "اسم المستخدم مطلوب عند تعيين بيان الاعتماد",
     "turnCredentialRequired": "بيان الاعتماد مطلوب عند تعيين اسم المستخدم",
     "stunNoAuth": "لا يقبل خادم STUN اسم مستخدم أو بيان اعتماد",
-    "relayWithoutTurn": "يتطلب «الترحيل فقط» خادم TURN واحداً مفعّلاً على الأقل."
+    "relayWithoutTurn": "يتطلب «الترحيل فقط» خادم TURN واحداً مفعّلاً على الأقل.",
+    "callerIdMax": "استخدم 64 حرفًا كحد أقصى"
   },
   "toasts": {
     "saved": "حُفظ خادم الهاتف",
@@ -185,7 +185,7 @@
   },
   "errors": {
     "WEBPHONE_SERVER_NOT_FOUND": "لم يعد خادم الهاتف هذا موجوداً. أعد تحميل القائمة.",
-    "WEBPHONE_SERVER_LIMIT_REACHED": "يمكنك تهيئة ما يصل إلى 10 خوادم هاتف.",
+    "WEBPHONE_SERVER_LIMIT_REACHED": "ما يصل إلى 50 خادمًا",
     "WEBPHONE_SERVER_ORDER_INVALID": "تعذّر تحديث ترتيب الخوادم. أعد التحميل وحاول مرة أخرى.",
     "WEBPHONE_RELAY_WITHOUT_TURN": "يتطلب «الترحيل فقط» خادم TURN واحداً مفعّلاً على الأقل.",
     "WEBPHONE_ICE_SERVER_NOT_FOUND": "لم يعد أحد إدخالات ICE موجوداً. أعد التحميل وحاول مرة أخرى.",
@@ -193,6 +193,19 @@
     "WEBPHONE_MODULE_INACTIVE": "اشتراك الهاتف معلّق، والتعديلات متوقفة.",
     "WEBPHONE_PROVISIONING_PENDING": "لا يزال إعداد الهاتف قيد التنفيذ لمساحة العمل.",
     "stillProcessing": "لا يزال تغييرك السابق قيد المعالجة. انتظر قليلًا، ثم حاول مرة أخرى.",
-    "generic": "حدث خطأ. حاول مرة أخرى."
-  }
+    "generic": "حدث خطأ. حاول مرة أخرى.",
+    "WEBPHONE_ICE_CREDENTIALS_INVALID": "يجب إدخال اسم المستخدم وبيانات اعتماد TURN معًا أو تركهما فارغين.",
+    "WEBPHONE_SCOPE_MISMATCH": "خادم الهاتف هذا خارج مساحة العمل الحالية.",
+    "MISSING_REQUIRED_PERMISSIONS": "ليست لديك صلاحية لتنفيذ هذا الإجراء.",
+    "TENANT_WIDE_PERMISSION_REQUIRED": "يتطلب صلاحية على مستوى مساحة العمل",
+    "notSaved": "لم يتم الحفظ. أعد المحاولة"
+  },
+  "limitReached": "ما يصل إلى {{limit}} خادمًا",
+  "defaultTimeoutHint": "القيمة الافتراضية 10 ثوانٍ",
+  "defaultRetriesHint": "القيمة الافتراضية محاولتا إعادة",
+  "sipOnly": "استخدم عنوانًا يبدأ بـ sip:",
+  "overCapacitySince": "تجاوز السعة منذ {{date}}",
+  "graceUntil": "فترة السماح حتى {{date}}",
+  "moduleInactiveNotice": "اشتراك الهاتف معلّق. التغييرات متوقفة حتى إعادة تحميل الصفحة.",
+  "needsTenantWide": "يتطلب صلاحية على مستوى مساحة العمل"
 }

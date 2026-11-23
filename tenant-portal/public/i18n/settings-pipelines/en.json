@@ -197,7 +197,7 @@
     "PIPELINE_DEFAULT_INACTIVE": "Activate this pipeline before making it default",
     "PIPELINE_DEFAULT_RESTRICTED": "The default pipeline must be open to everyone",
     "PIPELINE_RESET_DEFAULT_ONLY": "Only the default pipeline can be reset",
-    "PIPELINE_RESET_BLOCKED": "Move opportunities away from extra stages before resetting",
+    "PIPELINE_RESET_BLOCKED": "Move the opportunities out of the extra stages first",
     "OPPORTUNITY_STAGE_NOT_FOUND": "This stage is no longer available",
     "PIPELINE_STAGE_ALREADY_ASSIGNED": "This stage is already in the pipeline",
     "PIPELINE_STAGE_SEMANTIC_DUPLICATE": "Only one New, one Won, and one Lost stage is allowed per pipeline",
@@ -215,6 +215,7 @@
     "PIPELINE_ASSIGNMENT_USERS_INVALID": "One or more selected users are inactive or have no CRM seat",
     "PIPELINE_ASSIGNMENT_TEAMS_INVALID": "One or more selected teams are no longer active",
     "PIPELINE_RESET_CATALOG_MISSING": "A standard stage is missing, so the pipeline cannot be reset",
-    "PIPELINE_DEFAULT_MISSING": "No default pipeline is set. Reload and try again."
+    "PIPELINE_DEFAULT_MISSING": "No default pipeline is set. Reload and try again.",
+    "PIPELINE_READ_AUTHORITY_INVALID": "Pipeline data is unavailable. Try again or contact your administrator."
   }
 }

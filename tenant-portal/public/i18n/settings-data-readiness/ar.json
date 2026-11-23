@@ -126,5 +126,23 @@
       "statusChanged": "تغيير الحالة",
       "statusChangedHint": "الوقت الذي انتقل فيه مصدر البيانات هذا آخر مرة إلى حالته الحالية."
     }
+  },
+  "reasons": {
+    "CAPTURE_NOT_DEPLOYED": "لم يُنشر التقاط البيانات بعد.",
+    "NO_ACTIVE_POLICY": "لم تُضبط سياسة نشطة.",
+    "CALENDAR_HOURS_MISSING": "ساعات تقويم العمل غير محددة.",
+    "CONFIG_NOT_DESIGNED": "الإعدادات غير متاحة بعد.",
+    "MODULE_NOT_RELEASED": "لم تُصدر هذه الوحدة بعد.",
+    "READ_MODEL_NOT_DEPLOYED": "لم يُنشر نموذج القراءة بعد.",
+    "EVENT_NOT_INGESTED": "لم يُستقبل الحدث بعد.",
+    "VIEW_NOT_RELEASED": "لم يُصدر هذا العرض بعد.",
+    "TRIGGER_NOT_RELEASED": "لم يُصدر هذا المشغّل بعد.",
+    "PROVIDER_WEBHOOK_MISSING": "لم يُضبط خطاف الويب الخاص بمزوّد الخدمة.",
+    "NO_SPEND_SOURCE": "لم يُربط مصدر لبيانات الإنفاق.",
+    "NO_TOUCH_SOURCE": "لم يُربط مصدر لبيانات التفاعل.",
+    "UNKNOWN": "غير متاح بعد"
+  },
+  "errors": {
+    "CRM_READINESS_SOURCE_UNKNOWN": "لم يُعثر على مصدر البيانات هذا."
   }
 }

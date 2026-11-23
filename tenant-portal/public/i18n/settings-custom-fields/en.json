@@ -1,9 +1,4 @@
 {
-  "tabs": {
-    "label": "Custom fields sections",
-    "definitions": "Field definitions",
-    "values": "Record values"
-  },
   "add": "New field",
   "addLimitHint": "The limit counts archived fields too.",
   "search": "Search by Arabic name, English name, or key",
@@ -78,7 +73,7 @@
     "placeholderEn": "English placeholder",
     "placeholderEnHint": "Optional English example or prompt shown inside the empty input, up to 180 characters.",
     "sortOrder": "Display order",
-    "sortOrderHint": "Whole number controlling the display position of this field on forms (smaller numbers appear first).",
+    "sortOrderHint": "Positive whole number setting the display position of this field on forms (smaller numbers appear first).",
     "activeLabel": "Field status",
     "activeHint": "Turn off to archive this field and hide it from new record entry while keeping existing saved values.",
     "previewTitle": "Live preview",
@@ -86,7 +81,13 @@
     "previewHint": "{{name}} ({{type}})",
     "previewSelectPlaceholder": "Choose an option",
     "previewMultiPlaceholder": "No active options yet",
-    "previewDatePlaceholder": "Choose a date"
+    "previewDatePlaceholder": "Choose a date",
+    "today": "Today",
+    "prevMonth": "Previous month",
+    "nextMonth": "Next month",
+    "hour": "Hour",
+    "minute": "Minutes",
+    "keyLockedHint": "The key is fixed after creation to preserve integrations."
   },
   "options": {
     "title": "Options",
@@ -104,11 +105,10 @@
     "remove": "Remove option",
     "empty": "Add at least one option.",
     "restoreRemoved": "Restore removed options",
-    "inUseNotice": "These options have saved values and cannot be removed or deactivated: {{keys}}"
+    "inUseNotice": "One of these options is still used by records; keep it active."
   },
   "requirements": {
     "title": "Required fields: {{name}}",
-    "archivedNotice": "This field is archived. Restore it before changing required rules.",
     "create": "Required when creating",
     "createHint": "Require users to fill in this field before a new record can be created.",
     "update": "Required when updating",
@@ -118,62 +118,14 @@
     "scopedTitle": "Rules for specific record types",
     "saved": "Requirement rule updated"
   },
-  "values": {
-    "branch": "Branch",
-    "branchHint": "Choose the branch whose records and custom field values you want to inspect or update.",
-    "ownerType": "Record type",
-    "ownerTypeHint": "Select the CRM record type to load its records and applicable custom fields.",
-    "record": "Record",
-    "recordHint": "Pick a specific record to view, edit, or clear its custom field values.",
-    "recordPlaceholder": "Select a record",
-    "recordSearch": "Search records",
-    "recordSearchHint": "Type a record name or code to filter the records list.",
-    "recordSearchPlaceholder": "Search records by name or code",
-    "emptyTitle": "Select a record to view custom fields",
-    "emptyHint": "Choose a branch, record type, and record above to view or update its custom field values.",
-    "noFields": "No active custom fields for this record type.",
-    "clear": "Clear",
-    "saved": "Value saved",
-    "cleared": "Value cleared",
-    "unset": "Not set",
-    "hour": "Hour",
-    "minute": "Minutes",
-    "today": "Today",
-    "prevMonth": "Previous month",
-    "nextMonth": "Next month",
-    "typeHints": {
-      "TEXT": "{{name}} ({{type}}): enter text up to 500 characters and save to update this record.",
-      "TEXTAREA": "{{name}} ({{type}}): enter detailed notes up to 5000 characters and save to update this record.",
-      "NUMBER": "{{name}} ({{type}}): enter a numeric value (integers or decimals) and save to update this record.",
-      "DATE": "{{name}} ({{type}}): pick a calendar date and save to update this record.",
-      "DATETIME": "{{name}} ({{type}}): pick a date and 24-hour time (hours and minutes) and save to update this record.",
-      "BOOLEAN": "{{name}} ({{type}}): toggle between yes and no and save to update this record.",
-      "SELECT": "{{name}} ({{type}}): choose one active option from the list and save to update this record.",
-      "MULTI_SELECT": "{{name}} ({{type}}): toggle one or more active options and save to update this record.",
-      "URL": "{{name}} ({{type}}): enter a valid web address starting with http:// or https:// and save.",
-      "EMAIL": "{{name}} ({{type}}): enter a valid email address (for example name@company.com) and save.",
-      "PHONE": "{{name}} ({{type}}): enter a phone number with 7 to 15 digits and save to update this record."
-    },
-    "examples": {
-      "url": "https://",
-      "email": "name@company.com",
-      "phone": "+201001234567"
-    }
-  },
   "validation": {
     "required": "This field is required.",
     "maxLength": "At most {{max}} characters.",
     "keyInvalid": "Use lowercase letters, digits and _, starting with a letter.",
-    "sortOrder": "Enter a valid integer.",
+    "sortOrder": "Enter a whole number of 1 or greater.",
     "optionKeyRequired": "Option key is required.",
     "optionKeyDuplicate": "Option key must be unique.",
-    "optionOrderInvalid": "Order must be at least 1.",
-    "invalidNumber": "Enter a valid number.",
-    "invalidUrl": "Enter a link starting with http:// or https://.",
-    "invalidEmail": "Enter a valid email address.",
-    "invalidPhone": "Enter 7 to 15 digits (+, spaces, -, . and parentheses allowed).",
-    "invalidDate": "Choose a valid date.",
-    "invalidOption": "Choose an active option."
+    "optionOrderInvalid": "Order must be at least 1."
   },
   "toasts": {
     "created": "Custom field created",
@@ -197,7 +149,11 @@
     "CUSTOM_FIELD_OPTION_IN_USE": "Cannot remove or deactivate options that are used by existing records.",
     "CUSTOM_FIELD_INACTIVE": "This field is archived and cannot be changed or filled.",
     "CUSTOM_FIELD_REQUIREMENT_SCOPE_INVALID": "Convert requirements do not apply to opportunities.",
-    "CUSTOM_FIELD_VALUE_INVALID": "Enter a valid value for this field type.",
-    "CUSTOM_FIELD_REQUIRED": "This field is required on update and cannot be cleared."
+    "CRM_LEADS_DISABLED": "Turn on Leads for at least one company first.",
+    "CRM_OPPORTUNITIES_DISABLED": "Turn on Opportunities for at least one company first."
+  },
+  "archive": {
+    "title": "Archive this custom field?",
+    "text": "New records will no longer show this field. Existing values are kept."
   }
 }

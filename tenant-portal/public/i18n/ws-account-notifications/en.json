@@ -49,12 +49,13 @@
       "desc": "When a record you own is deleted."
     }
   },
-  "footer": "Notifications appear in the bell at the top of the screen. Email notifications are not available yet.",
+  "footer": "Applies to new notifications.",
   "toast": {
     "saved": "Notification setting saved"
   },
   "errors": {
     "generic": "Could not save the setting. Try again.",
-    "NOTIFICATION_TYPE_UNKNOWN": "This notification type is no longer available."
+    "NOTIFICATION_TYPE_UNKNOWN": "This notification type is no longer available.",
+    "notSaved": "Not saved. Try again."
   }
 }

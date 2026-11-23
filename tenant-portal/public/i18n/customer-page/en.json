@@ -32,7 +32,7 @@
   "scopeDenied": "You do not have permission to view this customer.",
   "delete": {
     "title": "Delete {{name}}?",
-    "bodyReopensLead": "The lead this customer came from will be reopened.",
+    "bodyReopensLead": "The lead this customer was most recently converted from will be reopened. Any older converted leads will be disqualified.",
     "bodyPermanent": "This can't be undone.",
     "reasonLabel": "Reason",
     "reasonHint": "Optional note explaining why this customer is being deleted, up to 500 characters.",
@@ -41,5 +41,6 @@
   },
   "history": {
     "rating": "{{n}} of 3 stars"
-  }
+  },
+  "notFound": "This customer was not found."
 }

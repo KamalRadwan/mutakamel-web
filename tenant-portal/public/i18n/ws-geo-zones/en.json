@@ -67,7 +67,9 @@
     "loadMore": "Load more",
     "noSelected": "No cities in this zone.",
     "unknownCity": "Unknown city",
-    "unknownZone": "another zone"
+    "unknownZone": "another zone",
+    "zoneLookup": "Find zone names",
+    "zoneLookupHint": "Search the zone catalogue to show names for assigned cities."
   },
   "created": "Zone created.",
   "saved": "Changes saved.",
@@ -89,7 +91,10 @@
     "GEO_ZONE_CITY_CONFLICT": "{{city}} already belongs to {{zone}}. Remove it there first.",
     "GEO_ZONE_CITY_CONFLICT_OTHER": "{{city}} already belongs to another zone. Remove it there first.",
     "GEO_ZONE_CITY_INVALID": "One or more cities no longer exist. Reload and try again.",
-    "GEO_ZONE_NOT_FOUND": "This zone no longer exists."
+    "GEO_ZONE_NOT_FOUND": "This zone no longer exists.",
+    "TENANT_WIDE_PERMISSION_REQUIRED": "Needs workspace-wide access"
   },
-  "loadMore": "Load more"
+  "loadMore": "Load more",
+  "needsTenantWide": "Needs workspace-wide access",
+  "notSaved": "Not saved. Try again"
 }

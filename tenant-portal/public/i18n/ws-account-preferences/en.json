@@ -52,6 +52,7 @@
     "deviceOnly": "Saved on this device only. It could not be saved to your account."
   },
   "errors": {
+    "notSaved": "Not saved. Try again.",
     "generic": "Could not save. Try again.",
     "CORE_VALIDATION_FAILED": "Check the name fields.",
     "PARTY_IMAGE_INVALID": "Choose a PNG, JPEG or WebP image.",

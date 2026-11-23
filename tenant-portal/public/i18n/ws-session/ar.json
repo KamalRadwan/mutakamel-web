@@ -1,5 +1,23 @@
 {
   "failedTitle": "تعذّر تحميل جلستك",
   "failedText": "تعذّر تحميل بيانات حسابك، ولذلك لا يمكن لهذه الصفحة التحقق من صلاحياتك. أعد المحاولة.",
-  "retry": "إعادة المحاولة"
+  "retry": "إعادة المحاولة",
+  "ownerOnly": "يمكن لمالك مساحة العمل وحده تغيير مدد الجلسات",
+  "needsTenantWide": "يتطلب صلاحية على مستوى مساحة العمل",
+  "planReadOnly": "خطتك تتيح القراءة فقط حاليًا",
+  "notSaved": "لم يتم الحفظ. حاول مرة أخرى",
+  "restoreDefaults": "استعادة القيم الافتراضية",
+  "restoreDefaultsConfirm": "هل تريد استعادة مدد الجلسات الافتراضية؟ سيؤدي ذلك إلى استبدال القيم المخصصة الحالية.",
+  "defaultHint": "القيمة الافتراضية: {{default}} ثانية.",
+  "saved": "تم حفظ مدد الجلسات",
+  "saveFailed": "تعذّر حفظ مدد الجلسات",
+  "errors": {
+    "SESSION_POLICY_LIMIT_EXCEEDED": "أدخل قيمة ضمن النطاق {{range}}",
+    "SESSION_POLICY_IDLE_EXCEEDS_ABSOLUTE": "لا يمكن أن تتجاوز مهلة الخمول مدة الجلسة",
+    "SESSION_POLICY_PRECONDITION_FAILED": "تغيّرت مدد الجلسات. أعد التحميل أو احتفظ بتغييراتك.",
+    "SESSION_POLICY_IDEMPOTENCY_CONFLICT": "يتعارض هذا الحفظ مع محاولة سابقة. أعد التحميل أو احتفظ بتغييراتك.",
+    "SESSION_POLICY_PRECONDITION_REQUIRED": "تعذّر الحفظ. أعد تحميل الصفحة وحاول مرة أخرى",
+    "SESSION_POLICY_INVALID_ETAG": "تعذّر الحفظ. أعد تحميل الصفحة وحاول مرة أخرى",
+    "ACCESS_POLICY_BLOCKED": "خطتك تتيح القراءة فقط حاليًا"
+  }
 }

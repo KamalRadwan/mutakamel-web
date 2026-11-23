@@ -177,5 +177,34 @@
     "PLANNED": "مخطط",
     "CANCELLED": "ملغى",
     "UNKNOWN": "أخرى"
+  },
+  "retryAfter": "طلبات كثيرة. أعد المحاولة بعد {{seconds}} ث.",
+  "tooManyRequests": "طلبات كثيرة. أعد المحاولة لاحقًا.",
+  "requestId": "معرّف الطلب: {{id}}",
+  "provisioningTitle": "هذه البيانات غير جاهزة بعد",
+  "openReadiness": "عرض جاهزية البيانات",
+  "datesInUtc": "التواريخ بالتوقيت العالمي المنسق UTC.",
+  "datesInZone": "التواريخ بتوقيت {{zone}}.",
+  "currency": "العملة",
+  "currencyHint": "اختر عملة واحدة لعرض السجلات التي تكوّن هذا المبلغ.",
+  "currencyUnavailable": "ليست لديك صلاحية الوصول إلى قائمة العملات. اطلبها من المسؤول. تتوفر العملة المحفوظة فقط.",
+  "refresh": "تحديث",
+  "receipts": "إيصالات التنفيذ",
+  "receiptsHint": "الأدلة المحفوظة للأرقام في هذا التنفيذ. افتح التفسير لمعرفة كيفية حساب الرقم.",
+  "receiptsEmpty": "لا تتوفر إيصالات لهذا التنفيذ.",
+  "receiptColumns": {
+    "metricKey": "المقياس",
+    "resultStatus": "النتيجة",
+    "executedAt": "وقت التنفيذ",
+    "explain": "التفسير"
+  },
+  "receiptStatus": {
+    "OK": "جاهز",
+    "EMPTY": "لا توجد بيانات",
+    "PARTIAL": "بيانات جزئية",
+    "UNAVAILABLE": "غير متاح",
+    "DENIED": "الوصول مرفوض",
+    "DEADLINE_EXCEEDED": "انتهت المهلة",
+    "ERROR": "فشل"
   }
 }

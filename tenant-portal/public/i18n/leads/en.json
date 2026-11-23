@@ -20,7 +20,8 @@
     "stageFlag": "Stage flag",
     "leadType": "Lead type",
     "stage": "Stage",
-    "source": "Source"
+    "source": "Source",
+    "owner": "Owner"
   },
   "presets": {
     "mine": "My leads",
@@ -57,7 +58,7 @@
   "board": {
     "add": "Add a lead to {{stage}}",
     "empty": "No leads in this stage",
-    "emptyHelp": "Drag a lead here or add a new one.",
+    "emptyHelp": "Drag a lead here.",
     "allShown": "All leads are shown"
   },
   "card": {
@@ -162,6 +163,23 @@
     "choose": "Choose a reason",
     "noReasons": "There are no active disqualification reasons. Add one in CRM settings, then try again.",
     "confirm": "Disqualify",
-    "close": "Close"
-  }
+    "close": "Close",
+    "noAccess": "You cannot load the reasons. Ask your administrator."
+  },
+  "retry": "Retry",
+  "accessDenied": "You do not have permission to view leads.",
+  "chooseBranch": "Choose a branch in the top bar to see leads.",
+  "catalogueUnavailable": "You do not have access to this list. Ask your administrator.",
+  "datesUtc": "Dates are in UTC.",
+  "kpis": {
+    "totalLeads": "Total leads",
+    "newStageLeads": "New stage",
+    "newTodayLeads": "New today",
+    "hotLeads": "Hot leads",
+    "overdueActivityLeads": "Overdue activity",
+    "qualifiedLeads": "Qualified leads",
+    "hint": "Count for this search; the chart shows its share of all matching leads."
+  },
+  "notSaved": "Not saved. Try again.",
+  "unavailable": "Unavailable"
 }

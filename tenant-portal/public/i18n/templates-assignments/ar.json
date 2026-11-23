@@ -142,7 +142,9 @@
     "statusLabel": "الحالة",
     "statusHint": "بيان ما إذا كان هذا التعيين نشطًا أم غير نشط حاليًا.",
     "noEligibleTemplates": "لا توجد قوالب منشورة مؤهلة للتعيين",
-    "noPublishedVersions": "لا توجد إصدارات منشورة متاحة"
+    "noPublishedVersions": "لا توجد إصدارات منشورة متاحة",
+    "overlapError": "يتداخل تعيين افتراضي آخر مع هذه الفترة.",
+    "fieldInvalid": "تحقق من هذه القيمة."
   },
   "testModal": {
     "title": "اختبار اختيار القالب",
@@ -163,7 +165,7 @@
     "matchExact": "مطابقة تامة",
     "matchDefault": "افتراضي (كل اللغات)",
     "candidateCount": "عدد المرشحين",
-    "noMatchTitle": "لا يوجد تعيين مطابق",
+    "noMatchTitle": "لن يتم اختيار أي قالب",
     "noMatchDescription": "لا يوجد تعيين افتراضي نشط يطابق هذا النطاق والمستند واللغة والوقت."
   },
   "confirmDeactivate": {
@@ -196,7 +198,9 @@
   "toasts": {
     "created": "تم إنشاء التعيين.",
     "saved": "تم تحديث التعيين.",
-    "deactivated": "تم إيقاف تفعيل التعيين."
+    "deactivated": "تم إيقاف تفعيل التعيين.",
+    "impactNow": "يسري الآن؛ عدد محددات الاختيار المتأثرة: {{count}}.",
+    "impactLater": "مجدول؛ عدد محددات الاختيار المتأثرة: {{count}}."
   },
   "states": {
     "emptyTitle": "لا توجد تعيينات لهذا النطاق",
@@ -209,7 +213,9 @@
     "forbiddenTitle": "تم رفض الوصول",
     "forbiddenDescription": "ليست لديك صلاحية لعرض تعيينات القوالب.",
     "featureDisabledTitle": "مصمم القوالب غير متاح",
-    "featureDisabledDescription": "مصمم القوالب غير متاح لمساحة العمل هذه."
+    "featureDisabledDescription": "مصمم القوالب غير مشمول في خطتك.",
+    "scopeEmptyTitle": "لا توجد بيانات يمكنك عرضها في هذا النطاق",
+    "scopeEmptyDescription": "اختر نطاقًا آخر لعرض تعييناته."
   },
   "errors": {
     "generic": "حدث خطأ. حاول مرة أخرى.",
@@ -222,7 +228,13 @@
     "CORE.TEMPLATE.FEATURE.DISABLED": "مصمم القوالب غير متاح لمساحة العمل هذه.",
     "CORE.TEMPLATE.NOT_FOUND": "لم يعد هذا التعيين موجودًا أو يقع خارج نطاقك.",
     "CORE.TEMPLATE.DEPENDENCY.UNAVAILABLE": "خدمة القوالب غير متاحة مؤقتًا.",
-    "CORE.TEMPLATE.ASSIGNMENT.OWNER_RUNTIME_UNAVAILABLE": "لا يمكن إسناد هذا المستند بعد لأن التطبيق المالك غير متاح لعرضه."
+    "CORE.TEMPLATE.ASSIGNMENT.OWNER_RUNTIME_UNAVAILABLE": "لا يمكن إسناد هذا المستند بعد لأن التطبيق المالك غير متاح لعرضه.",
+    "ASSIGNMENT.VERSION_INCOMPATIBLE": "الإصدار المختار غير منشور أو غير متوافق مع هذا المستند.",
+    "ASSIGNMENT.SCOPE_INVALID": "لا يمكن تعيين قوالب الشركة إلا لتلك الشركة أو لفروعها.",
+    "ASSIGNMENT.OWNER_RUNTIME_UNAVAILABLE": "لا يمكن إسناد هذا المستند بعد لأن التطبيق المالك غير متاح لعرضه.",
+    "DEPENDENCY.UNAVAILABLE": "خدمة القوالب غير متاحة مؤقتًا.",
+    "SCHEMA.INVALID": "تحقق من القيم المدخلة.",
+    "CORE.TEMPLATE.SCHEMA.INVALID": "تحقق من القيم المدخلة."
   },
   "disabledReasons": {
     "OWNER_RUNTIME_UNAVAILABLE": "غير متاح بعد"

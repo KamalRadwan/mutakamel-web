@@ -97,6 +97,29 @@
     "startFromHint": "ابدأ بشبكة فارغة أو اعتمد أحد القوالب المتاحة.",
     "blank": "لوحة فارغة",
     "create": "إنشاء",
-    "cancel": "إلغاء"
-  }
+    "cancel": "إلغاء",
+    "blueprintDescriptionHint": "يحدد القالب وصف لوحة المعلومات. اختر لوحة فارغة لإدخال وصف.",
+    "sourceUnavailable": "لم يعد هذا القالب متاحًا. اختر مصدرًا آخر."
+  },
+  "currentBranch": "الفرع المحدد في الشريط العلوي",
+  "branchRequired": "اختر فرعًا.",
+  "fromTemplates": "اختيار قالب",
+  "provisioningTitle": "القوالب ليست جاهزة بعد",
+  "notFoundTitle": "لوحة المعلومات غير موجودة",
+  "readiness": "عرض جاهزية البيانات",
+  "reload": "إعادة التحميل",
+  "correlation": " المرجع: {{id}}",
+  "ownerLimitTitle": "تم بلوغ حد لوحات المعلومات",
+  "templatesFailedTitle": "تعذر تحميل القوالب",
+  "errors": {
+    "CRM_DASHBOARD_NAME_CONFLICT": "توجد لوحة معلومات بهذا الاسم بالفعل.",
+    "CRM_DASHBOARD_OWNER_LIMIT": "يمكنك امتلاك 50 لوحة معلومات كحد أقصى. احذف إحداها قبل إنشاء لوحة أخرى.",
+    "reloadRequired": "لا يطابق هذا الطلب مفتاحه المحفوظ. أعد التحميل قبل المحاولة مجددًا.",
+    "notSaved": "لم يتم الحفظ. حاول مجددًا.",
+    "rateLimitedIn": "طلبات كثيرة جدًا. حاول مجددًا بعد {{seconds}} ثانية.",
+    "rateLimited": "طلبات كثيرة جدًا. حاول مجددًا لاحقًا.",
+    "moduleDisabled": "هذه الوحدة متوقفة لهذه الشركة.",
+    "subscriptionReadOnly": "اشتراكك للقراءة فقط. أُوقفت التعديلات مؤقتًا."
+  },
+  "requestAccess": "طلب الوصول"
 }

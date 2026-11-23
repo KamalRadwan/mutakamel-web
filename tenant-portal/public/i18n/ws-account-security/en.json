@@ -64,7 +64,7 @@
   },
   "errors": {
     "generic": "Something went wrong. Try again.",
-    "CURRENT_PASSWORD_INVALID": "The current password is not correct.",
+    "CURRENT_PASSWORD_INVALID": "Current password is wrong.",
     "WEAK_PASSWORD": "This password is too common or too simple. Choose another.",
     "PASSWORD_TOO_LONG": "Use 128 characters or fewer.",
     "TOO_MANY_REQUESTS": "Too many attempts. Try again in a minute.",
@@ -72,5 +72,9 @@
     "AUTH_MFA_THROTTLED": "Too many attempts. Try again in {{s}} seconds.",
     "AUTH_MFA_UNAVAILABLE": "Two-step verification is not available right now. Contact your administrator.",
     "CORE_VALIDATION_FAILED": "The new password does not meet the rules above."
+  },
+  "unknown": {
+    "text": "We could not confirm the change. Check again.",
+    "check": "Check again"
   }
 }

@@ -72,5 +72,23 @@
       "customer_profiles": "Customers",
       "targets": "Targets"
     }
-  }
+  },
+  "errors": {
+    "notSaved": "Not saved. Try again.",
+    "reloadRequired": "The request changed. Reload before trying again.",
+    "moduleDisabled": "This module is turned off for this company.",
+    "rateLimited": "Too many requests. Try again shortly.",
+    "rateLimitedIn": "Too many requests. Try again in {{seconds}} s.",
+    "reference": "{{message}} (Reference: {{id}})",
+    "readOnly": "This workspace is read-only. Your changes were not saved."
+  },
+  "loadFailed": "Could not load this content",
+  "revokeReason": "Reason",
+  "revokeReasonHint": "Record whether the owner or an administrator is revoking this access.",
+  "ownerRevoked": "Owner revoked access",
+  "adminRevoked": "Administrator revoked access",
+  "reasonRequired": "Choose a revoke reason",
+  "save": "Save",
+  "openReadiness": "Open data readiness",
+  "invalidAccess": "Choose a valid access level"
 }

@@ -60,13 +60,13 @@
   },
   "inactive": "غير نشط",
   "actions": {
-    "requestAccess": "طلب إتاحة",
     "cancel": "إلغاء",
     "decide": "اتخاذ قرار",
     "review": "مراجعة",
     "view": "عرض",
     "loadMore": "تحميل المزيد",
-    "clearDate": "مسح التاريخ"
+    "clearDate": "مسح التاريخ",
+    "readiness": "جاهزية البيانات"
   },
   "fields": {
     "requester": "مقدّم الطلب",
@@ -97,12 +97,17 @@
     "loadTitle": "تعذر تحميل طلبات الإتاحة",
     "forbiddenTitle": "الوصول مقيّد",
     "forbiddenText": "ليست لديك صلاحية لعرض هذا القسم.",
-    "resourceRequired": "اختر لوحة تحكم أو عنصرًا.",
+    "resourceRequired": "افتح لوحة معلومات أو أداة لطلب الوصول.",
     "purposeRequired": "أدخل سبب طلب الإتاحة.",
     "noteRequired": "أدخل ملاحظة توضّح سبب الرفض.",
     "ownerRequired": "اختر مستخدمًا نشطًا.",
     "reasonRequired": "أدخل سبب نقل الملكية.",
-    "maxLength": "يجب ألا يتجاوز {{max}} حرفًا."
+    "maxLength": "يجب ألا يتجاوز {{max}} حرفًا.",
+    "notSaved": "لم يُحفظ. حاول مرة أخرى.",
+    "moduleDisabled": "هذه الوحدة معطلة لهذه الشركة.",
+    "reloadRequired": "أعد التحميل قبل المحاولة مجددًا. لم يتطابق مفتاح الطلب.",
+    "rateLimited": "طلبات كثيرة. حاول مرة أخرى بعد {{seconds}} ثانية.",
+    "ownerTargetsUnavailable": "مرشحو نقل ملكية لوحة المعلومات غير متاحين. يمكن تنفيذ النقل لمرشح مقترح مسبقًا."
   },
   "confirmCancelRequest": {
     "title": "إلغاء طلب الإتاحة؟",
@@ -131,12 +136,6 @@
   },
   "request": {
     "title": "طلب إتاحة",
-    "resourceType": "نوع المورد",
-    "resourceTypeHint": "اختر ما إذا كنت تطلب إتاحة للوحة تحكم أو لعنصر.",
-    "resource": "المورد",
-    "resourceHint": "اختر لوحة تحكم أو عنصرًا لا يمكنك فتحه أو تعديله حاليًا.",
-    "resourcePlaceholder": "اختر المورد",
-    "searchResource": "البحث في الموارد",
     "level": "مستوى الصلاحية",
     "levelHint": "العرض يتيح القراءة فقط، والتعديل يسمح بتغيير التخطيط أو الإعدادات.",
     "expires": "صالح حتى",
@@ -167,7 +166,7 @@
     "proposedOwnerPlaceholder": "اختر المالك الجديد",
     "searchOwner": "البحث في المستخدمين",
     "reason": "السبب",
-    "reasonHintPropose": "سياق اختياري عند اقتراح المالك، بحد أقصى 500 حرف.",
+    "reasonHintPropose": "سبب اقتراح مالك جديد مطلوب، بحد أقصى 500 حرف.",
     "reasonHintTransfer": "سبب تدقيق مطلوب لتنفيذ نقل الملكية، بحد أقصى 500 حرف.",
     "reasonPlaceholder": "اشرح قرار نقل الملكية",
     "propose": "اقتراح",

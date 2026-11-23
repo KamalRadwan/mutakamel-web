@@ -145,5 +145,8 @@
     "emptyFirstText": "Create your first activity on a CRM, Core, or Trade record.",
     "emptyFilteredTitle": "No activities match",
     "emptyFilteredText": "Try adjusting or clearing your filters to see more activities."
+  },
+  "errors": {
+    "ACTIVITY_INVALID": "Check the activity details and try again"
   }
 }
