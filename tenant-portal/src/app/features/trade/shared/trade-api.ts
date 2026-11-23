@@ -41,7 +41,6 @@ export function assertBodyBooleans(body: object | null | undefined, fields: read
   }
 }
 
-export { fakeDelay, fakeId } from '../../../core/fake/fake-utils';
 export { newIdempotencyKey } from '../../../core/api/idempotency';
 
 export function errorCodeOf(e: unknown): string | null {

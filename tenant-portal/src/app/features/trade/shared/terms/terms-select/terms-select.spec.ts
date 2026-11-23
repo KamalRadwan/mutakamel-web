@@ -3,10 +3,10 @@ import { type ComponentFixture, TestBed } from '@angular/core/testing';
 import { TranslocoLoader, type Translation, provideTransloco } from '@jsverse/transloco';
 import { of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { TERM_LIMITS, type TermSelections } from '../terms.model';
+import { TERM_LIMITS, type TermOptions, type TermSelections, type TradeTerm } from '../terms.model';
 import { TradeTermsSelect } from './terms-select';
 import { bindTradeHttpForTest } from '../../trade-http';
-import { TradeFoundationFixtures } from '../../testing/trade-foundation-fixtures';
+import { TradeHttpStub } from '../../testing/trade-http-testing';
 
 const TSET_EN: Translation = {
   select: {
@@ -73,13 +73,34 @@ class Host {
   });
 }
 
+function termOption(id: string, termType: TradeTerm['termType']): TradeTerm {
+  return {
+    id, termType, side: 'SALES', code: id.toUpperCase(), displayName: id,
+    localizedNames: { en: id }, localizedTexts: { en: id },
+    dueDays: termType === 'PAYMENT' ? 30 : null, incotermCode: null,
+    isDefault: termType === 'PAYMENT', isActive: true, sortOrder: 0,
+    version: 1, updatedAt: '2026-11-24T00:00:00Z',
+  };
+}
+
+const TERM_OPTIONS: TermOptions = {
+  byType: {
+    PAYMENT: [termOption('term-c1-payment-net30', 'PAYMENT')],
+    DELIVERY: [termOption('term-c1-delivery-site14', 'DELIVERY')],
+    WARRANTY: [termOption('term-c1-warranty-w12', 'WARRANTY')],
+    RETURNS: [termOption('term-c1-returns-ret14', 'RETURNS')],
+    GENERAL: ['gen', 'conf', 'force', 'extra'].map((code) => termOption(`term-c1-general-${code}`, 'GENERAL')),
+  },
+  defaults: { PAYMENT: 'term-c1-payment-net30' },
+};
+
 describe('TradeTermsSelect max clauses enforcement (§6)', () => {
   const fixtures: ComponentFixture<Host>[] = [];
   let dispose: () => void;
 
   beforeEach(() => {
     vi.useFakeTimers();
-    dispose = bindTradeHttpForTest(new TradeFoundationFixtures());
+    dispose = bindTradeHttpForTest(new TradeHttpStub({ 'GET /terms/options': TERM_OPTIONS }));
     localStorage.removeItem('lang');
     document.documentElement.lang = 'en';
     TestBed.configureTestingModule({
@@ -94,7 +115,7 @@ describe('TradeTermsSelect max clauses enforcement (§6)', () => {
 
   afterEach(() => {
     while (fixtures.length > 0) {
-      fixtures.pop()!.destroy();
+      fixtures.pop()?.destroy();
     }
     dispose();
     vi.useRealTimers();
@@ -111,12 +132,12 @@ describe('TradeTermsSelect max clauses enforcement (§6)', () => {
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;
-    const clausesInput = el.querySelector<HTMLInputElement>('#test-terms-clauses')!;
-    expect(clausesInput).not.toBeNull();
+    const clausesInput = el.querySelector<HTMLInputElement>('#test-terms-clauses');
+    if (!clausesInput?.parentElement) throw new Error('Missing clauses field');
     expect(clausesInput.readOnly).toBe(true);
     expect(clausesInput.getAttribute('title')).toBe('Up to 4 clauses.');
 
-    clausesInput.parentElement!.click();
+    clausesInput.parentElement.click();
     fixture.detectChanges();
     await vi.advanceTimersByTimeAsync(50);
     fixture.detectChanges();
@@ -124,8 +145,8 @@ describe('TradeTermsSelect max clauses enforcement (§6)', () => {
     const options = Array.from(el.querySelectorAll<HTMLElement>('ul[aria-multiselectable="true"] li[role="option"]'));
     expect(options.length).toBeGreaterThan(4);
 
-    const unselectedOption = options.find((opt) => opt.getAttribute('aria-selected') === 'false')!;
-    expect(unselectedOption).toBeDefined();
+    const unselectedOption = options.find((opt) => opt.getAttribute('aria-selected') === 'false');
+    if (!unselectedOption) throw new Error('Missing unselected clause');
     expect(unselectedOption.getAttribute('aria-disabled')).toBe('true');
 
     // Clicking a disabled 5th clause leaves selection unchanged at 4.
@@ -142,7 +163,8 @@ describe('TradeTermsSelect max clauses enforcement (§6)', () => {
 
     const reenabledOption = Array.from(
       el.querySelectorAll<HTMLElement>('ul[aria-multiselectable="true"] li[role="option"]'),
-    ).find((opt) => opt.getAttribute('aria-selected') === 'false')!;
+    ).find((opt) => opt.getAttribute('aria-selected') === 'false');
+    if (!reenabledOption) throw new Error('Missing enabled clause');
     expect(reenabledOption.getAttribute('aria-disabled')).toBeNull();
 
     reenabledOption.click();

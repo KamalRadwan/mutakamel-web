@@ -2,7 +2,6 @@ import { Service, inject } from '@angular/core';
 import { QueryClient } from '@tanstack/angular-query';
 import { CoreHttp, type CoreQuery, type CoreReadOptions, type CoreWriteMethod, type CoreWriteOptions, type CoreWriteResult } from '../../../core/api/core-http';
 import { ApiError, TRADE_API_BASE, toTradeError } from './trade-api';
-import { TradeCoreStub, TradeHttpStub } from './testing/trade-http-testing';
 
 export type TradeReadOptions = Pick<CoreReadOptions, 'scope'>;
 export type TradeWriteOptions = Omit<CoreWriteOptions, 'key' | 'bare' | 'noBody'> & { key: string };
@@ -78,11 +77,14 @@ export function tradeQueries(): QueryClient {
   return boundQueries;
 }
 
-export function bindTradeHttpForTest(stub: TradeHttpTransport = new TradeHttpStub(), core: TradeCoreTransport = new TradeCoreStub()): () => void {
+/** Tests supply their own transports; omitted transports stay unbound. */
+export function bindTradeHttpForTest(stub?: TradeHttpTransport, core?: TradeCoreTransport): () => void {
   const previousHttp = boundHttp;
   const previousCore = boundCore;
   const previousQueries = boundQueries;
-  bindTradeHttp(stub, defaultQueries, core);
+  boundHttp = stub;
+  boundCore = core;
+  boundQueries = defaultQueries;
   return () => {
     boundHttp = previousHttp;
     boundCore = previousCore;

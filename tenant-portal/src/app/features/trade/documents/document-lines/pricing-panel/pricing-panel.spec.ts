@@ -3,7 +3,8 @@ import { type ComponentFixture, TestBed } from '@angular/core/testing';
 import { TranslocoLoader, provideTransloco } from '@jsverse/transloco';
 import { of } from 'rxjs';
 import { bindTradeHttpForTest } from '../../../shared/trade-http';
-import { TradeFoundationFixtures } from '../../../shared/testing/trade-foundation-fixtures';
+import { TradeHttpStub } from '../../../shared/testing/trade-http-testing';
+import type { ReasonCode } from '../../../shared/trade-foundation.model';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TradeReasonPicker, type ReasonPickerValue } from '../../../shared/pickers/reason-picker/reason-picker';
 import type { DiscountPolicy } from '../../shared/documents.api';
@@ -49,6 +50,14 @@ interface PanelInternals {
 const LOYALTY = 'rsn-document_discount-loyal_customer';
 const OTHER = 'rsn-document_discount-other';
 
+const DISCOUNT_REASONS: ReasonCode[] = [
+  { id: LOYALTY, code: 'LOYAL_CUSTOMER', requiresNote: false },
+  { id: OTHER, code: 'OTHER', requiresNote: true },
+].map((reason, sortOrder) => ({
+  ...reason, kind: 'DOCUMENT_DISCOUNT', localizedNames: { en: reason.code, ar: reason.code },
+  isActive: true, isSystem: false, sortOrder, version: 1, updatedAt: '2026-11-24T00:00:00Z',
+}));
+
 describe('PricingPanel discount reason (picker host)', () => {
   const fixtures: ComponentFixture<Host>[] = [];
   let dispose: () => void;
@@ -74,12 +83,12 @@ describe('PricingPanel discount reason (picker host)', () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
-    dispose = bindTradeHttpForTest(new TradeFoundationFixtures());
+    dispose = bindTradeHttpForTest(new TradeHttpStub({ 'GET /reason-codes': { items: DISCOUNT_REASONS } }));
     localStorage.removeItem('lang');
   });
 
   afterEach(() => {
-    while (fixtures.length > 0) fixtures.pop()!.destroy();
+    while (fixtures.length > 0) fixtures.pop()?.destroy();
     dispose();
     vi.useRealTimers();
     localStorage.removeItem('lang');

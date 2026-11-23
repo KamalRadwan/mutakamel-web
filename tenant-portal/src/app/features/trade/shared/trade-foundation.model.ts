@@ -247,7 +247,7 @@ export interface PartyRef {
   code: string | null;
 }
 
-// Fake-store types
+// Foundation entities
 
 export interface CategoryNode {
   id: string;
@@ -281,22 +281,6 @@ export interface ReferenceData {
   owners: Owner[];
   taxes: Tax[];
   companyCurrencyCode: string | null;
-}
-
-export interface FakeItem extends Omit<ItemRow, 'categorySummary' | 'eligibility'> {
-  comboComponents: ComboComponent[];
-  optionalProducts: OptionalProduct[];
-  deletedAt: string | null;
-}
-
-export interface FakeListing extends ChannelListing {
-  itemId: string;
-  companyId: string;
-}
-
-export interface FakeParty extends PartyRef {
-  displayNameAr: string;
-  roles: CommercialAccountRole[];
 }
 
 // Cross-part views

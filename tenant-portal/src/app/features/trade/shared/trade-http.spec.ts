@@ -190,16 +190,16 @@ describe('TradeHttp', () => {
     }
   });
 
-  it('tradeHttp throws when not bound', () => {
+  it('omitted test transports remain unbound instead of installing default responses', () => {
     const restore = bindTradeHttpForTest();
     try {
-      bindTradeHttp(undefined as never, tradeQueries(), undefined as never);
       expect(() => tradeHttp()).toThrow('TradeHttp is not bound');
       expect(() => tradeCore()).toThrow('Trade CoreHttp is not bound');
     } finally { restore(); }
   });
 
   it('bindTradeHttpForTest restores the previous binding', () => {
+    bindTradeHttp(api, tradeQueries(), TestBed.inject(CoreHttp));
     const previous = { http: tradeHttp(), core: tradeCore(), queries: tradeQueries() };
     const stub = new TradeHttpStub();
     const core = new TradeCoreStub();

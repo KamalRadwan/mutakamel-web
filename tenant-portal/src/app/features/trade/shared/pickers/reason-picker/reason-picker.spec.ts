@@ -3,9 +3,8 @@ import { type ComponentFixture, TestBed } from '@angular/core/testing';
 import { TranslocoLoader, type Translation, provideTransloco } from '@jsverse/transloco';
 import { of } from 'rxjs';
 import { bindTradeHttpForTest } from '../../trade-http';
-import { TradeFoundationFixtures } from '../../testing/trade-foundation-fixtures';
+import { TradeHttpStub } from '../../testing/trade-http-testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { TRADE_FAKE_DB } from '../../trade-foundation.fake';
 import type { ReasonCode, ReasonKind } from '../../trade-foundation.model';
 import { TradeReasonPicker, type ReasonPickerValue } from './reason-picker';
 
@@ -72,11 +71,30 @@ const OTHER_CANCEL = 'rsn-document_cancel-other';
 const DUP_CANCEL = 'rsn-document_cancel-duplicate';
 const OTHER_REVERSAL = 'rsn-inventory_reversal-other';
 
+function reasonRows(kind: ReasonKind): ReasonCode[] {
+  return [
+    ['CUSTOMER_REQUEST', 'Customer request'],
+    ['DATA_ERROR', 'Data entry error'],
+    ['DUPLICATE', 'Duplicate document'],
+    ['PRICE_NOT_ACCEPTED', 'Price not accepted'],
+    ['OTHER', 'Other'],
+  ].map(([code, name], sortOrder) => ({
+    id: `rsn-${kind.toLowerCase()}-${code.toLowerCase()}`,
+    kind, code, localizedNames: { en: name, ar: name },
+    requiresNote: code === 'OTHER' && kind === 'DOCUMENT_CANCEL',
+    isActive: true, isSystem: false, sortOrder, version: 1,
+    updatedAt: '2026-11-24T00:00:00Z',
+  }));
+}
+
 describe('TradeReasonPicker', () => {
   const fixtures: ComponentFixture<Host>[] = [];
   let dispose: () => void;
+  let stub: TradeHttpStub;
+  let reasons: ReasonCode[];
 
   async function mount(kind: ReasonKind = 'DOCUMENT_CANCEL'): Promise<ComponentFixture<Host>> {
+    stub.register('GET', '/reason-codes', { items: reasons.filter((row) => row.kind === kind && row.isActive) });
     TestBed.configureTestingModule({
       providers: [
         provideTransloco({
@@ -103,21 +121,23 @@ describe('TradeReasonPicker', () => {
 
   function setNote(fixture: ComponentFixture<Host>, note: string): void {
     const textarea = (fixture.nativeElement as HTMLElement).querySelector<HTMLTextAreaElement>('#rp-note');
-    expect(textarea).not.toBeNull();
-    textarea!.value = note;
-    textarea!.dispatchEvent(new Event('input'));
-    textarea!.dispatchEvent(new Event('blur'));
+    if (!textarea) throw new Error('Missing note field');
+    textarea.value = note;
+    textarea.dispatchEvent(new Event('input'));
+    textarea.dispatchEvent(new Event('blur'));
     fixture.detectChanges();
   }
 
   beforeEach(() => {
     vi.useFakeTimers();
-    dispose = bindTradeHttpForTest(new TradeFoundationFixtures());
+    stub = new TradeHttpStub();
+    reasons = [...reasonRows('DOCUMENT_CANCEL'), ...reasonRows('INVENTORY_REVERSAL')];
+    dispose = bindTradeHttpForTest(stub);
     localStorage.removeItem('lang');
   });
 
   afterEach(() => {
-    while (fixtures.length > 0) fixtures.pop()!.destroy();
+    while (fixtures.length > 0) fixtures.pop()?.destroy();
     dispose();
     vi.useRealTimers();
     localStorage.removeItem('lang');
@@ -137,18 +157,13 @@ describe('TradeReasonPicker', () => {
     ]);
   });
 
-  it('hides inactive reasons', async () => {
-    const target = TRADE_FAKE_DB.reasons.find((r) => r.id === DUP_CANCEL)!;
-    target.isActive = false;
-    try {
-      const fixture = await mount('DOCUMENT_CANCEL');
-      const ids = internals(fixture).reasons().map((r) => r.id);
-      expect(ids).not.toContain(DUP_CANCEL);
-      expect(ids.length).toBe(4);
-      expect(internals(fixture).dropdownOptions().some((o) => o.value === DUP_CANCEL)).toBe(false);
-    } finally {
-      target.isActive = true;
-    }
+  it('requests active reasons and displays the filtered API response', async () => {
+    reasons = reasons.filter((row) => row.id !== DUP_CANCEL);
+    const fixture = await mount('DOCUMENT_CANCEL');
+    expect(internals(fixture).reasons().map((row) => row.id)).not.toContain(DUP_CANCEL);
+    expect(internals(fixture).reasons()).toHaveLength(4);
+    expect(stub.recordedReads()[0]?.query).toEqual({ kind: 'DOCUMENT_CANCEL', includeInactive: false });
+    expect(internals(fixture).dropdownOptions().some((option) => option.value === DUP_CANCEL)).toBe(false);
   });
 
   it('emits the value as { reasonCodeId, note }', async () => {
@@ -241,6 +256,7 @@ describe('TradeReasonPicker', () => {
     await select(fixture, DUP_CANCEL);
     setNote(fixture, 'keep me');
 
+    stub.register('GET', '/reason-codes', { items: reasonRows('INVENTORY_REVERSAL') });
     fixture.componentInstance.kind.set('INVENTORY_REVERSAL');
     fixture.detectChanges();
     await vi.advanceTimersByTimeAsync(350);
@@ -253,10 +269,8 @@ describe('TradeReasonPicker', () => {
   });
 
   it('shows a disabled "none" option for a kind with no reasons and no required error', async () => {
-    const removed = TRADE_FAKE_DB.reasons.filter((r) => r.kind === 'DOCUMENT_CANCEL');
-    TRADE_FAKE_DB.reasons = TRADE_FAKE_DB.reasons.filter((r) => r.kind !== 'DOCUMENT_CANCEL');
+    reasons = [];
     const fixture = await mount('DOCUMENT_CANCEL');
-    TRADE_FAKE_DB.reasons.push(...removed);
     fixture.componentInstance.showErrors.set(true);
     fixture.detectChanges();
     expect(internals(fixture).dropdownOptions()).toEqual([

@@ -8,7 +8,6 @@ import type {
   CommercialAccountRole,
   CommercialAccountStatus,
   CommercialAccountSummary,
-  FakeItem,
   ItemCompanyProfile,
   ItemDetail,
   ItemEligibility,
@@ -124,15 +123,6 @@ async function loadTaxesById(ctx: TradeContext): Promise<ReadonlyMap<string, Tax
   } catch {
     return new Map();
   }
-}
-
-export function toRow(item: FakeItem, _ctx: TradeContext = {}): ItemRow {
-  const { comboComponents: _cc, optionalProducts: _op, deletedAt: _del, ...base } = item;
-  return {
-    ...base,
-    categorySummary: null,
-    eligibility: null,
-  };
 }
 
 export function toSummary(
