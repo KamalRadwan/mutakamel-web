@@ -1,13 +1,13 @@
 import { DestroyRef, EnvironmentInjector, Injectable, createEnvironmentInjector, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
-import { TranslocoLoader, provideTransloco } from '@jsverse/transloco';
+import { TranslocoLoader, TranslocoService, provideTransloco } from '@jsverse/transloco';
 import { of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../api/api-errors';
 import { Notify } from '../notify/notify';
 import { TabLeader } from '../tabs/tab-leader';
-import { AuthSession, safeReturnUrl } from './auth-session';
+import { AuthSession } from './auth-session';
 import { AuthSessionApi } from './auth-session.api';
 import { FAKE_TENANT_ME, fakeGetMe, fakeLogout, fakeRefreshSession, fakeSessionCallCounts, resetFakeSession, setFakeLogoutError, setFakeSessionNext } from './auth-session.fake';
 import type { TenantMe } from './auth-session.model';
@@ -861,6 +861,86 @@ describe('AuthSession', () => {
     expect(navigate).toHaveBeenCalledTimes(1);
   });
 
+  it('signedOutByServer clears the session and MFA, broadcasts once, and shows the MFA notice without a returnUrl', async () => {
+    const router = TestBed.inject(Router);
+    vi.spyOn(router, 'url', 'get').mockReturnValue('/crm/leads?page=2');
+    const navigate = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+    const info = vi.spyOn(TestBed.inject(Notify), 'info').mockImplementation(() => undefined);
+    const translate = vi.spyOn(TestBed.inject(TranslocoService), 'translate')
+      .mockReturnValueOnce('Security settings changed')
+      .mockReturnValueOnce('Sign in again to continue.');
+    const session = TestBed.inject(AuthSession);
+    expect(await settle(session.ensureLoaded())).toBe('signed-in');
+    const mfa = TestBed.inject(MfaPending);
+    mfa.set(MFA_STEP, { origin: 'login' });
+    expect(mfa.current()).not.toBeNull();
+    const broadcast = vi.spyOn(FakeBroadcastChannel.prototype, 'postMessage');
+
+    await session.signedOutByServer('security.mfaChanged');
+
+    expect(session.status()).toBe('signed-out');
+    expect(session.me()).toBeNull();
+    expect(mfa.current()).toBeNull();
+    expect(broadcast).toHaveBeenCalledExactlyOnceWith({ type: 'signed-out', at: expect.any(Number) });
+    expect(translate).toHaveBeenNthCalledWith(1, 'security.mfaChanged.title');
+    expect(translate).toHaveBeenNthCalledWith(2, 'security.mfaChanged.text');
+    expect(info).toHaveBeenCalledExactlyOnceWith('Security settings changed', 'Sign in again to continue.');
+    expect(navigate).toHaveBeenCalledExactlyOnceWith('/login', { replaceUrl: true });
+  });
+
+  it('signedOutByServer makes no logout call and leaves the pending-logout marker unset', async () => {
+    vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+    vi.spyOn(TestBed.inject(Notify), 'info').mockImplementation(() => undefined);
+    const session = TestBed.inject(AuthSession);
+    await settle(session.ensureLoaded());
+    expect(localStorage.getItem(pendingLogout)).toBeNull();
+    const setItem = vi.spyOn(Storage.prototype, 'setItem');
+
+    await session.signedOutByServer('security.mfaChanged');
+
+    expect(api.logout).not.toHaveBeenCalled();
+    expect(setItem).not.toHaveBeenCalledWith(pendingLogout, expect.anything());
+    expect(localStorage.getItem(pendingLogout)).toBeNull();
+  });
+
+  it('signedOutByServer also makes a signed-in peer tab leave through the existing broadcast handler', async () => {
+    const router = TestBed.inject(Router);
+    vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+    vi.spyOn(TestBed.inject(Notify), 'info').mockImplementation(() => undefined);
+    const session = TestBed.inject(AuthSession);
+    await settle(session.ensureLoaded());
+    const otherRouter = { url: '/crm/leads', navigateByUrl: vi.fn().mockResolvedValue(true) };
+    const other = createEnvironmentInjector(
+      [AuthSession, CurrentUser, { provide: Router, useValue: otherRouter }],
+      TestBed.inject(EnvironmentInjector),
+    );
+    extraInjectors.push(other);
+    const peer = other.get(AuthSession);
+    expect(await settle(peer.ensureLoaded())).toBe('signed-in');
+
+    await session.signedOutByServer('security.mfaChanged');
+    await Promise.resolve();
+
+    expect(peer.status()).toBe('signed-out');
+    expect(otherRouter.navigateByUrl).toHaveBeenCalledExactlyOnceWith('/login', { replaceUrl: true });
+  });
+
+  it('signedOutByServer uses the all-sessions-ended notice keys', async () => {
+    vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+    const info = vi.spyOn(TestBed.inject(Notify), 'info').mockImplementation(() => undefined);
+    const translate = vi.spyOn(TestBed.inject(TranslocoService), 'translate')
+      .mockReturnValueOnce('All sessions ended')
+      .mockReturnValueOnce('Sign in again to continue.');
+    const session = TestBed.inject(AuthSession);
+    await settle(session.ensureLoaded());
+
+    await session.signedOutByServer('security.allSessionsEnded');
+
+    expect(translate).toHaveBeenNthCalledWith(1, 'security.allSessionsEnded.title');
+    expect(translate).toHaveBeenNthCalledWith(2, 'security.allSessionsEnded.text');
+    expect(info).toHaveBeenCalledExactlyOnceWith('All sessions ended', 'Sign in again to continue.');
+  });
+
   it('sessionEnded clears state, notifies once, and preserves only safe returnUrl', async () => {
     const router = TestBed.inject(Router);
     const navigate = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
@@ -880,15 +960,4 @@ describe('AuthSession', () => {
     expect(typeof lastTarget === 'string' ? lastTarget : router.serializeUrl(lastTarget)).toBe('/login');
   });
 
-  it('safeReturnUrl rejects external, protocol-relative, backslash, and auth paths', () => {
-    expect(safeReturnUrl('/crm/leads?tab=1')).toBe('/crm/leads?tab=1');
-    expect(safeReturnUrl('//evil.com')).toBeNull();
-    expect(safeReturnUrl('https://evil.com')).toBeNull();
-    expect(safeReturnUrl('/\\evil')).toBeNull();
-    expect(safeReturnUrl('/login')).toBeNull();
-    expect(safeReturnUrl('/verify')).toBeNull();
-    expect(safeReturnUrl('/reset-password')).toBeNull();
-    expect(safeReturnUrl('/tenant/reset-password')).toBeNull();
-    expect(safeReturnUrl('/tenant/accept-invite')).toBeNull();
-  });
 });

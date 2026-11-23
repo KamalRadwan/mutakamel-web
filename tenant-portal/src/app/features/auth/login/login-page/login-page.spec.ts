@@ -81,6 +81,15 @@ afterEach(() => {
 });
 
 describe('login page', () => {
+  it('projects its unchanged form into the shared auth shell', () => {
+    const shell = fixture.nativeElement.querySelector('app-auth-card main.login') as HTMLElement;
+    expect(shell).not.toBeNull();
+    expect(shell.querySelector('.login-card form.login-form #login-email')).not.toBeNull();
+    expect(shell.querySelector('.login-card form.login-form #login-password')).not.toBeNull();
+    expect(shell.querySelector('.login-artwork .login-ribbon img')).not.toBeNull();
+    expect(shell.querySelectorAll('ui-preferences')).toHaveLength(1);
+  });
+
   it('waits for the current user and permissions before navigating to the requested route', async () => {
     TestBed.inject(ActivatedRoute).snapshot.queryParams = { returnUrl: '/crm/leads' };
     let finish!: (me: typeof FAKE_TENANT_ME) => void;

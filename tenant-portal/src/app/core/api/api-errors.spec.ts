@@ -7,6 +7,8 @@ import {
   fieldErrorsOf,
   isValidationError,
   sharedErrorKeyOf,
+  writeErrorMessage,
+  isRetryableWriteError,
 } from './api-errors';
 
 type Dict = Record<string, unknown>;
@@ -165,5 +167,99 @@ describe('errorMessage', () => {
     expect(errorMessage(new ApiError(401, 'UNKNOWN_CODE'), 'x', en)).toBe('Your session has ended. Sign in again.');
     expect(errorMessage(new ApiError(500, 'UNKNOWN_CODE'), 'x', en)).toBe('Something went wrong. Try again.');
     expect(errorMessage(new Error('boom'), 'x', { translate: en })).toBe('Something went wrong. Try again.');
+  });
+});
+
+describe('api-errors', () => {
+  const en = translator(enGlobal as Dict);
+  const ar = translator(arGlobal as Dict);
+
+  it('maps Core idempotency mismatch codes', () => {
+    for (const code of ['CORE.TEMPLATE.IDEMPOTENCY.MISMATCH', 'ACTIVITY_IDEMPOTENCY_MISMATCH']) {
+      expect(sharedErrorKeyOf(code)).toBe('idempotencyMismatch');
+      expect(errorMessage(new ApiError(409, code), 'ops', en)).toBe(enGlobal.apiErrors.idempotencyMismatch);
+      expect(errorMessage(new ApiError(409, code), 'ops', ar)).toBe(arGlobal.apiErrors.idempotencyMismatch);
+    }
+  });
+
+  it('maps Core in-flight codes', () => {
+    for (const code of ['CORE.TEMPLATE.IDEMPOTENCY.IN_FLIGHT', 'ACTIVITY_IDEMPOTENCY_IN_FLIGHT']) {
+      expect(sharedErrorKeyOf(code)).toBe('idempotency');
+      expect(errorMessage(new ApiError(409, code), 'ops', en)).toBe(enGlobal.apiErrors.idempotency);
+      expect(errorMessage(new ApiError(409, code), 'ops', ar)).toBe(arGlobal.apiErrors.idempotency);
+    }
+  });
+
+  it('rate limit message uses Retry-After when present', () => {
+    for (const [dict, expected] of [[enGlobal, 'Too many requests. Try again in 17 s.'],
+      [arGlobal, 'طلبات كثيرة جدًا. حاول مرة أخرى بعد 17 ثانية.']] as const) {
+      const t = (key: string, params?: Record<string, unknown>) =>
+        (lookup(dict as Dict, key) ?? key).replace('{{seconds}}', String(params?.['seconds']));
+      expect(errorMessage(new ApiError(429, 'GW.RATE.LIMIT_EXCEEDED', { retryAfterSeconds: ['17'] }), 'ops', t)).toBe(expected);
+      for (const details of [undefined, {}, { retryAfterSeconds: [] }]) {
+        expect(errorMessage(new ApiError(429, 'GW.RATE.LIMIT_EXCEEDED', details), 'ops', t)).toBe(dict.apiErrors.rateLimited);
+      }
+      expect(errorMessage(new ApiError(429, 'RATE_LIMITED', { retryAfterSeconds: ['17'] }), 'ops', t)).toBe(dict.apiErrors.rateLimited);
+    }
+  });
+
+  it('maintenance is not a permission error', () => {
+    for (const code of ['TENANT_MAINTENANCE_ACTIVE', 'TENANT_MAINTENANCE_RELEASE_REQUIRED']) {
+      expect(sharedErrorKeyOf(code)).toBe('maintenance');
+      expect(errorMessage(new ApiError(403, code), 'ops', en)).toBe(enGlobal.apiErrors.maintenance);
+      expect(errorMessage(new ApiError(403, code), 'ops', ar)).toBe(arGlobal.apiErrors.maintenance);
+    }
+  });
+
+  it('any 413 is too large', () => {
+    for (const code of ['GW.BODY.TOO_LARGE', 'OTHER_CODE', 'COMMON.GENERIC.HTTP_ERROR', 'GENERIC', 'ASSET_NOT_FOUND', '']) {
+      expect(errorMessage(new ApiError(413, code), 'ops', en)).toBe(enGlobal.apiErrors.tooLarge);
+      expect(errorMessage(new ApiError(413, code), 'ops', ar)).toBe(arGlobal.apiErrors.tooLarge);
+    }
+  });
+
+  it('access policy unavailable message', () => {
+    expect(sharedErrorKeyOf('ACCESS_POLICY_UNAVAILABLE')).toBe('accessCheckUnavailable');
+    expect(errorMessage(new ApiError(503, 'ACCESS_POLICY_UNAVAILABLE'), 'ops', en)).toBe(enGlobal.apiErrors.accessCheckUnavailable);
+    expect(errorMessage(new ApiError(503, 'ACCESS_POLICY_UNAVAILABLE'), 'ops', ar)).toBe(arGlobal.apiErrors.accessCheckUnavailable);
+  });
+
+  it('scoped key still wins over the new shared keys', () => {
+    const codes = [
+      [409, 'CORE.TEMPLATE.IDEMPOTENCY.MISMATCH'], [409, 'ACTIVITY_IDEMPOTENCY_MISMATCH'],
+      [409, 'CORE.TEMPLATE.IDEMPOTENCY.IN_FLIGHT'], [409, 'ACTIVITY_IDEMPOTENCY_IN_FLIGHT'],
+      [429, 'GW.RATE.LIMIT_EXCEEDED'], [403, 'TENANT_MAINTENANCE_ACTIVE'],
+      [403, 'TENANT_MAINTENANCE_RELEASE_REQUIRED'], [413, 'GW.BODY.TOO_LARGE'], [503, 'ACCESS_POLICY_UNAVAILABLE'],
+    ] as const;
+    const scoped = Object.fromEntries(codes.map(([, code]) => [code, `Scoped ${code}`]));
+    const t = (key: string) => key.startsWith('ops.errors.') ? scoped[key.slice('ops.errors.'.length)] ?? key : en(key);
+    for (const [status, code] of codes) {
+      expect(errorMessage(new ApiError(status, code, { retryAfterSeconds: ['17'] }), 'ops', t)).toBe(`Scoped ${code}`);
+    }
+  });
+
+  it('writeErrorMessage keeps the SD-11 rule', () => {
+    for (const code of ['GW.AUTH.SESSION_REVOKED', 'AUTH_MFA_INVALID_CHALLENGE', 'INVALID_CREDENTIALS']) {
+      expect(writeErrorMessage(new ApiError(401, code), 'ops', en)).toBe(enGlobal.apiErrors.notSaved);
+      expect(writeErrorMessage(new ApiError(401, code), 'ops', { translate: ar })).toBe(arGlobal.apiErrors.notSaved);
+    }
+    const conflict = new ApiError(409, 'CORE.TEMPLATE.IDEMPOTENCY.MISMATCH');
+    expect(writeErrorMessage(conflict, 'ops', en)).toBe(errorMessage(conflict, 'ops', en));
+    const settings = translator({ ...enGlobal, settings: { errors: { notSaved: 'Settings not saved' } } });
+    expect(writeErrorMessage(new ApiError(401, 'X'), 'ops', settings)).toBe('Settings not saved');
+  });
+
+  it('isRetryableWriteError', () => {
+    for (const [status, code] of [[0, 'NETWORK_ERROR'], [500, 'SERVER_ERROR'], [503, 'ACCESS_POLICY_UNAVAILABLE'],
+      [409, 'GW.IDEM.IN_FLIGHT'], [409, 'CORE.TEMPLATE.IDEMPOTENCY.IN_FLIGHT'], [409, 'ACTIVITY_IDEMPOTENCY_IN_FLIGHT'],
+      [409, 'IDEMPOTENCY_IN_PROGRESS'], [409, 'IDEMPOTENCY_REQUEST_PROCESSING']] as const) {
+      expect(isRetryableWriteError(new ApiError(status, code)), `${status} ${code}`).toBe(true);
+    }
+    for (const [status, code] of [[400, 'CORE_VALIDATION_FAILED'], [409, 'STALE_VERSION'], [422, 'VALIDATION_ERROR'],
+      [401, 'GW.AUTH.SESSION_REVOKED'], [429, 'GW.RATE.LIMIT_EXCEEDED'], [409, 'CORE.TEMPLATE.IDEMPOTENCY.MISMATCH']] as const) {
+      expect(isRetryableWriteError(new ApiError(status, code)), `${status} ${code}`).toBe(false);
+    }
+    expect(isRetryableWriteError(new Error('failure'))).toBe(false);
+    expect(isRetryableWriteError({ status: 503, code: 'SERVER_ERROR' })).toBe(false);
   });
 });

@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, newIdempotencyKey } from '../../../../shared/widgets/dashboard/analytics-api';
+import { bindAnalyticsPermissions } from '../../../../shared/widgets/dashboard/analytics-permissions';
+import { ANALYTICS_PERMISSIONS_FIXTURE } from '../../../../shared/widgets/dashboard/analytics-permissions.fixture';
 import { FAKE_ME, FAKE_PEOPLE } from '../../../../shared/widgets/dashboard/fake/fake-org';
 import {
   fakeCreateSubscription,
@@ -11,6 +13,9 @@ import {
   fakeUpdateSubscription,
 } from './schedules.fake';
 import type { CreateSubscription } from './schedules.model';
+
+beforeEach(() => bindAnalyticsPermissions(() => ANALYTICS_PERMISSIONS_FIXTURE));
+afterEach(() => bindAnalyticsPermissions(() => []));
 
 async function settle<T>(promise: Promise<T>): Promise<T> {
   const guarded = promise.then(

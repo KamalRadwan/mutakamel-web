@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ApiError, newIdempotencyKey } from '../../../../shared/widgets/dashboard/analytics-api';
 import { errorDetailField } from '../shared/api-error-details';
 import {
@@ -11,7 +11,11 @@ import {
   submitAccessRequest,
 } from './access.api';
 import { FAKE_ACTIVE_PEOPLE } from './access.fake';
-import { FAKE_PERMISSIONS } from '../../../../shared/widgets/dashboard/analytics-permissions';
+import { bindAnalyticsPermissions } from '../../../../shared/widgets/dashboard/analytics-permissions';
+import { ANALYTICS_PERMISSIONS_FIXTURE } from '../../../../shared/widgets/dashboard/analytics-permissions.fixture';
+
+beforeEach(() => bindAnalyticsPermissions(() => ANALYTICS_PERMISSIONS_FIXTURE));
+afterEach(() => bindAnalyticsPermissions(() => []));
 
 // Contract: crm-app src/crm/dashboards/access (access-request.service.ts, owner-review.service.ts).
 
@@ -121,12 +125,12 @@ describe('owner reviews fake (backend contract)', () => {
   });
 
   it('refuses GET owner-reviews/:id without crm.widgets.transfer_ownership (403 before the lookup)', async () => {
-    FAKE_PERMISSIONS.delete('crm.widgets.transfer_ownership');
+    bindAnalyticsPermissions(() => ANALYTICS_PERMISSIONS_FIXTURE.filter((key) => key !== 'crm.widgets.transfer_ownership'));
     try {
       const denied = await rejection(getOwnerReview('01934b99-0000-7000-8000-000000000999'));
       expect(denied.status).toBe(403);
     } finally {
-      FAKE_PERMISSIONS.add('crm.widgets.transfer_ownership');
+      bindAnalyticsPermissions(() => ANALYTICS_PERMISSIONS_FIXTURE);
     }
   });
 

@@ -105,6 +105,8 @@ const GENERIC_ERROR_KEYS: Readonly<Record<string, string>> = {
   IDEMPOTENCY_REQUEST_PROCESSING: 'idempotency',
   IDEM_IN_FLIGHT: 'idempotency',
   'GW.IDEM.IN_FLIGHT': 'idempotency',
+  'CORE.TEMPLATE.IDEMPOTENCY.IN_FLIGHT': 'idempotency',
+  ACTIVITY_IDEMPOTENCY_IN_FLIGHT: 'idempotency',
   // Key missing or malformed (gateway catalogue keys and their wire codes).
   CRM_IDEMPOTENCY_KEY_REQUIRED: 'idempotencyKey',
   INVALID_IDEMPOTENCY_KEY: 'idempotencyKey',
@@ -116,12 +118,17 @@ const GENERIC_ERROR_KEYS: Readonly<Record<string, string>> = {
   IDEMPOTENCY_BODY_MISMATCH: 'idempotencyMismatch',
   IDEM_MISMATCH: 'idempotencyMismatch',
   'GW.IDEM.MISMATCH': 'idempotencyMismatch',
+  'CORE.TEMPLATE.IDEMPOTENCY.MISMATCH': 'idempotencyMismatch',
+  ACTIVITY_IDEMPOTENCY_MISMATCH: 'idempotencyMismatch',
   // 429 with a Retry-After header and no details.
   RATE_LIMITED: 'rateLimited',
   'COMMON.GENERIC.RATE_LIMITED': 'rateLimited',
   'GW.RATE.LIMIT_EXCEEDED': 'rateLimited',
   SUBSCRIPTION: 'subscription',
   SUBSCRIPTION_READ_ONLY: 'subscription',
+  TENANT_MAINTENANCE_ACTIVE: 'maintenance',
+  TENANT_MAINTENANCE_RELEASE_REQUIRED: 'maintenance',
+  ACCESS_POLICY_UNAVAILABLE: 'accessCheckUnavailable',
   ...Object.fromEntries([...VALIDATION_ERROR_CODES].map((code) => [code, 'validation'])),
 };
 
@@ -156,10 +163,15 @@ export function errorMessage(error: unknown, scope: string, t: SettingsTranslato
   const shared = (key: string, params?: Record<string, unknown>): string =>
     resolveShared(translate, key, params) ?? translate(`settings.errors.${key}`, params);
 
-  if (code) {
-    const scoped = resolveTranslation(translate, `${scopePrefix}${code}`, details);
-    if (scoped) return scoped;
+  const scoped = code ? resolveTranslation(translate, `${scopePrefix}${code}`, details) : null;
+  if (scoped) return scoped;
+  if (error instanceof ApiError && error.status === 413) return shared('tooLarge', details);
 
+  if (code) {
+    const retryAfter = details?.['retryAfterSeconds'];
+    if (code === 'GW.RATE.LIMIT_EXCEEDED' && Array.isArray(retryAfter) && typeof retryAfter[0] === 'string') {
+      return shared('rateLimitedIn', { ...details, seconds: retryAfter[0] });
+    }
     const mapped = GENERIC_ERROR_KEYS[code] ?? code;
     const sharedMessage = resolveShared(translate, mapped, details);
     if (sharedMessage) return sharedMessage;
@@ -181,6 +193,24 @@ export function errorMessage(error: unknown, scope: string, t: SettingsTranslato
   }
 
   return shared('generic');
+}
+
+export function writeErrorMessage(error: unknown, scope: string, t: SettingsTranslator): string {
+  if (error instanceof ApiError && error.status === 401) {
+    const translate: Translate = typeof t === 'function' ? t : (key, params) => t.translate(key, params);
+    return resolveShared(translate, 'notSaved', error.details) ?? translate('settings.errors.notSaved', error.details);
+  }
+  return errorMessage(error, scope, t);
+}
+
+export function isRetryableWriteError(error: unknown): boolean {
+  return error instanceof ApiError && (error.status === 0 || error.status >= 500 || [
+    'GW.IDEM.IN_FLIGHT',
+    'CORE.TEMPLATE.IDEMPOTENCY.IN_FLIGHT',
+    'ACTIVITY_IDEMPOTENCY_IN_FLIGHT',
+    'IDEMPOTENCY_IN_PROGRESS',
+    'IDEMPOTENCY_REQUEST_PROCESSING',
+  ].includes(error.code));
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

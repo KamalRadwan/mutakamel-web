@@ -1,5 +1,5 @@
 import { Service, Signal, signal } from '@angular/core';
-import { DEFAULT_SIGNED_IN_URL } from './auth-session';
+import { DEFAULT_SIGNED_IN_URL } from './return-url';
 import type { MfaStep } from './auth-session.model';
 
 export type MfaPendingOrigin = 'login' | 'invitation';

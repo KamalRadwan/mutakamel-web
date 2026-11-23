@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, newIdempotencyKey } from '../../../../shared/widgets/dashboard/analytics-api';
-import { FAKE_PERMISSIONS } from '../../../../shared/widgets/dashboard/analytics-permissions';
+import { bindAnalyticsPermissions } from '../../../../shared/widgets/dashboard/analytics-permissions';
+import { ANALYTICS_PERMISSIONS_FIXTURE } from '../../../../shared/widgets/dashboard/analytics-permissions.fixture';
 import { FAKE_BRANCHES } from '../../../../shared/widgets/dashboard/fake/fake-org';
 import { getPolicy, listPolicies, previewClock, publishPolicy } from './sla.api';
 import { resetSlaFakeIdempotency } from './sla.fake';
@@ -86,11 +87,11 @@ describe('sla fake (backend contract)', () => {
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     resetSlaFakeIdempotency();
+    bindAnalyticsPermissions(() => ANALYTICS_PERMISSIONS_FIXTURE);
   });
   afterEach(() => {
     vi.useRealTimers();
-    FAKE_PERMISSIONS.add('crm.sla.manage');
-    FAKE_PERMISSIONS.add('crm.dashboards.read.all');
+    bindAnalyticsPermissions(() => []);
   });
 
   describe('GET crm/sla/policies', () => {
@@ -123,8 +124,7 @@ describe('sla fake (backend contract)', () => {
     });
 
     it('answers a bad cursor with 400 CRM_DASHBOARD_LIST_CURSOR_INVALID before the reader check', async () => {
-      FAKE_PERMISSIONS.delete('crm.sla.manage');
-      FAKE_PERMISSIONS.delete('crm.dashboards.read.all');
+      bindAnalyticsPermissions(() => ANALYTICS_PERMISSIONS_FIXTURE.filter((key) => !['crm.sla.manage', 'crm.dashboards.read.all'].includes(key)));
       const error = await errorOf(listPolicies({ cursor: '%%%' }));
       expect(error.code).toBe('CRM_DASHBOARD_LIST_CURSOR_INVALID');
       const denied = await errorOf(listPolicies());
@@ -154,7 +154,7 @@ describe('sla fake (backend contract)', () => {
     });
 
     it('runs the permission guard before the ValidationPipe', async () => {
-      FAKE_PERMISSIONS.delete('crm.sla.manage');
+      bindAnalyticsPermissions(() => ANALYTICS_PERMISSIONS_FIXTURE.filter((key) => key !== 'crm.sla.manage'));
       const error = await errorOf(publishPolicy(body({ nameEn: 5 as unknown as string }), newIdempotencyKey()));
       expect([error.status, error.code]).toEqual([403, 'CRM_PERMISSION_DENIED']);
     });

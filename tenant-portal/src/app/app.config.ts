@@ -4,6 +4,7 @@ import { TitleStrategy, provideRouter, withComponentInputBinding } from '@angula
 import { provideTransloco } from '@jsverse/transloco';
 import { acceptLanguageInterceptor } from './core/api/accept-language.interceptor';
 import { sessionRecoveryInterceptor } from './core/auth/session-recovery.interceptor';
+import { AuthSession } from './core/auth/auth-session';
 import { LanguageState } from './core/i18n/language';
 import { TranslationLoader } from './core/i18n/translation-loader';
 import { ThemeState } from './core/theme/theme';
@@ -11,6 +12,7 @@ import { ViewScale } from './core/view/view-scale';
 import { TabLeader } from './core/tabs/tab-leader';
 import { AppTitleStrategy } from './layout/title/app-title-strategy';
 import { provideBulkJobModules } from './shared/bulk-jobs/bulk-job-modules';
+import { bindAnalyticsPermissions } from './shared/widgets/dashboard/analytics-permissions';
 import { CRM_CUSTOMERS_BULK_MODULE } from './features/crm/customers/customer-bulk/customers-bulk.descriptor';
 import { CRM_LEADS_BULK_MODULE } from './features/crm/leads/lead-bulk/leads-bulk.descriptor';
 import { CRM_OPPORTUNITIES_BULK_MODULE } from './features/crm/opportunities/opportunity-bulk/opportunities-bulk.descriptor';
@@ -61,6 +63,7 @@ export const appConfig: ApplicationConfig = {
       TRADE_ACCOUNTS_BULK_MODULE,
     ]),
     provideAutomationBulkModules(),
+    provideAppInitializer(() => { const session = inject(AuthSession); bindAnalyticsPermissions(() => session.me()?.permissions ?? []); }),
     provideAppInitializer(() => {
       inject(LanguageState);
       inject(ThemeState);

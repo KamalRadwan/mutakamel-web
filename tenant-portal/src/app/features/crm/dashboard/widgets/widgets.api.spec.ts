@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ApiError, newIdempotencyKey } from '../../../../shared/widgets/dashboard/analytics-api';
+import { bindAnalyticsPermissions } from '../../../../shared/widgets/dashboard/analytics-permissions';
+import { ANALYTICS_PERMISSIONS_FIXTURE } from '../../../../shared/widgets/dashboard/analytics-permissions.fixture';
 import { FAKE_PEOPLE } from '../../../../shared/widgets/dashboard/fake/fake-org';
 import { detailIssues } from '../shared/api-error-details';
 import { WIDGET_STORE } from '../shared/widget-store.fake';
@@ -14,6 +16,9 @@ import {
   saveDraft,
   transferImpact,
 } from './widgets.api';
+
+beforeEach(() => bindAnalyticsPermissions(() => ANALYTICS_PERMISSIONS_FIXTURE));
+afterEach(() => bindAnalyticsPermissions(() => []));
 
 // Contract: crm-app src/crm/dashboards (dashboard-widgets.service.ts, dashboard-widget-*.service.ts).
 

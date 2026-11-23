@@ -1,8 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ApiError, newIdempotencyKey } from '../analytics-api';
+import { bindAnalyticsPermissions } from '../analytics-permissions';
+import { ANALYTICS_PERMISSIONS_FIXTURE } from '../analytics-permissions.fixture';
 import { errorText } from '../panel-state';
 import { cancelExport, createExport, downloadExport, getExport, listExports, pdfAvailable, toExportPeriod } from './exports.api';
 import type { CreateExportRequest } from './exports.model';
+
+beforeEach(() => bindAnalyticsPermissions(() => ANALYTICS_PERMISSIONS_FIXTURE));
+afterEach(() => bindAnalyticsPermissions(() => []));
 
 const DASHBOARD = '01934a10-0000-7000-8000-000000000001';
 const body = (extra: Partial<CreateExportRequest> = {}): CreateExportRequest => ({

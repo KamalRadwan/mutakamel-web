@@ -1,6 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { bindAnalyticsPermissions } from '../analytics-permissions';
+import { ANALYTICS_PERMISSIONS_FIXTURE } from '../analytics-permissions.fixture';
 import type { GovernedTargetResult, WidgetExecution } from '../analytics.model';
 import { applyFakeGovernedTarget, applyFakeTopN, applyFakeWinRate } from './fake-closure';
+
+beforeEach(() => bindAnalyticsPermissions(() => ANALYTICS_PERMISSIONS_FIXTURE));
+afterEach(() => bindAnalyticsPermissions(() => []));
 
 const scalar = (value: number): WidgetExecution => ({
   widgetId: 'w',

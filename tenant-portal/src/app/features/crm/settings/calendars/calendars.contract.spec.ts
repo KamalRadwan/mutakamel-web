@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, FAKE_FAIL, FAKE_NOW } from '../../../../shared/widgets/dashboard/analytics-api';
-import { FAKE_PERMISSIONS } from '../../../../shared/widgets/dashboard/analytics-permissions';
+import { bindAnalyticsPermissions } from '../../../../shared/widgets/dashboard/analytics-permissions';
+import { ANALYTICS_PERMISSIONS_FIXTURE } from '../../../../shared/widgets/dashboard/analytics-permissions.fixture';
 import { FAKE_BRANCHES } from '../../../../shared/widgets/dashboard/fake/fake-org';
 import { getCalendar, publishCalendar } from './calendars.api';
 import {
@@ -38,13 +39,16 @@ async function errorOf(promise: Promise<unknown>): Promise<ApiError | undefined>
 
 /** Runs `work` with the given permission keys removed, then restores them. */
 async function withoutPermissions<T>(keys: readonly string[], work: () => Promise<T>): Promise<T> {
-  const removed = keys.filter((key) => FAKE_PERMISSIONS.delete(key));
+  bindAnalyticsPermissions(() => ANALYTICS_PERMISSIONS_FIXTURE.filter((key) => !keys.includes(key)));
   try {
     return await work();
   } finally {
-    for (const key of removed) FAKE_PERMISSIONS.add(key);
+    bindAnalyticsPermissions(() => ANALYTICS_PERMISSIONS_FIXTURE);
   }
 }
+
+beforeEach(() => bindAnalyticsPermissions(() => ANALYTICS_PERMISSIONS_FIXTURE));
+afterEach(() => bindAnalyticsPermissions(() => []));
 
 const CAIRO = FAKE_BRANCHES[0].id;
 const ALEX = FAKE_BRANCHES[1].id;

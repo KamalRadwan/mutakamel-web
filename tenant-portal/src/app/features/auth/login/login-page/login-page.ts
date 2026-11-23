@@ -1,5 +1,4 @@
-import { NgOptimizedImage } from '@angular/common';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormField, email, form, maxLength, required, submit } from '@angular/forms/signals';
@@ -8,18 +7,18 @@ import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerArrowRight, tablerEye, tablerEyeOff } from '@ng-icons/tabler-icons';
 import { map } from 'rxjs';
 import { ApiError, fieldErrorsOf, isValidationError } from '../../../../core/api/api-errors';
-import { AuthSession, DEFAULT_SIGNED_IN_URL, safeReturnUrl } from '../../../../core/auth/auth-session';
+import { AuthSession } from '../../../../core/auth/auth-session';
+import { DEFAULT_SIGNED_IN_URL, safeReturnUrl } from '../../../../core/auth/return-url';
 import { isMfaStep } from '../../../../core/auth/auth-session.model';
 import { AuthTransport, TenantProvisioningError } from '../../../../core/auth/auth-transport';
-import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
-import { ThemeState } from '../../../../core/theme/theme';
 import { TenantProvisioningPage } from '../../../../layout/tenant-provisioning/tenant-provisioning-page';
 import { Button } from '../../../../shared/ui/button/button';
 import { Checkbox } from '../../../../shared/ui/checkbox/checkbox';
 import { Field } from '../../../../shared/ui/field/field';
 import { Preferences } from '../../../../shared/ui/preferences/preferences';
 import { SettingsNotice } from '../../../../shared/ui/settings-notice/settings-notice';
+import { AuthCard } from '../../shared/auth-card/auth-card';
 import { retryAfterSeconds } from '../../shared/auth-throttle';
 import { MfaPending } from '../../shared/mfa-pending';
 import { login } from '../login.api';
@@ -36,12 +35,12 @@ interface ServerFieldErrors {
 @Component({
   selector: 'app-login-page',
   imports: [
-    NgOptimizedImage, FormField, RouterLink, TranslocoPipe, NgIcon, Button, Checkbox, Field,
-    Preferences, SettingsNotice, TenantProvisioningPage,
+    FormField, RouterLink, TranslocoPipe, NgIcon, Button, Checkbox, Field,
+    Preferences, SettingsNotice, TenantProvisioningPage, AuthCard,
   ],
   providers: [provideIcons({ tablerArrowRight, tablerEye, tablerEyeOff })],
   templateUrl: './login-page.html',
-  styleUrl: './login-page.css',
+  styleUrls: ['./login-page.css', '../../shared/auth-card/auth-preferences.css'],
 })
 export class LoginPage {
   private readonly route = inject(ActivatedRoute);
@@ -51,16 +50,8 @@ export class LoginPage {
   private readonly authSession = inject(AuthSession);
   private readonly authTransport = inject(AuthTransport);
   private readonly mfaPending = inject(MfaPending);
-  private readonly language = inject(LanguageState);
-  protected readonly theme = inject(ThemeState);
   protected readonly tenantProvisioning = signal(false);
   protected readonly checkingTenant = signal(false);
-
-  protected readonly ribbon = computed(() => `assets/auth/login-ribbon-${this.theme.current()}.webp`);
-  protected readonly copyrightYear = computed(() =>
-    new Intl.NumberFormat(this.language.current() === 'ar' ? 'ar-EG' : 'en', { useGrouping: false })
-      .format(new Date().getFullYear()),
-  );
 
   protected readonly credentials = signal<LoginForm>({ email: '', password: '', remember: false });
   protected readonly form = form(this.credentials, (path) => {

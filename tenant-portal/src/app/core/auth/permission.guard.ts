@@ -1,6 +1,7 @@
 import { inject } from '@angular/core';
 import { type CanActivateFn, RedirectCommand, Router } from '@angular/router';
 import { AuthSession } from './auth-session';
+import { hasScopedPermission } from './scoped-permission';
 
 export function requirePermission(
   keys: string | readonly string[],
@@ -14,9 +15,9 @@ export function requirePermission(
     if (status !== 'signed-in') return true;
 
     const permissions = typeof keys === 'string' ? [keys] : keys;
-    const hasPermission = (key: string) => session.hasPermission(key) || (
-      options.scoped === true && ['own', 'team', 'all'].some((scope) => session.hasPermission(`${key}.${scope}`))
-    );
+    const hasPermission = (key: string) => options.scoped === true
+      ? hasScopedPermission(session.me()?.permissions ?? [], key)
+      : session.hasPermission(key);
     const allowed =
       options.any === true
         ? permissions.some(hasPermission)

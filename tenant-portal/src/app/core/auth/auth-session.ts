@@ -9,12 +9,12 @@ import { AuthSessionApi } from './auth-session.api';
 import type { LoginSession, SessionStatus, TenantMe } from './auth-session.model';
 import { CurrentUser } from './current-user';
 import { MfaPending } from './mfa-pending';
+import { DEFAULT_SIGNED_IN_URL, safeReturnUrl } from './return-url';
 import { isCsrfRejection, isRefreshable, isSessionEnded, refreshExpiresCookies, refreshFailureKind } from './session-errors';
 
 const AUTH_CHANNEL = 'mutakamel-auth';
 const REFRESH_LOCK = 'mutakamel-tenant-refresh';
 const PENDING_LOGOUT = 'mutakamel-tenant-logout-pending';
-const AUTH_ROUTE_PREFIXES = ['/login', '/verify', '/reset-password', '/tenant/reset-password', '/tenant/accept-invite'] as const;
 const REFRESH_RETRY_DELAY_MS = 30_000;
 const ACTIVITY_INTERVAL_MS = 60_000;
 
@@ -22,6 +22,7 @@ type Renewal = 'ok' | 'ended';
 type RenewalTrigger = 'manual' | 'request' | 'background';
 export type RenewalState = 'ok' | 'retrying';
 export type SignInOutcome = 'signed-in' | 'signed-out' | 'failed';
+export type ServerSignOutNotice = 'security.mfaChanged' | 'security.allSessionsEnded';
 
 interface AccessTiming {
   issuedAt: number;
@@ -32,31 +33,6 @@ interface AccessTiming {
 interface RequestVersion {
   generation: number;
   revision: number;
-}
-
-export const DEFAULT_SIGNED_IN_URL = '/workspace/home';
-
-/** Validates that a returnUrl is a relative same-app path outside auth routes. */
-export function safeReturnUrl(raw: unknown): string | null {
-  if (typeof raw !== 'string' || !raw.startsWith('/') || raw.startsWith('//')) return null;
-  if (/[\\\u0000-\u001f\u007f]/u.test(raw)) return null;
-
-  let path: string;
-  try {
-    path = decodeURIComponent(raw.split(/[?#]/u)[0]);
-  } catch {
-    return null;
-  }
-  if (path.startsWith('//') || /[\\\u0000-\u001f\u007f]/u.test(path)) return null;
-
-  const segments = path.split('/').map((segment) => segment.split(';')[0]);
-  if (segments.some((segment) => segment === '.' || segment === '..')) return null;
-  const normalized = segments.join('/').replace(/\/+$/u, '');
-  if (AUTH_ROUTE_PREFIXES.some((prefix) => normalized === prefix || normalized.startsWith(`${prefix}/`))) {
-    return null;
-  }
-
-  return raw;
 }
 
 function accessTiming(expiresIn: number, issuedAt: number): AccessTiming {
@@ -258,6 +234,13 @@ export class AuthSession {
       );
     }
     await this.navigateToLogin(returnUrl ?? this.router.url);
+  }
+
+  /** The server has already ended this session (security change). Leave every tab, with no logout call and no returnUrl. */
+  async signedOutByServer(notice: ServerSignOutNotice): Promise<void> {
+    this.signOutLocally();
+    this.notify.info(this.transloco.translate(`${notice}.title`), this.transloco.translate(`${notice}.text`));
+    await this.navigateToLogin();
   }
 
   /** Clears in-memory state only. Server-side termination is a separate operation. */

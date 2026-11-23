@@ -274,6 +274,11 @@
     "idempotencyKey": "The request could not be sent safely. Reload the page and try again.",
     "idempotencyMismatch": "This request was already sent with different data. Reload the page and try again.",
     "rateLimited": "Too many requests. Wait a moment and try again.",
+    "rateLimitedIn": "Too many requests. Try again in {{seconds}} s.",
+    "maintenance": "The workspace is under maintenance. Try again later.",
+    "tooLarge": "The file or content is too large.",
+    "accessCheckUnavailable": "Access check is unavailable. Try again.",
+    "notSaved": "Not saved. Try again.",
     "subscription": "Your subscription allows viewing only."
   },
   "session": {
@@ -289,6 +294,16 @@
       "title": "Could not load your workspace",
       "text": "Check your connection and try again.",
       "retry": "Retry"
+    }
+  },
+  "security": {
+    "mfaChanged": {
+      "title": "Security settings changed",
+      "text": "Sign in again to continue."
+    },
+    "allSessionsEnded": {
+      "title": "All sessions ended",
+      "text": "Sign in again to continue."
     }
   }
 }

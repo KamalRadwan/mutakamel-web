@@ -9,6 +9,7 @@ import { AuthSession } from '../../../../core/auth/auth-session';
 import { AuthSessionApi } from '../../../../core/auth/auth-session.api';
 import { fakeGetMe, resetFakeSession } from '../../../../core/auth/auth-session.fake';
 import { Notify } from '../../../../core/notify/notify';
+import { ThemeState } from '../../../../core/theme/theme';
 import { resetFakeChallenges } from '../../shared/mfa-challenge.fake';
 import { MfaPending } from '../../shared/mfa-pending';
 import {
@@ -103,6 +104,29 @@ afterEach(() => {
 });
 
 describe('invitation page', () => {
+  it('renders inside the shared login shell and swaps its logo and ribbon with the theme', () => {
+    const theme = TestBed.inject(ThemeState);
+    theme.current.set('light');
+    const root = mountWithFragment('token=x');
+    const shell = root.querySelector('app-auth-card main.login');
+
+    expect(shell).not.toBeNull();
+    expect(shell?.querySelector('.login-artwork[aria-hidden="true"] .login-ribbon img')?.getAttribute('src'))
+      .toBe('assets/auth/login-ribbon-light.webp');
+    expect(shell?.querySelector('.login-card .login-logo')?.getAttribute('src'))
+      .toBe('assets/brand/logo-horizontal-dark.png');
+    expect(shell?.querySelector('ui-preferences')).not.toBeNull();
+
+    theme.current.set('dark');
+    fixture!.detectChanges();
+
+    expect(shell?.querySelector('.login-card .login-logo')?.getAttribute('src'))
+      .toBe('assets/brand/logo-horizontal-light.png');
+    expect(shell?.querySelector('.login-ribbon img')?.getAttribute('src'))
+      .toBe('assets/auth/login-ribbon-dark.webp');
+    expect(shell?.querySelectorAll('.login-logo')).toHaveLength(1);
+  });
+
   it('reads the fragment token into memory and strips it from the URL immediately', () => {
     const route = TestBed.inject(ActivatedRoute);
     const root = mountWithFragment(`token=${FAKE_INVITE_TOKENS.valid}`);

@@ -1,6 +1,7 @@
 import { inject } from '@angular/core';
 import { type CanActivateFn, Router } from '@angular/router';
-import { AuthSession, DEFAULT_SIGNED_IN_URL, safeReturnUrl } from './auth-session';
+import { AuthSession } from './auth-session';
+import { DEFAULT_SIGNED_IN_URL, safeReturnUrl } from './return-url';
 
 /** Ensures the session is bootstrapped before entering the authenticated app layout. */
 export const authGuard: CanActivateFn = async (_route, state) => {
