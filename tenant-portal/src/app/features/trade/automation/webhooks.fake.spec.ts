@@ -1,512 +1,754 @@
+import { DOCUMENT } from '@angular/common';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, newIdempotencyKey } from '../shared/trade-api';
-import { FAKE_ME, setFakeActor } from './automation-fake-actors';
+import { ApiError as CoreApiError } from '../../../core/api/api-errors';
+import { CoreHttp } from '../../../core/api/core-http';
+import { ApiError, TRADE_API_BASE, type TradeContext, newIdempotencyKey } from '../shared/trade-api';
+import { TradeHttpStub } from '../shared/testing/trade-http-testing';
+import { TradeHttp, bindTradeHttp, bindTradeHttpForTest, tradeQueries } from '../shared/trade-http';
 import { ActionKeys } from './automation-shared/action-keys';
-import * as api from './webhooks.api';
 import {
+  WEBHOOKS_QUERY_KEYS,
+  createSubscription,
   getDelivery,
   getDeliveryCounts,
   getSubscription,
   listDeliveries,
   listEvents,
   listSubscriptions,
+  retryDelivery,
   revealSecret,
+  revokeSecret,
+  rotateSecret,
+  sendTest,
+  updateSubscription,
 } from './webhooks.api';
 import {
-  fakeCreateSubscription,
-  fakeRevealSecret,
-  fakeUpdateSubscription,
-  setFakeWebhookContext,
-} from './webhooks.fake';
-import {
-  type CreateSubscriptionInput,
-  type RetryDeliveryInput,
-  type UpdateSubscriptionInput,
+  type CreateSubscriptionResult,
+  type DeliveryStatus,
+  type RetryDeliveryAccepted,
+  type RevealSecretResult,
+  type SecretOperationAccepted,
+  type TestDeliveryAccepted,
+  type UpdateSubscriptionResult,
+  type WebhookDelivery,
+  type WebhookDeliveryCounts,
+  type WebhookDeliveryDetail,
+  type WebhookEventCatalogue,
+  type WebhookSubscription,
   type WebhookSubscriptionDetail,
   canRetryDelivery,
   endpointText,
 } from './webhooks.model';
+import { backoffText, endpointProblems } from './webhooks.registry';
 
-// Each test call is a new user action, so it gets its own idempotency key.
-const createSubscription = (input: CreateSubscriptionInput) => api.createSubscription(input, newIdempotencyKey());
-const updateSubscription = (id: string, input: UpdateSubscriptionInput, ifMatch: number) =>
-  api.updateSubscription(id, input, ifMatch, newIdempotencyKey());
-const rotateSecret = (id: string, hours: number, ifMatch: number) =>
-  api.rotateSecret(id, hours, ifMatch, newIdempotencyKey());
-const revokeSecret = (id: string, ifMatch: number) => api.revokeSecret(id, ifMatch, newIdempotencyKey());
-const sendTest = (id: string) => api.sendTest(id, newIdempotencyKey());
-const retryDelivery = (id: string, input: RetryDeliveryInput, ifMatch: number) =>
-  api.retryDelivery(id, input, ifMatch, newIdempotencyKey());
+const SUB_ID = '019a0000-0000-7000-8000-000000000101';
+const SECRET_REF_ID = '019a0000-0000-7000-8000-000000000201';
+const DELIVERY_ID = '019a0000-0000-7000-8000-000000000301';
+const OP_ID = '019a0000-0000-7000-8000-000000000401';
+const COMPANY_ID = '019a0000-0000-7000-8000-00000000c001';
+const BRANCH_ID = '019a0000-0000-7000-8000-00000000b001';
 
-/** Runs the fake timers (request delay and fake worker) to completion and returns or rethrows the result. */
-async function settle<T>(promise: Promise<T>): Promise<T> {
-  const guarded = promise.then(
-    (value) => ({ ok: true as const, value }),
-    (error: unknown) => ({ ok: false as const, error }),
-  );
-  await vi.runAllTimersAsync();
-  const result = await guarded;
-  if (!result.ok) throw result.error;
-  return result.value;
-}
+const UUID_V7_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-/** Advances only past the request delay, so the fake worker has not answered yet. */
-async function settleRequest<T>(promise: Promise<T>): Promise<T> {
-  const guarded = promise.then(
-    (value) => ({ ok: true as const, value }),
-    (error: unknown) => ({ ok: false as const, error }),
-  );
-  await vi.advanceTimersByTimeAsync(400);
-  const result = await guarded;
-  if (!result.ok) throw result.error;
-  return result.value;
-}
-
-async function rejection(promise: Promise<unknown>): Promise<ApiError> {
-  try {
-    await settle(promise);
-  } catch (error) {
-    expect(error).toBeInstanceOf(ApiError);
-    return error as ApiError;
-  }
-  throw new Error('expected the call to reject');
-}
-
-const NOW = '2026-11-21T12:00:00.000Z';
-const ITEM_EVENT = 'trading.catalog.item_changed.v1';
-const ERP = '0193a100-0000-7000-8001-000000000001';
-const delivery = (n: number) => `0193a100-0000-7000-8005-${String(n).padStart(12, '0')}`;
-let seq = 0;
-
-function input(extra: Partial<CreateSubscriptionInput> = {}): CreateSubscriptionInput {
-  seq += 1;
+function makeSubscription(over: Partial<WebhookSubscription> = {}): WebhookSubscription {
   return {
-    code: `SPEC_HOOK_${seq}`,
+    id: SUB_ID,
+    code: 'ERP_SYNC',
+    status: 'ACTIVE',
+    version: 3,
     scopeTarget: 'COMPANY',
-    endpointUri: `https://hooks.example.com/spec/${seq}?tenant=acme`,
-    retryPolicyCode: 'EXPONENTIAL_STANDARD',
-    maxAttempts: 6,
-    events: [{ eventType: ITEM_EVENT, eventVersion: 1, fields: ['status', 'aggregateId'] }],
-    ...extra,
+    companyId: COMPANY_ID,
+    endpoint: { origin: 'https://erp.example.com', pathname: '/hooks/trade' },
+    activeVersionNumber: 1,
+    secret: {
+      id: SECRET_REF_ID,
+      status: 'ACTIVE',
+      providerSecretVersion: '1',
+      algorithmCode: 'HMAC_SHA256',
+      signatureVersion: 1,
+      activeFrom: '2026-11-20T00:00:00.000Z',
+      overlapUntil: null,
+      revokedAt: null,
+    },
+    updatedAt: '2026-11-23T00:00:00.000Z',
+    ...over,
   };
 }
 
-/** Creates a subscription and lets the fake worker finish the CREATE secret operation. */
-async function activeSubscription(extra: Partial<CreateSubscriptionInput> = {}): Promise<WebhookSubscriptionDetail> {
-  const created = await settle(createSubscription(input(extra)));
-  return settle(getSubscription(created.id));
+function makeSubscriptionDetail(over: Partial<WebhookSubscriptionDetail> = {}): WebhookSubscriptionDetail {
+  return {
+    id: SUB_ID,
+    code: 'ERP_SYNC',
+    status: 'ACTIVE',
+    version: 3,
+    currentVersion: {
+      id: '019a0000-0000-7000-8000-000000000501',
+      versionNumber: 1,
+      scopeTarget: 'COMPANY',
+      companyId: COMPANY_ID,
+      endpoint: { origin: 'https://erp.example.com', pathname: '/hooks/trade' },
+      retryPolicyCode: 'EXPONENTIAL_STANDARD',
+      maxAttempts: 5,
+      status: 'ACTIVE',
+      branches: [BRANCH_ID],
+      events: [{ eventType: 'trade.order.confirmed', eventVersion: 1, fields: ['id', 'status'] }],
+    },
+    secret: makeSubscription().secret,
+    secretReveal: { available: false, availableUntil: null },
+    secretOperation: null,
+    ...over,
+  };
 }
 
-beforeEach(() => {
-  vi.useFakeTimers();
-  vi.setSystemTime(new Date(NOW));
-  setFakeActor(FAKE_ME);
-  setFakeWebhookContext({ target: 'COMPANY', companyId: 'c1', branchId: null });
-});
+function makeDelivery(over: Partial<WebhookDelivery> = {}): WebhookDelivery {
+  return {
+    id: DELIVERY_ID,
+    subscriptionId: SUB_ID,
+    subscriptionCode: 'ERP_SYNC',
+    status: 'EXHAUSTED',
+    sourceEventType: 'trade.order.confirmed',
+    sourceEventId: '019a0000-0000-7000-8000-000000000601',
+    companyId: COMPANY_ID,
+    branchId: BRANCH_ID,
+    payloadSchemaCode: 'trade.order.confirmed.v1',
+    payloadHash: 'sha256:abc123',
+    payloadSizeBytes: 512,
+    attemptCount: 5,
+    nextAttemptAt: null,
+    terminalAt: '2026-11-23T01:00:00.000Z',
+    version: 7,
+    createdAt: '2026-11-23T00:00:00.000Z',
+    updatedAt: '2026-11-23T01:00:00.000Z',
+    endpoint: { origin: 'https://erp.example.com', pathname: '/hooks/trade' },
+    ...over,
+  };
+}
 
-afterEach(() => {
-  setFakeWebhookContext({ target: 'COMPANY', companyId: 'c1', branchId: null });
-  vi.useRealTimers();
-});
+function makeDeliveryDetail(over: Partial<WebhookDeliveryDetail> = {}): WebhookDeliveryDetail {
+  return {
+    ...makeDelivery(),
+    attempts: [
+      {
+        attemptNumber: 1,
+        startedAt: '2026-11-23T00:59:00.000Z',
+        completedAt: '2026-11-23T00:59:05.000Z',
+        durationMs: 5000,
+        outcome: 'RETRYABLE_FAILURE',
+        retryClass: 'TIMEOUT',
+        httpStatus: 504,
+        safeErrorCode: 'UPSTREAM_TIMEOUT',
+      },
+    ],
+    ...over,
+  };
+}
 
-describe('GET /webhooks/events', () => {
-  it('answers {items} with the backend event types and fields', async () => {
-    const catalogue = await settle(listEvents());
+function emptyCounts(): WebhookDeliveryCounts {
+  return {
+    total: 4,
+    byStatus: {
+      PENDING: 1,
+      RETRY_PENDING: 1,
+      DELIVERED: 1,
+      FAILED: 0,
+      EXHAUSTED: 1,
+      DISABLED: 0,
+    },
+  };
+}
 
-    expect(catalogue.items.map((e) => e.eventType)).toEqual([
-      'trading.catalog.item_changed.v1',
-      'trading.commercial_account.changed.v1',
-      'trading.quotation.sent.v1',
-      'trading.quotation.accepted.v1',
-      'trading.sales_order.confirmed.v1',
-      'trading.purchase_order.confirmed.v1',
-      'inventory.receipt.completed.v1',
-      'inventory.delivery.completed.v1',
-    ]);
-    expect(catalogue.items[0]).toEqual({
-      eventType: ITEM_EVENT,
-      eventVersion: 1,
-      fields: ['aggregateId', 'aggregateVersion', 'companyId', 'itemKind', 'canonicalCode', 'status', 'changedFields', 'businessEffectiveAt'],
+describe('trade automation webhooks api (AU-WH)', () => {
+  let stub: TradeHttpStub;
+  let restoreHttp: () => void;
+
+  beforeEach(() => {
+    stub = new TradeHttpStub({
+      'GET /webhooks/events': {
+        items: [{ eventType: 'trade.order.confirmed', eventVersion: 1, fields: ['id', 'status'] }],
+      } satisfies WebhookEventCatalogue,
+      'GET /webhooks/subscriptions': {
+        items: [makeSubscription()],
+        total: 1,
+        page: 1,
+        limit: 20,
+      },
+      'GET /webhooks/subscriptions/:id': makeSubscriptionDetail(),
+      'POST /webhooks/subscriptions': {
+        id: SUB_ID,
+        code: 'ERP_SYNC',
+        status: 'DRAFT',
+        currentActiveVersionId: null,
+        currentSecretReferenceId: SECRET_REF_ID,
+        version: 1,
+        createdBy: 'u1',
+        updatedBy: 'u1',
+        createdAt: '2026-11-23T00:00:00.000Z',
+        updatedAt: '2026-11-23T00:00:00.000Z',
+        deletedAt: null,
+        currentVersion: {
+          id: 'v1',
+          versionNumber: 1,
+          scopeTarget: 'COMPANY',
+          companyId: COMPANY_ID,
+          endpoint: { origin: 'https://erp.example.com', pathname: '/hooks/trade' },
+          retryPolicyCode: 'EXPONENTIAL_STANDARD',
+          maxAttempts: 5,
+          status: 'PENDING_SECRET',
+          version: 1,
+        },
+        secretSetup: {
+          status: 'PENDING',
+          operationId: OP_ID,
+          secretReferenceId: SECRET_REF_ID,
+          plaintextReturned: false,
+        },
+      } satisfies CreateSubscriptionResult,
+      'PATCH /webhooks/subscriptions/:id': {
+        id: SUB_ID,
+        code: 'ERP_SYNC',
+        status: 'ACTIVE',
+        currentActiveVersionId: 'v1',
+        currentSecretReferenceId: SECRET_REF_ID,
+        version: 4,
+        createdBy: 'u1',
+        updatedBy: 'u1',
+        createdAt: '2026-11-23T00:00:00.000Z',
+        updatedAt: '2026-11-23T00:05:00.000Z',
+        deletedAt: null,
+        currentVersion: {
+          id: 'v1',
+          versionNumber: 1,
+          scopeTarget: 'COMPANY',
+          companyId: COMPANY_ID,
+          endpoint: { origin: 'https://erp.example.com', pathname: '/hooks/trade' },
+          retryPolicyCode: 'EXPONENTIAL_STANDARD',
+          maxAttempts: 6,
+          status: 'ACTIVE',
+          version: 2,
+        },
+      } satisfies UpdateSubscriptionResult,
+      'POST /webhooks/subscriptions/:id/rotate-secret': {
+        statusCode: 202,
+        subscriptionId: SUB_ID,
+        status: 'PENDING_PROVIDER_RECONCILIATION',
+        operationId: OP_ID,
+        secretReferenceId: '019a0000-0000-7000-8000-000000000202',
+        plaintextReturned: false,
+      } satisfies SecretOperationAccepted,
+      'POST /webhooks/subscriptions/:id/revoke-secret': {
+        statusCode: 202,
+        subscriptionId: SUB_ID,
+        status: 'PENDING_PROVIDER_RECONCILIATION',
+        operationId: OP_ID,
+        secretReferenceId: SECRET_REF_ID,
+        plaintextReturned: false,
+      } satisfies SecretOperationAccepted,
+      'POST /webhooks/subscriptions/:id/test': {
+        statusCode: 202,
+        deliveryId: DELIVERY_ID,
+        status: 'PENDING',
+        synthetic: true,
+      } satisfies TestDeliveryAccepted,
+      'GET /webhooks/deliveries/counts': emptyCounts(),
+      'GET /webhooks/deliveries': {
+        items: [makeDelivery()],
+        total: 1,
+        page: 1,
+        limit: 20,
+      },
+      'GET /webhooks/deliveries/:id': makeDeliveryDetail(),
+      'POST /webhooks/deliveries/:id/retry': {
+        statusCode: 202,
+        deliveryId: DELIVERY_ID,
+        status: 'RETRY_PENDING',
+        nextAttemptAt: '2026-11-23T02:00:00.000Z',
+      } satisfies RetryDeliveryAccepted,
+    });
+    restoreHttp = bindTradeHttpForTest(stub);
+  });
+
+  afterEach(() => {
+    restoreHttp();
+    TestBed.resetTestingModule();
+    vi.restoreAllMocks();
+  });
+
+  it('calls read endpoints with exact paths, compacted query params, and OPTIONAL scope', async () => {
+    const events = await listEvents({ companyId: COMPANY_ID });
+    expect(events.items).toHaveLength(1);
+
+    await listSubscriptions({ page: 2, limit: 24, status: 'ACTIVE' }, { companyId: COMPANY_ID, branchId: BRANCH_ID });
+    await getSubscription(SUB_ID);
+    const counts = await getDeliveryCounts(
+      {
+        status: ['FAILED', 'EXHAUSTED'],
+        subscriptionId: SUB_ID,
+        eventType: 'trade.order.confirmed',
+        createdFrom: '2026-11-01T00:00:00.000Z',
+        createdTo: '2026-11-23T23:59:59.999Z',
+      },
+      { companyId: COMPANY_ID },
+    );
+    expect(counts.total).toBe(4);
+
+    const deliveries = await listDeliveries({
+      page: 1,
+      limit: 24,
+      status: ['EXHAUSTED'],
+      subscriptionId: SUB_ID,
+    });
+    expect(deliveries.items).toHaveLength(1);
+
+    const detail = await getDelivery(DELIVERY_ID, { companyId: COMPANY_ID, branchId: BRANCH_ID });
+    expect(detail.attempts).toHaveLength(1);
+
+    const reads = stub.recordedReads();
+    expect(reads[0]).toEqual({ path: '/webhooks/events', query: undefined, scope: { companyId: COMPANY_ID } });
+    expect(reads[1]).toEqual({
+      path: '/webhooks/subscriptions',
+      query: { page: 2, limit: 24, status: 'ACTIVE' },
+      scope: { companyId: COMPANY_ID, branchId: BRANCH_ID },
+    });
+    expect(reads[2]).toEqual({ path: `/webhooks/subscriptions/${SUB_ID}`, query: undefined, scope: {} });
+    expect(reads[3]).toEqual({
+      path: '/webhooks/deliveries/counts',
+      query: {
+        status: 'FAILED,EXHAUSTED',
+        subscriptionId: SUB_ID,
+        eventType: 'trade.order.confirmed',
+        createdFrom: '2026-11-01T00:00:00.000Z',
+        createdTo: '2026-11-23T23:59:59.999Z',
+      },
+      scope: { companyId: COMPANY_ID },
+    });
+    expect(reads[4]).toEqual({
+      path: '/webhooks/deliveries',
+      query: { page: 1, limit: 24, status: 'EXHAUSTED', subscriptionId: SUB_ID },
+      scope: {},
+    });
+    expect(reads[5]).toEqual({
+      path: `/webhooks/deliveries/${DELIVERY_ID}`,
+      query: undefined,
+      scope: { companyId: COMPANY_ID, branchId: BRANCH_ID },
     });
   });
-});
 
-describe('subscription list and detail', () => {
-  it('lists summaries with the endpoint as origin and path only', async () => {
-    const page = await settle(listSubscriptions());
-    const erp = page.items.find((s) => s.id === ERP)!;
+  it('subscriptions CRUD: createSubscription whitelists DTO body and attaches UUIDv7 idempotency key', async () => {
+    const dirtyInput = {
+      code: 'ERP_SYNC',
+      scopeTarget: 'COMPANY' as const,
+      endpointUri: 'https://erp.example.com/hooks/trade',
+      retryPolicyCode: 'EXPONENTIAL_STANDARD' as const,
+      maxAttempts: 5,
+      branchIds: [BRANCH_ID],
+      events: [{ eventType: 'trade.order.confirmed', eventVersion: 1, fields: ['id'], extraEventProp: 'drop' }],
+      unexpectedField: 'must-be-stripped',
+    };
 
-    expect(page.limit).toBe(50);
-    expect(Object.keys(erp).sort()).toEqual(
-      ['activeVersionNumber', 'code', 'companyId', 'endpoint', 'id', 'scopeTarget', 'secret', 'status', 'updatedAt', 'version'].sort(),
-    );
-    expect(erp.endpoint).toEqual({ origin: 'https://erp.example.com', pathname: '/hooks/trade' });
-    expect(erp.activeVersionNumber).toBe(3);
-  });
+    const created = await createSubscription(dirtyInput as never, undefined, { companyId: COMPANY_ID });
+    expect(created.id).toBe(SUB_ID);
 
-  it('never returns the query string of the stored endpoint', async () => {
-    const detail = await activeSubscription();
-
-    expect(endpointText(detail.currentVersion.endpoint)).toBe(`https://hooks.example.com/spec/${seq}`);
-    expect(JSON.stringify(detail)).not.toContain('tenant=acme');
-  });
-
-  it('rejects a non-UUIDv7 id with 400 and an unknown one with SUBSCRIPTION_NOT_FOUND', async () => {
-    expect((await rejection(getSubscription('whsub-erp-sync'))).code).toBe('TRADE.VALIDATION_FAILED');
-    const missing = await rejection(getSubscription('0193a100-0000-7000-8001-999999999999'));
-    expect(missing.status).toBe(404);
-    expect(missing.code).toBe('TRADE.WEBHOOK.SUBSCRIPTION_NOT_FOUND');
-  });
-
-  it('hides company subscriptions from the tenant context', async () => {
-    setFakeWebhookContext({ target: 'TENANT', companyId: null, branchId: null });
-
-    const page = await settle(listSubscriptions());
-
-    expect(page.items.some((s) => s.id === ERP)).toBe(false);
-  });
-});
-
-describe('POST /webhooks/subscriptions', () => {
-  it('answers the entity, a version summary and a pending secret setup without any secret', async () => {
-    const created = await settleRequest(createSubscription(input()));
-
-    expect(created.status).toBe('DRAFT');
-    expect(created.currentSecretReferenceId).toBeNull();
-    expect(created.currentVersion).toMatchObject({ versionNumber: 1, status: 'PENDING_SECRET', scopeTarget: 'COMPANY' });
-    expect(created.secretSetup).toMatchObject({ status: 'PENDING', plaintextReturned: false });
-
-    const detail = await settleRequest(getSubscription(created.id));
-    expect(detail.secret).toBeNull();
-    expect(detail.secretOperation).toMatchObject({ type: 'CREATE', status: 'PENDING' });
-    expect(detail.currentVersion.events[0].fields).toEqual(['aggregateId', 'status']);
-  });
-
-  it('activates the subscription once the worker applies the secret', async () => {
-    const detail = await activeSubscription();
-
-    expect(detail.status).toBe('ACTIVE');
-    expect(detail.currentVersion.status).toBe('ACTIVE');
-    expect(detail.secret?.status).toBe('ACTIVE');
-    expect(detail.secretReveal.available).toBe(true);
-  });
-
-  it('rejects unknown body fields (whitelist) and a missing idempotency key with 400', async () => {
-    const legacy = { ...input(), endpointUrl: 'https://x.example.com' } as CreateSubscriptionInput;
-    expect((await rejection(createSubscription(legacy))).code).toBe('TRADE.VALIDATION_FAILED');
-    expect((await rejection(fakeCreateSubscription(input()))).code).toBe('TRADE.IDEMPOTENCY.KEY_MISSING');
-  });
-
-  it('rejects the old retry policy codes with 400', async () => {
-    const error = await rejection(
-      createSubscription({ ...input(), retryPolicyCode: 'STANDARD' as unknown as CreateSubscriptionInput['retryPolicyCode'] }),
-    );
-    expect(error.code).toBe('TRADE.VALIDATION_FAILED');
-  });
-
-  it('rejects a duplicate code with 409 SUBSCRIPTION_CODE_CONFLICT', async () => {
-    const error = await rejection(createSubscription(input({ code: 'ERP_SYNC' })));
-
-    expect(error.status).toBe(409);
-    expect(error.code).toBe('TRADE.WEBHOOK.SUBSCRIPTION_CODE_CONFLICT');
-  });
-
-  it.each([
-    'http://hooks.example.com/x',
-    'https://localhost/x',
-    'https://10.1.2.3/x',
-    'https://hooks.example.com:8080/x',
-    'https://hooks.example.com/x?token=abc',
-  ])('rejects the endpoint %s with 422 ENDPOINT_FORBIDDEN and no details', async (endpointUri) => {
-    const error = await rejection(createSubscription(input({ endpointUri })));
-
-    expect(error.status).toBe(422);
-    expect(error.code).toBe('TRADE.WEBHOOK.ENDPOINT_FORBIDDEN');
-    expect(error.details).toBeUndefined();
-  });
-
-  it('rejects a field outside the event projection with 422 PAYLOAD_INVALID', async () => {
-    const error = await rejection(
-      createSubscription(input({ events: [{ eventType: ITEM_EVENT, eventVersion: 1, fields: ['itemId'] }] })),
-    );
-    expect(error.code).toBe('TRADE.WEBHOOK.PAYLOAD_INVALID');
-  });
-
-  it('applies the scope rules: TENANT from a company 422, COMPANY from the tenant 403', async () => {
-    expect((await rejection(createSubscription(input({ scopeTarget: 'TENANT' })))).code).toBe(
-      'TRADE.WEBHOOK.PAYLOAD_INVALID',
-    );
-    setFakeWebhookContext({ target: 'TENANT', companyId: null, branchId: null });
-    const denied = await rejection(createSubscription(input()));
-    expect(denied.status).toBe(403);
-    expect(denied.code).toBe('TRADE.AUTH.TARGET_DENIED');
-  });
-
-  it('rejects branches on a tenant subscription and unknown branches with 422', async () => {
-    setFakeWebhookContext({ target: 'TENANT', companyId: null, branchId: null });
-    expect((await rejection(createSubscription(input({ scopeTarget: 'TENANT', branchIds: ['b1'] })))).code).toBe(
-      'TRADE.WEBHOOK.PAYLOAD_INVALID',
-    );
-    setFakeWebhookContext({ target: 'COMPANY', companyId: 'c1', branchId: null });
-    expect((await rejection(createSubscription(input({ branchIds: ['b4'] })))).code).toBe(
-      'TRADE.WEBHOOK.PAYLOAD_INVALID',
-    );
-  });
-});
-
-describe('POST /webhooks/subscriptions/:id/reveal-secret', () => {
-  it('returns the plaintext once, only in the reveal answer', async () => {
-    const detail = await activeSubscription();
-    const secretId = detail.secret!.id;
-
-    const revealed = await settle(revealSecret(detail.id, secretId));
-
-    expect(Object.keys(revealed).sort()).toEqual(['algorithmCode', 'secret', 'secretEncoding', 'secretReferenceId']);
-    expect(revealed).toMatchObject({ secretReferenceId: secretId, secretEncoding: 'base64', algorithmCode: 'HMAC_SHA256' });
-    expect(revealed.secret).toMatch(/^[A-Za-z0-9+/]{43}=$/);
-
-    const after = await settle(getSubscription(detail.id));
-    expect(JSON.stringify(after)).not.toContain(revealed.secret);
-    expect(after.secretReveal).toEqual({ available: false, availableUntil: null });
-
-    const again = await rejection(revealSecret(detail.id, secretId));
-    expect(again.status).toBe(409);
-    expect(again.details).toEqual({ reason: ['already_revealed'] });
-  });
-
-  it('answers reveal_expired after the 15-minute window', async () => {
-    const detail = await activeSubscription();
-    vi.setSystemTime(new Date(Date.now() + 16 * 60_000));
-
-    const error = await rejection(revealSecret(detail.id, detail.secret!.id));
-
-    expect(error.details).toEqual({ reason: ['reveal_expired'] });
-  });
-
-  it('answers not_current_reference for another secret id and 400 for a bad body', async () => {
-    const detail = await activeSubscription();
-    const error = await rejection(revealSecret(detail.id, '0193a100-0000-7000-8003-999999999999'));
-    expect(error.details).toEqual({ reason: ['not_current_reference'] });
-
-    const bad = await rejection(fakeRevealSecret(detail.id, { secretReferenceId: 'nope' }));
-    expect(bad.code).toBe('TRADE.VALIDATION_FAILED');
-  });
-});
-
-describe('rotate-secret and revoke-secret', () => {
-  it('accepts a rotation (202), blocks writes while pending, then keeps the prior secret in overlap', async () => {
-    const detail = await activeSubscription();
-    const prior = detail.secret!.id;
-
-    const accepted = await settleRequest(rotateSecret(detail.id, 48, detail.version));
-    expect(accepted).toMatchObject({
-      statusCode: 202,
-      subscriptionId: detail.id,
-      status: 'PENDING_PROVIDER_RECONCILIATION',
-      plaintextReturned: false,
+    const write = stub.recordedWrites()[0];
+    expect(write.method).toBe('POST');
+    expect(write.path).toBe('/webhooks/subscriptions');
+    expect(write.key).toMatch(UUID_V7_RE);
+    expect(write.ifMatch).toBeUndefined();
+    expect(write.scope).toEqual({ companyId: COMPANY_ID });
+    expect(write.body).toEqual({
+      code: 'ERP_SYNC',
+      scopeTarget: 'COMPANY',
+      endpointUri: 'https://erp.example.com/hooks/trade',
+      retryPolicyCode: 'EXPONENTIAL_STANDARD',
+      maxAttempts: 5,
+      branchIds: [BRANCH_ID],
+      events: [{ eventType: 'trade.order.confirmed', eventVersion: 1, fields: ['id'] }],
     });
-
-    const pending = await settleRequest(getSubscription(detail.id));
-    expect(pending.secretOperation).toMatchObject({ type: 'ROTATE', status: 'PENDING' });
-    const blocked = await rejection(updateSubscription(detail.id, { maxAttempts: 3 }, pending.version));
-    expect(blocked.details).toEqual({ reason: ['operation_pending'] });
-
-    const done = await settle(getSubscription(detail.id));
-    expect(done.secret?.id).toBe(accepted.secretReferenceId);
-    expect(done.secret?.id).not.toBe(prior);
-    expect(done.secret?.status).toBe('ACTIVE');
   });
 
-  it('rejects an overlap outside 30..168 hours with 400 and a pending create with operation_pending', async () => {
-    const detail = await activeSubscription();
-    expect((await rejection(rotateSecret(detail.id, 20, detail.version))).code).toBe('TRADE.VALIDATION_FAILED');
-
-    const draft = await settleRequest(createSubscription(input()));
-    const error = await rejection(rotateSecret(draft.id, 30, draft.version));
-    expect(error.details).toEqual({ reason: ['operation_pending'] });
-  });
-
-  it('revokes the current secret: the subscription returns to DRAFT and tests are refused', async () => {
-    const detail = await activeSubscription();
-
-    const accepted = await settle(revokeSecret(detail.id, detail.version));
-    expect(accepted.secretReferenceId).toBe(detail.secret!.id);
-
-    const after = await settle(getSubscription(detail.id));
-    expect(after.status).toBe('DRAFT');
-    expect(after.secret).toBeNull();
-    expect(after.currentVersion.status).toBe('PENDING_SECRET');
-
-    const test = await rejection(sendTest(detail.id));
-    expect(test.details).toEqual({ reason: ['not_active'] });
-  });
-});
-
-describe('PATCH /webhooks/subscriptions/:id', () => {
-  it('disables with a status-only body and answers the entity and the version summary', async () => {
-    const detail = await activeSubscription();
-
-    const result = await settle(updateSubscription(detail.id, { status: 'DISABLED' }, detail.version));
-
-    expect(result.status).toBe('DISABLED');
-    expect(result.currentActiveVersionId).toBeNull();
-    expect(result.currentVersion).toMatchObject({ versionNumber: 1, status: 'DISABLED' });
-  });
-
-  it('creates a new version for a configuration change and supersedes the active one', async () => {
-    const detail = await activeSubscription();
-
-    const result = await settle(
-      updateSubscription(detail.id, { retryPolicyCode: 'EXPONENTIAL_CONSERVATIVE' }, detail.version),
+  it('subscriptions CRUD: updateSubscription sends If-Match, UUIDv7 key, and whitelisted patch fields', async () => {
+    const key = newIdempotencyKey();
+    const updated = await updateSubscription(
+      SUB_ID,
+      {
+        endpointUri: 'https://erp.example.com/hooks/v2',
+        maxAttempts: 6,
+        status: 'ACTIVE',
+        unexpectedExtra: 123,
+      } as never,
+      3,
+      key,
+      { companyId: COMPANY_ID },
     );
+    expect(updated.version).toBe(4);
 
-    expect(result.currentVersion).toMatchObject({
-      versionNumber: 2,
+    const write = stub.recordedWrites()[0];
+    expect(write.method).toBe('PATCH');
+    expect(write.path).toBe(`/webhooks/subscriptions/${SUB_ID}`);
+    expect(write.key).toBe(key);
+    expect(write.ifMatch).toBe('"3"');
+    expect(write.body).toEqual({
+      endpointUri: 'https://erp.example.com/hooks/v2',
+      maxAttempts: 6,
       status: 'ACTIVE',
-      retryPolicyCode: 'EXPONENTIAL_CONSERVATIVE',
     });
-    expect(result.status).toBe('ACTIVE');
   });
 
-  it('answers 422 for an empty body, 409 for a stale version, 400 without If-Match, 403 at branch level', async () => {
-    const detail = await activeSubscription();
-    expect((await rejection(updateSubscription(detail.id, {}, detail.version))).code).toBe(
-      'TRADE.WEBHOOK.PAYLOAD_INVALID',
+  it('rotate / revoke / test / retry send required headers and expected 202 payloads', async () => {
+    const rotateKey = newIdempotencyKey();
+    const rotated = await rotateSecret(SUB_ID, 30, 3, rotateKey, { companyId: COMPANY_ID });
+    expect(rotated.statusCode).toBe(202);
+    expect(rotated.plaintextReturned).toBe(false);
+
+    const revokeKey = newIdempotencyKey();
+    const revoked = await revokeSecret(SUB_ID, 4, revokeKey);
+    expect(revoked.statusCode).toBe(202);
+
+    const testKey = newIdempotencyKey();
+    const tested = await sendTest(SUB_ID, testKey, { companyId: COMPANY_ID });
+    expect(tested.statusCode).toBe(202);
+    expect(tested.synthetic).toBe(true);
+
+    const retryKey = newIdempotencyKey();
+    const retried = await retryDelivery(
+      DELIVERY_ID,
+      { reasonCode: 'UPSTREAM_RECOVERED', reasonNote: 'ERP back online', ignored: true } as never,
+      7,
+      retryKey,
+      { companyId: COMPANY_ID, branchId: BRANCH_ID },
     );
-    expect((await rejection(updateSubscription(detail.id, { maxAttempts: 2 }, detail.version + 7))).code).toBe(
-      'TRADE.CONCURRENCY.STALE_VERSION',
-    );
-    expect(
-      (await rejection(fakeUpdateSubscription(detail.id, { maxAttempts: 2 }, { idempotencyKey: 'k' }))).code,
-    ).toBe('TRADE.CONCURRENCY.IF_MATCH_REQUIRED');
-    setFakeWebhookContext({ target: 'BRANCH', companyId: 'c1', branchId: 'b1' });
-    expect((await rejection(updateSubscription(detail.id, { maxAttempts: 2 }, detail.version))).status).toBe(403);
+    expect(retried.statusCode).toBe(202);
+    expect(retried.status).toBe('RETRY_PENDING');
+
+    const writes = stub.recordedWrites();
+    expect(writes[0]).toMatchObject({
+      method: 'POST',
+      path: `/webhooks/subscriptions/${SUB_ID}/rotate-secret`,
+      body: { overlapHours: 30 },
+      key: rotateKey,
+      ifMatch: '"3"',
+      scope: { companyId: COMPANY_ID },
+    });
+    expect(writes[1]).toMatchObject({
+      method: 'POST',
+      path: `/webhooks/subscriptions/${SUB_ID}/revoke-secret`,
+      body: undefined,
+      key: revokeKey,
+      ifMatch: '"4"',
+      scope: {},
+    });
+    expect(writes[2]).toMatchObject({
+      method: 'POST',
+      path: `/webhooks/subscriptions/${SUB_ID}/test`,
+      body: undefined,
+      key: testKey,
+      ifMatch: undefined,
+      scope: { companyId: COMPANY_ID },
+    });
+    expect(writes[3]).toMatchObject({
+      method: 'POST',
+      path: `/webhooks/deliveries/${DELIVERY_ID}/retry`,
+      body: { reasonCode: 'UPSTREAM_RECOVERED', reasonNote: 'ERP back online' },
+      key: retryKey,
+      ifMatch: '"7"',
+      scope: { companyId: COMPANY_ID, branchId: BRANCH_ID },
+    });
   });
 
-  it('refuses to enable a subscription without an active secret', async () => {
-    const detail = await activeSubscription();
-    await settle(revokeSecret(detail.id, detail.version));
-    const revoked = await settle(getSubscription(detail.id));
+  it('rejects missing/bad idempotency keys and missing/invalid If-Match before sending HTTP requests', async () => {
+    await expect(
+      createSubscription(
+        {
+          code: 'ERP_SYNC',
+          scopeTarget: 'TENANT',
+          endpointUri: 'https://erp.example.com/hooks',
+          retryPolicyCode: 'EXPONENTIAL_STANDARD',
+          maxAttempts: 5,
+          events: [{ eventType: 'trade.order.confirmed', eventVersion: 1, fields: ['id'] }],
+        },
+        '',
+      ),
+    ).rejects.toMatchObject({ status: 400, code: 'TRADE.IDEMPOTENCY.KEY_MISSING' });
 
-    const error = await rejection(updateSubscription(detail.id, { status: 'ACTIVE' }, revoked.version));
+    await expect(
+      sendTest(SUB_ID, 'not-a-uuid-v7'),
+    ).rejects.toMatchObject({ status: 422, code: 'TRADE.IDEMPOTENCY.KEY_REQUIRED' });
 
-    expect(error.code).toBe('TRADE.WEBHOOK.SECRET_VERSION_INVALID');
-    expect(error.details).toEqual({ reason: ['not_active'] });
-  });
-});
+    await expect(
+      updateSubscription(SUB_ID, { maxAttempts: 4 }, 0, newIdempotencyKey()),
+    ).rejects.toMatchObject({ status: 400, code: 'TRADE.CONCURRENCY.IF_MATCH_REQUIRED' });
 
-describe('POST /webhooks/subscriptions/:id/test', () => {
-  it('queues a synthetic delivery (202) that the worker delivers', async () => {
-    const detail = await activeSubscription();
+    await expect(
+      rotateSecret(SUB_ID, 30, 1.5, newIdempotencyKey()),
+    ).rejects.toMatchObject({ status: 400, code: 'TRADE.CONCURRENCY.IF_MATCH_REQUIRED' });
 
-    const accepted = await settleRequest(sendTest(detail.id));
-    expect(accepted).toMatchObject({ statusCode: 202, status: 'PENDING', synthetic: true });
-
-    await vi.runAllTimersAsync(); // let the fake worker attempt the delivery
-    const delivered = await settle(getDelivery(accepted.deliveryId));
-    expect(delivered.sourceEventType).toBe('trading.webhook.synthetic_test.v1');
-    expect(delivered.status).toBe('DELIVERED');
-    expect(delivered.attempts).toHaveLength(1);
-    expect(delivered.attempts[0]).toMatchObject({ attemptNumber: 1, outcome: 'DELIVERED', httpStatus: 200 });
-  });
-});
-
-describe('deliveries', () => {
-  it('lists the backend projection and filters by a status list', async () => {
-    const page = await settle(listDeliveries({ status: ['EXHAUSTED', 'DISABLED'] }));
-
-    expect(page.items.length).toBeGreaterThan(0);
-    expect(page.items.every((d) => d.status === 'EXHAUSTED' || d.status === 'DISABLED')).toBe(true);
-    expect(Object.keys(page.items[0]).sort()).toEqual(
-      [
-        'attemptCount', 'branchId', 'companyId', 'createdAt', 'endpoint', 'id', 'nextAttemptAt', 'payloadHash',
-        'payloadSchemaCode', 'payloadSizeBytes', 'sourceEventId', 'sourceEventType', 'status', 'subscriptionCode',
-        'subscriptionId', 'terminalAt', 'updatedAt', 'version',
-      ].sort(),
-    );
+    expect(stub.recordedWrites()).toHaveLength(0);
   });
 
-  it('filters by created range and rejects an unknown status with 400', async () => {
-    const page = await settle(
-      listDeliveries({ createdFrom: '2026-11-21T10:00:00.000Z', createdTo: '2026-11-21T10:35:00.000Z' }),
-    );
-    expect(page.items.every((d) => d.createdAt >= '2026-11-21T10:00:00.000Z' && d.createdAt <= '2026-11-21T10:35:00.000Z')).toBe(true);
+  describe('real TradeHttp / CoreHttp transport + reveal-secret wire contract', () => {
+    let httpMock: HttpTestingController;
+    let unbindReal: () => void;
 
-    const error = await rejection(listDeliveries({ status: ['GAVE_UP' as never] }));
-    expect(error.code).toBe('TRADE.VALIDATION_FAILED');
+    const context: TradeContext = { companyId: COMPANY_ID, branchId: BRANCH_ID };
+    const input = {
+      code: 'ERP_SYNC',
+      scopeTarget: 'COMPANY' as const,
+      endpointUri: 'https://erp.example.com/hooks/trade',
+      retryPolicyCode: 'EXPONENTIAL_STANDARD' as const,
+      maxAttempts: 5,
+      events: [{ eventType: 'trading.sales_order.confirmed.v1', eventVersion: 1, fields: ['id'] }],
+    };
+    const filter = { status: ['EXHAUSTED' as const], subscriptionId: SUB_ID };
+    const cases = [
+      { name: 'getDeliveryCounts', method: 'GET', path: '/webhooks/deliveries/counts',
+        query: { status: 'EXHAUSTED', subscriptionId: SUB_ID },
+        invoke: () => getDeliveryCounts(filter, context) },
+      { name: 'listEvents', method: 'GET', path: '/webhooks/events',
+        invoke: () => listEvents(context) },
+      { name: 'listSubscriptions', method: 'GET', path: '/webhooks/subscriptions',
+        query: { page: '2', limit: '24', status: 'ACTIVE' },
+        invoke: () => listSubscriptions({ page: 2, limit: 24, status: 'ACTIVE' }, context) },
+      { name: 'getSubscription', method: 'GET', path: `/webhooks/subscriptions/${SUB_ID}`,
+        invoke: () => getSubscription(SUB_ID, context) },
+      { name: 'createSubscription', method: 'POST', path: '/webhooks/subscriptions',
+        body: input, status: 201,
+        invoke: () => createSubscription(input, undefined, context) },
+      { name: 'updateSubscription', method: 'PATCH', path: `/webhooks/subscriptions/${SUB_ID}`,
+        body: { status: 'DISABLED' }, version: 3,
+        invoke: () => updateSubscription(SUB_ID, { status: 'DISABLED' }, 3, undefined, context) },
+      { name: 'revealSecret', method: 'POST', path: `/webhooks/subscriptions/${SUB_ID}/reveal-secret`,
+        body: { secretReferenceId: SECRET_REF_ID }, noKey: true,
+        invoke: () => revealSecret(SUB_ID, SECRET_REF_ID, context) },
+      { name: 'rotateSecret', method: 'POST', path: `/webhooks/subscriptions/${SUB_ID}/rotate-secret`,
+        body: { overlapHours: 30 }, version: 3, status: 202,
+        invoke: () => rotateSecret(SUB_ID, 30, 3, undefined, context) },
+      { name: 'revokeSecret', method: 'POST', path: `/webhooks/subscriptions/${SUB_ID}/revoke-secret`,
+        version: 3, status: 202,
+        invoke: () => revokeSecret(SUB_ID, 3, undefined, context) },
+      { name: 'sendTest', method: 'POST', path: `/webhooks/subscriptions/${SUB_ID}/test`, status: 202,
+        invoke: () => sendTest(SUB_ID, undefined, context) },
+      { name: 'listDeliveries', method: 'GET', path: '/webhooks/deliveries',
+        query: { page: '2', limit: '24', status: 'EXHAUSTED', subscriptionId: SUB_ID },
+        invoke: () => listDeliveries({ ...filter, page: 2, limit: 24 }, context) },
+      { name: 'getDelivery', method: 'GET', path: `/webhooks/deliveries/${DELIVERY_ID}`,
+        invoke: () => getDelivery(DELIVERY_ID, context) },
+      { name: 'retryDelivery', method: 'POST', path: `/webhooks/deliveries/${DELIVERY_ID}/retry`,
+        body: { reasonCode: 'UPSTREAM_RECOVERED', reasonNote: 'ERP back online' }, version: 7, status: 202,
+        invoke: () => retryDelivery(DELIVERY_ID,
+          { reasonCode: 'UPSTREAM_RECOVERED', reasonNote: 'ERP back online' }, 7, undefined, context) },
+    ];
+
+    beforeEach(() => {
+      tradeQueries().getQueryCache().clear();
+      TestBed.configureTestingModule({
+        providers: [provideHttpClient(), provideHttpClientTesting(), TradeHttp],
+      });
+      const doc = TestBed.inject(DOCUMENT);
+      vi.spyOn(doc, 'cookie', 'get').mockReturnValue('mutakamel-http-tenant-csrf=csrf-proof');
+
+      httpMock = TestBed.inject(HttpTestingController);
+      const realTradeHttp = TestBed.inject(TradeHttp);
+      const realCoreHttp = TestBed.inject(CoreHttp);
+      bindTradeHttp(realTradeHttp, tradeQueries(), realCoreHttp);
+      unbindReal = () => restoreHttp();
+    });
+
+    afterEach(() => {
+      httpMock.verify();
+      unbindReal();
+    });
+
+    it.each(cases)('$name: exact wire request, envelope unwrap, and field error mapping', async (testCase) => {
+      // Reveal has no key; the current shared stub, like TradeHttp.write, requires one.
+      if (!testCase.noKey) {
+        const restoreStub = bindTradeHttpForTest(stub);
+        try {
+          const payload = { id: 'stub-response' };
+          stub.register(testCase.method as Parameters<TradeHttpStub['register']>[0], testCase.path, payload);
+          expect(await testCase.invoke()).toEqual(payload);
+          const recorded = testCase.method === 'GET' ? stub.recordedReads().at(-1) : stub.recordedWrites().at(-1);
+          expect(recorded).toMatchObject({ path: testCase.path, scope: context });
+        } finally {
+          restoreStub();
+        }
+      }
+      const promise = testCase.invoke();
+      const request = httpMock.expectOne((req) => req.url === `${TRADE_API_BASE}${testCase.path}`);
+      expect(request.request.method).toBe(testCase.method);
+      expect(Object.fromEntries(request.request.params.keys().map((key) =>
+        [key, request.request.params.get(key)]))).toEqual(testCase.query ?? {});
+      expect(request.request.body ?? undefined).toEqual(testCase.body);
+      expect(request.request.headers.get('x-mutakamel-company-id')).toBe(COMPANY_ID);
+      expect(request.request.headers.get('x-mutakamel-branch-id')).toBe(BRANCH_ID);
+      const key = request.request.headers.get('x-idempotency-key');
+      if (testCase.method === 'GET' || testCase.noKey) expect(key).toBeNull();
+      else expect(key).toMatch(UUID_V7_RE);
+      expect(request.request.headers.get('If-Match')).toBe(
+        testCase.version === undefined ? null : `"${testCase.version}"`,
+      );
+      const payload = { id: 'unwrapped-response' };
+      request.flush({ success: true, data: payload, correlationId: 'corr-ok', timestamp: '2026-11-23T00:00:00Z' },
+        { status: testCase.status ?? 200, statusText: 'OK' });
+      expect(await promise).toEqual(payload);
+
+      const rejected = testCase.invoke();
+      const assertion = expect(rejected).rejects.toMatchObject({
+        status: 400, code: 'TRADE.VALIDATION_FAILED',
+        details: { endpointUri: ['INVALID_URL'] }, correlationId: 'corr-fields',
+      });
+      const invalidRequest = httpMock.expectOne((req) => req.url === `${TRADE_API_BASE}${testCase.path}`);
+      invalidRequest.flush({ errorCode: 'TRADE.VALIDATION_FAILED',
+        details: { endpointUri: ['INVALID_URL'] }, correlationId: 'corr-fields' },
+        { status: 400, statusText: 'Bad Request' });
+      await assertion;
+    });
+
+    it('reveal-secret posts via CoreHttp with NO x-idempotency-key, never caches, and never logs the secret', async () => {
+      const secretText = 'whsec_test_plaintext_secret_do_not_log';
+      const consoleSpies = [
+        vi.spyOn(console, 'log').mockImplementation(() => {}),
+        vi.spyOn(console, 'info').mockImplementation(() => {}),
+        vi.spyOn(console, 'warn').mockImplementation(() => {}),
+        vi.spyOn(console, 'error').mockImplementation(() => {}),
+        vi.spyOn(console, 'debug').mockImplementation(() => {}),
+      ];
+
+      const promise = revealSecret(SUB_ID, SECRET_REF_ID, { companyId: COMPANY_ID });
+      const req = httpMock.expectOne(`${TRADE_API_BASE}/webhooks/subscriptions/${SUB_ID}/reveal-secret`);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual({ secretReferenceId: SECRET_REF_ID });
+      expect(req.request.headers.has('x-idempotency-key')).toBe(false);
+      expect(req.request.headers.get('x-csrf-token')).toBe('csrf-proof');
+      expect(req.request.headers.get('x-mutakamel-company-id')).toBe(COMPANY_ID);
+      expect(req.request.headers.has('x-mutakamel-branch-id')).toBe(false);
+
+      req.flush({
+        success: true,
+        data: {
+          secretReferenceId: SECRET_REF_ID,
+          secret: secretText,
+          secretEncoding: 'base64',
+          algorithmCode: 'HMAC_SHA256',
+        } satisfies RevealSecretResult,
+      });
+
+      const revealed = await promise;
+      expect(revealed.secret).toBe(secretText);
+      expect(tradeQueries().getQueryCache().getAll()).toHaveLength(0);
+      for (const spy of consoleSpies) {
+        expect(JSON.stringify(spy.mock.calls)).not.toContain(secretText);
+      }
+    });
+
+    it('reveal-secret maps 409 already_revealed / CoreApiError to Trade ApiError cleanly', async () => {
+      const promise = revealSecret(SUB_ID, SECRET_REF_ID);
+      const req = httpMock.expectOne(`${TRADE_API_BASE}/webhooks/subscriptions/${SUB_ID}/reveal-secret`);
+      expect(req.request.headers.has('x-idempotency-key')).toBe(false);
+      expect(req.request.headers.has('x-mutakamel-company-id')).toBe(false);
+
+      req.flush(
+        {
+          success: false,
+          errorCode: 'TRADE.WEBHOOK.SECRET_VERSION_INVALID',
+          details: { reason: ['already_revealed'] },
+          correlationId: 'corr-secret-409',
+        },
+        { status: 409, statusText: 'Conflict' },
+      );
+
+      let caught: unknown;
+      try {
+        await promise;
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught).toBeInstanceOf(ApiError);
+      expect(caught).toMatchObject({
+        status: 409,
+        code: 'TRADE.WEBHOOK.SECRET_VERSION_INVALID',
+        correlationId: 'corr-secret-409',
+        details: { reason: ['already_revealed'] },
+      });
+    });
+
+    it('unwraps Trade envelope, sends OPTIONAL scope headers, and fails with 502 on bare non-envelope responses', async () => {
+      const countsPromise = getDeliveryCounts({}, { companyId: COMPANY_ID, branchId: BRANCH_ID });
+      const countsReq = httpMock.expectOne(`${TRADE_API_BASE}/webhooks/deliveries/counts`);
+      expect(countsReq.request.headers.get('x-mutakamel-company-id')).toBe(COMPANY_ID);
+      expect(countsReq.request.headers.get('x-mutakamel-branch-id')).toBe(BRANCH_ID);
+      countsReq.flush({ success: true, data: emptyCounts() });
+      expect((await countsPromise).total).toBe(4);
+
+      const badPromise = listEvents();
+      const badReq = httpMock.expectOne(`${TRADE_API_BASE}/webhooks/events`);
+      expect(badReq.request.headers.has('x-mutakamel-company-id')).toBe(false);
+      badReq.flush({ items: [] });
+
+      let caught: unknown;
+      try {
+        await badPromise;
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught).toBeInstanceOf(ApiError);
+      expect((caught as ApiError).status).toBe(502);
+      expect(CoreApiError).toBeDefined();
+    });
   });
 
-  it('counts {total, byStatus} with all six statuses', async () => {
-    const counts = await settle(getDeliveryCounts());
-
-    expect(Object.keys(counts.byStatus).sort()).toEqual(
-      ['DELIVERED', 'DISABLED', 'EXHAUSTED', 'FAILED', 'PENDING', 'RETRY_PENDING'],
-    );
-    expect(Object.values(counts.byStatus).reduce((a, b) => a + b, 0)).toBe(counts.total);
-  });
-
-  it('answers DELIVERY_NOT_FOUND for an unknown delivery', async () => {
-    const error = await rejection(getDelivery('0193a100-0000-7000-8005-999999999999'));
-    expect(error.code).toBe('TRADE.WEBHOOK.DELIVERY_NOT_FOUND');
-  });
-});
-
-describe('POST /webhooks/deliveries/:id/retry', () => {
-  it('validates the reason code shape (400) and the reason catalogue (422)', async () => {
-    const target = await settle(getDelivery(delivery(7)));
-    expect((await rejection(retryDelivery(target.id, { reasonCode: '' }, target.version))).code).toBe(
-      'TRADE.VALIDATION_FAILED',
-    );
-    expect((await rejection(retryDelivery(target.id, { reasonCode: 'NOT_A_REASON' }, target.version))).code).toBe(
-      'TRADE.REASON.NOT_FOUND',
-    );
-    expect(
-      (await rejection(retryDelivery(target.id, { reasonCode: 'OPERATOR_RETRY', reasonNote: 'x'.repeat(501) }, target.version)))
-        .code,
-    ).toBe('TRADE.VALIDATION_FAILED');
-  });
-
-  it.each([
-    [7, 'not_exhausted'],
-    [8, 'subscription_not_active'],
-  ])('refuses delivery %i with reason %s', async (n, reason) => {
-    const target = await settle(getDelivery(delivery(n)));
-
-    const error = await rejection(retryDelivery(target.id, { reasonCode: 'OPERATOR_RETRY' }, target.version));
-
-    expect(error.code).toBe('TRADE.WEBHOOK.DELIVERY_NOT_RETRYABLE');
-    expect(error.details).toEqual({ reason: [reason] });
-  });
-
-  it('accepts an exhausted, retryable delivery (202) and the worker delivers it', async () => {
-    const target = await settle(getDelivery(delivery(6)));
-    expect(canRetryDelivery(target, 'ACTIVE')).toBe(true);
-
-    const accepted = await settleRequest(
-      retryDelivery(target.id, { reasonCode: 'OPERATOR_RETRY', reasonNote: 'endpoint is back' }, target.version),
-    );
-    expect(accepted).toMatchObject({ statusCode: 202, deliveryId: target.id, status: 'RETRY_PENDING' });
-
-    await vi.runAllTimersAsync(); // let the fake worker attempt the delivery
-    const after = await settle(getDelivery(target.id));
-    expect(after.status).toBe('DELIVERED');
-    expect(after.attempts.at(-1)?.outcome).toBe('DELIVERED');
-  });
-
-  it('derives canRetry client-side: never for a permanent failure', async () => {
-    const failed = await settle(getDelivery(delivery(7)));
-    expect(canRetryDelivery(failed, 'ACTIVE')).toBe(false);
-  });
-});
-
-describe('ActionKeys', () => {
-  it('reuses one key while the same action is retried and issues a new one after success or a changed request', () => {
+  it('ActionKeys reuses key for identical body/If-Match and regenerates on change or done()', () => {
     const keys = new ActionKeys();
-    const first = keys.for('create', { code: 'A' });
-    expect(keys.for('create', { code: 'A' })).toBe(first);
-    expect(keys.for('create', { code: 'B' })).not.toBe(first);
-    const second = keys.for('create', { code: 'B' });
-    keys.done('create');
-    expect(keys.for('create', { code: 'B' })).not.toBe(second);
+    const k1 = keys.for('toggle', { id: SUB_ID, status: 'DISABLED', version: 3 });
+    const k2 = keys.for('toggle', { version: 3, status: 'DISABLED', id: SUB_ID });
+    expect(k2).toBe(k1);
+
+    const k3 = keys.for('toggle', { id: SUB_ID, status: 'DISABLED', version: 4 });
+    expect(k3).not.toBe(k1);
+
+    keys.done('toggle');
+    const k4 = keys.for('toggle', { id: SUB_ID, status: 'DISABLED', version: 4 });
+    expect(k4).not.toBe(k3);
+  });
+
+  it('pure webhook helpers validate endpoint URLs, retry eligibility, and localized backoff labels', () => {
+    expect(endpointText({ origin: 'https://erp.example.com', pathname: '/' })).toBe('https://erp.example.com');
+    expect(endpointText({ origin: 'https://erp.example.com', pathname: '/hooks' })).toBe(
+      'https://erp.example.com/hooks',
+    );
+
+    expect(endpointProblems('https://erp.example.com/hooks?token=secret')).toContain('SECRET_QUERY_FORBIDDEN');
+    expect(endpointProblems('http://localhost:8080/hook#frag')).toEqual(
+      expect.arrayContaining(['HTTPS_REQUIRED', 'FRAGMENT_FORBIDDEN', 'LOCALHOST_FORBIDDEN', 'PORT_FORBIDDEN']),
+    );
+    expect(endpointProblems('https://erp.example.com:8443/hooks')).toEqual([]);
+
+    const exhaustedRetryable = makeDeliveryDetail();
+    expect(canRetryDelivery(exhaustedRetryable, 'ACTIVE')).toBe(true);
+    expect(canRetryDelivery(exhaustedRetryable, 'DISABLED')).toBe(false);
+    expect(
+      canRetryDelivery(
+        makeDeliveryDetail({
+          attempts: [
+            {
+              attemptNumber: 1,
+              startedAt: '2026-11-23T00:00:00.000Z',
+              completedAt: '2026-11-23T00:00:01.000Z',
+              durationMs: 1000,
+              outcome: 'PERMANENT_FAILURE',
+              retryClass: 'CLIENT_ERROR',
+              httpStatus: 400,
+              safeErrorCode: 'BAD_REQUEST',
+            },
+          ],
+        }),
+        'ACTIVE',
+      ),
+    ).toBe(false);
+
+    expect(backoffText('EXPONENTIAL_STANDARD', 1, 'en')).toBe('30s');
+    expect(backoffText('EXPONENTIAL_STANDARD', 1, 'ar')).toBe('30 ثانية');
+    expect(WEBHOOKS_QUERY_KEYS.subscription(SUB_ID)).toEqual(['trade', 'automation', 'webhooks', 'subscription', SUB_ID]);
   });
 });

@@ -1,3 +1,14 @@
+@if (isForbidden()) {
+  <div class="flex flex-1 rounded-10 border border-border bg-surface shadow-card">
+    <ui-full-state
+      kind="forbidden"
+      [title]="'errors.forbidden.title' | transloco"
+      [text]="'errors.forbidden.text' | transloco"
+      [actionLabel]="'errors.notFound.action' | transloco"
+      (action)="goHome()"
+    />
+  </div>
+} @else {
 <div class="flex shrink-0 flex-wrap items-center gap-8 rounded-10 bg-surface p-8 shadow-card">
   @if (activeView() === 'subscriptions' && canManage()) {
     <button
@@ -206,12 +217,14 @@
     [subscriptionId]="activeSubscriptionId()"
     [eventsCatalogue]="eventsCatalogue()"
     [scopeTarget]="scopeTarget()"
+    [ctx]="ctx()"
     [canManage]="canManage()"
     [canTest]="canTest()"
     [openRotateOnLoad]="openRotateForId() !== null && openRotateForId() === activeSubscriptionId()"
     (closed)="onSubscriptionModalClosed()"
     (saved)="onSubscriptionModalSaved($event)"
     (openDelivery)="onOpenDeliveryFromSubModal($event)"
+    (forbidden)="onForbidden()"
   />
 }
 
@@ -220,9 +233,11 @@
     class="contents"
     [deliveryId]="activeDeliveryId()"
     [subscriptionStatus]="activeDeliverySubscriptionStatus()"
+    [ctx]="ctx()"
     [canReplay]="canReplay()"
     (closed)="onDeliveryModalClosed()"
     (retried)="onDeliveryRetried($event)"
+    (forbidden)="onForbidden()"
   />
 }
 
@@ -236,3 +251,4 @@
   (reload)="onRowConflictReload()"
   (keep)="onRowConflictKeep()"
 />
+}

@@ -32,12 +32,13 @@ import { Field } from '../../../../shared/ui/field/field';
 import { Modal } from '../../../../shared/ui/modal/modal';
 import { TagPicker, type TagOption } from '../../../../shared/ui/tag-picker/tag-picker';
 import { UnsavedDialog } from '../../../../shared/ui/unsaved-dialog/unsaved-dialog';
-import { ApiError, errorCodeOf } from '../../shared/trade-api';
+import { ApiError, type TradeContext, errorCodeOf } from '../../shared/trade-api';
 import { AutomationBadge } from '../automation-shared/automation-badge/automation-badge';
 import { ConflictDialog } from '../automation-shared/conflict-dialog/conflict-dialog';
 import { EventPicker, type EventSelection } from '../event-picker/event-picker';
 import { SecretPanel } from '../secret-panel/secret-panel';
 import { ActionKeys } from '../automation-shared/action-keys';
+import { isForbiddenError, isIdempotencyMismatch } from '../webhooks-page/webhook-access';
 import {
   createSubscription,
   getSubscription,
@@ -167,6 +168,7 @@ export class SubscriptionModal {
   readonly subscriptionId = input<string | null>(null);
   readonly eventsCatalogue = input.required<readonly WebhookEventDefinition[]>();
   readonly scopeTarget = input<ScopeTarget>('COMPANY');
+  readonly ctx = input<TradeContext>({});
   readonly canManage = input(true);
   readonly canTest = input(true);
   readonly openRotateOnLoad = input(false);
@@ -174,6 +176,7 @@ export class SubscriptionModal {
   readonly closed = output<void>();
   readonly saved = output<WebhookSubscriptionDetail>();
   readonly openDelivery = output<string>();
+  readonly forbidden = output<void>();
 
   protected readonly detail = signal<WebhookSubscriptionDetail | null>(null);
   protected readonly code = signal('');
@@ -265,11 +268,12 @@ export class SubscriptionModal {
   protected readonly retryPolicyHint = computed(() => {
     this.i18n();
     const policy = this.retryPolicy();
+    const lang = this.language();
     return this.transloco.translate('webhooks.subscription.fields.retryPolicy.hint', {
-      t1: backoffText(policy, 1),
-      t2: backoffText(policy, 2),
-      t3: backoffText(policy, 3),
-      t4: backoffText(policy, 4),
+      t1: backoffText(policy, 1, lang),
+      t2: backoffText(policy, 2, lang),
+      t3: backoffText(policy, 3, lang),
+      t4: backoffText(policy, 4, lang),
     });
   });
 
@@ -477,15 +481,22 @@ export class SubscriptionModal {
     if (!current || current.status !== 'ACTIVE' || this.busy() || !this.canTest()) return;
 
     this.testing.set(true);
+    const action = `test:${current.id}`;
     try {
-      const action = `test:${current.id}`;
-      const accepted = await sendTest(current.id, this.keys.for(action, current.id));
+      const accepted = await sendTest(current.id, this.keys.for(action, current.id), this.ctx());
       this.keys.done(action);
       if (this.destroyed) return;
       this.lastTestDeliveryId.set(accepted.deliveryId);
       this.notify.success(this.transloco.translate('webhooks.toast.testSent'));
     } catch (error) {
       if (this.destroyed) return;
+      if (isIdempotencyMismatch(errorCodeOf(error))) {
+        this.keys.done(action);
+      }
+      if (isForbiddenError(error)) {
+        this.onForbidden();
+        return;
+      }
       this.notify.error(this.translateError(error));
     } finally {
       this.testing.set(false);
@@ -504,12 +515,19 @@ export class SubscriptionModal {
     const nextStatus: 'ACTIVE' | 'DISABLED' = current.status === 'ACTIVE' ? 'DISABLED' : 'ACTIVE';
 
     this.togglingStatus.set(true);
+    const action = `status:${current.id}`;
     try {
-      const action = `status:${current.id}`;
+      const ctx = this.ctx();
       const request = { status: nextStatus, ifMatch: current.version };
-      await updateSubscription(current.id, { status: nextStatus }, current.version, this.keys.for(action, request));
+      await updateSubscription(
+        current.id,
+        { status: nextStatus },
+        current.version,
+        this.keys.for(action, request),
+        ctx,
+      );
       this.keys.done(action);
-      const updated = await getSubscription(current.id);
+      const updated = await getSubscription(current.id, ctx);
       if (this.destroyed) return;
       this.detail.set(updated);
       this.notify.success(
@@ -520,10 +538,18 @@ export class SubscriptionModal {
       this.saved.emit(updated);
     } catch (error) {
       if (this.destroyed) return;
+      const code = errorCodeOf(error);
+      if (isIdempotencyMismatch(code)) {
+        this.keys.done(action);
+      }
+      if (isForbiddenError(error)) {
+        this.onForbidden();
+        return;
+      }
       if (
         error instanceof ApiError &&
         error.status === 409 &&
-        errorCodeOf(error) === 'TRADE.CONCURRENCY.STALE_VERSION'
+        code === 'TRADE.CONCURRENCY.STALE_VERSION'
       ) {
         await this.handleConflict();
         return;
@@ -542,6 +568,11 @@ export class SubscriptionModal {
       this.applyLoaded(fresh);
     }
     this.saved.emit(fresh);
+  }
+
+  protected onForbidden(): void {
+    this.forbidden.emit();
+    this.forceClose();
   }
 
   protected async handleConflict(): Promise<void> {
@@ -563,12 +594,16 @@ export class SubscriptionModal {
     const id = this.detail()?.id ?? this.subscriptionId();
     if (!id) return;
     try {
-      const fresh = await getSubscription(id);
+      const fresh = await getSubscription(id, this.ctx());
       if (this.destroyed) return;
       this.detail.set(fresh);
       this.baseSnapshot.set(snapshotFromDetail(fresh));
     } catch (error) {
       if (!this.destroyed) {
+        if (isForbiddenError(error)) {
+          this.onForbidden();
+          return;
+        }
         this.notify.error(this.translateError(error));
       }
     }
@@ -672,7 +707,7 @@ export class SubscriptionModal {
     this.serverEndpointError.set(null);
 
     try {
-      const loaded = await getSubscription(id);
+      const loaded = await getSubscription(id, this.ctx());
       if (seq !== this.loadSeq || this.destroyed) return null;
       this.applyLoaded(loaded);
       this.maybeOpenPendingRotate(loaded.id);
@@ -680,6 +715,10 @@ export class SubscriptionModal {
     } catch (error) {
       if (seq !== this.loadSeq || this.destroyed) return null;
       this.loading.set(false);
+      if (isForbiddenError(error)) {
+        this.onForbidden();
+        return null;
+      }
       if (error instanceof ApiError && error.status === 404) {
         this.notFound.set(true);
       } else {
@@ -730,11 +769,12 @@ export class SubscriptionModal {
     };
 
     this.saving.set(true);
+    const ctx = this.ctx();
     try {
-      const accepted = await createSubscription(body, this.keys.for('create', body));
+      const accepted = await createSubscription(body, this.keys.for('create', body), ctx);
       this.keys.done('create');
       // The create answer is the entity plus a version summary; the form needs the detail.
-      const created = await getSubscription(accepted.id);
+      const created = await getSubscription(accepted.id, ctx);
       if (this.destroyed) return false;
       this.applyLoaded(created);
       this.notify.success(this.transloco.translate('webhooks.toast.created'));
@@ -742,6 +782,13 @@ export class SubscriptionModal {
       return true;
     } catch (error) {
       if (this.destroyed) return false;
+      if (isIdempotencyMismatch(errorCodeOf(error))) {
+        this.keys.done('create');
+      }
+      if (isForbiddenError(error)) {
+        this.onForbidden();
+        return false;
+      }
       this.handleWriteError(error);
       return false;
     } finally {
@@ -776,16 +823,18 @@ export class SubscriptionModal {
     if (Object.keys(patch).length === 0) return true;
 
     this.saving.set(true);
+    const action = `edit:${current.id}`;
+    const ctx = this.ctx();
     try {
-      const action = `edit:${current.id}`;
       const result = await updateSubscription(
         current.id,
         patch,
         current.version,
         this.keys.for(action, { patch, ifMatch: current.version }),
+        ctx,
       );
       this.keys.done(action);
-      const updated = await getSubscription(current.id);
+      const updated = await getSubscription(current.id, ctx);
       if (this.destroyed) return false;
       this.applyLoaded(updated);
       this.notify.success(
@@ -797,10 +846,18 @@ export class SubscriptionModal {
       return true;
     } catch (error) {
       if (this.destroyed) return false;
+      const code = errorCodeOf(error);
+      if (isIdempotencyMismatch(code)) {
+        this.keys.done(action);
+      }
+      if (isForbiddenError(error)) {
+        this.onForbidden();
+        return false;
+      }
       if (
         error instanceof ApiError &&
         error.status === 409 &&
-        errorCodeOf(error) === 'TRADE.CONCURRENCY.STALE_VERSION'
+        code === 'TRADE.CONCURRENCY.STALE_VERSION'
       ) {
         await this.handleConflict();
         return false;
@@ -821,6 +878,19 @@ export class SubscriptionModal {
     if (code === 'TRADE.WEBHOOK.SUBSCRIPTION_CODE_CONFLICT') {
       this.serverCodeError.set(this.translateError(error));
       return;
+    }
+    if (error instanceof ApiError && error.details) {
+      const codeDetail = error.details['code']?.[0];
+      const endpointDetail = error.details['endpointUri']?.[0];
+      if (codeDetail) {
+        this.serverCodeError.set(codeDetail);
+      }
+      if (endpointDetail) {
+        this.serverEndpointError.set(endpointDetail);
+      }
+      if (codeDetail || endpointDetail) {
+        return;
+      }
     }
     this.notify.error(this.translateError(error));
   }
@@ -851,6 +921,10 @@ export class SubscriptionModal {
       const autoKey = `automation.errors.${error.code}`;
       const autoText = this.transloco.translate(autoKey);
       if (autoText !== autoKey) return autoText;
+
+      const sharedKey = `tradeShared.errors.${error.code.replaceAll('.', '_')}`;
+      const sharedText = this.transloco.translate(sharedKey);
+      if (sharedText !== sharedKey) return sharedText;
     }
     return this.transloco.translate('webhooks.errors.generic');
   }

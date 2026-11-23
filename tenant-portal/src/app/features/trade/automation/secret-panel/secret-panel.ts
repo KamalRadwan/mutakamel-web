@@ -26,12 +26,13 @@ import { Button } from '../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { Field } from '../../../../shared/ui/field/field';
 import { Modal } from '../../../../shared/ui/modal/modal';
-import { ApiError, errorCodeOf } from '../../shared/trade-api';
+import { ApiError, type TradeContext, errorCodeOf } from '../../shared/trade-api';
 import { formatDate } from '../../shared/trade-format';
 import { AutomationBadge } from '../automation-shared/automation-badge/automation-badge';
-import { pollWhile } from '../automation-shared/poll';
+import { type PollHandle, pollWhile } from '../automation-shared/poll';
 import { RevealSecretModal } from '../reveal-secret-modal/reveal-secret-modal';
 import { ActionKeys } from '../automation-shared/action-keys';
+import { isForbiddenError, isIdempotencyMismatch } from '../webhooks-page/webhook-access';
 import { getSubscription, revokeSecret, rotateSecret } from '../webhooks.api';
 import type { SecretStatus, WebhookSubscriptionDetail } from '../webhooks.model';
 
@@ -79,10 +80,12 @@ export class SecretPanel {
   protected readonly uid = `webhook-secret-panel-${++SecretPanel.nextId}`;
 
   readonly subscription = input.required<WebhookSubscriptionDetail>();
+  readonly ctx = input<TradeContext>({});
   readonly canManage = input(true);
 
   readonly updated = output<WebhookSubscriptionDetail>();
   readonly conflict = output<void>();
+  readonly forbidden = output<void>();
 
   protected readonly showRevealModal = signal(false);
   protected readonly overlapHoursInput = signal(String(DEFAULT_OVERLAP_HOURS));
@@ -94,7 +97,7 @@ export class SecretPanel {
   private readonly keys = new ActionKeys();
   private pollSeq = 0;
   private activePollKey = '';
-  private stopPollHandle: unknown = null;
+  private stopPollHandle: PollHandle<WebhookSubscriptionDetail> | null = null;
 
   protected readonly secret = computed(() => this.subscription().secret ?? null);
   protected readonly secretOperation = computed(() => this.subscription().secretOperation ?? null);
@@ -217,10 +220,16 @@ export class SecretPanel {
     const sub = this.subscription();
     const hours = Number(this.overlapHoursInput().trim());
     this.rotating.set(true);
+    const action = `rotate:${sub.id}`;
 
     try {
-      const action = `rotate:${sub.id}`;
-      await rotateSecret(sub.id, hours, sub.version, this.keys.for(action, { hours, ifMatch: sub.version }));
+      await rotateSecret(
+        sub.id,
+        hours,
+        sub.version,
+        this.keys.for(action, { hours, ifMatch: sub.version }),
+        this.ctx(),
+      );
       this.keys.done(action);
       if (this.destroyed) return;
       this.rotateModal().close();
@@ -229,6 +238,15 @@ export class SecretPanel {
     } catch (error) {
       if (this.destroyed) return;
       const code = errorCodeOf(error);
+      if (isIdempotencyMismatch(code)) {
+        this.keys.done(action);
+      }
+      if (isForbiddenError(error)) {
+        this.stopPolling();
+        this.rotateModal().close();
+        this.forbidden.emit();
+        return;
+      }
       if (error instanceof ApiError && error.status === 409 && code === 'TRADE.CONCURRENCY.STALE_VERSION') {
         this.rotateModal().close();
         this.conflict.emit();
@@ -247,9 +265,14 @@ export class SecretPanel {
 
     const sub = this.subscription();
     this.revoking.set(true);
+    const action = `revoke:${sub.id}`;
     try {
-      const action = `revoke:${sub.id}`;
-      await revokeSecret(sub.id, sub.version, this.keys.for(action, { ifMatch: sub.version }));
+      await revokeSecret(
+        sub.id,
+        sub.version,
+        this.keys.for(action, { ifMatch: sub.version }),
+        this.ctx(),
+      );
       this.keys.done(action);
       if (this.destroyed) return;
       await this.refreshSubscription();
@@ -257,6 +280,14 @@ export class SecretPanel {
     } catch (error) {
       if (this.destroyed) return;
       const code = errorCodeOf(error);
+      if (isIdempotencyMismatch(code)) {
+        this.keys.done(action);
+      }
+      if (isForbiddenError(error)) {
+        this.stopPolling();
+        this.forbidden.emit();
+        return;
+      }
       if (error instanceof ApiError && error.status === 409 && code === 'TRADE.CONCURRENCY.STALE_VERSION') {
         this.conflict.emit();
         return;
@@ -291,10 +322,11 @@ export class SecretPanel {
     this.stopPolling();
     const seq = ++this.pollSeq;
     this.activePollKey = key;
+    const ctx = this.ctx();
 
     this.stopPollHandle = pollWhile(
       async () => {
-        const fresh = await getSubscription(subscriptionId);
+        const fresh = await getSubscription(subscriptionId, ctx);
         if (!this.destroyed && seq === this.pollSeq) {
           this.updated.emit(fresh);
         }
@@ -307,6 +339,13 @@ export class SecretPanel {
         fresh.secretOperation?.status === 'PENDING',
       POLL_MS,
       this.destroyRef,
+      undefined,
+      (error) => {
+        if (!this.destroyed && isForbiddenError(error)) {
+          this.stopPolling();
+          this.forbidden.emit();
+        }
+      },
     );
   }
 
@@ -315,19 +354,21 @@ export class SecretPanel {
     this.activePollKey = '';
     const handle = this.stopPollHandle;
     this.stopPollHandle = null;
-    if (typeof handle === 'function') {
-      (handle as () => void)();
-    }
+    handle?.stop();
   }
 
   private async refreshSubscription(): Promise<void> {
     const id = this.subscription().id;
     try {
-      const fresh = await getSubscription(id);
+      const fresh = await getSubscription(id, this.ctx());
       if (!this.destroyed) {
         this.updated.emit(fresh);
       }
-    } catch {
+    } catch (error) {
+      if (!this.destroyed && isForbiddenError(error)) {
+        this.stopPolling();
+        this.forbidden.emit();
+      }
       // Keep existing state if background refresh fails.
     }
   }

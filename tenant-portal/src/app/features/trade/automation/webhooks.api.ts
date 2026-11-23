@@ -1,19 +1,16 @@
-import type { Page } from '../shared/trade-foundation.model';
+import type { CoreHttp, CoreQuery } from '../../../core/api/core-http';
 import {
-  fakeCreateSubscription,
-  fakeGetDelivery,
-  fakeGetDeliveryCounts,
-  fakeGetSubscription,
-  fakeListDeliveries,
-  fakeListSubscriptions,
-  fakeListWebhookEvents,
-  fakeRetryDelivery,
-  fakeRevealSecret,
-  fakeRevokeSecret,
-  fakeRotateSecret,
-  fakeSendTestDelivery,
-  fakeUpdateSubscription,
-} from './webhooks.fake';
+  ApiError,
+  TRADE_API_BASE,
+  assertIdempotencyKey,
+  ifMatch,
+  newIdempotencyKey,
+  scopeFor,
+  toTradeError,
+  type TradeContext,
+} from '../shared/trade-api';
+import type { Page } from '../shared/trade-foundation.model';
+import { tradeCore, tradeHttp, type TradeCoreTransport } from '../shared/trade-http';
 import type {
   CreateSubscriptionInput,
   CreateSubscriptionResult,
@@ -31,6 +28,7 @@ import type {
   WebhookDeliveryCounts,
   WebhookDeliveryDetail,
   WebhookEventCatalogue,
+  WebhookEventSelection,
   WebhookSubscription,
   WebhookSubscriptionDetail,
 } from './webhooks.model';
@@ -51,96 +49,286 @@ export const WEBHOOKS_QUERY_KEYS = {
   delivery: (id: string) => ['trade', 'automation', 'webhooks', 'delivery', id] as const,
 };
 
-// GET /webhooks/deliveries/counts?status&subscriptionId&eventType&createdFrom&createdTo
-export function getDeliveryCounts(filters: DeliveryFilters = {}): Promise<WebhookDeliveryCounts> {
-  return fakeGetDeliveryCounts(filters);
+function encodeSeg(value: string): string {
+  return encodeURIComponent(value);
 }
 
-// GET /webhooks/events
-export function listEvents(): Promise<WebhookEventCatalogue> {
-  return fakeListWebhookEvents();
+function compactQuery(
+  entries: Record<string, string | number | boolean | undefined>,
+): CoreQuery | undefined {
+  const result: CoreQuery = {};
+  let count = 0;
+  for (const [k, v] of Object.entries(entries)) {
+    if (v === undefined || v === '') continue;
+    result[k] = v;
+    count += 1;
+  }
+  return count > 0 ? result : undefined;
 }
 
-// GET /webhooks/subscriptions?page&limit&status
+function requireIfMatchHeader(version: number): string {
+  if (typeof version !== 'number' || !Number.isSafeInteger(version) || version < 1) {
+    throw new ApiError(400, 'TRADE.CONCURRENCY.IF_MATCH_REQUIRED');
+  }
+  return ifMatch(version);
+}
+
+function deliveryFilterQuery(
+  filters: DeliveryFilters,
+): Record<string, string | number | boolean | undefined> {
+  return {
+    status: filters.status?.length ? filters.status.join(',') : undefined,
+    subscriptionId: filters.subscriptionId,
+    eventType: filters.eventType,
+    createdFrom: filters.createdFrom,
+    createdTo: filters.createdTo,
+  };
+}
+
+function sanitizeEvents(events: readonly WebhookEventSelection[]): WebhookEventSelection[] {
+  return events.map((e) => ({
+    eventType: e.eventType,
+    eventVersion: e.eventVersion,
+    fields: [...e.fields],
+  }));
+}
+
+// GET /webhooks/deliveries/counts?status&subscriptionId&eventType&createdFrom&createdTo (OPTIONAL scope)
+export function getDeliveryCounts(
+  filters: DeliveryFilters = {},
+  ctx: TradeContext = {},
+): Promise<WebhookDeliveryCounts> {
+  return tradeHttp().read<WebhookDeliveryCounts>(
+    '/webhooks/deliveries/counts',
+    compactQuery(deliveryFilterQuery(filters)),
+    { scope: scopeFor(ctx, 'OPTIONAL') },
+  );
+}
+
+// GET /webhooks/events (OPTIONAL scope)
+export function listEvents(ctx: TradeContext = {}): Promise<WebhookEventCatalogue> {
+  return tradeHttp().read<WebhookEventCatalogue>('/webhooks/events', undefined, {
+    scope: scopeFor(ctx, 'OPTIONAL'),
+  });
+}
+
+// GET /webhooks/subscriptions?page&limit&status (OPTIONAL scope)
 export function listSubscriptions(
   q: ListSubscriptionsQuery = {},
+  ctx: TradeContext = {},
 ): Promise<Page<WebhookSubscription>> {
-  return fakeListSubscriptions(q);
+  return tradeHttp().read<Page<WebhookSubscription>>(
+    '/webhooks/subscriptions',
+    compactQuery({
+      page: q.page,
+      limit: q.limit,
+      status: q.status,
+    }),
+    { scope: scopeFor(ctx, 'OPTIONAL') },
+  );
 }
 
-// GET /webhooks/subscriptions/:id
-export function getSubscription(id: string): Promise<WebhookSubscriptionDetail> {
-  return fakeGetSubscription(id);
+// GET /webhooks/subscriptions/:id (OPTIONAL scope)
+export function getSubscription(
+  id: string,
+  ctx: TradeContext = {},
+): Promise<WebhookSubscriptionDetail> {
+  return tradeHttp().read<WebhookSubscriptionDetail>(
+    `/webhooks/subscriptions/${encodeSeg(id)}`,
+    undefined,
+    { scope: scopeFor(ctx, 'OPTIONAL') },
+  );
 }
 
-// POST /webhooks/subscriptions (X-Idempotency-Key) -> 201
-export function createSubscription(
+// POST /webhooks/subscriptions (X-Idempotency-Key, OPTIONAL scope) -> 201
+export async function createSubscription(
   input: CreateSubscriptionInput,
-  idempotencyKey: string,
+  idempotencyKey: string = newIdempotencyKey(),
+  ctx: TradeContext = {},
 ): Promise<CreateSubscriptionResult> {
-  return fakeCreateSubscription(input, idempotencyKey);
+  const body: CreateSubscriptionInput = {
+    code: input.code,
+    scopeTarget: input.scopeTarget,
+    endpointUri: input.endpointUri,
+    retryPolicyCode: input.retryPolicyCode,
+    maxAttempts: input.maxAttempts,
+    ...(input.branchIds !== undefined ? { branchIds: [...input.branchIds] } : {}),
+    events: sanitizeEvents(input.events),
+  };
+  const { data } = await tradeHttp().write<CreateSubscriptionResult>(
+    'POST',
+    '/webhooks/subscriptions',
+    body,
+    {
+      key: assertIdempotencyKey(idempotencyKey),
+      scope: scopeFor(ctx, 'OPTIONAL'),
+    },
+  );
+  return data;
 }
 
-// PATCH /webhooks/subscriptions/:id (X-Idempotency-Key, If-Match) -> 200
-export function updateSubscription(
+// PATCH /webhooks/subscriptions/:id (X-Idempotency-Key, If-Match, OPTIONAL scope) -> 200
+export async function updateSubscription(
   id: string,
   input: UpdateSubscriptionInput,
-  ifMatch: number,
-  idempotencyKey: string,
+  expectedVersion: number,
+  idempotencyKey: string = newIdempotencyKey(),
+  ctx: TradeContext = {},
 ): Promise<UpdateSubscriptionResult> {
-  return fakeUpdateSubscription(id, input, { ifMatch, idempotencyKey });
+  const body: UpdateSubscriptionInput = {
+    ...(input.endpointUri !== undefined ? { endpointUri: input.endpointUri } : {}),
+    ...(input.retryPolicyCode !== undefined ? { retryPolicyCode: input.retryPolicyCode } : {}),
+    ...(input.maxAttempts !== undefined ? { maxAttempts: input.maxAttempts } : {}),
+    ...(input.status !== undefined ? { status: input.status } : {}),
+    ...(input.branchIds !== undefined ? { branchIds: [...input.branchIds] } : {}),
+    ...(input.events !== undefined ? { events: sanitizeEvents(input.events) } : {}),
+  };
+  const { data } = await tradeHttp().write<UpdateSubscriptionResult>(
+    'PATCH',
+    `/webhooks/subscriptions/${encodeSeg(id)}`,
+    body,
+    {
+      key: assertIdempotencyKey(idempotencyKey),
+      ifMatch: requireIfMatchHeader(expectedVersion),
+      scope: scopeFor(ctx, 'OPTIONAL'),
+    },
+  );
+  return data;
 }
 
-// POST /webhooks/subscriptions/:id/reveal-secret body {secretReferenceId} -> 200 (no idempotency key)
-export function revealSecret(id: string, secretReferenceId: string): Promise<RevealSecretResult> {
-  return fakeRevealSecret(id, { secretReferenceId });
+// POST /webhooks/subscriptions/:id/reveal-secret body {secretReferenceId} -> 200 (no idempotency key, never cached/logged)
+export async function revealSecret(
+  id: string,
+  secretReferenceId: string,
+  ctx: TradeContext = {},
+): Promise<RevealSecretResult> {
+  const scope = scopeFor(ctx, 'OPTIONAL');
+  const path = `${TRADE_API_BASE}/webhooks/subscriptions/${encodeSeg(id)}/reveal-secret`;
+  const core = tradeCore() as TradeCoreTransport & { write?: CoreHttp['write'] };
+  if (typeof core.write !== 'function') {
+    throw new ApiError(500, 'TRADE.TRANSPORT.UNSUPPORTED');
+  }
+  try {
+    const { data } = await core.write<RevealSecretResult>(
+      'POST',
+      path,
+      { secretReferenceId },
+      { scope },
+    );
+    return data;
+  } catch (error) {
+    throw toTradeError(error);
+  }
 }
 
-// POST /webhooks/subscriptions/:id/rotate-secret body {overlapHours} (X-Idempotency-Key, If-Match) -> 202
-export function rotateSecret(
+// POST /webhooks/subscriptions/:id/rotate-secret body {overlapHours} (X-Idempotency-Key, If-Match, OPTIONAL scope) -> 202
+export async function rotateSecret(
   id: string,
   overlapHours: number,
-  ifMatch: number,
-  idempotencyKey: string,
+  expectedVersion: number,
+  idempotencyKey: string = newIdempotencyKey(),
+  ctx: TradeContext = {},
 ): Promise<SecretOperationAccepted> {
-  return fakeRotateSecret(id, { overlapHours }, { ifMatch, idempotencyKey });
+  const { data } = await tradeHttp().write<SecretOperationAccepted>(
+    'POST',
+    `/webhooks/subscriptions/${encodeSeg(id)}/rotate-secret`,
+    { overlapHours },
+    {
+      key: assertIdempotencyKey(idempotencyKey),
+      ifMatch: requireIfMatchHeader(expectedVersion),
+      scope: scopeFor(ctx, 'OPTIONAL'),
+    },
+  );
+  return data;
 }
 
-// POST /webhooks/subscriptions/:id/revoke-secret (X-Idempotency-Key, If-Match) -> 202
-export function revokeSecret(
+// POST /webhooks/subscriptions/:id/revoke-secret (X-Idempotency-Key, If-Match, OPTIONAL scope) -> 202
+export async function revokeSecret(
   id: string,
-  ifMatch: number,
-  idempotencyKey: string,
+  expectedVersion: number,
+  idempotencyKey: string = newIdempotencyKey(),
+  ctx: TradeContext = {},
 ): Promise<SecretOperationAccepted> {
-  return fakeRevokeSecret(id, { ifMatch, idempotencyKey });
+  const { data } = await tradeHttp().write<SecretOperationAccepted>(
+    'POST',
+    `/webhooks/subscriptions/${encodeSeg(id)}/revoke-secret`,
+    undefined,
+    {
+      key: assertIdempotencyKey(idempotencyKey),
+      ifMatch: requireIfMatchHeader(expectedVersion),
+      scope: scopeFor(ctx, 'OPTIONAL'),
+    },
+  );
+  return data;
 }
 
-// POST /webhooks/subscriptions/:id/test (X-Idempotency-Key) -> 202
-export function sendTest(
+// POST /webhooks/subscriptions/:id/test (X-Idempotency-Key, OPTIONAL scope) -> 202
+export async function sendTest(
   id: string,
-  idempotencyKey: string,
+  idempotencyKey: string = newIdempotencyKey(),
+  ctx: TradeContext = {},
 ): Promise<TestDeliveryAccepted> {
-  return fakeSendTestDelivery(id, idempotencyKey);
+  const { data } = await tradeHttp().write<TestDeliveryAccepted>(
+    'POST',
+    `/webhooks/subscriptions/${encodeSeg(id)}/test`,
+    undefined,
+    {
+      key: assertIdempotencyKey(idempotencyKey),
+      scope: scopeFor(ctx, 'OPTIONAL'),
+    },
+  );
+  return data;
 }
 
-// GET /webhooks/deliveries?page&limit&status&subscriptionId&eventType&createdFrom&createdTo
+// GET /webhooks/deliveries?page&limit&status&subscriptionId&eventType&createdFrom&createdTo (OPTIONAL scope)
 export function listDeliveries(
   q: ListDeliveriesQuery = {},
+  ctx: TradeContext = {},
 ): Promise<Page<WebhookDelivery>> {
-  return fakeListDeliveries(q);
+  return tradeHttp().read<Page<WebhookDelivery>>(
+    '/webhooks/deliveries',
+    compactQuery({
+      page: q.page,
+      limit: q.limit,
+      ...deliveryFilterQuery(q),
+    }),
+    { scope: scopeFor(ctx, 'OPTIONAL') },
+  );
 }
 
-// GET /webhooks/deliveries/:id
-export function getDelivery(id: string): Promise<WebhookDeliveryDetail> {
-  return fakeGetDelivery(id);
+// GET /webhooks/deliveries/:id (OPTIONAL scope)
+export function getDelivery(
+  id: string,
+  ctx: TradeContext = {},
+): Promise<WebhookDeliveryDetail> {
+  return tradeHttp().read<WebhookDeliveryDetail>(
+    `/webhooks/deliveries/${encodeSeg(id)}`,
+    undefined,
+    { scope: scopeFor(ctx, 'OPTIONAL') },
+  );
 }
 
-// POST /webhooks/deliveries/:id/retry body {reasonCode, reasonNote?} (X-Idempotency-Key, If-Match) -> 202
-export function retryDelivery(
+// POST /webhooks/deliveries/:id/retry body {reasonCode, reasonNote?} (X-Idempotency-Key, If-Match, OPTIONAL scope) -> 202
+export async function retryDelivery(
   id: string,
   input: RetryDeliveryInput,
-  ifMatch: number,
-  idempotencyKey: string,
+  expectedVersion: number,
+  idempotencyKey: string = newIdempotencyKey(),
+  ctx: TradeContext = {},
 ): Promise<RetryDeliveryAccepted> {
-  return fakeRetryDelivery(id, input, { ifMatch, idempotencyKey });
+  const body: RetryDeliveryInput = {
+    reasonCode: input.reasonCode,
+    ...(input.reasonNote !== undefined ? { reasonNote: input.reasonNote } : {}),
+  };
+  const { data } = await tradeHttp().write<RetryDeliveryAccepted>(
+    'POST',
+    `/webhooks/deliveries/${encodeSeg(id)}/retry`,
+    body,
+    {
+      key: assertIdempotencyKey(idempotencyKey),
+      ifMatch: requireIfMatchHeader(expectedVersion),
+      scope: scopeFor(ctx, 'OPTIONAL'),
+    },
+  );
+  return data;
 }

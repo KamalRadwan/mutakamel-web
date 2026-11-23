@@ -190,9 +190,11 @@
       @if (!isCreate() && detail(); as current) {
         <app-secret-panel
           [subscription]="current"
+          [ctx]="ctx()"
           [canManage]="canManage()"
           (updated)="onSecretUpdated($event)"
           (conflict)="handleConflict()"
+          (forbidden)="onForbidden()"
         />
       }
     </form>

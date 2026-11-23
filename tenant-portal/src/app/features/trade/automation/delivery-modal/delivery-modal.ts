@@ -26,14 +26,15 @@ import { Notify } from '../../../../core/notify/notify';
 import { Button } from '../../../../shared/ui/button/button';
 import { Modal } from '../../../../shared/ui/modal/modal';
 import { TradeReasonPicker, type ReasonPickerValue } from '../../shared/pickers/reason-picker/reason-picker';
-import { ApiError, errorCodeOf } from '../../shared/trade-api';
+import { ApiError, type TradeContext, errorCodeOf } from '../../shared/trade-api';
 import { listReasons } from '../../shared/trade-foundation.api';
 import type { ReasonCode } from '../../shared/trade-foundation.model';
 import { formatDate } from '../../shared/trade-format';
 import { AutomationBadge } from '../automation-shared/automation-badge/automation-badge';
 import { ConflictDialog } from '../automation-shared/conflict-dialog/conflict-dialog';
-import { pollWhile } from '../automation-shared/poll';
+import { type PollHandle, pollWhile } from '../automation-shared/poll';
 import { ActionKeys } from '../automation-shared/action-keys';
+import { isForbiddenError, isIdempotencyMismatch } from '../webhooks-page/webhook-access';
 import { getDelivery, getSubscription, retryDelivery } from '../webhooks.api';
 import {
   type RetryDeliveryAccepted,
@@ -87,10 +88,12 @@ export class DeliveryModal {
 
   readonly deliveryId = input.required<string>();
   readonly subscriptionStatus = input<SubscriptionStatus | null>(null);
+  readonly ctx = input<TradeContext>({});
   readonly canReplay = input(true);
 
   readonly closed = output<void>();
   readonly retried = output<RetryDeliveryAccepted>();
+  readonly forbidden = output<void>();
 
   protected readonly detail = signal<WebhookDeliveryDetail | null>(null);
   protected readonly resolvedSubStatus = signal<SubscriptionStatus | null>(null);
@@ -110,7 +113,7 @@ export class DeliveryModal {
   private loadSeq = 0;
   private pollSeq = 0;
   private activePollId = '';
-  private stopPollHandle: unknown = null;
+  private stopPollHandle: PollHandle<WebhookDeliveryDetail> | null = null;
   private copyTimer: ReturnType<typeof setTimeout> | null = null;
 
   protected readonly effectiveSubStatus = computed<SubscriptionStatus | null>(
@@ -263,14 +266,15 @@ export class DeliveryModal {
     const reasonNote = this.reasonValue().note.trim();
 
     this.retrying.set(true);
+    const action = `retry:${current.id}`;
     try {
-      const action = `retry:${current.id}`;
       const input = { reasonCode, ...(reasonNote ? { reasonNote } : {}) };
       const accepted = await retryDelivery(
         current.id,
         input,
         current.version,
         this.keys.for(action, { input, ifMatch: current.version }),
+        this.ctx(),
       );
       this.keys.done(action);
       if (this.destroyed) return;
@@ -284,17 +288,25 @@ export class DeliveryModal {
       void this.loadDelivery(current.id);
     } catch (error) {
       if (this.destroyed) return;
+      const code = errorCodeOf(error);
+      if (isIdempotencyMismatch(code)) {
+        this.keys.done(action);
+      }
+      if (isForbiddenError(error)) {
+        this.onForbidden();
+        return;
+      }
       if (
         error instanceof ApiError &&
         error.status === 409 &&
-        errorCodeOf(error) === 'TRADE.CONCURRENCY.STALE_VERSION'
+        code === 'TRADE.CONCURRENCY.STALE_VERSION'
       ) {
         this.retryModal().close();
         this.conflictDialog().open();
         return;
       }
       this.notify.error(this.translateError(error));
-      if (errorCodeOf(error) === 'TRADE.WEBHOOK.DELIVERY_NOT_RETRYABLE') {
+      if (code === 'TRADE.WEBHOOK.DELIVERY_NOT_RETRYABLE') {
         this.retryModal().close();
         void this.loadDelivery(current.id);
       }
@@ -322,6 +334,13 @@ export class DeliveryModal {
     void this.loadDelivery(this.deliveryId());
   }
 
+  private onForbidden(): void {
+    this.stopPolling();
+    this.retryModal().close();
+    this.forbidden.emit();
+    this.modal().close();
+  }
+
   private async loadDelivery(id: string): Promise<void> {
     const seq = ++this.loadSeq;
     this.loading.set(true);
@@ -329,7 +348,7 @@ export class DeliveryModal {
     this.notFound.set(false);
 
     try {
-      const loaded = await getDelivery(id);
+      const loaded = await getDelivery(id, this.ctx());
       if (seq !== this.loadSeq || this.destroyed) return;
       this.detail.set(loaded);
       this.loading.set(false);
@@ -337,6 +356,10 @@ export class DeliveryModal {
     } catch (error) {
       if (seq !== this.loadSeq || this.destroyed) return;
       this.loading.set(false);
+      if (isForbiddenError(error)) {
+        this.onForbidden();
+        return;
+      }
       if (error instanceof ApiError && error.status === 404) {
         this.notFound.set(true);
       } else {
@@ -349,7 +372,7 @@ export class DeliveryModal {
     if (this.subscriptionStatus() !== null) return;
 
     try {
-      const sub = await getSubscription(loaded.subscriptionId);
+      const sub = await getSubscription(loaded.subscriptionId, this.ctx());
       if (!this.destroyed && this.detail()?.id === loaded.id) {
         this.resolvedSubStatus.set(sub.status);
       }
@@ -360,7 +383,7 @@ export class DeliveryModal {
 
   private async loadRetryReasons(): Promise<void> {
     try {
-      const reasons = await listReasons(RETRY_REASON_KIND);
+      const reasons = await listReasons(RETRY_REASON_KIND, undefined, this.ctx());
       if (!this.destroyed) {
         this.retryReasons.set(reasons);
         this.retryReasonsLoaded.set(true);
@@ -377,10 +400,11 @@ export class DeliveryModal {
     this.stopPolling();
     const seq = ++this.pollSeq;
     this.activePollId = id;
+    const ctx = this.ctx();
 
     this.stopPollHandle = pollWhile(
       async () => {
-        const fresh = await getDelivery(id);
+        const fresh = await getDelivery(id, ctx);
         if (!this.destroyed && seq === this.pollSeq) {
           this.detail.set(fresh);
         }
@@ -393,6 +417,12 @@ export class DeliveryModal {
         (fresh.status === 'PENDING' || fresh.status === 'RETRY_PENDING'),
       POLL_MS,
       this.destroyRef,
+      undefined,
+      (error) => {
+        if (!this.destroyed && isForbiddenError(error)) {
+          this.onForbidden();
+        }
+      },
     );
   }
 
@@ -401,9 +431,7 @@ export class DeliveryModal {
     this.activePollId = '';
     const handle = this.stopPollHandle;
     this.stopPollHandle = null;
-    if (typeof handle === 'function') {
-      (handle as () => void)();
-    }
+    handle?.stop();
   }
 
   private translateError(error: unknown): string {

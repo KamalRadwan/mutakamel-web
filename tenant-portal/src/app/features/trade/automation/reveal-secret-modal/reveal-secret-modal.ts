@@ -24,7 +24,8 @@ import { Notify } from '../../../../core/notify/notify';
 import { Button } from '../../../../shared/ui/button/button';
 import { Checkbox } from '../../../../shared/ui/checkbox/checkbox';
 import { Field } from '../../../../shared/ui/field/field';
-import { ApiError } from '../../shared/trade-api';
+import { ApiError, type TradeContext } from '../../shared/trade-api';
+import { isForbiddenError } from '../webhooks-page/webhook-access';
 import { revealSecret } from '../webhooks.api';
 
 /** Reveal reasons after which the secret can never be shown again (rotate for a new one). */
@@ -58,8 +59,10 @@ export class RevealSecretModal {
 
   readonly subscriptionId = input.required<string>();
   readonly secretReferenceId = input.required<string>();
+  readonly ctx = input<TradeContext>({});
 
   readonly closed = output<boolean>();
+  readonly forbidden = output<void>();
 
   protected readonly loading = signal(true);
   protected readonly failed = signal(false);
@@ -77,6 +80,7 @@ export class RevealSecretModal {
   constructor() {
     this.destroyRef.onDestroy(() => {
       this.destroyed = true;
+      this.secretValue.set('');
       if (this.copyTimer !== null) {
         clearTimeout(this.copyTimer);
         this.copyTimer = null;
@@ -145,21 +149,28 @@ export class RevealSecretModal {
     this.failed.set(false);
 
     try {
-      const result = await revealSecret(this.subscriptionId(), this.secretReferenceId());
+      const result = await revealSecret(this.subscriptionId(), this.secretReferenceId(), this.ctx());
       if (this.destroyed) return;
       this.secretValue.set(result.secret);
       this.consumed = true;
       this.loading.set(false);
     } catch (error) {
       if (this.destroyed) return;
+      if (isForbiddenError(error)) {
+        this.forbidden.emit();
+        this.forceClose(false);
+        return;
+      }
       if (error instanceof ApiError && error.code === 'TRADE.WEBHOOK.SECRET_VERSION_INVALID') {
         const reason = error.details?.['reason']?.[0] ?? '';
+        const key = GONE_REASONS.includes(reason)
+          ? 'webhooks.reveal.alreadyShown'
+          : `webhooks.errors.TRADE.WEBHOOK.SECRET_VERSION_INVALID.${reason}`;
+        const translated = this.transloco.translate(key);
         this.notify.error(
-          this.transloco.translate(
-            GONE_REASONS.includes(reason)
-              ? 'webhooks.reveal.alreadyShown'
-              : `webhooks.errors.TRADE.WEBHOOK.SECRET_VERSION_INVALID.${reason}`,
-          ),
+          translated !== key
+            ? translated
+            : this.transloco.translate('webhooks.errors.TRADE.WEBHOOK.SECRET_VERSION_INVALID'),
         );
         this.forceClose(true);
         return;
@@ -171,6 +182,7 @@ export class RevealSecretModal {
   }
 
   private forceClose(didConsume: boolean): void {
+    this.secretValue.set('');
     this.consumed = didConsume;
     const el = this.dialog().nativeElement;
     if (el.open) {

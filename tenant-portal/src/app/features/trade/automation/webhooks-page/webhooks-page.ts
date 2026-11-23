@@ -2,6 +2,7 @@ import {
   Component,
   DestroyRef,
   ElementRef,
+  Injector,
   computed,
   effect,
   inject,
@@ -27,18 +28,26 @@ import { ScopeState } from '../../../../core/scope/scope';
 import { Button } from '../../../../shared/ui/button/button';
 import { DateRange, type DateRangeValue } from '../../../../shared/ui/date-range/date-range';
 import { Dropdown, type DropdownOption } from '../../../../shared/ui/dropdown/dropdown';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { Pagination } from '../../../../shared/ui/pagination/pagination';
 import { Segmented, type SegmentedOption } from '../../../../shared/ui/segmented/segmented';
 import { StepFilter, type StepOption } from '../../../../shared/ui/step-filter/step-filter';
-import { ApiError, errorCodeOf } from '../../shared/trade-api';
+import { ApiError, type TradeContext, errorCodeOf, tradeContext } from '../../shared/trade-api';
 import { ConflictDialog } from '../automation-shared/conflict-dialog/conflict-dialog';
-import { pollWhile } from '../automation-shared/poll';
+import { type PollHandle, pollWhile } from '../automation-shared/poll';
 import { ScopeChip } from '../automation-shared/scope-chip/scope-chip';
 import { DeliveriesTable } from '../deliveries-table/deliveries-table';
 import { DeliveryModal } from '../delivery-modal/delivery-modal';
 import { SubscriptionModal } from '../subscription-modal/subscription-modal';
 import { SubscriptionsTable } from '../subscriptions-table/subscriptions-table';
 import { ActionKeys } from '../automation-shared/action-keys';
+import {
+  WEBHOOK_PERMISSIONS,
+  hasWebhookReadGrant,
+  hasWebhookScopeGrant,
+  isForbiddenError,
+  isIdempotencyMismatch,
+} from './webhook-access';
 import {
   getDeliveryCounts,
   getSubscription,
@@ -63,8 +72,6 @@ import {
   endpointText,
 } from '../webhooks.model';
 import { WEBHOOK_EVENTS } from '../webhooks.registry';
-
-const CAN = { manage: true, test: true, approve: true, publish: true, replay: true }; // later from the session
 
 type WebhooksView = 'subscriptions' | 'deliveries';
 type DeliveryStatusFilter = 'ALL' | DeliveryStatus;
@@ -155,6 +162,7 @@ let nextWebhooksPageId = 0;
     Button,
     DateRange,
     Dropdown,
+    FullState,
     Pagination,
     Segmented,
     StepFilter,
@@ -185,6 +193,7 @@ let nextWebhooksPageId = 0;
 export class WebhooksPage {
   protected readonly uid = `webhooks-page-${++nextWebhooksPageId}`;
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
@@ -227,6 +236,10 @@ export class WebhooksPage {
   /** Subscriptions whose secret operation is still with the worker (the list does not say so). */
   protected readonly pendingSecretIds = signal<readonly string[]>([]);
 
+  protected readonly forbidden = signal(false);
+  protected readonly canRead = computed(() => hasWebhookReadGrant(this.injector));
+  protected readonly isForbidden = computed(() => !this.canRead() || this.forbidden());
+
   protected readonly subscriptions = signal<WebhookSubscription[]>([]);
   protected readonly subscriptionsLoading = signal(true);
   protected readonly subscriptionsFailed = signal(false);
@@ -246,22 +259,32 @@ export class WebhooksPage {
   private delPollSeq = 0;
   private activeSubPollKey = '';
   private activeDelPollKey = '';
-  private stopSubPollHandle: unknown = null;
-  private stopDelPollHandle: unknown = null;
+  private stopSubPollHandle: PollHandle<unknown> | null = null;
+  private stopDelPollHandle: PollHandle<unknown> | null = null;
   private pendingConflictToggle: { row: WebhookSubscription; nextStatus: 'ACTIVE' | 'DISABLED' } | null = null;
   private lastDeliveryFilterKey = '';
-  private lastCompanyId: string | null = null;
+  private lastScopeKey: string | null = null;
 
   protected readonly activeView = computed<WebhooksView>(() => parseView(this.viewParam()));
 
   protected readonly scopeTarget = computed<ScopeTarget>(() =>
     parseScope(this.scopeParam(), !!this.scopeState.company()?.id),
   );
+  protected readonly ctx = computed<TradeContext>(() => tradeContext(this.scopeState, this.scopeTarget()));
 
   protected readonly isBranchScope = computed(() => this.scopeTarget() === 'BRANCH');
-  protected readonly canManage = computed(() => CAN.manage && !this.isBranchScope());
-  protected readonly canTest = computed(() => CAN.test && !this.isBranchScope());
-  protected readonly canReplay = computed(() => CAN.replay);
+  protected readonly canManage = computed(
+    () =>
+      !this.isForbidden() &&
+      !this.isBranchScope() &&
+      hasWebhookScopeGrant(this.injector, this.scopeState, WEBHOOK_PERMISSIONS.manage, this.scopeTarget()),
+  );
+  protected readonly canTest = computed(() => this.canManage());
+  protected readonly canReplay = computed(
+    () =>
+      !this.isForbidden() &&
+      hasWebhookScopeGrant(this.injector, this.scopeState, WEBHOOK_PERMISSIONS.replay, this.scopeTarget()),
+  );
 
   protected readonly page = computed(() => parsePositiveInt(this.pageParam(), DEFAULT_PAGE));
   protected readonly pageSize = computed(() => parsePageSize(this.sizeParam()));
@@ -435,8 +458,12 @@ export class WebhooksPage {
       this.stopDelPolling();
     });
 
-    void this.loadCatalogue();
-    void this.loadSubscriptions();
+    if (!this.isForbidden()) {
+      void this.loadCatalogue();
+      void this.loadSubscriptions();
+    } else {
+      this.subscriptionsLoading.set(false);
+    }
 
     let prevPage = this.page();
     effect(() => {
@@ -448,14 +475,22 @@ export class WebhooksPage {
     });
 
     effect(() => {
-      const companyId = this.scopeState.company()?.id ?? '';
-      if (this.lastCompanyId === null) {
-        this.lastCompanyId = companyId;
+      const target = this.scopeTarget();
+      const currentCtx = this.ctx();
+      const key = `${target}|${currentCtx.companyId ?? ''}|${currentCtx.branchId ?? ''}`;
+      if (this.lastScopeKey === null) {
+        this.lastScopeKey = key;
         return;
       }
-      if (companyId === this.lastCompanyId) return;
-      this.lastCompanyId = companyId;
+      if (key === this.lastScopeKey) return;
+      this.lastScopeKey = key;
       untracked(() => {
+        this.forbidden.set(false);
+        if (!this.canRead()) {
+          this.subscriptionsLoading.set(false);
+          return;
+        }
+        void this.loadCatalogue();
         void this.loadSubscriptions();
         if (this.activeView() === 'deliveries') {
           void this.loadDeliveries(true);
@@ -464,7 +499,7 @@ export class WebhooksPage {
     });
 
     effect(() => {
-      if (this.activeView() !== 'deliveries') {
+      if (this.activeView() !== 'deliveries' || this.isForbidden()) {
         untracked(() => this.stopDelPolling());
         return;
       }
@@ -485,7 +520,7 @@ export class WebhooksPage {
     });
 
     effect(() => {
-      const isSubsView = this.activeView() === 'subscriptions';
+      const isSubsView = this.activeView() === 'subscriptions' && !this.isForbidden();
       const pendingIds = isSubsView ? [...this.pendingSecretIds()] : [];
       const key = pendingIds.join(',');
 
@@ -501,7 +536,7 @@ export class WebhooksPage {
     });
 
     effect(() => {
-      const isDelView = this.activeView() === 'deliveries';
+      const isDelView = this.activeView() === 'deliveries' && !this.isForbidden();
       const inProgressIds = isDelView
         ? this.deliveries()
             .filter((row) => row.status === 'PENDING' || row.status === 'RETRY_PENDING')
@@ -559,7 +594,18 @@ export class WebhooksPage {
     this.searchText.set('');
   }
 
+  protected goHome(): void {
+    void this.router.navigateByUrl('/workspace/home');
+  }
+
+  protected onForbidden(): void {
+    this.forbidden.set(true);
+    this.stopSubPolling();
+    this.stopDelPolling();
+  }
+
   protected reload(): void {
+    if (this.isForbidden()) return;
     if (this.activeView() === 'subscriptions') {
       void this.loadSubscriptions();
     } else {
@@ -656,9 +702,9 @@ export class WebhooksPage {
   protected async onSendTestRow(row: WebhookSubscription): Promise<void> {
     if (!this.canTest() || row.status !== 'ACTIVE' || this.busySubscriptionId()) return;
     this.busySubscriptionId.set(row.id);
+    const action = `test:${row.id}`;
     try {
-      const action = `test:${row.id}`;
-      await sendTest(row.id, this.keys.for(action, row.id));
+      await sendTest(row.id, this.keys.for(action, row.id), this.ctx());
       this.keys.done(action);
       if (this.destroyed) return;
       this.notify.success(this.transloco.translate('webhooks.toast.testSent'));
@@ -666,9 +712,15 @@ export class WebhooksPage {
         void this.loadDeliveries(true);
       }
     } catch (error) {
-      if (!this.destroyed) {
-        this.notify.error(this.translateError(error));
+      if (this.destroyed) return;
+      if (isIdempotencyMismatch(errorCodeOf(error))) {
+        this.keys.done(action);
       }
+      if (isForbiddenError(error)) {
+        this.onForbidden();
+        return;
+      }
+      this.notify.error(this.translateError(error));
     } finally {
       this.busySubscriptionId.set(null);
     }
@@ -678,13 +730,14 @@ export class WebhooksPage {
     if (!this.canManage() || this.busySubscriptionId()) return;
     const nextStatus: 'ACTIVE' | 'DISABLED' = row.status === 'ACTIVE' ? 'DISABLED' : 'ACTIVE';
     this.busySubscriptionId.set(row.id);
+    const action = `status:${row.id}`;
     try {
-      const action = `status:${row.id}`;
       await updateSubscription(
         row.id,
         { status: nextStatus },
         row.version,
         this.keys.for(action, { status: nextStatus, ifMatch: row.version }),
+        this.ctx(),
       );
       this.keys.done(action);
       if (this.destroyed) return;
@@ -696,10 +749,18 @@ export class WebhooksPage {
       );
     } catch (error) {
       if (this.destroyed) return;
+      const code = errorCodeOf(error);
+      if (isIdempotencyMismatch(code)) {
+        this.keys.done(action);
+      }
+      if (isForbiddenError(error)) {
+        this.onForbidden();
+        return;
+      }
       if (
         error instanceof ApiError &&
         error.status === 409 &&
-        errorCodeOf(error) === 'TRADE.CONCURRENCY.STALE_VERSION'
+        code === 'TRADE.CONCURRENCY.STALE_VERSION'
       ) {
         this.pendingConflictToggle = { row, nextStatus };
         this.rowConflictDialog().open();
@@ -722,19 +783,22 @@ export class WebhooksPage {
     if (!pending) return;
 
     this.busySubscriptionId.set(pending.row.id);
+    let action: string | null = null;
     try {
-      const fresh = await getSubscription(pending.row.id);
+      const ctx = this.ctx();
+      const fresh = await getSubscription(pending.row.id, ctx);
       if (this.destroyed) return;
       if (fresh.status === pending.nextStatus) {
         void this.loadSubscriptions();
         return;
       }
-      const action = `status:${fresh.id}`;
+      action = `status:${fresh.id}`;
       await updateSubscription(
         fresh.id,
         { status: pending.nextStatus },
         fresh.version,
         this.keys.for(action, { status: pending.nextStatus, ifMatch: fresh.version }),
+        ctx,
       );
       this.keys.done(action);
       if (this.destroyed) return;
@@ -745,9 +809,15 @@ export class WebhooksPage {
         ),
       );
     } catch (error) {
-      if (!this.destroyed) {
-        this.notify.error(this.translateError(error));
+      if (this.destroyed) return;
+      if (action && isIdempotencyMismatch(errorCodeOf(error))) {
+        this.keys.done(action);
       }
+      if (isForbiddenError(error)) {
+        this.onForbidden();
+        return;
+      }
+      this.notify.error(this.translateError(error));
     } finally {
       this.busySubscriptionId.set(null);
     }
@@ -838,28 +908,39 @@ export class WebhooksPage {
 
   private async loadCatalogue(): Promise<void> {
     try {
-      const catalogue = await listEvents();
+      const catalogue = await listEvents(this.ctx());
       if (!this.destroyed && catalogue.items.length > 0) {
         this.eventsCatalogue.set(catalogue.items);
       }
-    } catch {
+    } catch (error) {
+      if (!this.destroyed && isForbiddenError(error)) {
+        this.onForbidden();
+      }
       // Keep the registry list if the catalogue request fails.
     }
   }
 
   protected async loadSubscriptions(): Promise<void> {
+    if (this.isForbidden()) {
+      this.subscriptionsLoading.set(false);
+      return;
+    }
     const seq = ++this.subsLoadSeq;
     this.subscriptionsLoading.set(true);
     this.subscriptionsFailed.set(false);
 
     try {
-      const res = await listSubscriptions({ page: 1, limit: SUB_LIST_LIMIT });
+      const res = await listSubscriptions({ page: 1, limit: SUB_LIST_LIMIT }, this.ctx());
       if (seq !== this.subsLoadSeq || this.destroyed) return;
       this.subscriptions.set(res.items);
       this.subscriptionsLoading.set(false);
     } catch (error) {
       if (seq !== this.subsLoadSeq || this.destroyed) return;
       this.subscriptionsLoading.set(false);
+      if (isForbiddenError(error)) {
+        this.onForbidden();
+        return;
+      }
       this.subscriptionsFailed.set(true);
       this.notify.error(this.translateError(error));
     }
@@ -888,15 +969,20 @@ export class WebhooksPage {
   }
 
   protected async loadDeliveries(includeCounts: boolean): Promise<void> {
+    if (this.isForbidden()) {
+      this.deliveriesLoading.set(false);
+      return;
+    }
     const seq = ++this.delLoadSeq;
     const query = this.buildDeliveriesQuery();
+    const ctx = this.ctx();
     this.deliveriesLoading.set(true);
     this.deliveriesFailed.set(false);
 
     try {
       const [listRes, countsRes] = await Promise.all([
-        listDeliveries(query),
-        includeCounts ? getDeliveryCounts(this.buildDeliveryFilters()) : Promise.resolve(null),
+        listDeliveries(query, ctx),
+        includeCounts ? getDeliveryCounts(this.buildDeliveryFilters(), ctx) : Promise.resolve(null),
       ]);
       if (seq !== this.delLoadSeq || this.destroyed) return;
       this.deliveries.set(listRes.items);
@@ -908,6 +994,10 @@ export class WebhooksPage {
     } catch (error) {
       if (seq !== this.delLoadSeq || this.destroyed) return;
       this.deliveriesLoading.set(false);
+      if (isForbiddenError(error)) {
+        this.onForbidden();
+        return;
+      }
       this.deliveriesFailed.set(true);
       this.notify.error(this.translateError(error));
     }
@@ -917,10 +1007,11 @@ export class WebhooksPage {
     this.stopSubPolling();
     const seq = ++this.subPollSeq;
     this.activeSubPollKey = key;
+    const ctx = this.ctx();
 
     this.stopSubPollHandle = pollWhile(
       async () => {
-        const refreshed = await Promise.all(ids.map((id) => getSubscription(id)));
+        const refreshed = await Promise.all(ids.map((id) => getSubscription(id, ctx)));
         if (!this.destroyed && seq === this.subPollSeq) {
           for (const detail of refreshed) {
             this.trackSecretOperation(detail);
@@ -935,9 +1026,16 @@ export class WebhooksPage {
         !this.destroyed &&
         seq === this.subPollSeq &&
         this.activeView() === 'subscriptions' &&
+        !this.isForbidden() &&
         refreshed.some((detail) => detail.secretOperation?.status === 'PENDING'),
       SUB_POLL_MS,
       this.destroyRef,
+      undefined,
+      (error) => {
+        if (!this.destroyed && isForbiddenError(error)) {
+          this.onForbidden();
+        }
+      },
     );
   }
 
@@ -946,9 +1044,7 @@ export class WebhooksPage {
     this.activeSubPollKey = '';
     const handle = this.stopSubPollHandle;
     this.stopSubPollHandle = null;
-    if (typeof handle === 'function') {
-      (handle as () => void)();
-    }
+    handle?.stop();
   }
 
   private startDelPolling(key: string): void {
@@ -956,12 +1052,13 @@ export class WebhooksPage {
     const seq = ++this.delPollSeq;
     this.activeDelPollKey = key;
     const query = this.buildDeliveriesQuery();
+    const ctx = this.ctx();
 
     this.stopDelPollHandle = pollWhile(
       async () => {
         const [listRes, countsRes] = await Promise.all([
-          listDeliveries(query),
-          getDeliveryCounts(this.buildDeliveryFilters()),
+          listDeliveries(query, ctx),
+          getDeliveryCounts(this.buildDeliveryFilters(), ctx),
         ]);
         if (!this.destroyed && seq === this.delPollSeq) {
           this.deliveries.set(listRes.items);
@@ -974,9 +1071,16 @@ export class WebhooksPage {
         !this.destroyed &&
         seq === this.delPollSeq &&
         this.activeView() === 'deliveries' &&
+        !this.isForbidden() &&
         items.some((row) => row.status === 'PENDING' || row.status === 'RETRY_PENDING'),
       DEL_POLL_MS,
       this.destroyRef,
+      undefined,
+      (error) => {
+        if (!this.destroyed && isForbiddenError(error)) {
+          this.onForbidden();
+        }
+      },
     );
   }
 
@@ -985,9 +1089,7 @@ export class WebhooksPage {
     this.activeDelPollKey = '';
     const handle = this.stopDelPollHandle;
     this.stopDelPollHandle = null;
-    if (typeof handle === 'function') {
-      (handle as () => void)();
-    }
+    handle?.stop();
   }
 
   private trackSecretOperation(detail: WebhookSubscriptionDetail): void {
@@ -1018,6 +1120,10 @@ export class WebhooksPage {
       const autoKey = `automation.errors.${error.code}`;
       const autoText = this.transloco.translate(autoKey);
       if (autoText !== autoKey) return autoText;
+
+      const sharedKey = `tradeShared.errors.${error.code.replaceAll('.', '_')}`;
+      const sharedText = this.transloco.translate(sharedKey);
+      if (sharedText !== sharedKey) return sharedText;
     }
     return this.transloco.translate('webhooks.errors.generic');
   }
