@@ -15,6 +15,20 @@
         </div>
       }
     </div>
+  } @else if (forbidden()) {
+    <ui-full-state
+      kind="forbidden"
+      [title]="'governance.forbiddenTitle' | transloco"
+      [text]="'governance.forbiddenText' | transloco"
+    />
+  } @else if (unavailable()) {
+    <ui-full-state
+      kind="provisioning"
+      [title]="'policy.decision.unavailableTitle' | transloco"
+      [text]="'policy.decision.unavailableText' | transloco"
+      [actionLabel]="'policy.decision.retry' | transloco"
+      (action)="retry()"
+    />
   } @else if (receipt(); as r) {
     <div class="grid gap-10 desktop:grid-cols-2">
       <ui-field
@@ -52,7 +66,7 @@
           tabindex="-1"
           dir="ltr"
           class="w-full cursor-default bg-transparent text-12 text-text outline-none"
-          [value]="r.reasonCode"
+          [value]="r.reasonCode || '—'"
         />
       </ui-field>
 
@@ -66,7 +80,7 @@
           tabindex="-1"
           dir="ltr"
           class="w-full cursor-default bg-transparent text-12 text-text outline-none"
-          [value]="r.explanationCode"
+          [value]="r.explanationCode || '—'"
         />
       </ui-field>
 
@@ -80,23 +94,61 @@
           tabindex="-1"
           dir="auto"
           class="w-full cursor-default bg-transparent text-12 text-text outline-none"
-          [value]="r.selectedValue ?? '—'"
+          [value]="selectedValueText()"
         />
       </ui-field>
 
       <ui-field
-        [label]="'policy.decision.matchedRuleLabel' | transloco"
-        [hint]="'policy.decision.matchedRuleHint' | transloco"
+        [label]="'policy.decision.scopeLabel' | transloco"
+        [hint]="'policy.decision.scopeHint' | transloco"
       >
         <input
           type="text"
           readonly
           tabindex="-1"
-          dir="ltr"
           class="w-full cursor-default bg-transparent text-12 text-text outline-none"
-          [value]="r.matchedRuleCode ?? '—'"
+          [value]="scopeText()"
         />
       </ui-field>
+
+      <div class="desktop:col-span-2">
+        <ui-field
+          size="bare"
+          [label]="'policy.decision.matchedRulesLabel' | transloco"
+          [hint]="'policy.decision.matchedRulesHint' | transloco"
+        >
+          <div class="flex min-h-field flex-wrap items-center gap-6">
+            @for (ruleCode of r.matchedRules; track $index) {
+              <span
+                class="inline-flex h-chip items-center rounded-6 bg-neutral-soft px-8 text-12 font-medium text-on-neutral-soft"
+                dir="ltr"
+              >
+                {{ ruleCode }}
+              </span>
+            } @empty {
+              <span class="text-12 text-text-muted">—</span>
+            }
+          </div>
+        </ui-field>
+      </div>
+
+      @if (r.explanation) {
+        <div class="desktop:col-span-2">
+          <ui-field
+            [label]="'policy.decision.explanationLabel' | transloco"
+            [hint]="'policy.decision.explanationHint' | transloco"
+          >
+            <input
+              type="text"
+              readonly
+              tabindex="-1"
+              dir="auto"
+              class="w-full cursor-default bg-transparent text-12 text-text outline-none"
+              [value]="r.explanation"
+            />
+          </ui-field>
+        </div>
+      }
 
       <div class="desktop:col-span-2">
         <ui-field
@@ -105,14 +157,14 @@
           [hint]="'policy.decision.policyVersionsHint' | transloco"
         >
           <div class="flex min-h-field flex-wrap items-center gap-6">
-            @for (ref of r.policyVersions; track ref.versionId) {
+            @for (ref of r.policyVersions; track ref.id) {
               <button
                 type="button"
                 class="inline-flex h-chip cursor-pointer items-center gap-4 rounded-6 bg-brand-soft px-8 text-12 font-medium text-on-brand-soft outline-none transition-colors duration-fast hover:bg-brand hover:text-on-brand focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
                 dir="ltr"
                 (click)="openVersion(ref)"
               >
-                {{ 'policy.decision.versionLink' | transloco: { code: ref.definitionCode, n: ref.versionNumber } }}
+                {{ 'policy.decision.versionLink' | transloco: { code: ref.definitionCode, n: ref.version } }}
               </button>
             } @empty {
               <span class="text-12 text-text-muted">—</span>
@@ -131,7 +183,7 @@
           tabindex="-1"
           dir="ltr"
           class="w-full cursor-default bg-transparent text-12 text-text outline-none"
-          [title]="r.document.aggregateId"
+          [title]="r.aggregateId ?? ''"
           [value]="documentText()"
         />
       </ui-field>

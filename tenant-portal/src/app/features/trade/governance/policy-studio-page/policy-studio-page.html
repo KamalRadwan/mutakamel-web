@@ -1,9 +1,18 @@
+@if (forbidden()) {
+  <div class="flex flex-1 rounded-10 border border-border bg-surface shadow-card">
+    <ui-full-state
+      kind="forbidden"
+      [title]="'governance.forbiddenTitle' | transloco"
+      [text]="'governance.forbiddenText' | transloco"
+    />
+  </div>
+} @else {
 <header class="flex flex-wrap items-center gap-8 rounded-12 border border-border bg-surface px-12 py-8 shadow-card">
   <div class="flex items-center gap-8">
     <h1 class="text-15 leading-22 font-medium text-text">
       {{ 'policy.list.title' | transloco }}
     </h1>
-    @if (canManage) {
+    @if (canManage()) {
       <button type="button" uiButton variant="primary" (click)="openCreateModal()">
         <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
         <span>{{ 'policy.list.newPolicy' | transloco }}</span>
@@ -58,7 +67,7 @@
     >
       <ng-icon name="tablerRefresh" size="14" aria-hidden="true" />
     </button>
-    <app-scope-chip />
+    <app-scope-chip [scope]="currentScopeTarget()" />
   </div>
 </header>
 
@@ -96,7 +105,7 @@
     </span>
     <p class="text-14 leading-20 font-medium text-text">{{ 'policy.list.emptyTitle' | transloco }}</p>
     <p class="text-12 leading-18 text-text-muted">{{ 'policy.list.emptyText' | transloco }}</p>
-    @if (canManage) {
+    @if (canManage()) {
       <button type="button" uiButton variant="primary" (click)="openCreateModal()">
         <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
         <span>{{ 'policy.list.newPolicy' | transloco }}</span>
@@ -199,7 +208,11 @@
 
 <app-policy-modal
   [kinds]="activeKinds()"
+  [scope]="currentScopeTarget()"
+  [ctx]="tradeCtx()"
   (created)="onPolicyCreated($event)"
+  (forbidden)="onModalForbidden()"
 />
 
-<app-decision-modal (closed)="onDecisionModalClosed()" />
+<app-decision-modal [ctx]="tradeCtx()" (closed)="onDecisionModalClosed()" />
+}

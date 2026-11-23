@@ -10,10 +10,11 @@ import { Button } from '../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { Field } from '../../../../shared/ui/field/field';
 import { Modal } from '../../../../shared/ui/modal/modal';
-import { ApiError, newIdempotencyKey } from '../../shared/trade-api';
+import { ApiError, type TradeContext, newIdempotencyKey } from '../../shared/trade-api';
 import { createDefinition } from '../policy.api';
 import type { GovernedDefinitionRecord, ScopeTarget } from '../policy.model';
 import { ACTIVE_WORKFLOW_KINDS, CODE_PATTERN } from '../policy.registry';
+import { isForbiddenError } from '../pricing.service';
 
 @Component({
   selector: 'app-workflow-modal',
@@ -31,7 +32,9 @@ export class WorkflowModal {
   private readonly discardDialog = viewChild.required(ConfirmDialog);
 
   readonly scope = input<ScopeTarget>('COMPANY');
+  readonly ctx = input<TradeContext>({});
   readonly created = output<GovernedDefinitionRecord>();
+  readonly forbidden = output<void>();
 
   protected readonly fixedKind = ACTIVE_WORKFLOW_KINDS[0];
   protected readonly code = signal('');
@@ -115,7 +118,7 @@ export class WorkflowModal {
       const def = await createDefinition(
         'workflow',
         { code: trimmed, workflowKind: this.fixedKind, scopeTarget: this.scope() },
-        { idempotencyKey: this.idemKey },
+        { idempotencyKey: this.idemKey, ctx: this.ctx() },
       );
       this.notify.success(this.transloco.translate('workflows.createModal.createdToast'));
       this.allowClose = true;
@@ -123,6 +126,13 @@ export class WorkflowModal {
       this.created.emit(def);
       this.modal().close();
     } catch (err) {
+      if (isForbiddenError(err)) {
+        this.allowClose = true;
+        this.isOpen.set(false);
+        this.modal().close();
+        this.forbidden.emit();
+        return;
+      }
       if (err instanceof ApiError) {
         this.idemKey = newIdempotencyKey();
         if (err.code === 'TRADE.POLICY.CODE_TAKEN') {

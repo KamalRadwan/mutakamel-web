@@ -10,10 +10,11 @@ import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dial
 import { Dropdown, type DropdownOption } from '../../../../shared/ui/dropdown/dropdown';
 import { Field } from '../../../../shared/ui/field/field';
 import { Modal } from '../../../../shared/ui/modal/modal';
-import { ApiError, errorCodeOf, newIdempotencyKey } from '../../shared/trade-api';
+import { ApiError, type TradeContext, errorCodeOf, newIdempotencyKey } from '../../shared/trade-api';
 import { createDefinition } from '../policy.api';
 import type { GovernedDefinitionRecord, ScopeTarget } from '../policy.model';
 import { ACTIVE_POLICY_KINDS, CODE_PATTERN, type PolicyKind } from '../policy.registry';
+import { isForbiddenError } from '../pricing.service';
 
 @Component({
   selector: 'app-policy-modal',
@@ -31,7 +32,9 @@ export class PolicyModal {
 
   readonly kinds = input<readonly PolicyKind[]>(ACTIVE_POLICY_KINDS);
   readonly scope = input<ScopeTarget>('COMPANY');
+  readonly ctx = input<TradeContext>({});
   readonly created = output<GovernedDefinitionRecord>();
+  readonly forbidden = output<void>();
 
   protected readonly code = signal('');
   protected readonly kind = signal<PolicyKind>('PRICING_GUARD');
@@ -127,7 +130,7 @@ export class PolicyModal {
       const def = await createDefinition(
         'policy',
         { code: trimmed, policyKind: this.kind(), scopeTarget: this.scope() },
-        { idempotencyKey: this.idemKey },
+        { idempotencyKey: this.idemKey, ctx: this.ctx() },
       );
       this.notify.success(this.transloco.translate('policy.createModal.createdToast'));
       this.allowClose = true;
@@ -135,6 +138,13 @@ export class PolicyModal {
       this.created.emit(def);
       this.modal().close();
     } catch (err) {
+      if (isForbiddenError(err)) {
+        this.allowClose = true;
+        this.isOpen.set(false);
+        this.modal().close();
+        this.forbidden.emit();
+        return;
+      }
       if (err instanceof ApiError) {
         this.idemKey = newIdempotencyKey();
         const apiCode = errorCodeOf(err);

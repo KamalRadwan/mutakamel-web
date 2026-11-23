@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal, viewChild } from '@angular/core';
+import { Component, Injector, computed, inject, signal, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../core/i18n/translation-events';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
@@ -12,9 +12,12 @@ import {
 } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
+import { ScopeState } from '../../../../core/scope/scope';
+import { TenantScopeState } from '../../../../core/scope/tenant-scope';
 import { type ActionItem, type ActionSelection, ActionsMenu } from '../../../../shared/ui/actions-menu/actions-menu';
 import { Button } from '../../../../shared/ui/button/button';
 import { Dropdown, type DropdownOption } from '../../../../shared/ui/dropdown/dropdown';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { Pagination } from '../../../../shared/ui/pagination/pagination';
 import { Segmented, type SegmentedOption } from '../../../../shared/ui/segmented/segmented';
 import { ApiError, newIdempotencyKey } from '../../shared/trade-api';
@@ -35,14 +38,16 @@ import type {
 import { supportedKinds } from '../policy.model';
 import {
   ACTIVE_WORKFLOW_KINDS,
+  POLICY_PERMISSIONS,
   PURCHASE_ORDER_WORKFLOW_SHAPE,
   WORKFLOW_KINDS,
   type WorkflowKind,
+  hasPolicyGrant,
+  operatingScopeTarget,
+  operatingTradeContext,
 } from '../policy.registry';
-import { formatDateOnly, isLiveScheduled } from '../pricing.service';
+import { formatDateOnly, isForbiddenError, isLiveScheduled } from '../pricing.service';
 import { WorkflowModal } from '../workflow-modal/workflow-modal';
-
-const CAN = { manage: true, test: true, approve: true, publish: true }; // later from the session
 
 const PAGE_SIZES = [12, 24, 48, 96];
 const DEFAULT_PAGE_SIZE = 12;
@@ -114,6 +119,7 @@ let nextWorkflowsPageId = 0;
     Button,
     ConflictDialog,
     Dropdown,
+    FullState,
     Pagination,
     ScopeChip,
     Segmented,
@@ -135,17 +141,28 @@ let nextWorkflowsPageId = 0;
 })
 export class WorkflowsPage {
   protected readonly uid = `workflows-page-${++nextWorkflowsPageId}`;
+  private readonly injector = inject(Injector);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly lang = inject(LanguageState).current;
   private readonly notify = inject(Notify);
+  private readonly scopeState = inject(ScopeState);
+  private readonly tenantScope = inject(TenantScopeState);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 
-  private readonly createModal = viewChild.required(WorkflowModal);
+  private readonly createModal = viewChild(WorkflowModal);
   private readonly conflictDialog = viewChild.required(ConflictDialog);
 
-  protected readonly canManage = CAN.manage;
+  protected readonly canRead = computed(() =>
+    hasPolicyGrant(this.injector, this.scopeState, POLICY_PERMISSIONS.read),
+  );
+  protected readonly canManage = computed(() =>
+    hasPolicyGrant(this.injector, this.scopeState, POLICY_PERMISSIONS.manage),
+  );
+  protected readonly tradeCtx = computed(() => operatingTradeContext(this.tenantScope));
+  protected readonly currentScopeTarget = computed(() => operatingScopeTarget(this.tenantScope));
+
   protected readonly pageSizes = PAGE_SIZES;
   protected readonly skeletonRows = [1, 2, 3, 4, 5];
 
@@ -153,6 +170,7 @@ export class WorkflowsPage {
   protected readonly metadata = signal<PolicyMetadata | null>(null);
   protected readonly loading = signal(true);
   protected readonly loadFailed = signal(false);
+  protected readonly forbidden = signal(false);
   protected readonly busyId = signal<string | null>(null);
 
   protected readonly search = signal('');
@@ -174,9 +192,10 @@ export class WorkflowsPage {
 
   protected readonly kindOptions = computed<DropdownOption<string>[]>(() => {
     this.i18n();
+    const visibleKinds = [...new Set<string>([...WORKFLOW_KINDS, ...this.activeKinds()])];
     return [
       { value: 'ALL', label: this.transloco.translate('workflows.list.allKinds') },
-      ...this.activeKinds().map((k) => ({
+      ...visibleKinds.map((k) => ({
         value: k,
         label: this.transloco.translate(`workflows.kinds.${k}.name`),
       })),
@@ -223,16 +242,27 @@ export class WorkflowsPage {
   }
 
   protected async reload(): Promise<void> {
+    if (!this.canRead()) {
+      this.forbidden.set(true);
+      this.loading.set(false);
+      return;
+    }
     this.loading.set(true);
     this.loadFailed.set(false);
+    this.forbidden.set(false);
+    const ctx = this.tradeCtx();
     try {
       const [defs, meta] = await Promise.all([
-        listDefinitions('workflow', { limit: 100 }),
-        this.metadata() ? Promise.resolve(this.metadata()!) : getMetadata(),
+        listDefinitions('workflow', { limit: 100 }, ctx),
+        this.metadata() ? Promise.resolve(this.metadata()!) : getMetadata(ctx),
       ]);
       this.definitions.set(defs.items);
       this.metadata.set(meta);
-    } catch {
+    } catch (err) {
+      if (isForbiddenError(err)) {
+        this.forbidden.set(true);
+        return;
+      }
       this.loadFailed.set(true);
     } finally {
       this.loading.set(false);
@@ -240,8 +270,12 @@ export class WorkflowsPage {
   }
 
   protected openCreateModal(): void {
-    if (!this.canManage) return;
-    this.createModal().open();
+    if (!this.canManage()) return;
+    this.createModal()?.open();
+  }
+
+  protected onModalForbidden(): void {
+    this.forbidden.set(true);
   }
 
   /** Create returns the bare definition row; a new definition has no versions yet. */
@@ -320,7 +354,7 @@ export class WorkflowsPage {
         title: this.transloco.translate('workflows.list.actions.newVersion'),
         icon: 'tablerPlus',
         tile: 'bg-icon-teal',
-        disabled: !this.canManage || isBusy,
+        disabled: !this.canManage() || isBusy,
       },
       {
         id: isActive ? 'deactivate' : 'activate',
@@ -329,7 +363,7 @@ export class WorkflowsPage {
         ),
         icon: isActive ? 'tablerCircleOff' : 'tablerCheck',
         tile: isActive ? 'bg-icon-orange' : 'bg-icon-green',
-        disabled: !this.canManage || isBusy,
+        disabled: !this.canManage() || isBusy,
       },
     ];
   }
@@ -357,7 +391,7 @@ export class WorkflowsPage {
     def: GovernedDefinition,
     nextStatus: DefinitionStatus,
   ): Promise<void> {
-    if (!this.canManage || this.busyId()) return;
+    if (!this.canManage() || this.busyId()) return;
     this.busyId.set(def.id);
     try {
       const updated = await setDefinitionStatus(
@@ -366,6 +400,7 @@ export class WorkflowsPage {
         nextStatus,
         def.version,
         newIdempotencyKey(),
+        this.tradeCtx(),
       );
       this.definitions.update((list) => list.map((d) => (d.id === updated.id ? { ...updated, versions: d.versions } : d)));
       this.notify.success(
@@ -381,8 +416,9 @@ export class WorkflowsPage {
   }
 
   private async createDraftVersion(def: GovernedDefinition): Promise<void> {
-    if (!this.canManage || this.busyId()) return;
+    if (!this.canManage() || this.busyId()) return;
     this.busyId.set(def.id);
+    const ctx = this.tradeCtx();
     try {
       const live = this.liveVersionOf(def);
       let content: WorkflowContent;
@@ -392,6 +428,7 @@ export class WorkflowsPage {
         const liveDetail = (await getVersion(
           'workflow',
           live.id,
+          ctx,
         )) as GovernedVersionDetail<WorkflowContent, WorkflowTestCase>;
         content = structuredClone(liveDetail.content);
         testCases = structuredClone(liveDetail.testCases ?? []);
@@ -413,6 +450,7 @@ export class WorkflowsPage {
         },
         def.version,
         newIdempotencyKey(),
+        ctx,
       );
       this.notify.success(
         this.transloco.translate('workflows.list.toasts.versionCreated', { n: created.versionNumber }),
@@ -426,6 +464,10 @@ export class WorkflowsPage {
   }
 
   private handleMutationError(err: unknown): void {
+    if (isForbiddenError(err)) {
+      this.forbidden.set(true);
+      return;
+    }
     if (err instanceof ApiError) {
       if (err.code === 'TRADE.CONCURRENCY.STALE_VERSION' || (err.status === 409 && err.code.includes('STALE'))) {
         this.conflictDialog().open();

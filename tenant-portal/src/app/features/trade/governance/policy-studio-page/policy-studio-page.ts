@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, signal, viewChild } from '@angular/core';
+import { Component, Injector, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { translationEvents } from '../../../../core/i18n/translation-events';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -13,9 +13,12 @@ import {
 } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
+import { ScopeState } from '../../../../core/scope/scope';
+import { TenantScopeState } from '../../../../core/scope/tenant-scope';
 import { type ActionItem, type ActionSelection, ActionsMenu } from '../../../../shared/ui/actions-menu/actions-menu';
 import { Button } from '../../../../shared/ui/button/button';
 import { Dropdown, type DropdownOption } from '../../../../shared/ui/dropdown/dropdown';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { Pagination } from '../../../../shared/ui/pagination/pagination';
 import { Segmented, type SegmentedOption } from '../../../../shared/ui/segmented/segmented';
 import { ApiError, errorCodeOf, newIdempotencyKey } from '../../shared/trade-api';
@@ -37,15 +40,17 @@ import type {
 } from '../policy.model';
 import {
   ACTIVE_POLICY_KINDS,
-  FACTS,
-  FACTS_BY_KIND,
   POLICY_KINDS,
+  POLICY_PERMISSIONS,
   type PolicyKind,
+  hasPolicyGrant,
+  isDecimalFact,
+  isMoneyFact,
+  operatingScopeTarget,
+  operatingTradeContext,
   operatorsFor,
 } from '../policy.registry';
-import { formatDateOnly } from '../pricing.service';
-
-const CAN = { manage: true, test: true, approve: true, publish: true }; // later from the session
+import { formatDateOnly, isForbiddenError } from '../pricing.service';
 
 const ALLOWED_PAGE_SIZES = new Set([10, 25, 50]);
 const NON_LIVE_IN_PROGRESS = new Set([
@@ -68,6 +73,7 @@ let nextPolicyStudioPageId = 0;
     Button,
     DecisionModal,
     Dropdown,
+    FullState,
     Pagination,
     PolicyModal,
     ScopeChip,
@@ -89,23 +95,35 @@ let nextPolicyStudioPageId = 0;
 })
 export class PolicyStudioPage {
   protected readonly uid = `policy-studio-${++nextPolicyStudioPageId}`;
+  private readonly injector = inject(Injector);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly lang = inject(LanguageState).current;
   private readonly notify = inject(Notify);
+  private readonly scopeState = inject(ScopeState);
+  private readonly tenantScope = inject(TenantScopeState);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 
-  private readonly createModal = viewChild.required(PolicyModal);
-  private readonly decisionModal = viewChild.required(DecisionModal);
+  private readonly createModal = viewChild(PolicyModal);
+  private readonly decisionModal = viewChild(DecisionModal);
 
-  protected readonly canManage = CAN.manage;
+  protected readonly canRead = computed(() =>
+    hasPolicyGrant(this.injector, this.scopeState, POLICY_PERMISSIONS.read),
+  );
+  protected readonly canManage = computed(() =>
+    hasPolicyGrant(this.injector, this.scopeState, POLICY_PERMISSIONS.manage),
+  );
+  protected readonly tradeCtx = computed(() => operatingTradeContext(this.tenantScope));
+  protected readonly currentScopeTarget = computed(() => operatingScopeTarget(this.tenantScope));
+
   protected readonly skeletonRows = [1, 2, 3, 4, 5];
 
   protected readonly definitions = signal<GovernedDefinition[]>([]);
   protected readonly metadata = signal<PolicyMetadata | null>(null);
   protected readonly loading = signal(true);
   protected readonly loadFailed = signal(false);
+  protected readonly forbidden = signal(false);
   protected readonly busyId = signal<string | null>(null);
 
   protected readonly search = signal('');
@@ -125,7 +143,7 @@ export class PolicyStudioPage {
     const supported = supportedKinds(meta?.kinds.policies);
     if (supported.length) {
       return supported.filter((k): k is PolicyKind =>
-        (POLICY_KINDS as readonly string[]).includes(k),
+        (ACTIVE_POLICY_KINDS as readonly string[]).includes(k),
       );
     }
     return ACTIVE_POLICY_KINDS;
@@ -184,10 +202,10 @@ export class PolicyStudioPage {
       const data = this.routeData();
       const params = this.routeParams();
       const decisionId = data?.['decisionModal'] ? params.get('id') : null;
-      if (decisionId && decisionId !== this.lastOpenedDecisionId) {
+      if (decisionId && decisionId !== this.lastOpenedDecisionId && this.canRead() && !this.forbidden()) {
         this.lastOpenedDecisionId = decisionId;
         queueMicrotask(() => {
-          void this.decisionModal().open(decisionId);
+          void this.decisionModal()?.open(decisionId);
         });
       } else if (!decisionId) {
         this.lastOpenedDecisionId = null;
@@ -196,16 +214,27 @@ export class PolicyStudioPage {
   }
 
   protected async reload(): Promise<void> {
+    if (!this.canRead()) {
+      this.forbidden.set(true);
+      this.loading.set(false);
+      return;
+    }
     this.loading.set(true);
     this.loadFailed.set(false);
+    this.forbidden.set(false);
+    const ctx = this.tradeCtx();
     try {
       const [defs, meta] = await Promise.all([
-        listDefinitions('policy', { limit: 100 }),
-        this.metadata() ? Promise.resolve(this.metadata()!) : getMetadata(),
+        listDefinitions('policy', { limit: 100 }, ctx),
+        this.metadata() ? Promise.resolve(this.metadata()!) : getMetadata(ctx),
       ]);
       this.definitions.set(defs.items);
       this.metadata.set(meta);
-    } catch {
+    } catch (err) {
+      if (isForbiddenError(err)) {
+        this.forbidden.set(true);
+        return;
+      }
       this.loadFailed.set(true);
     } finally {
       this.loading.set(false);
@@ -213,8 +242,12 @@ export class PolicyStudioPage {
   }
 
   protected openCreateModal(): void {
-    if (!this.canManage) return;
-    this.createModal().open();
+    if (!this.canManage()) return;
+    this.createModal()?.open();
+  }
+
+  protected onModalForbidden(): void {
+    this.forbidden.set(true);
   }
 
   /** Create returns the bare definition row; a new definition has no versions yet. */
@@ -289,7 +322,7 @@ export class PolicyStudioPage {
         title: this.transloco.translate('policy.list.actions.newVersion'),
         icon: 'tablerPlus',
         tile: 'bg-icon-teal',
-        disabled: !this.canManage || isBusy,
+        disabled: !this.canManage() || isBusy,
       },
       {
         id: isActive ? 'deactivate' : 'activate',
@@ -298,7 +331,7 @@ export class PolicyStudioPage {
         ),
         icon: isActive ? 'tablerCircleOff' : 'tablerCheck',
         tile: isActive ? 'bg-icon-orange' : 'bg-icon-green',
-        disabled: !this.canManage || isBusy,
+        disabled: !this.canManage() || isBusy,
       },
     ];
   }
@@ -323,7 +356,7 @@ export class PolicyStudioPage {
     def: GovernedDefinition,
     nextStatus: DefinitionStatus,
   ): Promise<void> {
-    if (!this.canManage || this.busyId()) return;
+    if (!this.canManage() || this.busyId()) return;
     this.busyId.set(def.id);
     try {
       const updated = await setDefinitionStatus(
@@ -332,6 +365,7 @@ export class PolicyStudioPage {
         nextStatus,
         def.version,
         newIdempotencyKey(),
+        this.tradeCtx(),
       );
       this.definitions.update((list) => list.map((d) => (d.id === updated.id ? { ...updated, versions: d.versions } : d)));
       this.notify.success(
@@ -340,6 +374,10 @@ export class PolicyStudioPage {
         ),
       );
     } catch (err) {
+      if (isForbiddenError(err)) {
+        this.forbidden.set(true);
+        return;
+      }
       this.notifyApiError(err);
       if (err instanceof ApiError && (errorCodeOf(err) ?? '').includes('STALE_VERSION')) {
         void this.reload();
@@ -350,26 +388,34 @@ export class PolicyStudioPage {
   }
 
   private async createDraftVersion(def: GovernedDefinition): Promise<void> {
-    if (!this.canManage || this.busyId()) return;
+    if (!this.canManage() || this.busyId()) return;
     this.busyId.set(def.id);
+    const ctx = this.tradeCtx();
     try {
       const live = this.liveVersionOf(def);
       let content: PolicyContent;
       let testCases: PolicyTestCase[];
 
       if (live) {
-        const liveDetail = await getVersion('policy', live.id);
+        const liveDetail = await getVersion('policy', live.id, ctx);
         if (!isPolicyVersionDetail(liveDetail)) throw new Error('Not a policy version');
         content = structuredClone(liveDetail.content);
         testCases = structuredClone(liveDetail.testCases ?? []);
       } else {
         const meta = this.metadata();
-        const factsList = meta?.facts ?? FACTS;
-        const byKind = meta?.factsByKind ?? FACTS_BY_KIND;
-        const firstFactKey = (byKind as Readonly<Record<string, readonly string[]>>)[(def.policyKind ?? '')]?.[0] ?? factsList[0]?.key ?? 'totalAmount';
+        const factsList = meta?.facts ?? [];
+        const byKind = meta?.factsByKind ?? {};
+        const firstFactKey = (byKind as Readonly<Record<string, readonly string[]>>)[def.policyKind ?? '']?.[0] ?? factsList[0]?.key ?? 'document.kind';
         const firstFact = factsList.find((f) => f.key === firstFactKey);
-        const op = operatorsFor(firstFact?.type ?? 'number')[0] ?? 'EQ';
-        const defaultVal = firstFact?.type === 'boolean' ? false : firstFact?.type === 'number' ? 0 : '';
+        const op = operatorsFor(firstFact?.type ?? 'string')[0] ?? 'EQ';
+        const defaultVal =
+          firstFact?.type === 'boolean'
+            ? false
+            : isDecimalFact(firstFact) || isMoneyFact(firstFactKey)
+              ? '0'
+              : firstFact?.type === 'number'
+                ? 0
+                : '';
         content = {
           rules: [
             {
@@ -377,20 +423,16 @@ export class PolicyStudioPage {
               priority: 10,
               all: [{ fact: firstFactKey, operator: op, value: defaultVal }],
               outcome: 'ALLOW',
-              selectedValue: null,
               reasonCode: '',
             },
           ],
           defaultOutcome: 'ALLOW',
-          defaultSelectedValue: null,
         };
         testCases = [
           {
             code: '',
             facts: { [firstFactKey]: defaultVal },
             expectedOutcome: 'ALLOW',
-            expectedRuleCode: null,
-            expectedSelectedValue: null,
           },
         ];
       }
@@ -407,12 +449,17 @@ export class PolicyStudioPage {
         },
         def.version,
         newIdempotencyKey(),
+        ctx,
       );
       this.notify.success(
         this.transloco.translate('policy.list.toasts.versionCreated', { n: created.versionNumber }),
       );
       void this.router.navigate(['/trade/governance/policy-studio', def.id, 'versions', created.id]);
     } catch (err) {
+      if (isForbiddenError(err)) {
+        this.forbidden.set(true);
+        return;
+      }
       this.notifyApiError(err);
       if (err instanceof ApiError && (errorCodeOf(err) ?? '').includes('STALE_VERSION')) {
         void this.reload();

@@ -19,16 +19,17 @@ import { Field } from '../../../../shared/ui/field/field';
 import { Segmented, type SegmentedOption } from '../../../../shared/ui/segmented/segmented';
 import type { PolicyCondition, PolicyContent, PolicyRule } from '../policy.model';
 import {
-  FACTS,
-  FACTS_BY_KIND,
   OUTCOMES,
-  isDecimalString,
-  isMoneyFact,
   type PolicyFactDefinition,
   type PolicyKind,
   type PolicyOutcome,
   REASON_CODE,
   RULE_CODE,
+  factLabel,
+  isDecimalFact,
+  isDecimalString,
+  isMoneyFact,
+  operatorsFor,
 } from '../policy.registry';
 import { RuleCondition } from '../rule-condition/rule-condition';
 
@@ -43,7 +44,10 @@ const OUTCOME_CHIP_CLASSES: Readonly<Record<PolicyOutcome, string>> = {
   SELECT: 'bg-neutral-soft text-on-neutral-soft',
 };
 
-export function validatePolicyContentClient(content: PolicyContent): Record<string, string> {
+export function validatePolicyContentClient(
+  content: PolicyContent,
+  facts: readonly PolicyFactDefinition[] = [],
+): Record<string, string> {
   const errors: Record<string, string> = {};
   const rules = content.rules ?? [];
 
@@ -88,8 +92,8 @@ export function validatePolicyContentClient(content: PolicyContent): Record<stri
           errors[`rules[${i}].all[${j}].value`] = 'policy.rules.validation.genericInvalid';
         }
       } else {
-        const factDef = FACTS.find((f) => f.key === cond.fact);
-        if (factDef && isMoneyFact(factDef.key)) {
+        const factDef = facts.find((f) => f.key === cond.fact);
+        if (isDecimalFact(factDef) || isMoneyFact(cond.fact)) {
           if (!isDecimalString(cond.value) && typeof cond.value !== 'number') {
             errors[`rules[${i}].all[${j}].value`] = 'policy.rules.validation.genericInvalid';
           } else if (typeof cond.value === 'number' && !Number.isFinite(cond.value)) {
@@ -153,8 +157,8 @@ export class RuleBuilder {
   readonly readonly = input(false);
   readonly readonlyNotice = input<string | null>(null);
   readonly kind = input.required<string>();
-  readonly facts = input<readonly PolicyFactDefinition[]>(FACTS);
-  readonly factsByKind = input<Readonly<Record<string, readonly string[]>>>(FACTS_BY_KIND);
+  readonly facts = input<readonly PolicyFactDefinition[]>([]);
+  readonly factsByKind = input<Readonly<Record<string, readonly string[]>>>({});
   readonly diagnostics = input<Readonly<Record<string, string>>>({});
   readonly showErrors = input(false);
   readonly expandRequest = input<{ index: number; seq: number } | null>(null);
@@ -180,7 +184,7 @@ export class RuleBuilder {
   protected readonly clientErrors = computed<Record<string, string>>(() => {
     this.i18n();
     const c = this.content();
-    const raw = validatePolicyContentClient(c);
+    const raw = validatePolicyContentClient(c, this.facts());
     const out: Record<string, string> = {};
 
     const showAll = this.showErrors();
@@ -202,7 +206,7 @@ export class RuleBuilder {
     const keys = this.supportedFactKeys();
     if (keys.length === 0) return '—';
     const sep = this.lang() === 'ar' ? '، ' : ', ';
-    return keys.map((key) => this.transloco.translate(`policy.facts.${key}`)).join(sep);
+    return keys.map((key) => factLabel((k) => this.transloco.translate(k), key)).join(sep);
   });
 
   constructor() {
@@ -238,13 +242,11 @@ export class RuleBuilder {
 
   protected conditionSummary(cond: PolicyCondition): string {
     this.i18n();
-    const factLabel = this.factMap().has(cond.fact)
-      ? this.transloco.translate(`policy.facts.${cond.fact}`)
-      : cond.fact;
+    const label = factLabel((k) => this.transloco.translate(k), cond.fact);
     const opLabel = this.transloco.translate(`policy.operatorSymbols.${cond.operator}`);
     const valLabel = this.formatConditionValue(cond);
     return this.transloco.translate('policy.rules.summaryIf', {
-      fact: factLabel,
+      fact: label,
       op: opLabel,
       value: valLabel,
     });
@@ -307,14 +309,22 @@ export class RuleBuilder {
       nextPriority += 1;
     }
 
-    const firstFactKey = this.supportedFactKeys()[0] ?? this.facts()[0]?.key ?? 'documentKind';
+    const firstFactKey = this.supportedFactKeys()[0] ?? this.facts()[0]?.key ?? 'document.kind';
     const firstFactDef = this.factMap().get(firstFactKey);
-    const initialValue = firstFactDef?.type === 'boolean' ? false : isMoneyFact(firstFactKey) ? '0' : firstFactDef?.type === 'number' ? 0 : '';
+    const initialOperator = operatorsFor(firstFactDef?.type ?? 'string')[0] ?? 'EQ';
+    const initialValue =
+      firstFactDef?.type === 'boolean'
+        ? false
+        : isDecimalFact(firstFactDef) || isMoneyFact(firstFactKey)
+          ? '0'
+          : firstFactDef?.type === 'number'
+            ? 0
+            : '';
 
     const newRule: PolicyRule = {
       code: `RULE_${n}`,
       priority: nextPriority,
-      all: [{ fact: firstFactKey, operator: 'EQ', value: initialValue }],
+      all: [{ fact: firstFactKey, operator: initialOperator, value: initialValue }],
       outcome: 'ALLOW',
       reasonCode: 'RULE_MATCHED',
     };
@@ -343,10 +353,16 @@ export class RuleBuilder {
   protected onRuleOutcomeChange(index: number, value: string | null): void {
     if (!OUTCOMES.includes(value as PolicyOutcome)) return;
     const outcome = value as PolicyOutcome;
-    this.patchRule(index, {
-      outcome,
-      selectedValue: outcome === 'SELECT' ? (this.content().rules[index]?.selectedValue ?? '') : null,
-    });
+    this.content.update((c) => ({
+      ...c,
+      rules: c.rules.map((r, i) => {
+        if (i !== index) return r;
+        const { selectedValue, ...rest } = r;
+        return outcome === 'SELECT'
+          ? { ...rest, outcome, selectedValue: selectedValue ?? '' }
+          : { ...rest, outcome };
+      }),
+    }));
   }
 
   protected onRuleSelectedValueInput(index: number, event: Event): void {
@@ -359,12 +375,20 @@ export class RuleBuilder {
     const rule = this.content().rules[ruleIndex];
     if (!rule || rule.all.length >= MAX_CONDITIONS) return;
 
-    const firstFactKey = this.supportedFactKeys()[0] ?? this.facts()[0]?.key ?? 'documentKind';
+    const firstFactKey = this.supportedFactKeys()[0] ?? this.facts()[0]?.key ?? 'document.kind';
     const firstFactDef = this.factMap().get(firstFactKey);
-    const initialValue = firstFactDef?.type === 'boolean' ? false : isMoneyFact(firstFactKey) ? '0' : firstFactDef?.type === 'number' ? 0 : '';
+    const initialOperator = operatorsFor(firstFactDef?.type ?? 'string')[0] ?? 'EQ';
+    const initialValue =
+      firstFactDef?.type === 'boolean'
+        ? false
+        : isDecimalFact(firstFactDef) || isMoneyFact(firstFactKey)
+          ? '0'
+          : firstFactDef?.type === 'number'
+            ? 0
+            : '';
 
     this.patchRule(ruleIndex, {
-      all: [...rule.all, { fact: firstFactKey, operator: 'EQ', value: initialValue }],
+      all: [...rule.all, { fact: firstFactKey, operator: initialOperator, value: initialValue }],
     });
   }
 
@@ -386,11 +410,12 @@ export class RuleBuilder {
   protected onDefaultOutcomeChange(value: string | null): void {
     if (!OUTCOMES.includes(value as PolicyOutcome)) return;
     const outcome = value as PolicyOutcome;
-    this.content.update((c) => ({
-      ...c,
-      defaultOutcome: outcome,
-      defaultSelectedValue: outcome === 'SELECT' ? (c.defaultSelectedValue ?? '') : null,
-    }));
+    this.content.update((c) => {
+      const { defaultSelectedValue, ...rest } = c;
+      return outcome === 'SELECT'
+        ? { ...rest, defaultOutcome: outcome, defaultSelectedValue: defaultSelectedValue ?? '' }
+        : { ...rest, defaultOutcome: outcome };
+    });
   }
 
   protected onDefaultSelectedValueInput(event: Event): void {

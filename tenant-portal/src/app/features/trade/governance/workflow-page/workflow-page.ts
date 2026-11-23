@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, signal, viewChild } from '@angular/core';
+import { Component, Injector, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { translationEvents } from '../../../../core/i18n/translation-events';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -12,9 +12,11 @@ import {
 } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
+import { ScopeState } from '../../../../core/scope/scope';
+import { TenantScopeState } from '../../../../core/scope/tenant-scope';
 import { Button } from '../../../../shared/ui/button/button';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { ApiError, newIdempotencyKey } from '../../shared/trade-api';
-import { actorName, getFakeActor } from '../governance-fake-actors';
 import { ConflictDialog } from '../governance-shared/conflict-dialog/conflict-dialog';
 import {
   type GovernedRow,
@@ -36,10 +38,14 @@ import type {
   WorkflowContent,
   WorkflowTestCase,
 } from '../policy.model';
-import { PURCHASE_ORDER_WORKFLOW_SHAPE } from '../policy.registry';
-import { formatDateTime, isLiveScheduled, rangeText } from '../pricing.service';
-
-const CAN = { manage: true, test: true, approve: true, publish: true }; // later from the session
+import {
+  POLICY_PERMISSIONS,
+  PURCHASE_ORDER_WORKFLOW_SHAPE,
+  actorLabel,
+  hasPolicyGrant,
+  operatingTradeContext,
+} from '../policy.registry';
+import { formatDateTime, isForbiddenError, isLiveScheduled, rangeText } from '../pricing.service';
 
 function isGovernedLiveScheduled(v: Pick<GovernedVersion, 'status' | 'effectiveFrom' | 'effectiveTo'>): boolean {
   return (
@@ -96,6 +102,7 @@ function defaultWorkflowSeed(kind: string): { content: WorkflowContent; testCase
     TranslocoPipe,
     Button,
     ConflictDialog,
+    FullState,
     GovernedVersionsTable,
     ReasonDialog,
     ScopeChip,
@@ -113,10 +120,13 @@ function defaultWorkflowSeed(kind: string): { content: WorkflowContent; testCase
   host: { class: 'flex min-h-full flex-col gap-12 p-12' },
 })
 export class WorkflowPage {
+  private readonly injector = inject(Injector);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   protected readonly lang = inject(LanguageState).current;
   private readonly notify = inject(Notify);
+  private readonly scopeState = inject(ScopeState);
+  private readonly tenantScope = inject(TenantScopeState);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 
@@ -124,8 +134,16 @@ export class WorkflowPage {
   private readonly retireDialog = viewChild<ReasonDialog>('retireDialog');
   private readonly conflictDialog = viewChild.required(ConflictDialog);
 
-  protected readonly canManage = CAN.manage;
-  protected readonly canPublish = CAN.publish;
+  protected readonly canRead = computed(() =>
+    hasPolicyGrant(this.injector, this.scopeState, POLICY_PERMISSIONS.read),
+  );
+  protected readonly canManage = computed(() =>
+    hasPolicyGrant(this.injector, this.scopeState, POLICY_PERMISSIONS.manage),
+  );
+  protected readonly canPublish = computed(() =>
+    hasPolicyGrant(this.injector, this.scopeState, POLICY_PERMISSIONS.publish),
+  );
+  protected readonly tradeCtx = computed(() => operatingTradeContext(this.tenantScope));
 
   private readonly paramMap = toSignal(this.route.paramMap, {
     initialValue: this.route.snapshot.paramMap,
@@ -135,6 +153,7 @@ export class WorkflowPage {
   protected readonly definition = signal<GovernedDefinition | null>(null);
   protected readonly loading = signal(true);
   protected readonly loadFailed = signal(false);
+  protected readonly forbidden = signal(false);
   protected readonly creatingVersion = signal(false);
   protected readonly actionBusy = signal(false);
   protected readonly reasonTarget = signal<GovernedVersion | null>(null);
@@ -144,14 +163,15 @@ export class WorkflowPage {
     const def = this.definition();
     if (!def) return [];
     const currentLang = this.lang();
-    const me = getFakeActor();
+    const meUser = this.tenantScope.me();
+    const meId = meUser?.id ?? '';
     const byId = new Map(def.versions.map((v) => [v.id, v]));
 
     return [...def.versions]
       .sort((a, b) => b.versionNumber - a.versionNumber)
       .map((v) => {
         const actorId = v.submittedBy || v.createdBy;
-        const actor = actorName(actorId)[currentLang];
+        const actor = actorLabel(actorId, meUser, currentLang);
         const ts = v.approvedAt || v.effectiveFrom;
         const supersededByVersionNumber = v.supersededByVersionId
           ? (byId.get(v.supersededByVersionId)?.versionNumber ?? null)
@@ -169,7 +189,7 @@ export class WorkflowPage {
           },
         ];
 
-        if (this.canManage && (v.status === 'PUBLISHED' || v.status === 'RETIRED' || v.status === 'SUPERSEDED')) {
+        if (this.canPublish() && (v.status === 'PUBLISHED' || v.status === 'RETIRED' || v.status === 'SUPERSEDED')) {
           actions.push({
             key: 'rollback',
             title: this.transloco.translate('workflows.version.rollback'),
@@ -178,7 +198,7 @@ export class WorkflowPage {
           });
         }
 
-        if (this.canPublish && (v.status === 'PUBLISHED' || v.status === 'SCHEDULED')) {
+        if (this.canPublish() && (v.status === 'PUBLISHED' || v.status === 'SCHEDULED')) {
           actions.push({
             key: 'retire',
             title: this.transloco.translate('workflows.version.retire'),
@@ -201,7 +221,7 @@ export class WorkflowPage {
           effectiveRange: rangeText(v.effectiveFrom, v.supersededAt ?? v.effectiveTo, currentLang),
           byPrimary: actor,
           bySecondary: formatDateTime(ts, currentLang),
-          byIsMe: actorId === me,
+          byIsMe: Boolean(meId && actorId === meId),
           sourceLabel:
             restoredFromVersionNumber !== null
               ? this.transloco.translate('workflows.detail.fromVersion', {
@@ -225,12 +245,22 @@ export class WorkflowPage {
   protected async reload(): Promise<void> {
     const id = this.definitionId();
     if (!id) return;
+    if (!this.canRead()) {
+      this.forbidden.set(true);
+      this.loading.set(false);
+      return;
+    }
     this.loading.set(true);
     this.loadFailed.set(false);
+    this.forbidden.set(false);
     try {
-      const def = await getDefinition('workflow', id);
+      const def = await getDefinition('workflow', id, this.tradeCtx());
       this.definition.set(def);
-    } catch {
+    } catch (err) {
+      if (isForbiddenError(err)) {
+        this.forbidden.set(true);
+        return;
+      }
       this.loadFailed.set(true);
     } finally {
       this.loading.set(false);
@@ -249,8 +279,9 @@ export class WorkflowPage {
 
   protected async createNewVersion(): Promise<void> {
     const def = this.definition();
-    if (!def || !this.canManage || this.creatingVersion()) return;
+    if (!def || !this.canManage() || this.creatingVersion()) return;
     this.creatingVersion.set(true);
+    const ctx = this.tradeCtx();
     try {
       const live = [...def.versions]
         .filter((v) => v.status === 'PUBLISHED')
@@ -263,6 +294,7 @@ export class WorkflowPage {
         const liveDetail = (await getVersion(
           'workflow',
           live.id,
+          ctx,
         )) as GovernedVersionDetail<WorkflowContent, WorkflowTestCase>;
         content = structuredClone(liveDetail.content);
         testCases = structuredClone(liveDetail.testCases ?? []);
@@ -284,6 +316,7 @@ export class WorkflowPage {
         },
         def.version,
         newIdempotencyKey(),
+        ctx,
       );
 
       this.notify.success(
@@ -327,6 +360,7 @@ export class WorkflowPage {
         { reasonCode: result.reasonCode, reasonNote: result.reasonNote || undefined },
         target.version,
         newIdempotencyKey(),
+        this.tradeCtx(),
       )) as GovernedVersionRecord;
       this.rollbackDialog()?.close();
       this.reasonTarget.set(null);
@@ -357,6 +391,7 @@ export class WorkflowPage {
         { reasonCode: result.reasonCode, reasonNote: result.reasonNote || undefined },
         target.version,
         newIdempotencyKey(),
+        this.tradeCtx(),
       );
       this.retireDialog()?.close();
       this.reasonTarget.set(null);
@@ -390,6 +425,12 @@ export class WorkflowPage {
   }
 
   private handleMutationError(err: unknown): void {
+    if (isForbiddenError(err)) {
+      this.rollbackDialog()?.close();
+      this.retireDialog()?.close();
+      this.forbidden.set(true);
+      return;
+    }
     if (err instanceof ApiError) {
       if (err.code === 'TRADE.CONCURRENCY.STALE_VERSION' || (err.status === 409 && err.code.includes('STALE'))) {
         this.conflictDialog().open();

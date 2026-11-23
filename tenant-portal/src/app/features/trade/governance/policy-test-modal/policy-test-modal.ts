@@ -11,16 +11,15 @@ import { Modal } from '../../../../shared/ui/modal/modal';
 import { Segmented, type SegmentedOption } from '../../../../shared/ui/segmented/segmented';
 import type { PolicyRule, PolicyTestCase } from '../policy.model';
 import {
-  FACTS,
-  FACTS_BY_KIND,
   type FactType,
   OUTCOMES,
-  isDecimalString,
-  isMoneyFact,
   type PolicyFactDefinition,
   type PolicyKind,
   type PolicyOutcome,
   RULE_CODE,
+  factLabel,
+  isDecimalString,
+  isMoneyFact,
 } from '../policy.registry';
 
 interface FactRow {
@@ -50,8 +49,8 @@ export class PolicyTestModal {
 
   readonly kind = input('');
   readonly rules = input<readonly PolicyRule[]>([]);
-  readonly facts = input<readonly PolicyFactDefinition[]>(FACTS);
-  readonly factsByKind = input<Readonly<Record<string, readonly string[]>>>(FACTS_BY_KIND);
+  readonly facts = input<readonly PolicyFactDefinition[]>([]);
+  readonly factsByKind = input<Readonly<Record<string, readonly string[]>>>({});
   readonly existingCodes = input<readonly string[]>([]);
 
   readonly saved = output<{ index: number | null; testCase: PolicyTestCase }>();
@@ -163,7 +162,7 @@ export class PolicyTestModal {
   });
 
   openCreate(): void {
-    const firstKey = this.supportedFactKeys()[0] ?? this.facts()[0]?.key ?? 'totalAmount';
+    const firstKey = this.supportedFactKeys()[0] ?? this.facts()[0]?.key ?? 'document.kind';
     this.editingIndex.set(null);
     this.code.set('');
     this.factRows.set([this.makeDefaultRow(firstKey)]);
@@ -185,8 +184,8 @@ export class PolicyTestModal {
       entries.map(([fact, value]) => ({
         id: ++PolicyTestModal.nextRowId,
         fact,
-        // Legacy numeric money facts load as decimal strings.
-        value: isMoneyFact(fact) && typeof value === 'number' ? String(value) : value,
+        // Decimal/money facts load as decimal strings.
+        value: this.isDecimalKey(fact) && typeof value === 'number' ? String(value) : value,
       })),
     );
     this.expectedOutcome.set(testCase.expectedOutcome);
@@ -201,6 +200,10 @@ export class PolicyTestModal {
 
   protected factTypeOf(factKey: string): FactType {
     return this.factMap().get(factKey)?.type ?? 'string';
+  }
+
+  protected isDecimalKey(factKey: string): boolean {
+    return this.factTypeOf(factKey) === 'decimal' || isMoneyFact(factKey);
   }
 
   protected factOptionsForRow(rowIndex: number, currentFact: string): DropdownOption<string>[] {
@@ -224,12 +227,12 @@ export class PolicyTestModal {
         if (def.key === currentFact) hasCurrent = true;
         opts.push({
           value: def.key,
-          label: this.transloco.translate(`policy.facts.${def.key}`),
+          label: factLabel((k) => this.transloco.translate(k), def.key),
         });
       }
     }
     if (currentFact && !hasCurrent) {
-      opts.unshift({ value: currentFact, label: currentFact });
+      opts.unshift({ value: currentFact, label: factLabel((k) => this.transloco.translate(k), currentFact) });
     }
     return opts;
   }
@@ -238,7 +241,7 @@ export class PolicyTestModal {
     this.i18n();
     if (!this.submitted()) return null;
     const type = this.factTypeOf(row.fact);
-    if (isMoneyFact(row.fact)) {
+    if (this.isDecimalKey(row.fact)) {
       if (!isDecimalString(row.value)) {
         return this.transloco.translate('policy.rules.validation.genericInvalid');
       }
@@ -289,7 +292,7 @@ export class PolicyTestModal {
     const prevType = this.factTypeOf(prev.fact);
     const nextType = this.factTypeOf(nextFact);
     let nextValue = prev.value;
-    if (prevType !== nextType || isMoneyFact(prev.fact) !== isMoneyFact(nextFact)) {
+    if (prevType !== nextType || this.isDecimalKey(prev.fact) !== this.isDecimalKey(nextFact)) {
       nextValue = this.defaultValueForType(nextType, nextFact);
     }
     this.factRows.update((rows) =>
@@ -303,7 +306,7 @@ export class PolicyTestModal {
       this.patchRowValue(idx, '');
       return;
     }
-    if (isMoneyFact(this.factRows()[idx]?.fact ?? '')) {
+    if (this.isDecimalKey(this.factRows()[idx]?.fact ?? '')) {
       this.patchRowValue(idx, raw.trim());
       return;
     }
@@ -355,7 +358,7 @@ export class PolicyTestModal {
     const factsRecord: Record<string, string | number | boolean> = {};
     for (const row of this.factRows()) {
       const type = this.factTypeOf(row.fact);
-      if (isMoneyFact(row.fact)) {
+      if (this.isDecimalKey(row.fact)) {
         factsRecord[row.fact] = String(row.value).trim();
       } else if (type === 'number') {
         factsRecord[row.fact] = Number(row.value);
@@ -366,13 +369,14 @@ export class PolicyTestModal {
       }
     }
 
+    const ruleCode = this.expectedRuleCode().trim();
+    const selectedVal = this.expectedOutcome() === 'SELECT' ? this.expectedSelectedValue().trim() : '';
     const testCase: PolicyTestCase = {
       code: this.code().trim(),
       facts: factsRecord,
       expectedOutcome: this.expectedOutcome(),
-      expectedRuleCode: this.expectedRuleCode().trim() || null,
-      expectedSelectedValue:
-        this.expectedOutcome() === 'SELECT' ? this.expectedSelectedValue().trim() : null,
+      ...(ruleCode ? { expectedRuleCode: ruleCode } : {}),
+      ...(selectedVal ? { expectedSelectedValue: selectedVal } : {}),
     };
 
     this.allowClose = true;
@@ -437,7 +441,7 @@ export class PolicyTestModal {
 
   private defaultValueForType(type: FactType, factKey: string): string | number | boolean {
     if (type === 'boolean') return false;
-    if (isMoneyFact(factKey)) return '0';
+    if (type === 'decimal' || isMoneyFact(factKey)) return '0';
     if (type === 'number') return 0;
     return '';
   }

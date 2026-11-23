@@ -27,6 +27,7 @@ export class WorkflowTests {
   readonly states = input<readonly string[]>([]);
   readonly initialState = input('');
   readonly lastResult = input<WorkflowTestResult | null>(null);
+  readonly testError = input<string | null>(null);
   readonly readonly = input(false);
 
   protected readonly maxTests = MAX_TESTS;

@@ -8,10 +8,9 @@ import { Button } from '../../../../shared/ui/button/button';
 import { PolicyTestModal } from '../policy-test-modal/policy-test-modal';
 import type { PolicyRule, PolicyTestCase, PolicyTestCaseResult, PolicyTestResult } from '../policy.model';
 import {
-  FACTS,
-  FACTS_BY_KIND,
   type PolicyFactDefinition,
   type PolicyOutcome,
+  factLabel,
 } from '../policy.registry';
 
 const MAX_TESTS = 100;
@@ -43,15 +42,14 @@ export class PolicyTests {
 
   readonly testCases = model.required<PolicyTestCase[]>();
   readonly lastResult = input<PolicyTestResult | null>(null);
+  readonly testError = input<string | null>(null);
   readonly readonly = input(false);
   readonly kind = input('');
   readonly rules = input<readonly PolicyRule[]>([]);
-  readonly facts = input<readonly PolicyFactDefinition[]>(FACTS);
-  readonly factsByKind = input<Readonly<Record<string, readonly string[]>>>(FACTS_BY_KIND);
+  readonly facts = input<readonly PolicyFactDefinition[]>([]);
+  readonly factsByKind = input<Readonly<Record<string, readonly string[]>>>({});
 
   protected readonly maxTests = MAX_TESTS;
-
-  private readonly knownFactKeys = computed(() => new Set(this.facts().map((f) => f.key)));
 
   protected readonly existingCodes = computed(() => this.testCases().map((t) => t.code));
 
@@ -113,10 +111,9 @@ export class PolicyTests {
 
   protected factChipsFor(testCase: PolicyTestCase): { visible: FactChip[]; extra: number } {
     this.i18n();
-    const known = this.knownFactKeys();
     const entries = Object.entries(testCase.facts ?? {});
     const visible = entries.slice(0, 3).map(([key, raw]) => {
-      const label = known.has(key) ? this.transloco.translate(`policy.facts.${key}`) : key;
+      const label = factLabel((k) => this.transloco.translate(k), key);
       const value =
         typeof raw === 'boolean'
           ? this.transloco.translate(raw ? 'policy.rules.yes' : 'policy.rules.no')

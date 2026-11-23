@@ -41,7 +41,7 @@
           (click)="toggleFactMenu()"
         >
           <span class="min-w-0 truncate text-start">
-            {{ selectedFact() ? ('policy.facts.' + selectedFact()!.key | transloco) : condition().fact }}
+            {{ factDisplay(condition().fact) }}
           </span>
           <span class="flex shrink-0 items-center gap-6">
             <span class="inline-flex h-chip items-center rounded-6 bg-neutral-soft px-6 text-11 font-medium text-text-muted">
@@ -72,7 +72,7 @@
         (click)="toggleFactMenu()"
       >
         <span class="min-w-0 truncate text-start">
-          {{ selectedFact() ? ('policy.facts.' + selectedFact()!.key | transloco) : condition().fact }}
+          {{ factDisplay(condition().fact) }}
         </span>
         <span class="flex shrink-0 items-center gap-6">
           <span class="inline-flex h-chip items-center rounded-6 bg-neutral-soft px-6 text-11 font-medium text-text-muted">
@@ -162,11 +162,12 @@
             [value]="boolStringValue()"
             (valueChange)="onBoolChange($event)"
           />
-        } @else if (factType() === 'number') {
+        } @else if (isNumericOrDecimal()) {
           <input
             [id]="uid + '-val'"
-            type="number"
-            step="any"
+            [type]="isDecimal() ? 'text' : 'number'"
+            [attr.inputmode]="isDecimal() ? 'decimal' : null"
+            [attr.step]="isDecimal() ? null : 'any'"
             dir="ltr"
             class="w-full bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
             [placeholder]="'policy.rules.valuePlaceholder' | transloco"
@@ -209,7 +210,7 @@
           [value]="boolStringValue()"
           (valueChange)="onBoolChange($event)"
         />
-      } @else if (factType() === 'number') {
+      } @else if (isNumericOrDecimal()) {
         <div
           class="flex h-field items-center rounded-8 border bg-surface-field px-8 text-12 text-text transition-colors duration-fast"
           [class]="
@@ -220,8 +221,9 @@
         >
           <input
             [id]="uid + '-val'"
-            type="number"
-            step="any"
+            [type]="isDecimal() ? 'text' : 'number'"
+            [attr.inputmode]="isDecimal() ? 'decimal' : null"
+            [attr.step]="isDecimal() ? null : 'any'"
             dir="ltr"
             class="w-full bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
             [attr.aria-label]="'policy.rules.valueLabel' | transloco"
@@ -314,7 +316,7 @@
           [attr.aria-selected]="isChosen"
           (click)="chooseFact(fact)"
         >
-          <span class="min-w-0 truncate">{{ 'policy.facts.' + fact.key | transloco }}</span>
+          <span class="min-w-0 truncate">{{ factDisplay(fact.key) }}</span>
           <span class="flex shrink-0 items-center gap-6">
             <span class="inline-flex h-chip items-center rounded-6 bg-neutral-soft px-6 text-11 font-medium text-text-muted">
               {{ 'policy.factTypes.' + fact.type | transloco }}

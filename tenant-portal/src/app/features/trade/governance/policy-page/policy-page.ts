@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, signal, viewChild } from '@angular/core';
+import { Component, Injector, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { translationEvents } from '../../../../core/i18n/translation-events';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -13,9 +13,11 @@ import {
 } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
+import { ScopeState } from '../../../../core/scope/scope';
+import { TenantScopeState } from '../../../../core/scope/tenant-scope';
 import { Button } from '../../../../shared/ui/button/button';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { ApiError, errorCodeOf, newIdempotencyKey } from '../../shared/trade-api';
-import { getFakeActor, actorName } from '../governance-fake-actors';
 import { ConflictDialog } from '../governance-shared/conflict-dialog/conflict-dialog';
 import {
   type GovernedRow,
@@ -33,16 +35,21 @@ import { isPolicyVersionDetail } from '../policy.model';
 import type {
   GovernedDefinition,
   GovernedVersion,
-  GovernedVersionDetail,
   GovernedVersionRecord,
   PolicyContent,
   PolicyMetadata,
   PolicyTestCase,
 } from '../policy.model';
-import { FACTS, FACTS_BY_KIND, operatorsFor } from '../policy.registry';
-import { formatDateTime, rangeText } from '../pricing.service';
-
-const CAN = { manage: true, test: true, approve: true, publish: true }; // later from the session
+import {
+  POLICY_PERMISSIONS,
+  actorLabel,
+  hasPolicyGrant,
+  isDecimalFact,
+  isMoneyFact,
+  operatingTradeContext,
+  operatorsFor,
+} from '../policy.registry';
+import { formatDateTime, isForbiddenError, rangeText } from '../pricing.service';
 
 @Component({
   selector: 'app-policy-page',
@@ -51,6 +58,7 @@ const CAN = { manage: true, test: true, approve: true, publish: true }; // later
     TranslocoPipe,
     Button,
     ConflictDialog,
+    FullState,
     GovernedVersionsTable,
     ReasonDialog,
     ScopeChip,
@@ -69,10 +77,13 @@ const CAN = { manage: true, test: true, approve: true, publish: true }; // later
   host: { class: 'flex min-h-full flex-col gap-12 p-12' },
 })
 export class PolicyPage {
+  private readonly injector = inject(Injector);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   protected readonly lang = inject(LanguageState).current;
   private readonly notify = inject(Notify);
+  private readonly scopeState = inject(ScopeState);
+  private readonly tenantScope = inject(TenantScopeState);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 
@@ -80,8 +91,16 @@ export class PolicyPage {
   private readonly retireDialog = viewChild<ReasonDialog>('retireDialog');
   private readonly conflictDialog = viewChild.required(ConflictDialog);
 
-  protected readonly canManage = CAN.manage;
-  protected readonly canPublish = CAN.publish;
+  protected readonly canRead = computed(() =>
+    hasPolicyGrant(this.injector, this.scopeState, POLICY_PERMISSIONS.read),
+  );
+  protected readonly canManage = computed(() =>
+    hasPolicyGrant(this.injector, this.scopeState, POLICY_PERMISSIONS.manage),
+  );
+  protected readonly canPublish = computed(() =>
+    hasPolicyGrant(this.injector, this.scopeState, POLICY_PERMISSIONS.publish),
+  );
+  protected readonly tradeCtx = computed(() => operatingTradeContext(this.tenantScope));
 
   private readonly paramMap = toSignal(this.route.paramMap, {
     initialValue: this.route.snapshot.paramMap,
@@ -92,6 +111,7 @@ export class PolicyPage {
   protected readonly metadata = signal<PolicyMetadata | null>(null);
   protected readonly loading = signal(true);
   protected readonly loadFailed = signal(false);
+  protected readonly forbidden = signal(false);
   protected readonly creatingVersion = signal(false);
   protected readonly actionBusy = signal(false);
   protected readonly reasonTarget = signal<GovernedVersion | null>(null);
@@ -101,14 +121,15 @@ export class PolicyPage {
     const def = this.definition();
     if (!def) return [];
     const currentLang = this.lang();
-    const me = getFakeActor();
+    const meUser = this.tenantScope.me();
+    const meId = meUser?.id ?? '';
     const byId = new Map(def.versions.map((v) => [v.id, v]));
 
     return [...def.versions]
       .sort((a, b) => b.versionNumber - a.versionNumber)
       .map((v) => {
         const actorId = v.submittedBy || v.createdBy;
-        const actor = actorName(actorId)[currentLang];
+        const actor = actorLabel(actorId, meUser, currentLang);
         const ts = v.approvedAt || v.effectiveFrom;
         const supersededByVersionNumber = v.supersededByVersionId
           ? (byId.get(v.supersededByVersionId)?.versionNumber ?? null)
@@ -126,7 +147,7 @@ export class PolicyPage {
           },
         ];
 
-        if (this.canManage && (v.status === 'PUBLISHED' || v.status === 'RETIRED' || v.status === 'SUPERSEDED')) {
+        if (this.canPublish() && (v.status === 'PUBLISHED' || v.status === 'RETIRED' || v.status === 'SUPERSEDED')) {
           actions.push({
             key: 'rollback',
             title: this.transloco.translate('policy.version.rollback'),
@@ -135,7 +156,7 @@ export class PolicyPage {
           });
         }
 
-        if (this.canPublish && (v.status === 'PUBLISHED' || v.status === 'SCHEDULED')) {
+        if (this.canPublish() && (v.status === 'PUBLISHED' || v.status === 'SCHEDULED')) {
           actions.push({
             key: 'retire',
             title: this.transloco.translate('policy.version.retire'),
@@ -158,7 +179,7 @@ export class PolicyPage {
           effectiveRange: rangeText(v.effectiveFrom, v.supersededAt ?? v.effectiveTo, currentLang),
           byPrimary: actor,
           bySecondary: formatDateTime(ts, currentLang),
-          byIsMe: actorId === me,
+          byIsMe: Boolean(meId && actorId === meId),
           sourceLabel:
             restoredFromVersionNumber !== null
               ? this.transloco.translate('policy.review.fromVersion', {
@@ -182,16 +203,27 @@ export class PolicyPage {
   protected async reload(): Promise<void> {
     const id = this.definitionId();
     if (!id) return;
+    if (!this.canRead()) {
+      this.forbidden.set(true);
+      this.loading.set(false);
+      return;
+    }
     this.loading.set(true);
     this.loadFailed.set(false);
+    this.forbidden.set(false);
+    const ctx = this.tradeCtx();
     try {
       const [def, meta] = await Promise.all([
-        getDefinition('policy', id),
-        this.metadata() ? Promise.resolve(this.metadata()!) : getMetadata(),
+        getDefinition('policy', id, ctx),
+        this.metadata() ? Promise.resolve(this.metadata()!) : getMetadata(ctx),
       ]);
       this.definition.set(def);
       this.metadata.set(meta);
-    } catch {
+    } catch (err) {
+      if (isForbiddenError(err)) {
+        this.forbidden.set(true);
+        return;
+      }
       this.loadFailed.set(true);
     } finally {
       this.loading.set(false);
@@ -210,8 +242,9 @@ export class PolicyPage {
 
   protected async createNewVersion(): Promise<void> {
     const def = this.definition();
-    if (!def || !this.canManage || this.creatingVersion()) return;
+    if (!def || !this.canManage() || this.creatingVersion()) return;
     this.creatingVersion.set(true);
+    const ctx = this.tradeCtx();
     try {
       const live = [...def.versions]
         .filter((v) => v.status === 'PUBLISHED')
@@ -221,18 +254,25 @@ export class PolicyPage {
       let testCases: PolicyTestCase[];
 
       if (live) {
-        const liveDetail = await getVersion('policy', live.id);
+        const liveDetail = await getVersion('policy', live.id, ctx);
         if (!isPolicyVersionDetail(liveDetail)) throw new Error('Not a policy version');
         content = structuredClone(liveDetail.content);
         testCases = structuredClone(liveDetail.testCases ?? []);
       } else {
         const meta = this.metadata();
-        const factsList = meta?.facts ?? FACTS;
-        const byKind = meta?.factsByKind ?? FACTS_BY_KIND;
-        const firstFactKey = (byKind as Readonly<Record<string, readonly string[]>>)[(def.policyKind ?? '')]?.[0] ?? factsList[0]?.key ?? 'totalAmount';
+        const factsList = meta?.facts ?? [];
+        const byKind = meta?.factsByKind ?? {};
+        const firstFactKey = (byKind as Readonly<Record<string, readonly string[]>>)[def.policyKind ?? '']?.[0] ?? factsList[0]?.key ?? 'document.kind';
         const firstFact = factsList.find((f) => f.key === firstFactKey);
-        const op = operatorsFor(firstFact?.type ?? 'number')[0] ?? 'EQ';
-        const defaultVal = firstFact?.type === 'boolean' ? false : firstFact?.type === 'number' ? 0 : '';
+        const op = operatorsFor(firstFact?.type ?? 'string')[0] ?? 'EQ';
+        const defaultVal =
+          firstFact?.type === 'boolean'
+            ? false
+            : isDecimalFact(firstFact) || isMoneyFact(firstFactKey)
+              ? '0'
+              : firstFact?.type === 'number'
+                ? 0
+                : '';
         content = {
           rules: [
             {
@@ -240,20 +280,16 @@ export class PolicyPage {
               priority: 10,
               all: [{ fact: firstFactKey, operator: op, value: defaultVal }],
               outcome: 'ALLOW',
-              selectedValue: null,
               reasonCode: '',
             },
           ],
           defaultOutcome: 'ALLOW',
-          defaultSelectedValue: null,
         };
         testCases = [
           {
             code: '',
             facts: { [firstFactKey]: defaultVal },
             expectedOutcome: 'ALLOW',
-            expectedRuleCode: null,
-            expectedSelectedValue: null,
           },
         ];
       }
@@ -270,6 +306,7 @@ export class PolicyPage {
         },
         def.version,
         newIdempotencyKey(),
+        ctx,
       );
 
       this.notify.success(
@@ -313,6 +350,7 @@ export class PolicyPage {
         { reasonCode: result.reasonCode, reasonNote: result.reasonNote || undefined },
         target.version,
         newIdempotencyKey(),
+        this.tradeCtx(),
       )) as GovernedVersionRecord;
       this.rollbackDialog()?.close();
       this.reasonTarget.set(null);
@@ -343,6 +381,7 @@ export class PolicyPage {
         { reasonCode: result.reasonCode, reasonNote: result.reasonNote || undefined },
         target.version,
         newIdempotencyKey(),
+        this.tradeCtx(),
       );
       this.retireDialog()?.close();
       this.reasonTarget.set(null);
@@ -376,6 +415,12 @@ export class PolicyPage {
   }
 
   private handleMutationError(err: unknown): void {
+    if (isForbiddenError(err)) {
+      this.rollbackDialog()?.close();
+      this.retireDialog()?.close();
+      this.forbidden.set(true);
+      return;
+    }
     if (err instanceof ApiError) {
       const code = errorCodeOf(err);
       if (code === 'TRADE.CONCURRENCY.STALE_VERSION' || (err.status === 409 && (code ?? '').includes('STALE'))) {

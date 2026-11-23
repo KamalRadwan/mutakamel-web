@@ -22,11 +22,12 @@ import { Segmented, type SegmentedOption } from '../../../../shared/ui/segmented
 import { TagPicker, type TagOption } from '../../../../shared/ui/tag-picker/tag-picker';
 import type { PolicyCondition } from '../policy.model';
 import {
-  FACTS,
   type FactType,
-  isMoneyFact,
   type PolicyFactDefinition,
   type PolicyOperator,
+  factLabel,
+  isDecimalFact,
+  isMoneyFact,
   operatorsFor,
 } from '../policy.registry';
 
@@ -44,7 +45,7 @@ interface FactGroup {
   items: PolicyFactDefinition[];
 }
 
-const FACT_TYPE_ORDER: readonly FactType[] = ['number', 'string', 'boolean'];
+const FACT_TYPE_ORDER: readonly FactType[] = ['decimal', 'number', 'string', 'boolean'];
 
 @Component({
   selector: 'app-rule-condition',
@@ -73,7 +74,7 @@ export class RuleCondition {
   readonly showLabels = input(false);
   readonly canRemove = input(true);
   readonly kind = input.required<string>();
-  readonly facts = input<readonly PolicyFactDefinition[]>(FACTS);
+  readonly facts = input<readonly PolicyFactDefinition[]>([]);
   readonly supportedFactKeys = input<readonly string[]>([]);
   readonly factError = input<string | null>(null);
   readonly operatorError = input<string | null>(null);
@@ -95,6 +96,18 @@ export class RuleCondition {
   );
 
   protected readonly factType = computed<FactType>(() => this.selectedFact()?.type ?? 'string');
+  protected readonly isDecimal = computed(() => {
+    const sel = this.selectedFact();
+    return isDecimalFact(sel) || isMoneyFact(this.condition().fact);
+  });
+  protected readonly isNumericOrDecimal = computed(
+    () => this.factType() === 'number' || this.factType() === 'decimal',
+  );
+
+  protected factDisplay(key: string): string {
+    this.i18n();
+    return factLabel((k) => this.transloco.translate(k), key);
+  }
 
   protected readonly isUnsupportedFact = computed(() => {
     const key = this.condition().fact;
@@ -269,12 +282,13 @@ export class RuleCondition {
     const prevType = this.factType();
     const allowedOps = operatorsFor(fact.type);
     const nextOp = allowedOps.includes(prev.operator) ? prev.operator : allowedOps[0];
+    const decimal = isDecimalFact(fact);
 
     let nextValue = prev.value;
     if (nextOp === 'IN') {
       nextValue = Array.isArray(prev.value) ? prev.value : [];
     } else if (prevType !== fact.type || Array.isArray(prev.value)) {
-      nextValue = fact.type === 'boolean' ? false : isMoneyFact(fact.key) ? '0' : fact.type === 'number' ? 0 : '';
+      nextValue = fact.type === 'boolean' ? false : decimal ? '0' : fact.type === 'number' ? 0 : '';
     }
 
     this.closeMenu();
@@ -290,20 +304,20 @@ export class RuleCondition {
     const prev = this.condition();
     if (nextOp === prev.operator) return;
     const type = this.factType();
-    const money = isMoneyFact(prev.fact);
+    const decimal = this.isDecimal();
 
     let nextValue: PolicyCondition['value'] = prev.value;
     if (nextOp === 'IN') {
       if (Array.isArray(prev.value)) {
         nextValue = prev.value;
       } else if (prev.value !== '' && prev.value !== null && prev.value !== undefined) {
-        nextValue = [type === 'number' && !money ? Number(prev.value) : String(prev.value)];
+        nextValue = [type === 'number' && !decimal ? Number(prev.value) : String(prev.value)];
       } else {
         nextValue = [];
       }
     } else if (prev.operator === 'IN') {
       const first = Array.isArray(prev.value) ? prev.value[0] : undefined;
-      if (money) {
+      if (decimal) {
         nextValue = first !== undefined ? String(first) : '0';
       } else if (type === 'number') {
         const parsed = first !== undefined ? Number(first) : 0;
@@ -325,8 +339,8 @@ export class RuleCondition {
   protected onNumberInput(event: Event): void {
     const raw = (event.target as HTMLInputElement).value;
     const trimmed = raw.trim();
-    // Money thresholds stay decimal strings (never a JS number) so no precision is lost.
-    const nextVal = isMoneyFact(this.condition().fact)
+    // Decimal/money thresholds stay decimal strings (never a JS number) so precision is preserved.
+    const nextVal = this.isDecimal()
       ? trimmed
       : trimmed === '' ? '' : Number.isFinite(Number(trimmed)) ? Number(trimmed) : raw;
     this.conditionChange.emit({
@@ -353,8 +367,9 @@ export class RuleCondition {
 
   protected onInValuesChange(nextIds: string[]): void {
     const type = this.factType();
+    const decimal = this.isDecimal();
     const nextValue: (string | number)[] =
-      type === 'number' && !isMoneyFact(this.condition().fact)
+      type === 'number' && !decimal
         ? nextIds.map((item) => {
             const num = Number(item);
             return Number.isFinite(num) && item.trim() !== '' ? num : item;

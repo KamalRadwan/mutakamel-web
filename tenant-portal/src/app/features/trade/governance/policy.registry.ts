@@ -1,3 +1,11 @@
+import { type Injector, inject, runInInjectionContext } from '@angular/core';
+import type { TenantMe } from '../../../core/auth/auth-session.model';
+import type { ScopeState } from '../../../core/scope/scope';
+import { TenantScopeState } from '../../../core/scope/tenant-scope';
+import { branchGrants, tenantWide } from '../shared/trade-access';
+import type { TradeContext } from '../shared/trade-api';
+import type { ScopeTarget } from './policy.model';
+
 export const REGISTRY_VERSION = '2026.11.1';
 
 export const POLICY_KINDS = [
@@ -25,50 +33,95 @@ export const WORKFLOW_KINDS = [
   'PURCHASE_ORDER',
   'QUOTATION',
   'SALES_ORDER',
-  'PRICE_CHANGE',
-  'CREDIT_OVERRIDE',
+  'PRICE_PUBLICATION',
+  'CONFIGURATION_PUBLICATION',
 ] as const;
 
 export type WorkflowKind = (typeof WORKFLOW_KINDS)[number];
 
 export const ACTIVE_WORKFLOW_KINDS: readonly WorkflowKind[] = ['PURCHASE_ORDER'];
 
-export type FactType = 'string' | 'number' | 'boolean';
+export type FactType = 'string' | 'number' | 'decimal' | 'boolean';
 
 export interface PolicyFactDefinition {
   key: string;
   type: FactType;
 }
 
-export const FACTS: readonly PolicyFactDefinition[] = [
-  { key: 'documentKind', type: 'string' },
-  { key: 'totalAmount', type: 'number' },
-  { key: 'subtotalAmount', type: 'number' },
-  { key: 'currencyCode', type: 'string' },
-  { key: 'accountStatus', type: 'string' },
-  { key: 'accountRole', type: 'string' },
-  { key: 'customerEligible', type: 'boolean' },
-  { key: 'discountPercent', type: 'number' },
-  { key: 'marginPercent', type: 'number' },
-  { key: 'actorHasOverride', type: 'boolean' },
-  { key: 'lineCount', type: 'number' },
-  { key: 'hasPriceLock', type: 'boolean' },
-  { key: 'channelType', type: 'string' },
-  { key: 'branchId', type: 'string' },
-  { key: 'creditExposureRatio', type: 'number' },
-  { key: 'creditBlocked', type: 'boolean' },
-  { key: 'availableQuantity', type: 'number' },
-  { key: 'requestedQuantity', type: 'number' },
-  { key: 'overReceiptPercent', type: 'number' },
-  { key: 'allowNegativeStock', type: 'boolean' },
-  { key: 'reservationPriority', type: 'number' },
-];
-
-/** Facts carrying money: sent and compared as decimal strings (backend S2, 8 decimals). */
-export const MONEY_FACT_KEYS: readonly string[] = ['totalAmount', 'subtotalAmount'];
+/** Dotted facts carrying money or decimal thresholds (backend numeric 24,8). */
+export const MONEY_FACT_KEYS: readonly string[] = ['document.total', 'account.credit_limit'];
 
 export function isMoneyFact(key: string): boolean {
   return MONEY_FACT_KEYS.includes(key);
+}
+
+export function isDecimalFact(fact: Pick<PolicyFactDefinition, 'key' | 'type'> | null | undefined): boolean {
+  if (!fact) return false;
+  return fact.type === 'decimal' || isMoneyFact(fact.key);
+}
+
+export function factLabel(translate: (key: string) => string, factKey: string): string {
+  const i18nKey = `policy.facts.${factKey}`;
+  const translated = translate(i18nKey);
+  return translated && translated !== i18nKey ? translated : factKey;
+}
+
+export const POLICY_PERMISSIONS = {
+  read: 'trade.policy.read',
+  manage: 'trade.policy.manage',
+  test: 'trade.policy.test',
+  approve: 'trade.policy.approve',
+  publish: 'trade.policy.publish',
+} as const;
+
+export function hasPolicyGrant(injector: Injector, scope: ScopeState, key: string): boolean {
+  if (runInInjectionContext(injector, () => tenantWide(key))) {
+    return true;
+  }
+  if (key === POLICY_PERMISSIONS.publish) return false;
+  const grants = runInInjectionContext(injector, () => branchGrants(key));
+  if (grants === 'ALL') return true;
+  const company = scope.company();
+  if (!company?.id) return grants.size > 0;
+  const branchId = scope.branch()?.id || undefined;
+  if (branchId && grants.has(branchId)) return true;
+  if (!branchId && company.branches.some((branch) => grants.has(branch.id))) return true;
+  const me = runInInjectionContext(injector, () => inject(TenantScopeState).me());
+  const variants = [key, `${key}.own`, `${key}.team`, `${key}.all`];
+  return variants.some(
+    (variant) =>
+      !!me?.permissions.includes(variant) &&
+      !!me.permissionScopes[variant]?.companyIds.includes(company.id),
+  );
+}
+
+export function operatingTradeContext(tenantScope: TenantScopeState): TradeContext {
+  const sel = tenantScope.selection();
+  const ctx: TradeContext = {};
+  if (sel?.companyId) ctx.companyId = sel.companyId;
+  if (sel?.branchId) ctx.branchId = sel.branchId;
+  return ctx;
+}
+
+export function operatingScopeTarget(tenantScope: TenantScopeState): ScopeTarget {
+  const sel = tenantScope.selection();
+  if (sel?.branchId) return 'BRANCH';
+  if (sel?.companyId) return 'COMPANY';
+  return 'TENANT';
+}
+
+export function actorLabel(
+  id: string | null | undefined,
+  me: TenantMe | null | undefined,
+  lang: 'en' | 'ar',
+): string {
+  if (!id) {
+    return lang === 'ar' ? 'النظام' : 'System';
+  }
+  if (me && id === me.id) {
+    return `${me.firstName} ${me.lastName}`.trim() || me.email || id;
+  }
+  return id;
 }
 
 const DECIMAL_STRING = /^-?\d{1,18}(\.\d{1,8})?$/;
@@ -98,12 +151,13 @@ export type PolicyOperator = (typeof OPERATORS)[number];
 
 const OPERATORS_BY_TYPE: Readonly<Record<FactType, readonly PolicyOperator[]>> = {
   number: ['EQ', 'NEQ', 'GT', 'GTE', 'LT', 'LTE', 'IN'],
+  decimal: ['EQ', 'NEQ', 'GT', 'GTE', 'LT', 'LTE', 'IN'],
   string: ['EQ', 'NEQ', 'IN', 'CONTAINS'],
   boolean: ['EQ', 'NEQ'],
 };
 
 export function operatorsFor(type: FactType): readonly PolicyOperator[] {
-  return OPERATORS_BY_TYPE[type];
+  return OPERATORS_BY_TYPE[type] ?? OPERATORS_BY_TYPE.string;
 }
 
 export const OUTCOMES = ['ALLOW', 'DENY', 'REQUIRE_APPROVAL', 'SELECT'] as const;
@@ -121,69 +175,6 @@ export const WORKFLOW_ACTIONS = [
   'RETRY',
 ] as const;
 export type WorkflowAction = (typeof WORKFLOW_ACTIONS)[number];
-
-export const FACTS_BY_KIND: Readonly<Record<PolicyKind, readonly string[]>> = {
-  PRICING_GUARD: [
-    'documentKind',
-    'totalAmount',
-    'currencyCode',
-    'accountStatus',
-    'customerEligible',
-    'discountPercent',
-    'marginPercent',
-    'actorHasOverride',
-  ],
-  ORDER_CONFIRMATION: [
-    'documentKind',
-    'totalAmount',
-    'currencyCode',
-    'accountStatus',
-    'customerEligible',
-    'lineCount',
-    'hasPriceLock',
-    'channelType',
-    'creditBlocked',
-    'actorHasOverride',
-  ],
-  PURCHASE_APPROVAL: [
-    'documentKind',
-    'totalAmount',
-    'currencyCode',
-    'accountStatus',
-    'accountRole',
-    'lineCount',
-    'branchId',
-    'actorHasOverride',
-  ],
-  CREDIT: [
-    'accountStatus',
-    'currencyCode',
-    'totalAmount',
-    'creditExposureRatio',
-    'creditBlocked',
-    'actorHasOverride',
-  ],
-  INVENTORY_NEGATIVE: [
-    'branchId',
-    'availableQuantity',
-    'requestedQuantity',
-    'allowNegativeStock',
-    'actorHasOverride',
-  ],
-  INVENTORY_RESERVATION: [
-    'branchId',
-    'channelType',
-    'availableQuantity',
-    'requestedQuantity',
-    'reservationPriority',
-  ],
-  INVENTORY_OVER_RECEIPT: [
-    'branchId',
-    'requestedQuantity',
-    'overReceiptPercent',
-    'actorHasOverride',
-  ],
-};
 
 export const PURCHASE_ORDER_WORKFLOW_SHAPE = {
   states: ['PENDING', 'APPROVED', 'REJECTED', 'WITHDRAWN'] as readonly string[],

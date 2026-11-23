@@ -1,4 +1,6 @@
+import type { TradeContext } from '../shared/trade-api';
 import type {
+  FactType,
   PolicyFactDefinition,
   PolicyKind,
   PolicyOperator,
@@ -8,6 +10,12 @@ import type {
 } from './policy.registry';
 
 // Shapes follow trade-app policy-studio (policy-studio.service.ts, policy-governance.ts, dto/policy-studio.dto.ts).
+
+export interface PolicyWriteOptions {
+  idempotencyKey?: string;
+  ifMatch?: number;
+  ctx?: TradeContext;
+}
 
 export type GovernedDomain = 'policy' | 'workflow';
 
@@ -155,22 +163,22 @@ export interface PolicyRule {
   priority: number;
   all: PolicyCondition[];
   outcome: PolicyOutcome;
-  selectedValue?: string | null;
+  selectedValue?: string;
   reasonCode: string;
 }
 
 export interface PolicyContent {
   rules: PolicyRule[];
   defaultOutcome: PolicyOutcome;
-  defaultSelectedValue?: string | null;
+  defaultSelectedValue?: string;
 }
 
 export interface PolicyTestCase {
   code: string;
   facts: Record<string, string | number | boolean>;
   expectedOutcome: PolicyOutcome;
-  expectedRuleCode?: string | null;
-  expectedSelectedValue?: string | null;
+  expectedRuleCode?: string;
+  expectedSelectedValue?: string;
 }
 
 export interface PolicyTestCaseResult {
@@ -271,26 +279,56 @@ export interface GovernedDeleteResult {
 }
 
 export interface DecisionPolicyVersionRef {
+  type: string;
+  policyKind: string;
   definitionId: string;
   definitionCode: string;
-  versionId: string;
-  versionNumber: number;
-  kind: string;
+  id: string;
+  version: number;
+  contentHash: string;
+  registryVersion: string;
+}
+
+export interface WireDecisionResult {
+  outcome?: PolicyOutcome | string;
+  reasonCode?: string | null;
+  explanationCode?: string | null;
+  selectedValue?: string | boolean | null;
+}
+
+export interface WireDecisionReceipt {
+  id: string;
+  decisionType: string;
+  scopeTarget?: ScopeTarget | string | null;
+  companyId?: string | null;
+  branchId?: string | null;
+  channelId?: string | null;
+  aggregateType?: string | null;
+  aggregateId?: string | null;
+  policyVersions?: DecisionPolicyVersionRef[] | null;
+  matchedRules?: string[] | null;
+  result?: WireDecisionResult | null;
+  explanation?: string | null;
+  evaluatedAt: string;
+  correlationId: string;
 }
 
 export interface DecisionReceipt {
   id: string;
   decisionType: string;
-  outcome: PolicyOutcome;
+  scopeTarget: ScopeTarget | string | null;
+  companyId: string | null;
+  branchId: string | null;
+  channelId: string | null;
+  aggregateType: string | null;
+  aggregateId: string | null;
+  outcome: PolicyOutcome | string;
   reasonCode: string;
   explanationCode: string;
-  selectedValue: string | null;
-  matchedRuleCode: string | null;
+  selectedValue: string | boolean | null;
+  matchedRules: string[];
+  explanation: string | null;
   policyVersions: DecisionPolicyVersionRef[];
-  document: {
-    aggregateType: string;
-    aggregateId: string;
-  };
   evaluatedAt: string;
   correlationId: string;
 }
@@ -314,6 +352,10 @@ export interface PolicyMetadata {
   factsByKind: Readonly<Record<string, readonly string[]>>;
   purchaseOrderWorkflowShape: WorkflowContent;
   codePatterns: { definition: string; rule: string; state: string; reason: string };
+}
+
+export interface WirePolicyMetadata extends Omit<PolicyMetadata, 'facts'> {
+  facts: Readonly<Record<string, FactType>> | readonly PolicyFactDefinition[];
 }
 
 export function supportedKinds<K extends string>(kinds: readonly GovernedKindSupport<K>[] | undefined): K[] {

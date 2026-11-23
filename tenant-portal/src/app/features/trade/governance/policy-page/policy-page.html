@@ -1,3 +1,12 @@
+@if (forbidden()) {
+  <div class="flex flex-1 rounded-10 border border-border bg-surface shadow-card">
+    <ui-full-state
+      kind="forbidden"
+      [title]="'governance.forbiddenTitle' | transloco"
+      [text]="'governance.forbiddenText' | transloco"
+    />
+  </div>
+} @else {
 @if (loading()) {
   <div class="flex flex-col gap-12" aria-busy="true">
     <div class="flex items-center gap-10 rounded-12 border border-border bg-surface p-10 shadow-card">
@@ -70,7 +79,7 @@
       </div>
     </div>
 
-    @if (canManage) {
+    @if (canManage()) {
       <button
         type="button"
         uiButton
@@ -131,3 +140,4 @@
 />
 
 <app-conflict-dialog (reload)="onConflictReload()" (keep)="onConflictKeep()" />
+}

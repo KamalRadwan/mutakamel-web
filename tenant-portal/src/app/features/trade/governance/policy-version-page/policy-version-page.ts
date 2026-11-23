@@ -1,6 +1,7 @@
 import {
   Component,
   type ElementRef,
+  Injector,
   computed,
   effect,
   inject,
@@ -33,6 +34,8 @@ import {
 } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
+import { ScopeState } from '../../../../core/scope/scope';
+import { TenantScopeState } from '../../../../core/scope/tenant-scope';
 import { type ActionItem, type ActionSelection, ActionsMenu } from '../../../../shared/ui/actions-menu/actions-menu';
 import { Button } from '../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
@@ -40,10 +43,10 @@ import { DateField } from '../../../../shared/ui/date-time/date-field';
 import { TimeField } from '../../../../shared/ui/date-time/time-field';
 import { Dropdown, type DropdownOption } from '../../../../shared/ui/dropdown/dropdown';
 import { Field } from '../../../../shared/ui/field/field';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { Modal } from '../../../../shared/ui/modal/modal';
 import { UnsavedDialog } from '../../../../shared/ui/unsaved-dialog/unsaved-dialog';
 import { ApiError, errorCodeOf, newIdempotencyKey } from '../../shared/trade-api';
-import { getFakeActor } from '../governance-fake-actors';
 import { ConflictDialog } from '../governance-shared/conflict-dialog/conflict-dialog';
 import { LifecycleStepper } from '../governance-shared/lifecycle-stepper/lifecycle-stepper';
 import {
@@ -65,11 +68,9 @@ import type {
   PolicyTestCase,
   PolicyTestResult,
 } from '../policy.model';
-import { FACTS, FACTS_BY_KIND } from '../policy.registry';
-import { formatDateTime, rangeText } from '../pricing.service';
+import { POLICY_PERMISSIONS, hasPolicyGrant, operatingTradeContext } from '../policy.registry';
+import { formatDateTime, isForbiddenError, rangeText } from '../pricing.service';
 import { RuleBuilder, validatePolicyContentClient } from '../rule-builder/rule-builder';
-
-const CAN = { manage: true, test: true, approve: true, publish: true }; // later from the session
 
 type TabKey = 'rules' | 'tests' | 'review';
 const TABS: readonly TabKey[] = ['rules', 'tests', 'review'];
@@ -77,7 +78,6 @@ const TABS: readonly TabKey[] = ['rules', 'tests', 'review'];
 const EMPTY_CONTENT: PolicyContent = {
   rules: [],
   defaultOutcome: 'ALLOW',
-  defaultSelectedValue: null,
 };
 
 function isoToLocalParts(iso: string | null | undefined): { date: string | null; time: string | null } {
@@ -116,6 +116,7 @@ function localPartsToIso(date: string | null, time: string | null): string | nul
     DateField,
     Dropdown,
     Field,
+    FullState,
     GovernedReview,
     LifecycleStepper,
     Modal,
@@ -151,14 +152,16 @@ function localPartsToIso(date: string | null, time: string | null): string | nul
   host: {
     class: 'flex min-h-full flex-col gap-12 p-12',
     '(window:beforeunload)': 'onBeforeUnload($event)',
-    '(window:focus)': 'refreshActor()',
   },
 })
 export class PolicyVersionPage {
+  private readonly injector = inject(Injector);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   protected readonly lang = inject(LanguageState).current;
   private readonly notify = inject(Notify);
+  private readonly scopeState = inject(ScopeState);
+  private readonly tenantScope = inject(TenantScopeState);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 
@@ -171,10 +174,22 @@ export class PolicyVersionPage {
   private readonly publishModal = viewChild<Modal>('publishModal');
   private readonly tabButtons = viewChildren<ElementRef<HTMLButtonElement>>('tabBtn');
 
-  protected readonly canManage = CAN.manage;
-  protected readonly canTest = CAN.test;
-  protected readonly canApprove = CAN.approve;
-  protected readonly canPublish = CAN.publish;
+  protected readonly canRead = computed(() =>
+    hasPolicyGrant(this.injector, this.scopeState, POLICY_PERMISSIONS.read),
+  );
+  protected readonly canManage = computed(() =>
+    hasPolicyGrant(this.injector, this.scopeState, POLICY_PERMISSIONS.manage),
+  );
+  protected readonly canTest = computed(() =>
+    hasPolicyGrant(this.injector, this.scopeState, POLICY_PERMISSIONS.test),
+  );
+  protected readonly canApprove = computed(() =>
+    hasPolicyGrant(this.injector, this.scopeState, POLICY_PERMISSIONS.approve),
+  );
+  protected readonly canPublish = computed(() =>
+    hasPolicyGrant(this.injector, this.scopeState, POLICY_PERMISSIONS.publish),
+  );
+  protected readonly tradeCtx = computed(() => operatingTradeContext(this.tenantScope));
 
   private readonly paramMap = toSignal(this.route.paramMap, {
     initialValue: this.route.snapshot.paramMap,
@@ -182,12 +197,13 @@ export class PolicyVersionPage {
   protected readonly definitionId = computed(() => this.paramMap().get('id') ?? '');
   protected readonly versionId = computed(() => this.paramMap().get('versionId') ?? '');
 
-  protected readonly actor = signal(getFakeActor());
+  protected readonly actor = computed(() => this.tenantScope.me()?.id ?? '');
   protected readonly detail = signal<GovernedVersionDetail<PolicyContent, PolicyTestCase> | null>(null);
   protected readonly definition = signal<GovernedDefinition | null>(null);
   protected readonly metadata = signal<PolicyMetadata | null>(null);
   protected readonly loading = signal(true);
   protected readonly loadFailed = signal(false);
+  protected readonly forbidden = signal(false);
 
   protected readonly draftContent = signal<PolicyContent>(structuredClone(EMPTY_CONTENT));
   protected readonly draftTests = signal<PolicyTestCase[]>([]);
@@ -202,6 +218,7 @@ export class PolicyVersionPage {
   protected readonly showClientErrors = signal(false);
   protected readonly diagnostics = signal<Readonly<Record<string, string>>>({});
   protected readonly lastTestResult = signal<PolicyTestResult | null>(null);
+  protected readonly testError = signal<string | null>(null);
   protected readonly expandRuleRequest = signal<{ index: number; seq: number } | null>(null);
   private expandSeq = 0;
 
@@ -212,7 +229,7 @@ export class PolicyVersionPage {
 
   protected readonly editable = computed(() => {
     const status = this.detail()?.status;
-    return this.canManage && (status === 'DRAFT' || status === 'REJECTED');
+    return this.canManage() && (status === 'DRAFT' || status === 'REJECTED');
   });
 
   protected readonly isDraftLike = computed(() => {
@@ -231,8 +248,8 @@ export class PolicyVersionPage {
     return Boolean(d.evidence?.validation?.passed && d.evidence.validation.contentHash === d.contentHash);
   });
 
-  protected readonly factsList = computed(() => this.metadata()?.facts ?? FACTS);
-  protected readonly factsByKindMap = computed(() => this.metadata()?.factsByKind ?? FACTS_BY_KIND);
+  protected readonly factsList = computed(() => this.metadata()?.facts ?? []);
+  protected readonly factsByKindMap = computed(() => this.metadata()?.factsByKind ?? {});
 
   protected readonly subtitleText = computed(() => {
     this.i18n();
@@ -247,7 +264,7 @@ export class PolicyVersionPage {
     this.i18n();
     const d = this.detail();
     if (!d || this.editable()) return null;
-    const statusLabel = this.transloco.translate(`governance.policyStatuses.${d.status}`);
+    const statusLabel = this.transloco.translate(`governance.status.policy.${d.status}`);
     return this.transloco.translate('policy.rules.readonlyNotice', { status: statusLabel });
   });
 
@@ -278,7 +295,10 @@ export class PolicyVersionPage {
 
   protected readonly rulesHaveErrors = computed(() => {
     if (Object.keys(this.diagnostics()).length > 0) return true;
-    if (this.showClientErrors() && Object.keys(validatePolicyContentClient(this.draftContent())).length > 0) {
+    if (
+      this.showClientErrors() &&
+      Object.keys(validatePolicyContentClient(this.draftContent(), this.factsList())).length > 0
+    ) {
       return true;
     }
     return false;
@@ -321,13 +341,13 @@ export class PolicyVersionPage {
   protected readonly approveDisabledByMakerChecker = computed(() => {
     const d = this.detail();
     const me = this.actor();
-    return !!d && (d.createdBy === me || d.submittedBy === me);
+    return !!d && Boolean(me) && (d.createdBy === me || d.submittedBy === me);
   });
 
   protected readonly publishDisabledByMakerChecker = computed(() => {
     const d = this.detail();
     const me = this.actor();
-    return !!d && d.createdBy === me;
+    return !!d && Boolean(me) && d.createdBy === me;
   });
 
   protected readonly moreActions = computed<ActionItem[]>(() => {
@@ -341,7 +361,7 @@ export class PolicyVersionPage {
       d.status !== 'PUBLISHED' &&
       !d.actions.some((a) => a.action === 'PUBLISH');
 
-    if (this.canManage && (d.status === 'DRAFT' || d.status === 'REJECTED') && neverPublished) {
+    if (this.canManage() && (d.status === 'DRAFT' || d.status === 'REJECTED') && neverPublished) {
       items.push({
         id: 'delete',
         title: this.transloco.translate('policy.version.deleteDraft'),
@@ -352,7 +372,7 @@ export class PolicyVersionPage {
       });
     }
 
-    if (this.canPublish && (d.status === 'PUBLISHED' || d.status === 'SCHEDULED')) {
+    if (this.canPublish() && (d.status === 'PUBLISHED' || d.status === 'SCHEDULED')) {
       items.push({
         id: 'retire',
         title: this.transloco.translate('policy.version.retire'),
@@ -364,7 +384,7 @@ export class PolicyVersionPage {
     }
 
     if (
-      this.canManage &&
+      this.canPublish() &&
       (d.status === 'PUBLISHED' || d.status === 'RETIRED' || d.status === 'SUPERSEDED')
     ) {
       items.push({
@@ -464,6 +484,7 @@ export class PolicyVersionPage {
       const verId = this.versionId();
       if (defId && verId) {
         this.lastTestResult.set(null);
+        this.testError.set(null);
         this.diagnostics.set({});
         this.showClientErrors.set(false);
         this.activeTab.set('rules');
@@ -471,10 +492,6 @@ export class PolicyVersionPage {
         void this.reload();
       }
     });
-  }
-
-  protected refreshActor(): void {
-    this.actor.set(getFakeActor());
   }
 
   protected onBeforeUnload(event: BeforeUnloadEvent): void {
@@ -495,14 +512,21 @@ export class PolicyVersionPage {
     const defId = this.definitionId();
     const verId = this.versionId();
     if (!defId || !verId) return;
+    if (!this.canRead()) {
+      this.forbidden.set(true);
+      this.loading.set(false);
+      return;
+    }
 
     this.loading.set(true);
     this.loadFailed.set(false);
+    this.forbidden.set(false);
+    const ctx = this.tradeCtx();
     try {
       const [verAny, def, meta] = await Promise.all([
-        getVersion('policy', verId),
-        getDefinition('policy', defId),
-        this.metadata() ? Promise.resolve(this.metadata()!) : getMetadata(),
+        getVersion('policy', verId, ctx),
+        getDefinition('policy', defId, ctx),
+        this.metadata() ? Promise.resolve(this.metadata()!) : getMetadata(ctx),
       ]);
       if (!isPolicyVersionDetail(verAny)) throw new Error('Not a policy version');
       const ver = verAny;
@@ -510,7 +534,11 @@ export class PolicyVersionPage {
       this.definition.set(def);
       this.metadata.set(meta);
       this.seedDraftFromDetail(ver);
-    } catch {
+    } catch (err) {
+      if (isForbiddenError(err)) {
+        this.forbidden.set(true);
+        return;
+      }
       this.loadFailed.set(true);
     } finally {
       this.loading.set(false);
@@ -556,10 +584,12 @@ export class PolicyVersionPage {
     if (Object.keys(this.diagnostics()).length > 0) {
       this.diagnostics.set({});
     }
+    this.testError.set(null);
   }
 
   protected onDraftTestsChange(next: PolicyTestCase[]): void {
     this.draftTests.set(next);
+    this.testError.set(null);
   }
 
   protected onEffFromDateChange(date: string | null): void {
@@ -606,7 +636,7 @@ export class PolicyVersionPage {
     if (!d || !this.editable() || this.saving()) return false;
 
     this.showClientErrors.set(true);
-    const contentErrors = validatePolicyContentClient(this.draftContent());
+    const contentErrors = validatePolicyContentClient(this.draftContent(), this.factsList());
     const fromIso = localPartsToIso(this.effFromDate(), this.effFromTime());
     const toDate = this.effToDate();
     const toIso = toDate ? localPartsToIso(toDate, this.effToTime()) : null;
@@ -627,6 +657,7 @@ export class PolicyVersionPage {
     }
 
     this.saving.set(true);
+    const ctx = this.tradeCtx();
     try {
       const saved = (await updateVersion(
         'policy',
@@ -639,12 +670,14 @@ export class PolicyVersionPage {
         },
         d.version,
         newIdempotencyKey(),
+        ctx,
       )) as GovernedVersionRecord;
-      const updated = (await getVersion('policy', saved.id)) as GovernedVersionDetail<PolicyContent, PolicyTestCase>;
+      const updated = (await getVersion('policy', saved.id, ctx)) as GovernedVersionDetail<PolicyContent, PolicyTestCase>;
       this.detail.set(updated);
       this.seedDraftFromDetail(updated);
       this.showClientErrors.set(false);
       this.diagnostics.set({});
+      this.testError.set(null);
       this.notify.success(this.transloco.translate('policy.version.toasts.saved'));
       await this.refreshDefinitionQuietly();
       return true;
@@ -658,7 +691,7 @@ export class PolicyVersionPage {
 
   protected async runValidate(): Promise<void> {
     const d = this.detail();
-    if (!d || !this.canManage || this.busyAction()) return;
+    if (!d || !this.canTest() || this.busyAction()) return;
     if (this.dirty()) {
       this.notify.warning(this.transloco.translate('policy.version.toasts.saveFirst'));
       return;
@@ -673,6 +706,7 @@ export class PolicyVersionPage {
         undefined,
         d.version,
         newIdempotencyKey(),
+        this.tradeCtx(),
       )) as GovernedValidateResult;
 
       if (res.passed) {
@@ -713,13 +747,14 @@ export class PolicyVersionPage {
 
   protected async runTestsAction(): Promise<void> {
     const d = this.detail();
-    if (!d || !this.canTest || this.busyAction()) return;
+    if (!d || !this.canTest() || this.busyAction()) return;
     if (this.dirty()) {
       this.notify.warning(this.transloco.translate('policy.version.toasts.saveFirst'));
       return;
     }
 
     this.busyAction.set('test');
+    this.testError.set(null);
     try {
       const res = (await runAction(
         'policy',
@@ -728,6 +763,7 @@ export class PolicyVersionPage {
         undefined,
         d.version,
         newIdempotencyKey(),
+        this.tradeCtx(),
       )) as PolicyTestResult;
       this.lastTestResult.set(res);
       this.selectTab('tests');
@@ -738,6 +774,15 @@ export class PolicyVersionPage {
       }
       await this.reloadAfterAction();
     } catch (err) {
+      if (err instanceof ApiError && errorCodeOf(err) === 'TRADE.POLICY.TEST_FAILED') {
+        const key = 'governance.errors.TRADE_POLICY_TEST_FAILED';
+        const translated = this.transloco.translate(key);
+        this.testError.set(
+          translated !== key ? translated : this.transloco.translate('policy.version.toasts.testsFailed'),
+        );
+        this.selectTab('tests');
+        return;
+      }
       this.handleMutationError(err);
     } finally {
       this.busyAction.set(null);
@@ -746,8 +791,9 @@ export class PolicyVersionPage {
 
   protected async runSubmit(): Promise<void> {
     const d = this.detail();
-    if (!d || !this.canManage || this.busyAction()) return;
+    if (!d || !this.canManage() || this.busyAction()) return;
     this.busyAction.set('submit');
+    const ctx = this.tradeCtx();
     try {
       const saved = (await runAction(
         'policy',
@@ -756,8 +802,9 @@ export class PolicyVersionPage {
         undefined,
         d.version,
         newIdempotencyKey(),
+        ctx,
       )) as GovernedVersionRecord;
-      const updated = (await getVersion('policy', saved.id)) as GovernedVersionDetail<PolicyContent, PolicyTestCase>;
+      const updated = (await getVersion('policy', saved.id, ctx)) as GovernedVersionDetail<PolicyContent, PolicyTestCase>;
       this.detail.set(updated);
       this.seedDraftFromDetail(updated);
       this.notify.success(this.transloco.translate('policy.version.toasts.submitted'));
@@ -771,8 +818,9 @@ export class PolicyVersionPage {
 
   protected async runApprove(): Promise<void> {
     const d = this.detail();
-    if (!d || !this.canApprove || this.approveDisabledByMakerChecker() || this.busyAction()) return;
+    if (!d || !this.canApprove() || this.approveDisabledByMakerChecker() || this.busyAction()) return;
     this.busyAction.set('approve');
+    const ctx = this.tradeCtx();
     try {
       const saved = (await runAction(
         'policy',
@@ -781,8 +829,9 @@ export class PolicyVersionPage {
         undefined,
         d.version,
         newIdempotencyKey(),
+        ctx,
       )) as GovernedVersionRecord;
-      const updated = (await getVersion('policy', saved.id)) as GovernedVersionDetail<PolicyContent, PolicyTestCase>;
+      const updated = (await getVersion('policy', saved.id, ctx)) as GovernedVersionDetail<PolicyContent, PolicyTestCase>;
       this.detail.set(updated);
       this.seedDraftFromDetail(updated);
       this.notify.success(this.transloco.translate('policy.version.toasts.approved'));
@@ -795,14 +844,15 @@ export class PolicyVersionPage {
   }
 
   protected openRejectDialog(): void {
-    if (!this.canApprove || this.approveDisabledByMakerChecker() || this.busyAction()) return;
+    if (!this.canApprove() || this.approveDisabledByMakerChecker() || this.busyAction()) return;
     void this.rejectDialog()?.open();
   }
 
   protected async confirmReject(result: ReasonDialogResult): Promise<void> {
     const d = this.detail();
-    if (!d || !this.canApprove || this.busyAction()) return;
+    if (!d || !this.canApprove() || this.busyAction()) return;
     this.busyAction.set('reject');
+    const ctx = this.tradeCtx();
     try {
       const saved = (await runAction(
         'policy',
@@ -811,8 +861,9 @@ export class PolicyVersionPage {
         { reasonCode: result.reasonCode, reasonNote: result.reasonNote || undefined },
         d.version,
         newIdempotencyKey(),
+        ctx,
       )) as GovernedVersionRecord;
-      const updated = (await getVersion('policy', saved.id)) as GovernedVersionDetail<PolicyContent, PolicyTestCase>;
+      const updated = (await getVersion('policy', saved.id, ctx)) as GovernedVersionDetail<PolicyContent, PolicyTestCase>;
       this.rejectDialog()?.close();
       this.detail.set(updated);
       this.seedDraftFromDetail(updated);
@@ -827,7 +878,7 @@ export class PolicyVersionPage {
 
   protected openPublishDialog(): void {
     const d = this.detail();
-    if (!d || !this.canPublish || this.publishDisabledByMakerChecker() || this.busyAction()) return;
+    if (!d || !this.canPublish() || this.publishDisabledByMakerChecker() || this.busyAction()) return;
     const live = this.supersedeCandidates().find((v) => v.status === 'PUBLISHED');
     this.replacesVersionId.set(live?.id ?? '');
     this.publishModal()?.open();
@@ -835,8 +886,9 @@ export class PolicyVersionPage {
 
   protected async confirmPublish(): Promise<void> {
     const d = this.detail();
-    if (!d || !this.canPublish || this.busyAction()) return;
+    if (!d || !this.canPublish() || this.busyAction()) return;
     this.busyAction.set('publish');
+    const ctx = this.tradeCtx();
     try {
       const saved = (await runAction(
         'policy',
@@ -845,8 +897,9 @@ export class PolicyVersionPage {
         { supersedesVersionId: this.replacesVersionId() || undefined },
         d.version,
         newIdempotencyKey(),
+        ctx,
       )) as GovernedVersionRecord;
-      const updated = (await getVersion('policy', saved.id)) as GovernedVersionDetail<PolicyContent, PolicyTestCase>;
+      const updated = (await getVersion('policy', saved.id, ctx)) as GovernedVersionDetail<PolicyContent, PolicyTestCase>;
       this.publishModal()?.close();
       this.detail.set(updated);
       this.seedDraftFromDetail(updated);
@@ -877,13 +930,13 @@ export class PolicyVersionPage {
 
   private async handleDeleteDraft(): Promise<void> {
     const d = this.detail();
-    if (!d || !this.canManage || this.busyAction()) return;
+    if (!d || !this.canManage() || this.busyAction()) return;
     const ok = await this.deleteConfirmDialog()?.open();
     if (!ok) return;
 
     this.busyAction.set('delete');
     try {
-      await deleteVersion('policy', d.id, d.version, newIdempotencyKey());
+      await deleteVersion('policy', d.id, d.version, newIdempotencyKey(), this.tradeCtx());
       this.notify.success(this.transloco.translate('policy.version.toasts.deleted'));
       this.skipDirtyGuard = true;
       void this.router.navigate(['/trade/governance/policy-studio', d.definition.id]);
@@ -896,8 +949,9 @@ export class PolicyVersionPage {
 
   protected async confirmRetire(result: ReasonDialogResult): Promise<void> {
     const d = this.detail();
-    if (!d || !this.canPublish || this.busyAction()) return;
+    if (!d || !this.canPublish() || this.busyAction()) return;
     this.busyAction.set('retire');
+    const ctx = this.tradeCtx();
     try {
       const saved = (await runAction(
         'policy',
@@ -906,8 +960,9 @@ export class PolicyVersionPage {
         { reasonCode: result.reasonCode, reasonNote: result.reasonNote || undefined },
         d.version,
         newIdempotencyKey(),
+        ctx,
       )) as GovernedVersionRecord;
-      const updated = (await getVersion('policy', saved.id)) as GovernedVersionDetail<PolicyContent, PolicyTestCase>;
+      const updated = (await getVersion('policy', saved.id, ctx)) as GovernedVersionDetail<PolicyContent, PolicyTestCase>;
       this.retireDialog()?.close();
       this.detail.set(updated);
       this.seedDraftFromDetail(updated);
@@ -922,7 +977,7 @@ export class PolicyVersionPage {
 
   protected async confirmRollback(result: ReasonDialogResult): Promise<void> {
     const d = this.detail();
-    if (!d || !this.canManage || this.busyAction()) return;
+    if (!d || !this.canPublish() || this.busyAction()) return;
     this.busyAction.set('rollback');
     try {
       const created = (await runAction(
@@ -932,6 +987,7 @@ export class PolicyVersionPage {
         { reasonCode: result.reasonCode, reasonNote: result.reasonNote || undefined },
         d.version,
         newIdempotencyKey(),
+        this.tradeCtx(),
       )) as GovernedVersionRecord;
       this.rollbackDialog()?.close();
       this.notify.success(
@@ -983,10 +1039,11 @@ export class PolicyVersionPage {
     const defId = this.definitionId();
     const verId = this.versionId();
     if (!defId || !verId) return;
+    const ctx = this.tradeCtx();
     try {
       const [verAny, def] = await Promise.all([
-        getVersion('policy', verId),
-        getDefinition('policy', defId),
+        getVersion('policy', verId, ctx),
+        getDefinition('policy', defId, ctx),
       ]);
       if (!isPolicyVersionDetail(verAny)) throw new Error('Not a policy version');
       const ver = verAny;
@@ -1004,7 +1061,7 @@ export class PolicyVersionPage {
     const defId = this.definitionId();
     if (!defId) return;
     try {
-      this.definition.set(await getDefinition('policy', defId));
+      this.definition.set(await getDefinition('policy', defId, this.tradeCtx()));
     } catch {
       // ignore background refresh failures
     }
@@ -1018,6 +1075,7 @@ export class PolicyVersionPage {
 
     this.draftContent.set(contentCopy);
     this.draftTests.set(testsCopy);
+    this.testError.set(null);
     this.effFromDate.set(fromParts.date);
     this.effFromTime.set(fromParts.time);
     this.effToDate.set(toParts.date);
@@ -1050,6 +1108,14 @@ export class PolicyVersionPage {
   }
 
   private handleMutationError(err: unknown): void {
+    if (isForbiddenError(err)) {
+      this.rejectDialog()?.close();
+      this.retireDialog()?.close();
+      this.rollbackDialog()?.close();
+      this.publishModal()?.close();
+      this.forbidden.set(true);
+      return;
+    }
     if (err instanceof ApiError) {
       const code = errorCodeOf(err);
       if (code === 'TRADE.CONCURRENCY.STALE_VERSION' || (err.status === 409 && (code ?? '').includes('STALE'))) {
