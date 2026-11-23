@@ -40,6 +40,10 @@ import { ActionSelection, ActionsMenu } from '../../../../shared/ui/actions-menu
 import { Button } from '../../../../shared/ui/button/button';
 import { Checkbox } from '../../../../shared/ui/checkbox/checkbox';
 import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
+import { listPageSizes } from '../../shared/lookups/page-sizes';
+import { settingsTimeZone } from '../../settings/shared/settings-time-zone';
+import { runInCrm } from '../../shared/crm-runtime';
 import { rectInPage, viewport } from '../../../../shared/ui/overlay/zoom';
 import { Pagination } from '../../../../shared/ui/pagination/pagination';
 import { PhoneActionSource, PhoneActions } from '../../../../shared/widgets/phone-actions/phone-actions';
@@ -58,6 +62,9 @@ import {
   customerCity,
   customerEmail,
   customerErrorMessage,
+  customerReadState,
+  customerNeedsReload,
+  customerReadOnlyError,
   customerPhone,
   customerPhoneSource,
   customerStatusBadgeClass,
@@ -82,7 +89,6 @@ import {
   CustomerSortField,
   CustomerStatus,
   SearchResponse,
-  StatusCounts,
   TagSummary,
   nameIn,
   ownerFullName,
@@ -168,7 +174,7 @@ interface ChooserPlace {
 
 @Component({
   selector: 'app-customer-table',
-  imports: [NgIcon, TranslocoPipe, ActionsMenu, Button, Checkbox, ConfirmDialog, Pagination, PhoneActions],
+  imports: [NgIcon, TranslocoPipe, ActionsMenu, Button, Checkbox, ConfirmDialog, FullState, Pagination, PhoneActions],
   providers: [
     provideIcons({
       tablerAdjustmentsHorizontal,
@@ -221,7 +227,7 @@ export class CustomerTable {
   readonly activities = output<CustomerRow>();
   readonly create = output<void>();
   readonly clearSearch = output<void>();
-  readonly countsLoaded = output<StatusCounts>();
+  readonly readOnlyDetected = output<void>();
 
   protected readonly skeletonRows = [1, 2, 3, 4, 5, 6];
   protected readonly stars = STARS;
@@ -233,11 +239,17 @@ export class CustomerTable {
     storageKey: 'customers.table.pageSize',
     sizes: DEFAULT_LIST_PAGE_SIZES,
     defaultSize: DEFAULT_LIST_PAGE_SIZE,
+    load: listPageSizes,
   });
   protected readonly pageSizes = this.pageSizePref.sizes;
   private syncedInitialPageSize = false;
   private lastPageResult: SearchResponse | undefined;
+  private loadedBranchId: string | undefined;
   private readonly refreshTick = signal(0);
+  private readonly readOnly = signal(false);
+  private readonly timeZoneResource = resource({ loader: () => runInCrm(() => settingsTimeZone()).catch(() => null) });
+  protected readonly timeZone = computed(() => this.timeZoneResource.value() ?? null);
+  protected readonly dateHint = computed(() => this.timeZone() ?? this.transloco.translate('customers.dates.utcHint'));
   private chooserSeq = 0;
   private lastClickedId: string | null = null;
   private lastShiftKey = false;
@@ -268,7 +280,6 @@ export class CustomerTable {
       ...base,
       ...(activeStatus !== 'ALL' ? { status: activeStatus } : {}),
       ...(activeSort ? { sort: activeSort } : {}),
-      includeStatusCounts: true,
     };
   });
 
@@ -283,6 +294,11 @@ export class CustomerTable {
           }
         : undefined,
     loader: async ({ params }) => {
+      if (this.loadedBranchId !== params.query.branchId) {
+        this.lastPageResult = undefined;
+        this.loadedBranchId = params.query.branchId;
+        this.readOnly.set(false);
+      }
       try {
         const res = await searchCustomers(params.query, params.page, params.pageSize);
         if (res.items.length === 0 && params.page > 1) {
@@ -290,32 +306,33 @@ export class CustomerTable {
           if (target !== params.page) {
             this.page.set(target);
             const fallback = await searchCustomers(params.query, target, params.pageSize);
-            this.lastPageResult = fallback;
+            if (this.loadedBranchId === params.query.branchId) this.lastPageResult = fallback;
             return fallback;
           }
         }
-        this.lastPageResult = res;
+        if (this.loadedBranchId === params.query.branchId) this.lastPageResult = res;
         return res;
       } catch (error) {
         if (error instanceof ApiError && error.status === 400) {
           this.notify.error(this.transloco.translate('customers.search.invalid'));
-          return this.lastPageResult;
+          return this.loadedBranchId === params.query.branchId ? this.lastPageResult : undefined;
         }
         throw error;
       }
     },
   });
 
-  private readonly pageData = linkedSignal<SearchResponse | undefined>(() => this.pageResource.value());
+  private readonly pageData = linkedSignal<SearchResponse | undefined>(() => this.pageResource.hasValue() ? this.pageResource.value() : undefined);
 
   readonly items = computed(() => this.pageData()?.items ?? []);
   readonly loading = this.pageResource.isLoading;
   protected readonly failed = computed(() => !!this.pageResource.error());
+  protected readonly failureState = computed(() => customerReadState(this.pageResource.error(), this.transloco));
 
   protected retryLoad(): void {
     this.pageResource.reload();
   }
-  protected readonly canCreate = computed(() => canCreateCustomer(this.capabilities()));
+  protected readonly canCreate = computed(() => !this.readOnly() && canCreateCustomer(this.capabilities()));
 
   readonly totalCount = linkedSignal<{ total: number; loading: boolean }, number>({
     source: () => ({
@@ -336,7 +353,7 @@ export class CustomerTable {
 
   protected readonly hovered = signal<{ customerId: string; value: number } | null>(null);
   protected readonly deletingName = signal('');
-  protected readonly deletingHasSourceLead = signal(false);
+  protected readonly deletingError = signal('');
 
   protected readonly phoneSources = computed<Record<string, PhoneActionSource>>(() => {
     const map: Record<string, PhoneActionSource> = {};
@@ -355,12 +372,6 @@ export class CustomerTable {
       this.host.nativeElement.closest('main')?.scrollTo({ top: 0 });
     });
 
-    effect(() => {
-      const counts = this.pageResource.value()?.counts;
-      if (counts) {
-        untracked(() => this.countsLoaded.emit(counts));
-      }
-    });
 
     effect(() => {
       const state = this.pageState();
@@ -408,11 +419,11 @@ export class CustomerTable {
   }
 
   protected canUpdate(customer: CustomerRow): boolean {
-    return canUpdateCustomer(this.capabilities(), customer);
+    return !this.readOnly() && canUpdateCustomer(this.capabilities(), customer);
   }
 
   protected canDelete(customer: CustomerRow): boolean {
-    return canDeleteCustomer(this.capabilities(), customer);
+    return !this.readOnly() && canDeleteCustomer(this.capabilities(), customer);
   }
 
   protected isColumnVisible(id: CustomerTableColumnId): boolean {
@@ -627,7 +638,7 @@ export class CustomerTable {
   }
 
   protected formatDate(iso: string | null | undefined): string {
-    return formatCustomerDate(iso, this.language());
+    return formatCustomerDate(iso, this.language(), this.timeZone() ?? 'UTC');
   }
 
   protected ratingValue(customer: CustomerRow): number {
@@ -665,6 +676,7 @@ export class CustomerTable {
     } catch (error) {
       this.pageData.set(before);
       this.notify.error(customerErrorMessage(error, this.transloco, 'customers.rate.failed'));
+      this.handleWriteError(error);
     }
   }
 
@@ -792,32 +804,47 @@ export class CustomerTable {
     } catch (error) {
       this.pageData.set(before);
       this.notify.error(customerErrorMessage(error, this.transloco, 'customers.color.failed'));
+      this.handleWriteError(error);
     }
   }
 
   private async remove(customer: CustomerRow): Promise<void> {
     if (!this.canDelete(customer) || customer.status === 'BLACKLISTED') return;
+    this.deletingError.set('');
     this.deletingName.set(customer.displayName);
-    this.deletingHasSourceLead.set(Boolean(customer.sourceLeadId));
-    if (!(await this.confirmDialog().open())) return;
-
-    const before = this.pageData();
-    this.pageData.update((current) =>
-      current
-        ? {
-            ...current,
-            items: current.items.filter((item) => item.id !== customer.id),
-            total: Math.max(0, current.total - 1),
-          }
-        : current,
-    );
-    try {
-      await deleteCustomer(customer.id);
-      this.notify.success(this.transloco.translate('customers.delete.done'));
-      this.refresh();
-    } catch (error) {
-      this.pageData.set(before);
-      this.notify.error(customerErrorMessage(error, this.transloco, 'customers.delete.failed'));
+    while (await this.confirmDialog().open()) {
+      if (!this.canDelete(customer)) return;
+      const before = this.pageData();
+      this.pageData.update((current) =>
+        current
+          ? {
+              ...current,
+              items: current.items.filter((item) => item.id !== customer.id),
+              total: Math.max(0, current.total - 1),
+            }
+          : current,
+      );
+      try {
+        await deleteCustomer(customer.id);
+        this.notify.success(this.transloco.translate('customers.delete.done'));
+        this.refresh();
+        return;
+      } catch (error) {
+        this.pageData.set(before);
+        this.notify.error(customerErrorMessage(error, this.transloco, 'customers.delete.failed'));
+        this.handleWriteError(error);
+        if (!(error instanceof ApiError) || error.status !== 409 || !error.code.startsWith('CUSTOMER_PROFILE_')) return;
+        this.deletingError.set(customerErrorMessage(error, this.transloco, 'customers.delete.failed'));
+      }
     }
   }
+
+  private handleWriteError(error: unknown): void {
+    if (customerReadOnlyError(error)) {
+      this.readOnly.set(true);
+      this.readOnlyDetected.emit();
+    }
+    if (customerNeedsReload(error)) this.refresh();
+  }
+
 }

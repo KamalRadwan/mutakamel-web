@@ -71,16 +71,11 @@
         </div>
       </div>
     </div>
-  } @else if (loadFailed()) {
-    <div modalMain class="flex flex-1 flex-col items-center justify-center gap-8 p-16 text-center">
-      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
-        <ng-icon name="tablerCloudOff" size="18" aria-hidden="true" />
-      </span>
-      <p class="text-12 leading-18 text-text-muted">{{ 'customerModal.loadFailed' | transloco }}</p>
-      <button type="button" uiButton variant="primary" (click)="retryLoad()">
-        {{ 'recordModal.retry' | transloco }}
-      </button>
-    </div>
+  } @else if (loadFailed() || reloadRequired() || branchMissing() || !canRead()) {
+    <ui-full-state modalMain [kind]="branchMissing() || !canRead() ? 'forbidden' : loadKind()"
+      [title]="(reloadRequired() ? 'customerForm.server.reloadRequired' : loadKind() === 'not-found' ? 'customerModal.notFound' : branchMissing() || !canRead() || loadKind() === 'forbidden' ? 'customerModal.forbidden' : 'customerModal.loadFailed') | transloco"
+      [text]="branchMissing() ? ('customerForm.chooseBranch' | transloco) : loadMessage() + (loadCorrelation() ? ' · ' + loadCorrelation() : '')"
+      [actionLabel]="'recordModal.retry' | transloco" (action)="retryLoad()" />
   } @else {
     <app-customer-form
       modalMain
@@ -149,49 +144,9 @@
   />
 </div>
 
-<dialog
-  #conflictDialog
-  class="z-modal m-auto w-modal-confirm rounded-14 border border-border bg-surface p-0 text-text shadow-modal backdrop:bg-overlay"
-  [attr.aria-labelledby]="uid + '-conflict-title'"
-  [attr.aria-describedby]="uid + '-conflict-text'"
-  (cancel)="onConflictEscape($event)"
-  (keydown.escape)="onConflictEscape($event)"
-  (close)="onConflictNativeClose()"
->
-  <header class="flex items-center gap-8 border-b border-border px-10 py-8">
-    <span class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-orange text-on-icon">
-      <ng-icon name="tablerAlertTriangle" size="15" aria-hidden="true" />
-    </span>
-    <div class="min-w-0 flex-1">
-      <h2 [id]="uid + '-conflict-title'" class="text-15 leading-22 font-medium text-text">
-        {{ 'customerModal.conflict.title' | transloco }}
-      </h2>
-      @if (displayName().trim(); as label) {
-        <p class="truncate text-12 leading-18 text-text-muted" dir="auto">{{ label }}</p>
-      }
-    </div>
-  </header>
-
-  <p [id]="uid + '-conflict-text'" class="p-10 text-12 leading-18 text-text-muted">
-    {{ 'customerModal.conflict.text' | transloco }}
-  </p>
-
-  <footer class="flex items-center gap-8 rounded-b-14 border-t border-border bg-surface-muted px-10 py-8">
-    <button
-      #conflictReloadBtn
-      type="button"
-      uiButton
-      variant="primary"
-      autofocus
-      (click)="onConflictChoice('reload')"
-    >
-      {{ 'customerModal.conflict.reload' | transloco }}
-    </button>
-    <button type="button" uiButton variant="secondary" (click)="onConflictChoice('keep')">
-      {{ 'customerModal.conflict.keepEditing' | transloco }}
-    </button>
-  </footer>
-</dialog>
+<ui-conflict-dialog [open]="conflictOpen()" [recordLabel]="displayName()"
+  (openChange)="onConflictOpenChange($event)" (reload)="onConflictChoice('reload')"
+  (keepEditing)="onConflictChoice('keep')" />
 
 <dialog
   #deleteDialog

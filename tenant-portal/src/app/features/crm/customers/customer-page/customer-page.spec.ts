@@ -33,12 +33,62 @@ import { listActivities } from '../../../../shared/widgets/activities/activities
 import { fakeCreate, resetActivitiesFake, setFakeActivitiesDelay } from '../../../../shared/widgets/activities/activities.fake';
 import type { CustomerDraft } from '../customer-form/customer-draft';
 import { CustomerForm } from '../customer-form/customer-form';
-import { ACME_CUSTOMER_ID, fakeGetCustomer, fakePatchCustomer } from '../customers.fake';
-import type { CustomerDetail } from '../customers.model';
+import { ACME_CUSTOMER_ID, fakeGetCustomer, fakePatchCustomer, fakeGetCustomerCapabilities } from '../customers.fake';
+import type { CustomerDetail, CustomerCapabilities } from '../customers.model';
 import { CustomerPage } from './customer-page';
+import { TenantScopeState } from '../../../../core/scope/tenant-scope';
+import { bindAnalyticsPermissions } from '../../../../shared/widgets/dashboard/analytics-permissions';
+
+
+import * as customerFake from '../customers.fake';
+import { CoreHttp, CoreQuery, CoreWriteMethod } from '../../../../core/api/core-http';
+import { WorkspaceLookups } from '../../../../shared/widgets/workspace-lookups/workspace-lookups.api';
+import { bindCrmHttpForTest, CrmReadOptions, CrmWriteOptions } from '../../shared/crm-http';
+import { CrmHttpStub } from '../../shared/testing/crm-http-testing';
+import { RecordHistoryApi } from '../../../../shared/widgets/record-history/record-history.api';
+import type { HistoryPage } from '../../../../shared/widgets/record-history/record-history.model';
+
+const TEST_COMPANY_ID = '0192b7ea-7c4f-7a7d-9c9f-51c7f2b30001';
+const TEST_BRANCH_ID = '0192b7ea-7c4f-7a7d-9c9f-51c7f2b30002';
+
+/** Retained seeded-record UI fixtures run through the real feature API boundary. */
+class SeededCustomerTransport extends CrmHttpStub {
+  override async read<T>(path: string, query?: CoreQuery, options?: CrmReadOptions): Promise<T> {
+    await super.read(path, query, options).catch(() => undefined);
+    if (path === '/customer-profiles/capabilities') return { ...await customerFake.fakeGetCustomerCapabilities('b1'), branchId: TEST_BRANCH_ID } as T;
+    if (path === '/assignable-owners') {
+      const owners = await customerFake.fakeListBranchOwners('b1');
+      return { items: owners.map((owner) => ({ id: owner.userId, displayName: owner.name, avatarUrl: owner.avatarUrl })), nextCursor: null } as T;
+    }
+    if (path === '/custom-fields') return (await customerFake.fakeListCustomerCustomFields()).map((field) => ({ ...field, ownerType: 'CUSTOMER_PROFILE', isActive: true,
+      options: field.options.map((option) => ({ ...option, isActive: true })), requirements: [
+        { operation: 'CREATE', entityScope: null, isRequired: field.requiredOnCreate },
+        { operation: 'UPDATE', entityScope: null, isRequired: field.requiredOnUpdate },
+      ] })) as T;
+    if (path === '/tags') return await customerFake.fakeListTags() as T;
+    if (path === '/acquisition-sources') return await customerFake.fakeListSources() as T;
+    if (path === '/static-data') return { enums: {}, enumOptions: { customerStatuses: (['PROSPECT', 'ACTIVE_CUSTOMER', 'INACTIVE', 'BLACKLISTED'] as const).map((value) => ({ value, label: { en: enCustomers.statuses[value], ar: value } })) } } as T;
+    if (path.startsWith('/customer-profiles/')) return { ...await customerFake.fakeGetCustomer(path.split('/')[2]), branchId: TEST_BRANCH_ID } as T;
+    return super.read(path, query, options);
+  }
+  override async write<T>(method: CoreWriteMethod, path: string, body: unknown, options: CrmWriteOptions) {
+    const response = await super.write<T>(method, path, body, options);
+    if (method === 'PATCH') return { ...response, data: { ...await customerFake.fakePatchCustomer(path.split('/')[2], body as import('../customers.model').UpdateCustomerBody), branchId: TEST_BRANCH_ID } as T };
+    if (path === '/leads/duplicate-check') return { ...response, data: { matches: [] } as T };
+    return response;
+  }
+}
 
 /** Acme Retail: seeded corporate customer on branch b1 (Cairo HQ, company c1) with seeded audit history. */
 const MISSING_ID = '0192b7ea-7c4f-7a7d-9c9f-51c7f2b3ffff';
+const CUSTOMER_HISTORY: HistoryPage = {
+  items: ['CUSTOMER_CREATED', 'CUSTOMER_STATUS_CHANGED', 'CUSTOMER_UPDATED'].map((action, index) => ({
+    id: `customer-history-${index}`, action, subjectKind: 'customer', subjectId: ACME_CUSTOMER_ID,
+    referenceLabel: 'Acme Retail', createdAt: '2026-11-23T06:00:00Z', actorLabel: 'Owner',
+    actorType: 'USER', outcome: 'SUCCESS', reason: null, diff: [],
+  })),
+  nextCursor: null,
+};
 
 const TRANSLATIONS: Record<string, Translation> = {
   en: enGlobal,
@@ -78,6 +128,7 @@ class StubPage {}
 
 /** Read-only access to the page's protected state (no source change). */
 interface PageInternals {
+  capabilities: { set(value: CustomerCapabilities | null): void };
   draft(): CustomerDraft;
   detail(): CustomerDetail | null;
   updatedAt: { (): string | null; set(value: string | null): void };
@@ -114,10 +165,10 @@ async function settle<T>(promise: Promise<T>, maxMs = 20_000): Promise<T> {
   return result.value;
 }
 
-// Page mounts drive many fake calls through fake timers; real time per test can exceed the 5 s default
-// on a loaded machine. Math.random is pinned so fake API delays are fixed and responses never race.
+// The seeded transport uses deterministic fake delays and drains its timers between tests.
 describe('CustomerPage', { timeout: 60_000 }, () => {
   let harness: RouterTestingHarness;
+  let disposeTransport: () => void;
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -134,8 +185,14 @@ describe('CustomerPage', { timeout: 60_000 }, () => {
       // Browsers fire `close` as a queued task, after the caller's synchronous code.
       setTimeout(() => this.dispatchEvent(new Event('close')));
     };
+    bindAnalyticsPermissions(() => ['crm.customer_profiles.read.all', 'crm.customer_profiles.status.manage', 'activities.create', 'crm.attachments.create', 'crm.attachments.delete', 'org.branch.read', 'org.company.read']);
+    disposeTransport = bindCrmHttpForTest(new SeededCustomerTransport());
     TestBed.configureTestingModule({
       providers: [
+        { provide: RecordHistoryApi, useValue: { listRecordHistory: async () => structuredClone(CUSTOMER_HISTORY) } },
+        { provide: TenantScopeState, useValue: { me: () => null, selection: () => ({ companyId: TEST_COMPANY_ID, branchId: TEST_BRANCH_ID }), branchCompanies: () => new Map([[TEST_BRANCH_ID, TEST_COMPANY_ID]]) } },
+        { provide: WorkspaceLookups, useValue: { allBranches: async () => [{ id: TEST_BRANCH_ID, companyId: TEST_COMPANY_ID, name: FAKE_COMPANIES[0].branches[0].nameEn }], allCompanies: async () => [{ id: TEST_COMPANY_ID, name: FAKE_COMPANIES[0].nameEn }] } },
+        { provide: CoreHttp, useValue: { read: async () => ({ items: [] }) } },
         provideRouter([
           { path: 'crm/customers/:id', component: CustomerPage },
           { path: 'crm/customers', component: StubPage },
@@ -156,15 +213,15 @@ describe('CustomerPage', { timeout: 60_000 }, () => {
   });
 
   afterEach(async () => {
+    disposeTransport();
     TestBed.resetTestingModule();
-    // Drain fake API timers: module-level fakes cache promises (for example the audit fake's lead roots), and a
-    // promise whose timer is dropped by useRealTimers() would never settle for the next test.
     await vi.advanceTimersByTimeAsync(5_000);
     resetActivitiesFake();
     setFakeActivitiesDelay(300);
     vi.useRealTimers();
     vi.restoreAllMocks();
     localStorage.removeItem('lang');
+    bindAnalyticsPermissions(() => []);
     dialogProto['showModal'] = originalDialog.showModal;
     dialogProto['close'] = originalDialog.close;
   });
@@ -189,12 +246,17 @@ describe('CustomerPage', { timeout: 60_000 }, () => {
     harness = await settle(RouterTestingHarness.create());
     const component = await settle(harness.navigateByUrl(`/crm/customers/${id}`, CustomerPage));
     const page = component as unknown as PageInternals;
-    await waitFor(() => page.detail()?.id === id && !page.loading() && !page.showSkeleton());
+    await waitFor(() => page.detail()?.id === id && !page.loading() && !page.showSkeleton(), 20_000, () => {
+      const state = component as unknown as { scopesReady(): boolean; lookupsSettled(): boolean; loadFailed(): boolean; scopeDenied(): boolean; lookups(): { loading(): boolean } | null };
+      return { id: page.detail()?.id, loading: page.loading(), skeleton: page.showSkeleton(), scopes: state.scopesReady(), settled: state.lookupsSettled(), failed: state.loadFailed(), denied: state.scopeDenied(), lookups: state.lookups()?.loading() };
+    });
     // Let tab counts, lookups and capabilities settle.
     for (let i = 0; i < 20; i++) {
       await vi.advanceTimersByTimeAsync(100);
       harness.detectChanges();
     }
+    page.capabilities.set(await settle(fakeGetCustomerCapabilities('b1')));
+    harness.detectChanges();
     return page;
   }
 
@@ -269,12 +331,11 @@ describe('CustomerPage', { timeout: 60_000 }, () => {
       expect(page.dirty()).toBe(false);
     });
 
-    it('navigates to /not-found for an unknown id (404 CUSTOMER_PROFILE_NOT_FOUND)', async () => {
+    it('shows the record not-found state for an unknown id (404 CUSTOMER_PROFILE_NOT_FOUND)', async () => {
       harness = await settle(RouterTestingHarness.create());
       await settle(harness.navigateByUrl(`/crm/customers/${MISSING_ID}`));
-      const router = TestBed.inject(Router);
-      await waitFor(() => router.url === '/not-found');
-      expect(host().querySelector('app-customer-form')).toBeNull();
+      await waitFor(() => host().querySelector('ui-full-state')?.textContent?.includes(enCustomerPage.notFound) === true);
+      expect(host().querySelector('app-customer-form')?.closest('.hidden')).not.toBeNull();
     });
   });
 
@@ -283,7 +344,7 @@ describe('CustomerPage', { timeout: 60_000 }, () => {
       const page = await openReady(ACME_CUSTOMER_ID);
       const draft = page.draft();
 
-      expect(draft.branchId).toBe('b1');
+      expect(draft.branchId).toBe(TEST_BRANCH_ID);
       expect(draft.profileType).toBe('CORPORATE');
       expect(draft.companyName).toBe('Acme Retail');
       expect(scopeFieldText('company')).toBe(FAKE_COMPANIES[0].nameEn);
@@ -322,7 +383,7 @@ describe('CustomerPage', { timeout: 60_000 }, () => {
       expect(page.updatedAt()).toBe(stored.updatedAt);
     });
 
-    it('opens the conflict dialog on 409 and, on keep, re-saves the edit on top of the fresh record', async () => {
+    it('opens the conflict dialog on 409 and, on keep, refreshes the token without resending edits', async () => {
       const page = await openReady(ACME_CUSTOMER_ID);
       const loaded = page.detail()!;
       await settle(
@@ -335,7 +396,10 @@ describe('CustomerPage', { timeout: 60_000 }, () => {
       await waitFor(() => page.conflictOpen() && conflictDialog()?.hasAttribute('open') === true);
 
       dialogButton(conflictDialog()!, enRecordPage.conflict.keepEditing).click();
-      await waitFor(() => !page.conflictOpen() && !page.saving() && !page.dirty());
+      await waitFor(() => !page.conflictOpen() && !page.saving() && page.updatedAt() !== loaded.updatedAt);
+      expect(page.dirty()).toBe(true);
+      expect(page.draft().description).toBe('Kept description');
+      await clickSave(page);
 
       const stored = await settle(fakeGetCustomer(ACME_CUSTOMER_ID));
       expect(stored.description).toBe('Kept description');

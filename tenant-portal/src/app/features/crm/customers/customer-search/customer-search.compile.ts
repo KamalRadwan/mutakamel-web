@@ -70,7 +70,7 @@ function compileDateCondition(
   if (op === 'isNull' || op === 'isNotNull') {
     return { field: wireField, operator: op };
   }
-  const resolved = resolveDate(op, value ?? null, ctx.timeZone || 'Africa/Cairo', ctx.now);
+  const resolved = resolveDate(op, value ?? null, ctx.timeZone || 'UTC', ctx.now);
   if (resolved.isNull !== undefined) {
     return { field: wireField, operator: resolved.isNull ? 'isNull' : 'isNotNull' };
   }

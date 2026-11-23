@@ -10,6 +10,10 @@ import {
 } from '@ng-icons/tabler-icons';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { LanguageState } from '../../../../core/i18n/language';
+import { TenantScopeState } from '../../../../core/scope/tenant-scope';
+import { runInCrm } from '../../shared/crm-runtime';
+import { branchGrants } from '../../settings/shared/settings-access';
+import { ApiError, correlationIdOf } from '../../../../core/api/api-errors';
 import { ActionItem, ActionSelection, ActionSwatch } from '../../../../shared/ui/actions-menu/actions-menu';
 import { contrastInkFor } from '../../../../shared/ui/color/contrast-ink';
 import {
@@ -44,17 +48,13 @@ const STATUS_BADGE_TONE: Record<'brand' | 'success' | 'danger', string> = {
   danger: 'bg-danger text-on-danger',
 };
 
-const EN_DATE = new Intl.DateTimeFormat('en-US', {
-  month: 'short',
-  day: 'numeric',
-  year: 'numeric',
-});
-
-const AR_DATE = new Intl.DateTimeFormat('ar-EG-u-nu-latn', {
-  day: 'numeric',
-  month: 'long',
-  year: 'numeric',
-});
+export function canManageCustomerStatus(branchId: string): boolean {
+  return runInCrm(() => {
+    if (inject(TenantScopeState).me()?.isTenantOwner) return true;
+    const grants = branchGrants('crm.customer_profiles.status.manage');
+    return grants === 'ALL' || grants.has(branchId);
+  });
+}
 
 export function customerStatusBadgeClass(status: CustomerStatus): string {
   return STATUS_BADGE_TONE[CUSTOMER_STATUS_TONE[status]];
@@ -62,10 +62,7 @@ export function customerStatusBadgeClass(status: CustomerStatus): string {
 
 function hasScopedCapability(cap: Cap | null | undefined, ownerUserId: string | null): boolean {
   if (!cap) return false;
-  if (cap.ownerUserIds) {
-    return !!ownerUserId && cap.ownerUserIds.includes(ownerUserId);
-  }
-  return true;
+  return cap.scope === 'all' || (!!ownerUserId && !!cap.ownerUserIds?.includes(ownerUserId));
 }
 
 export function canCreateCustomer(capabilities: CustomerCapabilities | null): boolean {
@@ -153,11 +150,13 @@ export function ownerInitials(name: string): string {
     .join('');
 }
 
-export function formatCustomerDate(iso: string | null | undefined, language: string): string {
+export function formatCustomerDate(iso: string | null | undefined, language: string, timeZone = 'UTC'): string {
   if (!iso || !iso.trim()) return '—';
   const parsed = new Date(iso);
   if (Number.isNaN(parsed.getTime())) return '—';
-  return (language === 'ar' ? AR_DATE : EN_DATE).format(parsed);
+  return new Intl.DateTimeFormat(language === 'ar' ? 'ar-EG-u-nu-latn' : 'en-US', {
+    day: 'numeric', month: language === 'ar' ? 'long' : 'short', year: 'numeric', timeZone,
+  }).format(parsed);
 }
 
 export function customerErrorMessage(
@@ -165,15 +164,40 @@ export function customerErrorMessage(
   transloco: TranslocoService,
   fallbackKey: string,
 ): string {
-  const code = errorCodeOf(error);
-  if (code) {
-    const mappedKey = CUSTOMER_ERROR_KEYS[code] ?? `customers.errors.${code}`;
-    const translated = transloco.translate(mappedKey);
-    if (translated && translated !== mappedKey) {
-      return translated;
+  if (error instanceof ApiError) {
+    if (error.status === 401) return transloco.translate('customers.errors.notSaved');
+    if (error.status === 429) {
+      const value = error.details?.['retryAfterSeconds'];
+      const seconds = Array.isArray(value) ? value[0] : value;
+      return transloco.translate('customers.errors.rateLimited', { seconds: seconds ?? 0 });
     }
   }
+  const code = errorCodeOf(error);
+  if (code) {
+    const mappedKey = code.endsWith('_IDEMPOTENCY_MISMATCH') ? 'customers.errors.GW.IDEM.MISMATCH'
+      : CUSTOMER_ERROR_KEYS[code] ?? `customers.errors.${code}`;
+    if (Object.hasOwn(transloco.getTranslation(transloco.getActiveLang()), mappedKey)) return transloco.translate(mappedKey);
+  }
   return transloco.translate(fallbackKey);
+}
+
+export function customerReadState(error: unknown, transloco: TranslocoService) {
+  const correlation = correlationIdOf(error);
+  return {
+    kind: error instanceof ApiError && error.status === 403 ? 'forbidden' as const
+      : error instanceof ApiError && error.status === 404 ? 'not-found' as const : 'load-failure' as const,
+    text: [customerErrorMessage(error, transloco, 'customers.empty.loadFailed'), correlation].filter(Boolean).join(' · '),
+  };
+}
+
+export function customerNeedsReload(error: unknown): boolean {
+  return error instanceof ApiError && (error.code === 'CRM.CUSTOMER_PROFILE.CONCURRENT_UPDATE'
+    || error.code === 'GW.IDEM.MISMATCH' || error.code.endsWith('_IDEMPOTENCY_MISMATCH'));
+}
+
+export function customerReadOnlyError(error: unknown): boolean {
+  return error instanceof ApiError && ['CRM_SUBSCRIPTION_READ_ONLY', 'SEAT_OVER_CAPACITY_READ_ONLY',
+    'CRM_LEADS_DISABLED', 'CRM_OPPORTUNITIES_DISABLED'].includes(error.code);
 }
 
 /** Build the card and table Actions menu items for a customer. */
@@ -194,6 +218,7 @@ export function customerActions(
       title: translate('customers.card.menu.edit'),
       icon: 'tablerEdit',
       tile: 'bg-icon-orange',
+      ...(!perms.canUpdate ? { disabled: true, reason: translate('customers.card.menu.editDenied') } : {}),
     },
   ];
 

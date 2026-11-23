@@ -1,4 +1,4 @@
-import { Injectable, Type } from '@angular/core';
+import { Injectable, Type, signal } from '@angular/core';
 import { type ComponentFixture, TestBed } from '@angular/core/testing';
 import { TranslocoLoader, provideTransloco } from '@jsverse/transloco';
 import { of } from 'rxjs';
@@ -7,7 +7,14 @@ import { BulkJobsTracker } from '../../../../shared/bulk-jobs/bulk-jobs-tracker'
 import type { BulkJobSubmit, BulkJobSubmitResult } from '../../../../shared/bulk-jobs/bulk-jobs.model';
 import { toLocalDateTime } from '../../../../shared/widgets/activities/activity-form/activity-form.model';
 import { ApiError } from '../../settings/shared/settings-api';
-import { DEFAULT_CUSTOMER_BRANCH_ID } from '../customers.fake';
+import { TenantScopeState } from '../../../../core/scope/tenant-scope';
+import { FAKE_TENANT_ME } from '../../../../core/auth/auth-session.fake';
+import { bindCrmHttpForTest, crmHttp } from '../../shared/crm-http';
+import { CrmHttpStub } from '../../shared/testing/crm-http-testing';
+import { CustomerBulkMenu } from './bulk-menu/customer-bulk-menu';
+import { CustomerCapabilities } from '../customers.model';
+import en from '../../../../../../public/i18n/customer-bulk/en.json';
+import ar from '../../../../../../public/i18n/customer-bulk/ar.json';
 import { CustomerBulkActivityModal } from './activity-modal/customer-bulk-activity-modal';
 import { CustomerBulkAssignModal } from './assign-modal/customer-bulk-assign-modal';
 import { SelectedCustomerRow } from './customer-bulk.model';
@@ -17,7 +24,7 @@ import { CustomerBulkStatusModal } from './status-modal/customer-bulk-status-mod
 
 /*
  * Body builders of the four customer bulk modals: each submit is exactly one BulkJobsTracker.submit('crm', …)
- * with the backend payload (crm.customer_profiles). The tracker is a spy; the modals run on the fake customers API.
+ * with the backend payload (crm.customer_profiles). Scoped lookups and selection use the bound transport.
  */
 
 @Injectable()
@@ -27,7 +34,12 @@ class EmptyLoader implements TranslocoLoader {
   }
 }
 
-const BRANCH = DEFAULT_CUSTOMER_BRANCH_ID;
+const BRANCH = '019f0000-0000-7000-8000-000000000011';
+const COMPANY = '019f0000-0000-7000-8000-000000000010';
+const OTHER_BRANCH = '019f0000-0000-7000-8000-000000000012';
+const selectedScope = signal<{ companyId: string; branchId: string | null }>({ companyId: COMPANY, branchId: BRANCH });
+const me = signal({ ...FAKE_TENANT_ME, isTenantOwner: true });
+let disposeHttp: () => void;
 
 const ROWS: SelectedCustomerRow[] = [
   { id: 'c-1', displayName: 'One', ownerUserId: 'u1', status: 'PROSPECT', updatedAt: '2026-11-01T00:00:00Z' },
@@ -72,7 +84,21 @@ function lastBody(): BulkJobSubmit {
   return submit.mock.calls.at(-1)![1];
 }
 
+describe.each([['en', 'light'], ['en', 'dark'], ['ar', 'light'], ['ar', 'dark']])('CustomerBulk %s / %s', (lang, theme) => {
+let attributes: (string | null)[];
 beforeEach(() => {
+  attributes = ['lang', 'dir', 'data-theme'].map((name) => document.documentElement.getAttribute(name));
+  document.documentElement.lang = lang;
+  document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+  document.documentElement.dataset['theme'] = theme;
+  selectedScope.set({ companyId: COMPANY, branchId: BRANCH });
+  me.set({ ...FAKE_TENANT_ME, isTenantOwner: true });
+  const stub = new CrmHttpStub({ '/assignable-owners': { items: [
+    { id: 'u1', displayName: 'One', avatarUrl: null },
+    { id: 'u2', displayName: 'Two', avatarUrl: null },
+  ], nextCursor: null } });
+  vi.spyOn(stub, 'write').mockResolvedValue({ status: 200, data: { items: ROWS, total: 2, truncated: false }, etag: null, location: null });
+  disposeHttp = bindCrmHttpForTest(stub);
   vi.useFakeTimers();
   dialogProto['showModal'] = function (this: HTMLDialogElement) {
     this.setAttribute('open', '');
@@ -86,6 +112,9 @@ beforeEach(() => {
   TestBed.configureTestingModule({
     providers: [
       CustomerSelection,
+      { provide: TenantScopeState, useValue: {
+        selection: selectedScope, me, branchCompanies: () => new Map([[BRANCH, COMPANY], [OTHER_BRANCH, COMPANY]]),
+      } },
       { provide: BulkJobsTracker, useValue: { submit, hasActive: () => false } },
       provideTransloco({
         config: { availableLangs: ['ar', 'en'], defaultLang: 'en', missingHandler: { logMissingKey: false } },
@@ -101,10 +130,13 @@ afterEach(() => {
   dialogProto['showModal'] = originalDialog.showModal;
   dialogProto['close'] = originalDialog.close;
   vi.useRealTimers();
+  disposeHttp();
+  ['lang', 'dir', 'data-theme'].forEach((name, i) => attributes[i] === null
+    ? document.documentElement.removeAttribute(name) : document.documentElement.setAttribute(name, attributes[i]!));
 });
 
 describe('assign modal', () => {
-  it('sends one ASSIGN job with IDS selection and { ownerUserId }', async () => {
+  it('CustomerBulk › submit', async () => {
     const { fixture, c, selection, emitted } = await mount(CustomerBulkAssignModal);
     selection.setRows(ROWS, true);
     c['open']();
@@ -123,6 +155,7 @@ describe('assign modal', () => {
       selection: { kind: 'IDS', ids: ['c-1', 'c-2'] },
       params: { ownerUserId: 'u2' },
     });
+    expect(submit.mock.calls[0][2]).toEqual({ idempotencyKey: expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i) });
     expect(emitted).toEqual(['job-1']);
   });
 
@@ -382,4 +415,133 @@ describe('idempotency key on retry after a network failure', () => {
     expect(submit).toHaveBeenCalledTimes(2);
     expect(submit.mock.calls[1][2]?.idempotencyKey).not.toBe(submit.mock.calls[0][2]?.idempotencyKey);
   });
+});
+
+describe('CustomerBulk', () => {
+  it.each([CustomerBulkAssignModal, CustomerBulkStatusModal, CustomerBulkDeleteModal, CustomerBulkActivityModal])('CustomerBulk › branch pre-check: %o', async (cmp) => {
+    const { fixture, c, selection } = await mount(cmp as Type<unknown>);
+    selection.selectAllMatching({ branchId: OTHER_BRANCH }, 2);
+    c['open'](ROWS);
+    await flush(fixture);
+    c['selectedOwnerId']?.set('u2');
+    c['selectStatus']?.('INACTIVE');
+    if (cmp === CustomerBulkActivityModal) {
+      const start = toLocalDateTime(new Date(Date.now() + 2 * 86_400_000));
+      c['startDate'].set(start.date);
+      c['startTime'].set(start.time);
+      c['subject'].set('Call back');
+    }
+    // Assign uses the current selection when no explicit rows were supplied.
+    if (cmp === CustomerBulkAssignModal) c['explicitRows'].set(null);
+    await c['submit']();
+    expect(submit).not.toHaveBeenCalled();
+    expect(c['requestError']()).toBeTruthy();
+  });
+
+  it('CustomerBulk › status needs the grant', async () => {
+    me.set({ ...FAKE_TENANT_ME, isTenantOwner: false, permissions: ['crm.customer_profiles.status.manage'],
+      permissionScopes: { 'crm.customer_profiles.status.manage': { tenantWide: false, companyIds: [], branchIds: [OTHER_BRANCH] } } });
+    const fixture = TestBed.createComponent(CustomerBulkMenu);
+    fixtures.push(fixture);
+    fixture.componentRef.setInput('capabilities', { branchId: BRANCH, customerProfiles: {
+      create: null, update: { scope: 'all', ownerUserIds: null }, delete: null,
+    } } satisfies CustomerCapabilities);
+    const c = fixture.componentInstance as unknown as { actions(): { id: string }[] };
+    expect(c.actions().map((action) => action.id)).not.toContain('status');
+    me.update((value) => ({ ...value, permissionScopes: {
+      'crm.customer_profiles.status.manage': { tenantWide: false, companyIds: [], branchIds: [BRANCH] },
+    } }));
+    expect(c.actions().map((action) => action.id)).toContain('status');
+  });
+
+  it('CustomerBulk › record owner maps to LEAD_OWNER', async () => {
+    const { fixture, c } = await mount(CustomerBulkActivityModal);
+    c['open'](ROWS);
+    await flush(fixture);
+    const start = toLocalDateTime(new Date(Date.now() + 2 * 86_400_000));
+    c['startDate'].set(start.date);
+    c['startTime'].set(start.time);
+    c['subject'].set('Call back');
+    c['assigneeMode'].set('owner');
+    await c['submit']();
+    expect(lastBody().params).toMatchObject({ schedule: { assignee: { mode: 'LEAD_OWNER' } } });
+  });
+
+  it('never resends an idempotency mismatch until the page is reloaded', async () => {
+    const { fixture, c } = await mount(CustomerBulkDeleteModal);
+    c['open'](ROWS);
+    await flush(fixture);
+    submit.mockRejectedValueOnce(new ApiError(409, 'GW.IDEM.MISMATCH'));
+    await c['submit']();
+    c['reason'].set('changed');
+    await c['submit']();
+    c['open'](ROWS);
+    await flush(fixture);
+    await c['submit']();
+    expect(submit).toHaveBeenCalledTimes(1);
+  });
+
+  it('selection load failure replaces the form and Retry recovers it with the correlation reference', async () => {
+    const { fixture, c, selection } = await mount(CustomerBulkStatusModal);
+    selection.setRows(ROWS, true);
+    vi.spyOn(selection, 'resolve').mockRejectedValueOnce(new ApiError(503, 'SERVER_ERROR', undefined, { correlationId: 'corr-bulk' }));
+    c['open']();
+    await flush(fixture);
+    expect(c['loadFailure']()).toBe('corr-bulk');
+    expect(fixture.nativeElement.querySelector('ui-full-state')).not.toBeNull();
+    c['retryLoad']();
+    await flush(fixture);
+    expect(c['loadFailure']()).toBeNull();
+    expect(c['rows']()).toHaveLength(2);
+  });
+
+  it('activity retries the failed owners read without dropping explicit selected rows', async () => {
+    vi.spyOn(crmHttp(), 'read').mockRejectedValueOnce(new ApiError(503, 'SERVER_ERROR'));
+    const { fixture, c } = await mount(CustomerBulkActivityModal);
+    c['open'](ROWS);
+    await flush(fixture);
+    expect(c['loadFailure']()).toBe('');
+    expect(c['rows']()).toHaveLength(2);
+    c['retryLoad']();
+    await flush(fixture);
+    expect(c['loadFailure']()).toBeNull();
+    expect(c['owners']()).toHaveLength(2);
+    expect(c['rows']()).toHaveLength(2);
+  });
+
+  it('a forbidden owners catalogue disables its control with the access hint', async () => {
+    vi.spyOn(crmHttp(), 'read').mockRejectedValue(new ApiError(403, 'PERMISSION_DENIED'));
+    const { fixture, c } = await mount(CustomerBulkAssignModal);
+    c['open'](ROWS);
+    await flush(fixture);
+    expect(c['ownersDenied']()).toBe(true);
+    expect(fixture.nativeElement.querySelector('[aria-haspopup="listbox"]').disabled).toBe(true);
+    expect(c['ownerFieldError']()).toBeTruthy();
+  });
+
+  it.each(['CRM_SUBSCRIPTION_READ_ONLY', 'SEAT_OVER_CAPACITY_READ_ONLY', 'CRM_LEADS_DISABLED'])(
+    'blocks another submit and disables the fields after %s', async (code) => {
+      const { fixture, c } = await mount(CustomerBulkDeleteModal);
+      c['open'](ROWS);
+      await flush(fixture);
+      submit.mockRejectedValueOnce(new ApiError(403, code));
+      await c['submit']();
+      fixture.detectChanges();
+      expect(c['readOnly']()).toBe(true);
+      expect(fixture.nativeElement.querySelector('fieldset').disabled).toBe(true);
+      await c['submit']();
+      expect(submit).toHaveBeenCalledTimes(1);
+      expect(fixture.nativeElement.querySelector('[role="alert"]')).toBeNull();
+    },
+  );
+
+  it('has translated existing field labels and hints', () => {
+    const dict = lang === 'ar' ? ar : en;
+    for (const text of [dict.assign.owner, dict.assign.ownerHint, dict.status.field, dict.status.fieldHint,
+      dict.delete.reason, dict.delete.reasonHint, ...Object.values(dict.activity.hints)]) {
+      expect(text.trim()).not.toBe('');
+      if (lang === 'ar') expect(text).toMatch(/[\u0600-\u06ff]/);
+    }
+  });
+});
 });

@@ -19,6 +19,8 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { Notify } from '../../../../core/notify/notify';
 import { Button } from '../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
+import { listPageSizes } from '../../shared/lookups/page-sizes';
 import { Pagination } from '../../../../shared/ui/pagination/pagination';
 import { ApiError } from '../../settings/shared/settings-api';
 import {
@@ -32,6 +34,9 @@ import {
   canDeleteCustomer,
   canUpdateCustomer,
   customerErrorMessage,
+  customerReadState,
+  customerNeedsReload,
+  customerReadOnlyError,
 } from '../customer-card/customer-card';
 import {
   deleteCustomer,
@@ -46,12 +51,11 @@ import {
   CustomerSearchBody,
   CustomerStatus,
   SearchResponse,
-  StatusCounts,
 } from '../customers.model';
 
 @Component({
   selector: 'app-customer-cards',
-  imports: [NgIcon, TranslocoPipe, Button, ConfirmDialog, Pagination, CustomerCard],
+  imports: [NgIcon, TranslocoPipe, Button, ConfirmDialog, FullState, Pagination, CustomerCard],
   providers: [provideIcons({ tablerPlus, tablerSearch, tablerUsers })],
   templateUrl: './customer-cards.html',
   host: { class: 'flex flex-1 shrink-0 flex-col gap-8' },
@@ -74,17 +78,20 @@ export class CustomerCards {
   readonly activities = output<CustomerRow>();
   readonly create = output<void>();
   readonly clearSearch = output<void>();
-  readonly countsLoaded = output<StatusCounts>();
+  readonly readOnlyDetected = output<void>();
 
   protected readonly skeletonCards = [1, 2, 3, 4, 5, 6];
   protected readonly pageSizePref = createListPageSize({
     storageKey: 'customers.cards.pageSize',
     sizes: DEFAULT_LIST_PAGE_SIZES,
     defaultSize: DEFAULT_LIST_PAGE_SIZE,
+    load: listPageSizes,
   });
   private syncedInitialPageSize = false;
   private lastPageResult: SearchResponse | undefined;
+  private loadedBranchId: string | undefined;
   private readonly refreshTick = signal(0);
+  private readonly readOnly = signal(false);
 
   private readonly requestBody = computed<CustomerSearchBody>(() => {
     const base = this.body();
@@ -92,7 +99,6 @@ export class CustomerCards {
     return {
       ...base,
       ...(activeStatus !== 'ALL' ? { status: activeStatus } : {}),
-      includeStatusCounts: true,
     };
   });
 
@@ -107,6 +113,11 @@ export class CustomerCards {
           }
         : undefined,
     loader: async ({ params }) => {
+      if (this.loadedBranchId !== params.query.branchId) {
+        this.lastPageResult = undefined;
+        this.loadedBranchId = params.query.branchId;
+        this.readOnly.set(false);
+      }
       try {
         const res = await searchCustomers(params.query, params.page, params.pageSize);
         if (res.items.length === 0 && params.page > 1) {
@@ -114,32 +125,33 @@ export class CustomerCards {
           if (target !== params.page) {
             this.page.set(target);
             const fallback = await searchCustomers(params.query, target, params.pageSize);
-            this.lastPageResult = fallback;
+            if (this.loadedBranchId === params.query.branchId) this.lastPageResult = fallback;
             return fallback;
           }
         }
-        this.lastPageResult = res;
+        if (this.loadedBranchId === params.query.branchId) this.lastPageResult = res;
         return res;
       } catch (error) {
         if (error instanceof ApiError && error.status === 400) {
           this.notify.error(this.transloco.translate('customers.search.invalid'));
-          return this.lastPageResult;
+          return this.loadedBranchId === params.query.branchId ? this.lastPageResult : undefined;
         }
         throw error;
       }
     },
   });
 
-  private readonly pageData = linkedSignal<SearchResponse | undefined>(() => this.pageResource.value());
+  private readonly pageData = linkedSignal<SearchResponse | undefined>(() => this.pageResource.hasValue() ? this.pageResource.value() : undefined);
 
   protected readonly items = computed(() => this.pageData()?.items ?? []);
   protected readonly loading = this.pageResource.isLoading;
   protected readonly failed = computed(() => !!this.pageResource.error());
+  protected readonly failureState = computed(() => customerReadState(this.pageResource.error(), this.transloco));
 
   protected retryLoad(): void {
     this.pageResource.reload();
   }
-  protected readonly canCreate = computed(() => canCreateCustomer(this.capabilities()));
+  protected readonly canCreate = computed(() => !this.readOnly() && canCreateCustomer(this.capabilities()));
 
   protected readonly totalCount = linkedSignal<{ total: number; loading: boolean }, number>({
     source: () => ({
@@ -151,7 +163,7 @@ export class CustomerCards {
   });
 
   protected readonly deletingName = signal('');
-  protected readonly deletingHasSourceLead = signal(false);
+  protected readonly deletingError = signal('');
 
   constructor() {
     let lastPage = this.page();
@@ -162,12 +174,6 @@ export class CustomerCards {
       this.host.nativeElement.closest('main')?.scrollTo({ top: 0 });
     });
 
-    effect(() => {
-      const counts = this.pageResource.value()?.counts;
-      if (counts) {
-        untracked(() => this.countsLoaded.emit(counts));
-      }
-    });
 
     effect(() => {
       const sizes = this.pageSizePref.sizes();
@@ -195,11 +201,11 @@ export class CustomerCards {
   }
 
   protected canUpdate(customer: CustomerRow): boolean {
-    return canUpdateCustomer(this.capabilities(), customer);
+    return !this.readOnly() && canUpdateCustomer(this.capabilities(), customer);
   }
 
   protected canDelete(customer: CustomerRow): boolean {
-    return canDeleteCustomer(this.capabilities(), customer);
+    return !this.readOnly() && canDeleteCustomer(this.capabilities(), customer);
   }
 
   protected onPageSizeChange(size: number): void {
@@ -236,6 +242,7 @@ export class CustomerCards {
     } catch (error) {
       this.pageData.set(before);
       this.notify.error(customerErrorMessage(error, this.transloco, 'customers.rate.failed'));
+      this.handleWriteError(error);
     }
   }
 
@@ -267,32 +274,47 @@ export class CustomerCards {
     } catch (error) {
       this.pageData.set(before);
       this.notify.error(customerErrorMessage(error, this.transloco, 'customers.color.failed'));
+      this.handleWriteError(error);
     }
   }
 
   protected async remove(customer: CustomerRow): Promise<void> {
     if (!this.canDelete(customer) || customer.status === 'BLACKLISTED') return;
+    this.deletingError.set('');
     this.deletingName.set(customer.displayName);
-    this.deletingHasSourceLead.set(Boolean(customer.sourceLeadId));
-    if (!(await this.confirmDialog().open())) return;
-
-    const before = this.pageData();
-    this.pageData.update((current) =>
-      current
-        ? {
-            ...current,
-            items: current.items.filter((item) => item.id !== customer.id),
-            total: Math.max(0, current.total - 1),
-          }
-        : current,
-    );
-    try {
-      await deleteCustomer(customer.id);
-      this.notify.success(this.transloco.translate('customers.delete.done'));
-      this.refresh();
-    } catch (error) {
-      this.pageData.set(before);
-      this.notify.error(customerErrorMessage(error, this.transloco, 'customers.delete.failed'));
+    while (await this.confirmDialog().open()) {
+      if (!this.canDelete(customer)) return;
+      const before = this.pageData();
+      this.pageData.update((current) =>
+        current
+          ? {
+              ...current,
+              items: current.items.filter((item) => item.id !== customer.id),
+              total: Math.max(0, current.total - 1),
+            }
+          : current,
+      );
+      try {
+        await deleteCustomer(customer.id);
+        this.notify.success(this.transloco.translate('customers.delete.done'));
+        this.refresh();
+        return;
+      } catch (error) {
+        this.pageData.set(before);
+        this.notify.error(customerErrorMessage(error, this.transloco, 'customers.delete.failed'));
+        this.handleWriteError(error);
+        if (!(error instanceof ApiError) || error.status !== 409 || !error.code.startsWith('CUSTOMER_PROFILE_')) return;
+        this.deletingError.set(customerErrorMessage(error, this.transloco, 'customers.delete.failed'));
+      }
     }
   }
+
+  private handleWriteError(error: unknown): void {
+    if (customerReadOnlyError(error)) {
+      this.readOnly.set(true);
+      this.readOnlyDetected.emit();
+    }
+    if (customerNeedsReload(error)) this.refresh();
+  }
+
 }

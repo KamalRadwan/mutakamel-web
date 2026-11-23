@@ -5,6 +5,7 @@ import {
   ActivityType,
 } from '../../../../shared/widgets/activities/activities.model';
 import { ApiError } from '../../settings/shared/settings-api';
+import { correlationIdOf } from '../../../../core/api/api-errors';
 import { CustomerSort, CustomerStatus, ManualCustomerStatus } from '../customers.model';
 
 export const CUSTOMER_SELECTION_LIMIT = 10_000;
@@ -78,11 +79,13 @@ function formatSelectionMax(value: unknown): string {
 
 export function extractBulkErrorParams(error: unknown): Record<string, unknown> {
   if (!(error instanceof ApiError) || !error.details) {
-    return { max: CUSTOMER_SELECTION_LIMIT.toLocaleString() };
+    return { max: CUSTOMER_SELECTION_LIMIT.toLocaleString(), status: error instanceof ApiError ? error.status : null };
   }
   const details = error.details;
   return {
     ...details,
+    status: error.status,
+    retryAfter: details['retryAfterSeconds'] ?? details['retryAfter'] ?? 0,
     max: formatSelectionMax(details['max']),
   };
 }
@@ -96,6 +99,9 @@ export function translateCustomerBulkError(
     max: CUSTOMER_SELECTION_LIMIT.toLocaleString(),
     ...params,
   };
+  if (params?.['status'] === 401) return transloco.translate('customerBulk.notSaved');
+  if (params?.['status'] === 429) return transloco.translate('customerBulk.rateLimited', merged);
+  if (code?.endsWith('_IDEMPOTENCY_MISMATCH')) code = 'GW.IDEM.MISMATCH';
   if (code) {
     const moduleKey = `customerBulk.codes.${code}`;
     const moduleText = transloco.translate(moduleKey, merged);
@@ -108,4 +114,15 @@ export function translateCustomerBulkError(
 
   const fallback = transloco.translate('customerBulk.codes.generic', merged);
   return fallback && fallback !== 'customerBulk.codes.generic' ? fallback : 'Something went wrong.';
+}
+
+export function customerBulkReadOnly(error: unknown): boolean {
+  const code = error instanceof ApiError ? error.code : '';
+  return code === 'CRM_SUBSCRIPTION_READ_ONLY' || code === 'SEAT_OVER_CAPACITY_READ_ONLY'
+    || /^CRM_.*_DISABLED$/.test(code);
+}
+
+export function customerBulkLoadFailure(error: unknown): string | null {
+  return error instanceof TypeError || error instanceof ApiError && (error.status === 0 || error.status >= 500)
+    ? correlationIdOf(error) ?? '' : null;
 }

@@ -1,10 +1,6 @@
 @if (failed()) {
-  <div class="flex flex-col items-center gap-8 p-16 text-center">
-    <p class="text-12 text-danger-text" role="alert">{{ 'customers.empty.loadFailed' | transloco }}</p>
-    <button type="button" uiButton variant="secondary" (click)="retryLoad()">
-      {{ 'customers.empty.retry' | transloco }}
-    </button>
-  </div>
+  <ui-full-state [kind]="failureState().kind" [title]="'customers.empty.loadFailed' | transloco"
+    [text]="failureState().text" [actionLabel]="'customers.empty.retry' | transloco" (action)="retryLoad()" />
 } @else if ((!ready() || loading()) && lanes().length === 0) {
   <div class="flex shrink-0 items-start gap-8 overflow-x-auto pb-8" aria-busy="true">
     @for (lane of skeletonLanes; track lane) {
@@ -57,6 +53,16 @@
     }
   </div>
 } @else {
+  @for (lane of lanes(); track lane.status) {
+    @if (laneErrors()[lane.status]; as message) {
+      <div class="flex items-center gap-8 p-8" role="status">
+        <span class="text-12 text-text">{{ 'customers.statuses.' + lane.status | transloco }} · {{ message }}</span>
+        <button type="button" uiButton variant="secondary" [disabled]="loadingMore() !== null" (click)="onLoadMore(lane.status)">
+          {{ 'customers.empty.retry' | transloco }}
+        </button>
+      </div>
+    }
+  }
   <app-record-board
     [lanes]="boardLanes()"
     [itemTemplate]="customerCardTpl"
@@ -101,7 +107,7 @@
   #deleteDialog
   class="absolute"
   [title]="'customers.delete.title' | transloco: { name: deletingName() }"
-  [text]="(deletingHasSourceLead() ? 'customers.delete.textFromLead' : 'customers.delete.text') | transloco"
+  [text]="('customers.delete.textFromLead' | transloco) + (deletingError() ? ' ' + deletingError() : '')"
   [confirmLabel]="'common.delete' | transloco"
   [cancelLabel]="'common.cancel' | transloco"
 />

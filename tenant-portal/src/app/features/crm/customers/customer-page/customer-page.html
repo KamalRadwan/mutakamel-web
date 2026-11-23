@@ -148,27 +148,17 @@
           </div>
         }
       </div>
-    } @else if (scopeDenied()) {
-      <div class="mt-10 flex flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
-        <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-orange text-on-icon">
-          <ng-icon name="tablerLock" size="18" aria-hidden="true" />
-        </span>
-        <p class="text-12 leading-18 text-text-muted">{{ 'customerPage.scopeDenied' | transloco }}</p>
-        <button type="button" uiButton variant="secondary" (click)="goBack()">
-          {{ 'customerPage.back' | transloco }}
-        </button>
-      </div>
-    } @else if (loadFailed()) {
-      <div class="mt-10 flex flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
-        <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
-          <ng-icon name="tablerCloudOff" size="18" aria-hidden="true" />
-        </span>
-        <p class="text-12 leading-18 text-text-muted">{{ 'customerPage.loadFailed' | transloco }}</p>
-        <button type="button" uiButton (click)="retryLoad()">{{ 'recordPage.retry' | transloco }}</button>
-      </div>
+    } @else if (branchMissing() || scopeDenied() || !canRead()) {
+      <ui-full-state kind="forbidden" [title]="'customerPage.scopeDenied' | transloco"
+        [text]="(branchMissing() ? 'customerForm.chooseBranch' : 'customerPage.scopeDenied') | transloco"
+        [actionLabel]="'recordPage.retry' | transloco" (action)="retryLoad()" />
+    } @else if (loadFailed() || reloadRequired()) {
+      <ui-full-state [kind]="loadKind()"
+        [title]="(reloadRequired() ? 'customerForm.server.reloadRequired' : loadKind() === 'not-found' ? 'customerPage.notFound' : 'customerPage.loadFailed') | transloco"
+        [text]="loadMessage() + (loadCorrelation() ? ' · ' + loadCorrelation() : '')" [actionLabel]="'recordPage.retry' | transloco" (action)="retryLoad()" />
     }
 
-    <div [class]="showSkeleton() || scopeDenied() || loadFailed() ? 'hidden' : 'contents'">
+    <div [class]="showSkeleton() || branchMissing() || scopeDenied() || !canRead() || loadFailed() || reloadRequired() ? 'hidden' : 'contents'">
       <div
         role="tabpanel"
         [id]="uid + '-panel-overview'"

@@ -15,9 +15,14 @@ import { Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerAlertTriangle, tablerCloudOff, tablerTrash } from '@ng-icons/tabler-icons';
-import { CurrentUser } from '../../../../core/auth/current-user';
+import { TenantScopeState } from '../../../../core/scope/tenant-scope';
+import { can } from '../../../../shared/widgets/dashboard/analytics-permissions';
+import { FullState, FullStateKind } from '../../../../shared/ui/full-state/full-state';
+import { ConflictDialog } from '../../../../shared/ui/conflict-dialog/conflict-dialog';
+import { sessionBranch } from '../../shared/lookups/session-branch';
+import { customerRecordError } from '../customer-form/customer-errors';
+import { canManageFormStatus } from '../customer-form/customer-lookups.api';
 import { Notify } from '../../../../core/notify/notify';
-import { ScopeState } from '../../../../core/scope/scope';
 import { Button } from '../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { Field } from '../../../../shared/ui/field/field';
@@ -35,7 +40,6 @@ import { ApiError, errorCodeOf, newIdempotencyKey } from '../../settings/shared/
 import {
   canDeleteCustomer,
   canUpdateCustomer,
-  customerErrorMessage,
 } from '../customer-card/customer-card';
 import {
   CustomerDraft,
@@ -46,22 +50,16 @@ import {
   emptyDraft,
   mapServerErrors,
   validationErrorPath,
-  toContactChangeBody,
   toCreateBody,
   toPatchBody,
   validateDraft,
 } from '../customer-form/customer-draft';
 import { CustomerForm } from '../customer-form/customer-form';
 import { CustomerLookups } from '../customer-form/customer-lookups';
-import {
-  companyForBranch,
-  pickCompanyBranchId,
-} from '../customer-form/sections/classification/customer-classification';
+import { CustomerContactSaveError, contactsAfterChange, hasCustomerContactChanges, saveCustomerContacts } from '../customer-form/customer-contact-save';
 import { isManualStatus } from '../customer-statuses';
 import {
   attachCustomerTags,
-  canManageStatus,
-  changeCustomerContact,
   createCustomer,
   deleteCustomer,
   detachCustomerTag,
@@ -108,6 +106,8 @@ const CONTACT_FIELD_MAP: Record<string, string> = {
     RecordModalFrame,
     RecordRelatedBadges,
     CustomerForm,
+    FullState,
+    ConflictDialog,
   ],
   providers: [
     provideTranslocoScope(
@@ -136,17 +136,12 @@ export class CustomerModal {
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
-  private readonly currentUser = inject(CurrentUser);
-  private readonly scope = inject(ScopeState);
+  private readonly tenant = inject(TenantScopeState);
   private readonly draftStore = inject(RecordDraftStore);
 
   private readonly unsavedDialog = viewChild<UnsavedDialog>('unsavedDialog');
   private readonly blacklistDialogWrap = viewChild<ElementRef<HTMLElement>>('blacklistDialogWrap');
   private readonly blacklistDialog = viewChild.required<ConfirmDialog>('blacklistDialog');
-  private readonly conflictDialog = viewChild<ElementRef<HTMLDialogElement>>('conflictDialog');
-  private readonly conflictReloadBtn = viewChild<Button, ElementRef<HTMLButtonElement>>('conflictReloadBtn', {
-    read: ElementRef,
-  });
   private readonly deleteDialog = viewChild<ElementRef<HTMLDialogElement>>('deleteDialog');
   private readonly deleteCancelBtn = viewChild<Button, ElementRef<HTMLButtonElement>>('deleteCancelBtn', {
     read: ElementRef,
@@ -171,6 +166,13 @@ export class CustomerModal {
 
   protected readonly loading = signal(false);
   protected readonly loadFailed = signal(false);
+  protected readonly loadKind = signal<FullStateKind>('load-failure');
+  protected readonly loadCorrelation = signal<string | null>(null);
+  protected readonly loadMessage = signal('');
+  protected readonly writeReadonly = signal(false);
+  protected readonly reloadRequired = signal(false);
+  protected readonly branchMissing = computed(() => { this.tenant.selection(); return !sessionBranch(); });
+  protected readonly canRead = computed(() => { this.tenant.me(); return can('crm.customer_profiles.read'); });
   protected readonly saving = signal(false);
   protected readonly deleting = signal(false);
   protected readonly instantUpdating = signal(false);
@@ -210,12 +212,15 @@ export class CustomerModal {
   protected readonly saveContactBound = (change: ContactChange) => this.onSaveContact(change);
 
   protected readonly canEdit = computed(() => {
-    if (this.mode() === 'create') return true;
+    this.tenant.me();
+    if (!this.canRead() || this.branchMissing() || this.writeReadonly() || this.reloadRequired()) return false;
+    if (this.mode() === 'create') return this.formLookups()?.canCreate() ?? false;
     const current = this.detail();
     return !!current && canUpdateCustomer(this.capabilities(), current);
   });
 
   protected readonly canDelete = computed(() => {
+    if (!this.canRead() || this.writeReadonly() || this.reloadRequired() || this.branchMissing()) return false;
     if (this.mode() !== 'edit') return false;
     const current = this.detail();
     return !!current && canDeleteCustomer(this.capabilities(), current);
@@ -308,28 +313,16 @@ export class CustomerModal {
     this.lastIdempotencyKey = null;
 
     const status: CustomerStatus =
-      preset?.status && preset.status !== 'PROSPECT' && isManualStatus(preset.status) && canManageStatus()
+      preset?.status && preset.status !== 'PROSPECT' && isManualStatus(preset.status) && canManageFormStatus()
         ? preset.status
         : 'PROSPECT';
 
-    const sessionCompany = this.scope.company();
-    const branches = this.formLookups()?.branches() ?? [];
-    const defaultBranchId =
-      branches.length > 0
-        ? (pickCompanyBranchId(
-            sessionCompany,
-            sessionCompany,
-            this.scope.branch(),
-            this.scope.companies(),
-            branches,
-          ) ?? branches[0].id)
-        : null;
+    const selected = sessionBranch();
 
     const initial = emptyDraft({
       profileType: preset?.profileType ?? 'INDIVIDUAL',
-      companyId: sessionCompany.id,
-      branchId: defaultBranchId,
-      ownerUserId: this.currentUser.userId(),
+      companyId: selected?.companyId ?? null,
+      branchId: selected?.branchId ?? null,
       status,
     });
 
@@ -341,6 +334,8 @@ export class CustomerModal {
     this.capabilities.set(null);
     this.loading.set(false);
     this.loadFailed.set(false);
+    this.reloadRequired.set(false);
+    this.writeReadonly.set(false);
     this.saving.set(false);
     this.deleting.set(false);
     this.instantUpdating.set(false);
@@ -407,6 +402,7 @@ export class CustomerModal {
   }
 
   protected retryLoad(): void {
+    if (this.reloadRequired()) { window.location.reload(); return; }
     const id = this.customerId();
     if (!id) return;
     void this.loadCustomer(id);
@@ -471,7 +467,7 @@ export class CustomerModal {
       this.detail.update((d) => (d ? { ...d, rating: prevRating } : d));
       this.base.update((b) => ({ ...b, rating: prevBaseRating }));
       this.draft.update((d) => ({ ...d, rating: prevDraftRating }));
-      this.notify.error(customerErrorMessage(error, this.transloco, 'customers.rate.failed'));
+      this.toastServerError(error);
     } finally {
       this.instantUpdating.set(false);
     }
@@ -512,7 +508,7 @@ export class CustomerModal {
       this.detail.update((d) => (d ? { ...d, cardColor: prevColor } : d));
       this.base.update((b) => ({ ...b, cardColor: prevBaseColor }));
       this.draft.update((d) => ({ ...d, cardColor: prevDraftColor }));
-      this.notify.error(customerErrorMessage(error, this.transloco, 'customers.color.failed'));
+      this.toastServerError(error);
     } finally {
       this.instantUpdating.set(false);
     }
@@ -585,7 +581,7 @@ export class CustomerModal {
       this.detail.update((d) => (d ? { ...d, status: prevStatus } : d));
       this.base.update((b) => ({ ...b, status: prevBaseStatus }));
       this.draft.update((d) => ({ ...d, status: prevDraftStatus }));
-      this.notify.error(customerErrorMessage(error, this.transloco, 'customers.board.moveFailed'));
+      this.toastServerError(error);
     } finally {
       this.instantUpdating.set(false);
     }
@@ -724,8 +720,11 @@ export class CustomerModal {
       this.deleted.emit(current.id);
       this.closeModal(true);
     } catch (error) {
+      const mapped = customerRecordError(error, this.transloco);
+      if (mapped.readOnly) this.writeReadonly.set(true);
+      if (mapped.reloadRequired) this.reloadRequired.set(true);
       if (error instanceof ApiError && error.status === 409) {
-        this.deleteConflictError.set(customerErrorMessage(error, this.transloco, 'customers.delete.failed'));
+        this.deleteConflictError.set(mapped.message);
         return;
       }
       const dialogEl = this.deleteDialog()?.nativeElement;
@@ -734,7 +733,7 @@ export class CustomerModal {
       }
       this.deleteOpen.set(false);
       this.deleteConflictError.set(null);
-      this.notify.error(customerErrorMessage(error, this.transloco, 'customers.delete.failed'));
+      this.toastServerError(error);
       if (error instanceof ApiError && error.status === 404) {
         this.deleted.emit(current.id);
         this.closeModal(true);
@@ -751,31 +750,13 @@ export class CustomerModal {
   }
 
   protected onConflictChoice(choice: 'reload' | 'keep'): void {
-    const dialogEl = this.conflictDialog()?.nativeElement;
-    if (dialogEl?.open) {
-      dialogEl.close();
-    }
     this.conflictOpen.set(false);
     this.settleConflict(choice);
   }
 
-  protected onConflictEscape(event: Event): void {
-    event.preventDefault();
-    event.stopPropagation();
-    const dialogEl = this.conflictDialog()?.nativeElement;
-    if (dialogEl?.open) {
-      dialogEl.close();
-    }
-    this.conflictOpen.set(false);
-    this.settleConflict('dismiss');
-  }
-
-  protected onConflictNativeClose(): void {
-    const dialogEl = this.conflictDialog()?.nativeElement;
-    if (dialogEl && !dialogEl.open && this.conflictOpen()) {
-      this.conflictOpen.set(false);
-      this.settleConflict('dismiss');
-    }
+  protected onConflictOpenChange(open: boolean): void {
+    this.conflictOpen.set(open);
+    if (!open) this.settleConflict('dismiss');
   }
 
   protected onBlacklistDialogEscape(event: Event): void {
@@ -881,10 +862,6 @@ export class CustomerModal {
   }
 
   private closeNestedDialogs(): void {
-    const conflictEl = this.conflictDialog()?.nativeElement;
-    if (conflictEl?.open) {
-      conflictEl.close();
-    }
     this.conflictOpen.set(false);
 
     const deleteEl = this.deleteDialog()?.nativeElement;
@@ -926,11 +903,6 @@ export class CustomerModal {
   private openConflictDialog(): Promise<ConflictChoice> {
     this.settleConflict('dismiss');
     this.conflictOpen.set(true);
-    const dialogEl = this.conflictDialog()?.nativeElement;
-    if (dialogEl && !dialogEl.open) {
-      dialogEl.showModal();
-    }
-    this.conflictReloadBtn()?.nativeElement.focus();
     return new Promise<ConflictChoice>((resolve) => {
       this.conflictResolver = resolve;
     });
@@ -1031,6 +1003,16 @@ export class CustomerModal {
     const seq = ++this.loadSeq;
     this.loading.set(true);
     this.loadFailed.set(false);
+    this.reloadRequired.set(false);
+    this.writeReadonly.set(false);
+    this.loadCorrelation.set(null);
+    this.loadMessage.set('');
+    if (this.branchMissing() || !can('crm.customer_profiles.read')) {
+      this.loadKind.set('forbidden');
+      this.loadFailed.set(true);
+      this.loading.set(false);
+      return;
+    }
     this.attemptedSubmit.set(false);
     this.serverErrors.set({});
     this.instantUpdating.set(false);
@@ -1041,20 +1023,19 @@ export class CustomerModal {
       const caps = await getCustomerCapabilities(loaded.branchId);
       if (seq !== this.loadSeq) return;
       this.applyLoadedCustomer(loaded, caps);
-    } catch {
+    } catch (error) {
       if (seq !== this.loadSeq) return;
       this.loading.set(false);
       this.loadFailed.set(true);
+      const failure = customerRecordError(error, this.transloco);
+      this.loadKind.set(failure.kind);
+      this.loadCorrelation.set(failure.correlationId);
+      this.loadMessage.set(failure.message);
     }
   }
 
   private resolveCompanyIdForBranch(branchId: string, fallbackCompanyId: string | null = null): string | null {
-    const branches = this.formLookups()?.branches() ?? [];
-    if (branches.length > 0) {
-      const matched = companyForBranch(branchId, this.scope.companies(), branches);
-      if (matched) return matched.id;
-    }
-    return fallbackCompanyId;
+    return this.tenant.branchCompanies().get(branchId) ?? fallbackCompanyId;
   }
 
   private applyLoadedCustomer(loaded: CustomerDetail, caps: CustomerCapabilities): void {
@@ -1072,6 +1053,7 @@ export class CustomerModal {
   }
 
   private async submitCreate(addAnother: boolean): Promise<boolean> {
+    if (this.formLookups()?.loading() || this.formLookups()?.customFieldsUnavailable()) return false;
     const currentDraft = this.draft();
     const body = toCreateBody(currentDraft);
     const fingerprint = JSON.stringify(body);
@@ -1132,6 +1114,7 @@ export class CustomerModal {
   }
 
   private async submitEdit(): Promise<boolean> {
+    if (this.formLookups()?.loading() || this.formLookups()?.customFieldsUnavailable()) return false;
     const id = this.customerId();
     const expectedUpdatedAt = this.updatedAt();
     if (!id || !expectedUpdatedAt) return false;
@@ -1144,7 +1127,7 @@ export class CustomerModal {
     const hasPatchFields = Object.keys(patchBody).length > 1;
     const hasTagChanges = tagDiff.added.length > 0 || tagDiff.removed.length > 0;
 
-    if (!hasPatchFields && !hasTagChanges) return true;
+    if (!hasPatchFields && !hasTagChanges && !hasCustomerContactChanges(baseDraft.contacts, currentDraft.contacts)) return true;
 
     const companyId = this.resolveCompanyIdForBranch(
       currentDraft.branchId ?? this.detail()?.branchId ?? '',
@@ -1174,6 +1157,9 @@ export class CustomerModal {
           this.draft.set({ ...patchedMapped, tagIds: [...currentDraft.tagIds] });
         }
       }
+
+      latest = await saveCustomerContacts({ ...latest!, updatedAt: hasPatchFields ? latest!.updatedAt : expectedUpdatedAt },
+        baseDraft.contacts, currentDraft.contacts);
 
       if (hasTagChanges) {
         try {
@@ -1215,18 +1201,29 @@ export class CustomerModal {
       this.notify.success(this.transloco.translate('customerModal.saved'));
       this.saved.emit(latest);
       return true;
+    } catch (error) {
+      if (error instanceof CustomerContactSaveError) {
+        await this.handlePartialContacts(error);
+      } else {
+        this.handleSaveError(error);
+      }
+      return false;
     } finally {
       this.saving.set(false);
     }
   }
 
   private async handleConflict(id: string): Promise<boolean> {
-    if (this.anyGuardBusy()) return false;
+    if (this.conflictOpen() || this.deleteOpen()) return false;
     const choice = await this.openConflictDialog();
-    if (choice !== 'reload') return false;
+    if (choice === 'dismiss') return false;
 
     try {
       const fresh = await getCustomer(id);
+      if (choice === 'keep') {
+        this.updatedAt.set(fresh.updatedAt);
+        return false;
+      }
       const caps = await getCustomerCapabilities(fresh.branchId);
       if (this.customerId() !== id) return false;
       this.applyLoadedCustomer(fresh, caps);
@@ -1247,7 +1244,8 @@ export class CustomerModal {
 
     this.instantUpdating.set(true);
     try {
-      const updated = await changeCustomerContact(id, toContactChangeBody(change), expectedUpdatedAt);
+      const updated = await saveCustomerContacts({ ...current, updatedAt: expectedUpdatedAt },
+        this.base().contacts, contactsAfterChange(this.draft().contacts, change));
       if (this.customerId() !== id) return {};
 
       const companyId = this.resolveCompanyIdForBranch(updated.branchId, this.draft().companyId);
@@ -1268,6 +1266,10 @@ export class CustomerModal {
       this.changed.emit(updated.id);
       return null;
     } catch (error) {
+      if (error instanceof CustomerContactSaveError) {
+        await this.handlePartialContacts(error);
+        return this.mapContactActionErrors(error.error, change);
+      }
       if (this.isConcurrentUpdate(error)) {
         this.instantUpdating.set(false);
         await this.handleConflict(id);
@@ -1277,6 +1279,27 @@ export class CustomerModal {
       return this.mapContactActionErrors(error, change);
     } finally {
       this.instantUpdating.set(false);
+    }
+  }
+
+  private async handlePartialContacts(error: CustomerContactSaveError): Promise<void> {
+    if (error.fresh) {
+      const freshBase = draftFromDetail(error.fresh, this.base().companyId);
+      // Preserve non-contact edits while rebasing the remaining operations onto the server list.
+      this.detail.set(error.fresh);
+      this.updatedAt.set(error.fresh.updatedAt);
+      this.base.update((base) => ({ ...base, contacts: freshBase.contacts }));
+      this.draft.update((draft) => ({ ...draft, contacts: error.remaining }));
+      this.changed.emit(error.fresh.id);
+      invalidateRelatedCounts('CUSTOMER_PROFILE', error.fresh.id);
+    } else {
+      this.draft.update((draft) => ({ ...draft, contacts: error.remaining }));
+    }
+    this.toastServerError(error.error, error.saved);
+    if (this.isConcurrentUpdate(error.error)) {
+      this.instantUpdating.set(false);
+      this.saving.set(false);
+      await this.handleConflict(this.customerId()!);
     }
   }
 
@@ -1330,7 +1353,14 @@ export class CustomerModal {
       return;
     }
 
-    const mapped = mapServerErrors(error, this.draft());
+    const result = customerRecordError(error, this.transloco, this.draft());
+    if (this.mode() === 'create' && !result.keepKey) {
+      this.lastIdempotencyKey = null;
+      this.lastBodyFingerprint = null;
+    }
+    if (result.readOnly) this.writeReadonly.set(true);
+    if (result.reloadRequired) this.reloadRequired.set(true);
+    const mapped = result.fields;
     if (Object.keys(mapped).length > 0) {
       this.serverErrors.set(mapped);
       this.toastServerError(error);
@@ -1366,8 +1396,13 @@ export class CustomerModal {
     return draftsEqual(normalized, next);
   }
 
-  private toastServerError(error: unknown): void {
-    const message = customerErrorMessage(error, this.transloco, 'customerForm.server.generic');
-    this.notify.error(message);
+  private toastServerError(error: unknown, saved?: readonly string[]): void {
+    const mapped = customerRecordError(error, this.transloco, this.draft());
+    if (mapped.readOnly) this.writeReadonly.set(true);
+    if (mapped.reloadRequired) this.reloadRequired.set(true);
+    this.notify.error(mapped.message, saved
+      ? [this.transloco.translate('customerForm.server.notSaved'),
+        ...(saved.length ? [`${this.transloco.translate('recordForm.contacts.saved')}: ${saved.join('; ')}`] : [])].join(' ')
+      : '');
   }
 }

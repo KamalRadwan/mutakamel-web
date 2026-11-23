@@ -3,8 +3,13 @@ import { type ComponentFixture, TestBed } from '@angular/core/testing';
 import { TranslocoLoader, provideTransloco } from '@jsverse/transloco';
 import { of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CustomerBoardItem, CustomerStatus } from '../customers.model';
+import { CustomerBoardItem, CustomerDetail, CustomerStatus } from '../customers.model';
 import { CustomerBoard } from './customer-board';
+import { TenantScopeState } from '../../../../core/scope/tenant-scope';
+import { bindCrmHttpForTest } from '../../shared/crm-http';
+import { CrmHttpStub } from '../../shared/testing/crm-http-testing';
+import { CUSTOMERS_FAKE_DB, fakeLoadBoard, fakeSetCustomerStatus } from '../customers.fake';
+import { CustomerSearchBody } from '../customers.model';
 
 /*
  * The board runs on the real customers fake. A drop on Blacklisted is simulated through the record board's own
@@ -26,6 +31,8 @@ const TO: CustomerStatus = 'BLACKLISTED';
 
 let fixture: ComponentFixture<CustomerBoard>;
 let c: Internals;
+let dispose: () => void;
+let customersBefore: CustomerDetail[];
 
 async function flush(): Promise<void> {
   fixture.detectChanges();
@@ -63,23 +70,42 @@ function dropOnBlacklisted() {
 }
 
 beforeEach(async () => {
+  customersBefore = structuredClone(CUSTOMERS_FAKE_DB);
   vi.useFakeTimers();
+  vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
   TestBed.configureTestingModule({
     providers: [
+      { provide: TenantScopeState, useValue: { me: () => ({ isTenantOwner: true }) } },
       provideTransloco({
         config: { availableLangs: ['ar', 'en'], defaultLang: 'en', missingHandler: { logMissingKey: false } },
         loader: EmptyLoader,
       }),
     ],
   });
+  const stub = new CrmHttpStub();
+  vi.spyOn(stub, 'write').mockImplementation(async <T>(_method: unknown, path: string, body: unknown) => ({
+    status: 200,
+    data: (path.endsWith('/board') ? await fakeLoadBoard(body as CustomerSearchBody)
+      : await fakeSetCustomerStatus(path.split('/').at(-1)!, (body as { status: CustomerStatus }).status,
+        (body as { expectedUpdatedAt: string }).expectedUpdatedAt)) as T,
+    etag: null, location: null,
+  }));
+  dispose = bindCrmHttpForTest(stub);
   fixture = TestBed.createComponent(CustomerBoard);
   fixture.componentRef.setInput('body', { branchId: 'b1' });
+  fixture.componentRef.setInput('capabilities', { branchId: 'b1', customerProfiles: {
+    create: { scope: 'all', ownerUserIds: null }, update: { scope: 'all', ownerUserIds: null },
+    delete: { scope: 'all', ownerUserIds: null },
+  } });
   c = fixture.componentInstance as unknown as Internals;
   await flush();
 });
 
 afterEach(() => {
   fixture.destroy();
+  CUSTOMERS_FAKE_DB.splice(0, CUSTOMERS_FAKE_DB.length, ...customersBefore);
+  vi.unstubAllGlobals();
+  dispose();
   TestBed.resetTestingModule();
   vi.useRealTimers();
 });

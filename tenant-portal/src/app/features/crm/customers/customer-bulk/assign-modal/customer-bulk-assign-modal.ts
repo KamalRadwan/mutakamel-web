@@ -14,17 +14,19 @@ import {
 import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { tablerCheck, tablerChevronDown, tablerCircleX, tablerSearch, tablerUserShare } from '@ng-icons/tabler-icons';
+import { tablerCheck, tablerChevronDown, tablerSearch, tablerUserShare } from '@ng-icons/tabler-icons';
+import { Notify } from '../../../../../core/notify/notify';
 import { PluralKeyPipe } from '../../../../../core/i18n/plural';
-import { ScopeState } from '../../../../../core/scope/scope';
+import { sessionBranch } from '../../../shared/lookups/session-branch';
 import { BulkJobsTracker } from '../../../../../shared/bulk-jobs/bulk-jobs-tracker';
 import { BulkJobSelection, BulkJobSubmit } from '../../../../../shared/bulk-jobs/bulk-jobs.model';
+import { FullState } from '../../../../../shared/ui/full-state/full-state';
 import { Field } from '../../../../../shared/ui/field/field';
 import { rectInPage, viewport } from '../../../../../shared/ui/overlay/zoom';
 import { BulkRunModal } from '../../../shared/record/bulk/bulk-run-modal/bulk-run-modal';
-import { errorCodeOf } from '../../../settings/shared/settings-api';
+import { ApiError, errorCodeOf } from '../../../settings/shared/settings-api';
 import { ownerInitials } from '../../customer-card/customer-card';
-import { getCustomerCapabilities, listBranchOwners } from '../../customers.api';
+import { listCustomerBulkOwners } from '../customer-bulk.api';
 import { CustomerCapabilities, OwnerOption } from '../../customers.model';
 import {
   CUSTOMERS_BULK_APP,
@@ -32,6 +34,8 @@ import {
   SelectedCustomerRow,
   extractBulkErrorParams,
   translateCustomerBulkError,
+  customerBulkReadOnly,
+  customerBulkLoadFailure,
 } from '../customer-bulk.model';
 import { CustomerBulkSubmitKey } from '../customer-bulk-submit-key';
 import { CustomerSelection } from '../customer-selection';
@@ -48,8 +52,8 @@ const MENU_EDGE = 8;
 
 @Component({
   selector: 'app-customer-bulk-assign-modal',
-  imports: [NgIcon, TranslocoPipe, PluralKeyPipe, BulkRunModal, Field],
-  providers: [provideIcons({ tablerUserShare, tablerChevronDown, tablerCheck, tablerSearch, tablerCircleX })],
+  imports: [NgIcon, TranslocoPipe, PluralKeyPipe, BulkRunModal, Field, FullState],
+  providers: [provideIcons({ tablerUserShare, tablerChevronDown, tablerCheck, tablerSearch })],
   templateUrl: './customer-bulk-assign-modal.html',
   host: {
     '(document:click)': 'closeOwnerMenuIfOutside($event)',
@@ -62,8 +66,8 @@ export class CustomerBulkAssignModal {
 
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
-  private readonly scopeState = inject(ScopeState);
   private readonly transloco = inject(TranslocoService);
+  private readonly notify = inject(Notify);
   private readonly i18n = translationEvents(this.transloco);
   private readonly selection = inject(CustomerSelection, { optional: true });
   private readonly tracker = inject(BulkJobsTracker);
@@ -79,9 +83,12 @@ export class CustomerBulkAssignModal {
 
   private readonly explicitRows = signal<readonly SelectedCustomerRow[] | null>(null);
   protected readonly submitting = signal(false);
+  protected readonly readOnly = signal(false);
+  protected readonly loadFailure = signal<string | null>(null);
   protected readonly owners = signal<OwnerOption[]>([]);
   protected readonly ownersLoading = signal(false);
   protected readonly ownersLoaded = signal(false);
+  protected readonly ownersDenied = signal(false);
   protected readonly selectedOwnerId = signal('');
   protected readonly ownerSearch = signal('');
   protected readonly ownerMenuOpen = signal(false);
@@ -95,7 +102,10 @@ export class CustomerBulkAssignModal {
   private readonly submitKey = new CustomerBulkSubmitKey();
   private menuSeq = 0;
 
-  private readonly effectiveBranchId = computed(() => this.branchId().trim() || this.scopeState.branch().id);
+  private readonly effectiveBranchId = computed(() => {
+    const branchId = sessionBranch()?.branchId ?? '';
+    return !this.branchId() || this.branchId() === branchId ? branchId : '';
+  });
 
   protected readonly displayCount = computed(() => {
     const explicit = this.explicitRows();
@@ -116,6 +126,7 @@ export class CustomerBulkAssignModal {
 
   protected readonly ownerFieldError = computed<string | null>(() => {
     this.i18n();
+    if (this.ownersDenied()) return this.transloco.translate('customerBulk.catalogueDenied');
     if (this.ownersLoaded() && this.owners().length === 0) {
       return this.transloco.translate('customerBulk.assign.noOwners');
     }
@@ -124,6 +135,8 @@ export class CustomerBulkAssignModal {
 
   protected readonly canSubmit = computed(
     () =>
+      !this.readOnly() &&
+      this.loadFailure() === null &&
       !this.submitting() &&
       !this.ownersLoading() &&
       !!this.selectedOwnerId() &&
@@ -254,6 +267,11 @@ export class CustomerBulkAssignModal {
     this.explicitRows.set(null);
   }
 
+  protected retryLoad(): void {
+    this.loadFailure.set(null);
+    void this.loadOwners(this.openSeq);
+  }
+
   protected async submit(): Promise<void> {
     if (!this.canSubmit()) return;
     const ownerUserId = this.selectedOwnerId();
@@ -282,12 +300,16 @@ export class CustomerBulkAssignModal {
       this.close();
       this.submitted.emit(res.jobId);
     } catch (error) {
+      this.submitKey.failed(error);
+      this.readOnly.update((value) => value || customerBulkReadOnly(error));
       const code = errorCodeOf(error);
       if (code === 'BULK_JOB_ACTIVE') {
         this.close();
         return;
       }
-      this.requestError.set(translateCustomerBulkError(this.transloco, code, extractBulkErrorParams(error)));
+      const message = translateCustomerBulkError(this.transloco, code, extractBulkErrorParams(error));
+      this.requestError.set(message);
+      this.notify.error(message);
     } finally {
       this.submitting.set(false);
     }
@@ -296,12 +318,14 @@ export class CustomerBulkAssignModal {
   private async initOpen(rows?: readonly SelectedCustomerRow[]): Promise<void> {
     const seq = ++this.openSeq;
     this.submitKey.reset();
+    this.loadFailure.set(null);
     this.explicitRows.set(rows ? [...rows] : null);
     this.ownerSearch.set('');
     this.requestError.set(null);
     this.submitting.set(false);
     this.closeOwnerMenu();
     this.ownersLoaded.set(false);
+    this.ownersDenied.set(false);
     this.selectedOwnerId.set('');
     this.modal().open();
 
@@ -312,20 +336,23 @@ export class CustomerBulkAssignModal {
     const branchId = this.effectiveBranchId();
     this.ownersLoading.set(true);
     try {
-      const [rawOwners, resolvedCaps] = await Promise.all([
-        listBranchOwners(branchId),
-        this.capabilities() && this.capabilities()!.branchId === branchId
-          ? Promise.resolve(this.capabilities())
-          : getCustomerCapabilities(branchId).catch(() => null),
-      ]);
+      const allowed = await listCustomerBulkOwners(branchId);
       if (seq !== this.openSeq) return;
-      const ownerFilter = resolvedCaps?.customerProfiles.update?.ownerUserIds ?? null;
-      const allowed = ownerFilter ? rawOwners.filter((o) => ownerFilter.includes(o.userId)) : rawOwners;
       this.owners.set(allowed);
       this.ownersLoaded.set(true);
-    } catch {
+    } catch (error) {
       if (seq !== this.openSeq) return;
+      const failure = customerBulkLoadFailure(error);
+      if (failure !== null) {
+        this.loadFailure.set(failure);
+        return;
+      }
       this.owners.set([]);
+      this.ownersDenied.set(error instanceof ApiError && error.status === 403);
+      const code = errorCodeOf(error);
+      const message = translateCustomerBulkError(this.transloco, code, extractBulkErrorParams(error));
+      this.requestError.set(message);
+      this.notify.error(message);
       this.ownersLoaded.set(true);
     } finally {
       if (seq === this.openSeq) {

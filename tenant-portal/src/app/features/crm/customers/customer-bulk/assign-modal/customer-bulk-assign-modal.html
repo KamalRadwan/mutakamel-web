@@ -13,21 +13,23 @@
   (cancel)="closeOwnerMenu()"
   (closed)="onModalClosed()"
 >
-  @if (requestError(); as err) {
-    <div
-      role="alert"
-      class="flex items-start gap-8 rounded-8 border border-danger-border bg-danger-soft px-10 py-8 text-12 leading-18 text-on-danger-soft"
-    >
-      <ng-icon name="tablerCircleX" size="14" class="mt-2 shrink-0" aria-hidden="true" />
-      <span>{{ err }}</span>
-    </div>
-  }
+  @if (loadFailure() !== null) {
+    <ui-full-state
+      kind="load-failure"
+      [title]="'customerBulk.loadFailure' | transloco"
+      [text]="loadFailure() ? ('customerBulk.correlation' | transloco: { id: loadFailure() }) : ''"
+      [actionLabel]="'customerBulk.retry' | transloco"
+      [busy]="ownersLoading()"
+      (action)="retryLoad()"
+    />
+  } @else {
+  <fieldset class="contents" [disabled]="readOnly()">
 
   <ui-field
     size="bare"
     [label]="'customerBulk.assign.owner' | transloco"
     [for]="uid + '-owner'"
-    [hint]="'customerBulk.assign.ownerHint' | transloco"
+    [hint]="(ownersDenied() ? 'customerBulk.catalogueDenied' : 'customerBulk.assign.ownerHint') | transloco"
     [required]="true"
     [error]="ownerFieldError()"
   >
@@ -155,5 +157,7 @@
     <p class="text-12 leading-18 text-text-muted">
       {{ 'customerBulk.assign.summary' | transloco: { n: displayCount(), owner: owner.name } }}
     </p>
+  }
+  </fieldset>
   }
 </app-bulk-run-modal>

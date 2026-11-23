@@ -15,15 +15,17 @@
   (submit)="submit()"
   (closed)="onModalClosed()"
 >
-  @if (requestError(); as err) {
-    <div
-      role="alert"
-      class="flex items-start gap-8 rounded-8 border border-danger-border bg-danger-soft px-10 py-8 text-12 leading-18 text-on-danger-soft"
-    >
-      <ng-icon name="tablerCircleX" size="14" class="mt-2 shrink-0" aria-hidden="true" />
-      <span>{{ err }}</span>
-    </div>
-  }
+  @if (loadFailure() !== null) {
+    <ui-full-state
+      kind="load-failure"
+      [title]="'customerBulk.loadFailure' | transloco"
+      [text]="loadFailure() ? ('customerBulk.correlation' | transloco: { id: loadFailure() }) : ''"
+      [actionLabel]="'customerBulk.retry' | transloco"
+      [busy]="resolving()"
+      (action)="retryLoad()"
+    />
+  } @else {
+  <fieldset class="contents" [disabled]="readOnly()">
 
   <p class="text-12 leading-18 text-text-muted">
     {{ 'customerBulk.delete.leads' | transloco }}
@@ -55,4 +57,6 @@
       (input)="onReasonInput($event)"
     ></textarea>
   </ui-field>
+  </fieldset>
+  }
 </app-bulk-run-modal>

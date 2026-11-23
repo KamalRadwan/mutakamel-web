@@ -4,7 +4,8 @@ import { TranslocoService } from '@jsverse/transloco';
 import { BulkJobsTracker } from '../../../../../shared/bulk-jobs/bulk-jobs-tracker';
 import { RecordBulkMenu } from '../../../shared/record/bulk/record-bulk-menu/record-bulk-menu';
 import { RecordBulkAction } from '../../../shared/record/bulk/record-bulk.model';
-import { canManageStatus } from '../../customers.api';
+import { sessionBranch } from '../../../shared/lookups/session-branch';
+import { canManageCustomerBulkStatus } from '../customer-bulk-access';
 import { CustomerCapabilities } from '../../customers.model';
 import { CUSTOMERS_BULK_APP, CUSTOMERS_BULK_MODULE_ID } from '../customer-bulk.model';
 import { CustomerSelection } from '../customer-selection';
@@ -38,11 +39,13 @@ export class CustomerBulkMenu {
   protected readonly actions = computed<RecordBulkAction[]>(() => {
     this.i18n();
     const caps = this.capabilities();
-    const canUpdate = caps !== null && caps.customerProfiles.update !== null;
-    const canDelete = caps !== null && caps.customerProfiles.delete !== null;
-    const hasStatusPerm = canManageStatus();
+    const branchId = sessionBranch()?.branchId ?? '';
+    const current = !!branchId && caps?.branchId === branchId;
+    const canUpdate = current && caps.customerProfiles.update !== null;
+    const canDelete = current && caps.customerProfiles.delete !== null;
+    const hasStatusPerm = canManageCustomerBulkStatus(branchId);
     const canStatus = canUpdate && hasStatusPerm;
-    const canActivity = caps !== null;
+    const canActivity = current;
 
     return [
       {
@@ -77,7 +80,7 @@ export class CustomerBulkMenu {
         allowed: canDelete,
         reasonKey: 'customerBulk.reason.noDelete',
       },
-    ];
+    ].filter((action) => action.id !== 'status' || canStatus);
   });
 
   protected onRun(id: string): void {

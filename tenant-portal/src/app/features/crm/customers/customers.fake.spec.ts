@@ -1,17 +1,13 @@
+import { fakeChangeCustomerContact as changeCustomerContact } from './customers.fake';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../settings/shared/settings-api';
 import {
-  changeCustomerContact,
-  createCustomer,
-  getCustomer,
   listBranchOwners,
   listCurrencies,
-  loadBoard,
-  loadStatusPage,
-  patchCustomer,
-  searchCustomers,
-  setCustomerStatus,
 } from './customers.api';
+import { fakeGetCustomer as getCustomer, fakeCreateCustomer as createCustomer, fakePatchCustomer as patchCustomer } from './customers.fake';
+// These suites verify the retained fake's contract; live list transport has separate specs.
+import { fakeLoadBoard as loadBoard, fakeLoadStatusPage as loadStatusPage, fakeSearchCustomerProfiles as searchCustomers, fakeSetCustomerStatus as setCustomerStatus } from './customers.fake';
 import { CUSTOMER_STATUS_ORDER, MANUAL_STATUSES, isManualStatus } from './customer-statuses';
 import { ACME_CUSTOMER_ID, CUSTOMERS_FAKE_DB, DEFAULT_CUSTOMER_BRANCH_ID, fakeListTags } from './customers.fake';
 import {

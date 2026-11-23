@@ -16,6 +16,9 @@ export interface CustomerSearchFieldsContext {
   owners: (term: string) => Promise<FieldOption[]>;
   ownerOptions?: FieldOption[];
   language: 'ar' | 'en';
+  statuses?: { value: string; label: { en: string; ar: string } }[];
+  unavailable?: string[];
+  dateHint?: string;
 }
 
 const PROFILE_TYPES: readonly ProfileType[] = ['INDIVIDUAL', 'CORPORATE'];
@@ -128,7 +131,8 @@ export function customerSearchFields(ctx: CustomerSearchFieldsContext): QueryFie
       hint: tr(ctx, 'search.fields.status.hint'),
       group: classification,
       placement: 'tree',
-      options: CUSTOMER_STATUS_ORDER.map((value) => ({ value, label: tr(ctx, `statuses.${value}`) })),
+      options: ctx.statuses?.map(({ value, label }) => ({ value, label: label[ctx.language] }))
+        ?? CUSTOMER_STATUS_ORDER.map((value) => ({ value, label: tr(ctx, `statuses.${value}`) })),
       chip: true,
     },
     {
@@ -209,7 +213,7 @@ export function customerSearchFields(ctx: CustomerSearchFieldsContext): QueryFie
       id: 'createdAt',
       label: tr(ctx, 'search.fields.createdAt.label'),
       kind: 'date',
-      hint: tr(ctx, 'search.fields.createdAt.hint'),
+      hint: [tr(ctx, 'search.fields.createdAt.hint'), ctx.dateHint].filter(Boolean).join(' · '),
       group: dates,
       placement: 'tree',
     },
@@ -217,7 +221,7 @@ export function customerSearchFields(ctx: CustomerSearchFieldsContext): QueryFie
       id: 'updatedAt',
       label: tr(ctx, 'search.fields.updatedAt.label'),
       kind: 'date',
-      hint: tr(ctx, 'search.fields.updatedAt.hint'),
+      hint: [tr(ctx, 'search.fields.updatedAt.hint'), ctx.dateHint].filter(Boolean).join(' · '),
       group: dates,
       placement: 'tree',
     },
@@ -241,5 +245,5 @@ export function customerSearchFields(ctx: CustomerSearchFieldsContext): QueryFie
     },
   );
 
-  return fields;
+  return fields.filter((field) => !ctx.unavailable?.includes(field.id));
 }

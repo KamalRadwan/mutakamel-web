@@ -1,3 +1,4 @@
+import { fakeChangeCustomerContact as changeCustomerContact } from './customers.fake';
 /**
  * Contract spec: the customers fake against the crm-app backend contract
  * (crm/customer-profiles, crm/leads duplicate-check, crm/related-records,
@@ -7,21 +8,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../settings/shared/settings-api';
 import {
   CUSTOMER_ERROR_KEYS,
-  attachCustomerTags,
-  changeCustomerContact,
-  checkDuplicates,
-  createCustomer,
-  deleteCustomer,
-  detachCustomerTag,
-  getCustomer,
-  getCustomerCapabilities,
-  listCustomerTags,
-  loadBoard,
-  loadStatusPage,
-  patchCustomer,
-  searchCustomers,
-  setCustomerStatus,
 } from './customers.api';
+import { fakeGetCustomer as getCustomer, fakeCreateCustomer as createCustomer, fakePatchCustomer as patchCustomer, fakeAttachCustomerTags as attachCustomerTags, fakeDetachCustomerTag as detachCustomerTag, fakeListCustomerTags as listCustomerTags, fakeCheckDuplicates as checkDuplicates } from './customers.fake';
+// These suites verify the retained fake's contract; live list transport has separate specs.
+import { fakeLoadBoard as loadBoard, fakeLoadStatusPage as loadStatusPage, fakeSearchCustomerProfiles as searchCustomers, fakeGetCustomerCapabilities as getCustomerCapabilities, fakeSetCustomerStatus as setCustomerStatus, fakeDeleteCustomer as deleteCustomer } from './customers.fake';
 import { CUSTOMER_STATUS_ORDER, MANUAL_STATUSES, isManualStatus } from './customer-statuses';
 import { DEFAULT_CUSTOMER_BRANCH_ID, fakeListTags } from './customers.fake';
 import {

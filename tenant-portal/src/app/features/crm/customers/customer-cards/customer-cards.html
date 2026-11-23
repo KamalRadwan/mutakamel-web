@@ -1,10 +1,6 @@
 @if (failed()) {
-  <div class="flex flex-col items-center gap-8 p-16 text-center">
-    <p class="text-12 text-danger-text" role="alert">{{ 'customers.empty.loadFailed' | transloco }}</p>
-    <button type="button" uiButton variant="secondary" (click)="retryLoad()">
-      {{ 'customers.empty.retry' | transloco }}
-    </button>
-  </div>
+  <ui-full-state [kind]="failureState().kind" [title]="'customers.empty.loadFailed' | transloco"
+    [text]="failureState().text" [actionLabel]="'customers.empty.retry' | transloco" (action)="retryLoad()" />
 } @else if (!ready() || loading()) {
   <div class="grid grid-cols-kanban-cards gap-12" aria-busy="true">
     @for (item of skeletonCards; track item) {
@@ -86,7 +82,7 @@
 <ui-confirm-dialog
   class="contents"
   [title]="'customers.delete.title' | transloco: { name: deletingName() }"
-  [text]="(deletingHasSourceLead() ? 'customers.delete.textFromLead' : 'customers.delete.text') | transloco"
+  [text]="('customers.delete.textFromLead' | transloco) + (deletingError() ? ' ' + deletingError() : '')"
   [confirmLabel]="'common.delete' | transloco"
   [cancelLabel]="'common.cancel' | transloco"
 />

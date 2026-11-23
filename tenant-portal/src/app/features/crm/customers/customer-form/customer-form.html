@@ -108,6 +108,8 @@
               [errors]="errors()"
               [readonly]="effectiveReadonly()"
               [legacyAddress]="legacyAddress()"
+              [geoFailed]="lookups.geoFailed()"
+              (retryGeo)="lookups.retryGeo()"
             />
           </div>
         }
@@ -260,6 +262,8 @@
         [errors]="errors()"
         [readonly]="effectiveReadonly()"
         [legacyAddress]="legacyAddress()"
+              [geoFailed]="lookups.geoFailed()"
+              (retryGeo)="lookups.retryGeo()"
       />
     </section>
   </div>

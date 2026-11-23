@@ -23,7 +23,16 @@ import {
 } from '@ng-icons/tabler-icons';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { Notify } from '../../../../core/notify/notify';
-import { ScopeState } from '../../../../core/scope/scope';
+import { can } from '../../../../shared/widgets/dashboard/analytics-permissions';
+import { runInCrm } from '../../shared/crm-runtime';
+import { sessionBranch } from '../../shared/lookups/session-branch';
+import { listAssignableOwners } from '../../shared/lookups/assignable-owners';
+import { listLeadSources } from '../../settings/lead-sources/lead-sources.api';
+import { listTags } from '../../settings/tags/tags.api';
+import { getCrmStaticData } from '../../settings/static-data/static-data.api';
+import { ApiError } from '../../../../core/api/api-errors';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
+import { Field } from '../../../../shared/ui/field/field';
 import { listBulkJobItems } from '../../../../shared/bulk-jobs/bulk-jobs.api';
 import { BulkJobsTracker } from '../../../../shared/bulk-jobs/bulk-jobs-tracker';
 import { FieldOption, Query, countConditions } from '../../../../shared/query-builder/query.model';
@@ -60,10 +69,6 @@ import { CUSTOMER_STATUS_ORDER, CUSTOMER_STATUS_TONE } from '../customer-statuse
 import { CustomerTable } from '../customer-table/customer-table';
 import {
   getCustomerCapabilities,
-  listBranchOwners,
-  listBranches,
-  listSources,
-  listTags,
   loadStatusPage,
   searchCustomers,
 } from '../customers.api';
@@ -78,7 +83,6 @@ import {
   CustomerSort,
   CustomerStatus,
   CustomerView,
-  StatusCounts,
 } from '../customers.model';
 
 interface BoardViewSnapshot {
@@ -152,6 +156,8 @@ function parseSort(raw: string | undefined): CustomerSort | null {
     NgIcon,
     TranslocoPipe,
     Button,
+    FullState,
+    Field,
     FacetSearch,
     QueryBuilder,
     StepFilter,
@@ -197,7 +203,6 @@ function parseSort(raw: string | undefined): CustomerSort | null {
 export class CustomersPage implements CanLeaveRecord {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
-  private readonly scope = inject(ScopeState);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
@@ -205,7 +210,7 @@ export class CustomersPage implements CanLeaveRecord {
   protected readonly selection = inject(CustomerSelection);
   private readonly queryParams = toSignal(this.route.queryParamMap);
 
-  readonly customerModal = viewChild.required(CustomerModal);
+  readonly customerModal = viewChild(CustomerModal);
   private readonly recordActivities = viewChild.required(RecordActivities);
   private readonly boardView = viewChild(CustomerBoard);
   private readonly cardsView = viewChild(CustomerCards);
@@ -248,49 +253,46 @@ export class CustomersPage implements CanLeaveRecord {
       this.store.facets().some((facet) => facet.field === ADVANCED_FACET_FIELD),
   );
 
-  private readonly branchesResource = resource({
-    loader: () => listBranches().catch(() => []),
-  });
+  protected readonly canRead = computed(() => can('crm.customer_profiles.read'));
+  protected readonly branchId = computed(() => runInCrm(() => sessionBranch())?.branchId ?? null);
+  protected readonly ready = computed(() => this.canRead() && this.branchId() !== null);
+
   private readonly sourcesResource = resource({
-    loader: () => listSources().catch(() => []),
+    params: () => this.ready() || undefined,
+    loader: () => listLeadSources(),
   });
   private readonly tagsResource = resource({
-    loader: () => listTags().catch(() => []),
+    params: () => this.ready() || undefined,
+    loader: () => listTags(),
   });
-
-  protected readonly branchId = computed<string | null>(() => {
-    if (this.branchesResource.isLoading() && !this.branchesResource.hasValue()) {
-      return null;
-    }
-    const active = this.scope.branch();
-    const list = this.branchesResource.value() ?? [];
-    const matched =
-      list.find((item) => item.id === active?.id) ??
-      list.find((item) => item.name === active?.nameEn || item.name === active?.nameAr) ??
-      list[0];
-    return matched?.id ?? active?.id ?? null;
+  private readonly staticResource = resource({
+    params: () => this.ready() || undefined,
+    loader: () => getCrmStaticData(),
   });
-
-  protected readonly ready = computed(() => this.branchId() !== null);
 
   private readonly capabilitiesResource = resource({
-    params: () => this.branchId() ?? undefined,
+    params: () => this.ready() ? this.branchId()! : undefined,
     loader: ({ params }) => getCustomerCapabilities(params).catch(() => null),
   });
 
   private readonly ownersResource = resource({
-    params: () => this.branchId() ?? undefined,
-    loader: ({ params }) => listBranchOwners(params).catch(() => []),
+    params: () => this.ready() ? this.branchId()! : undefined,
+    loader: ({ params }) => listAssignableOwners(params, 'customer_profiles', 'update'),
   });
 
+  protected readonly unavailableCatalogues = computed(() => [
+    { id: 'tags', error: this.tagsResource.error() },
+    { id: 'acquisitionSourceId', error: this.sourcesResource.error() },
+    { id: 'ownerUserId', error: this.ownersResource.error() },
+  ].filter(({ error }) => error instanceof ApiError && error.status === 403));
+
+  protected readonly writeReadOnly = signal(false);
   protected readonly capabilities = computed<CustomerCapabilities | null>(() =>
-    this.capabilitiesResource.hasValue() ? this.capabilitiesResource.value() : null,
+    !this.writeReadOnly() && this.capabilitiesResource.hasValue() ? this.capabilitiesResource.value() : null,
   );
 
   protected readonly canCreate = computed(() => canCreateCustomer(this.capabilities()));
   protected readonly canUseBulk = computed(() => this.capabilities() !== null);
-
-  private readonly counts = signal<StatusCounts | null>(null);
 
   protected readonly status = linkedSignal<{ view: CustomerView; param: string | undefined }, 'ALL' | CustomerStatus>({
     source: () => ({ view: this.current(), param: this.statusParam() }),
@@ -327,17 +329,17 @@ export class CustomersPage implements CanLeaveRecord {
 
   protected readonly statusSteps = computed<StepOption[]>(() => {
     this.i18n();
-    const currentCounts = this.counts();
+    const counts = this.statusCounts.hasValue() ? this.statusCounts.value() : undefined;
     return [
       {
         id: 'ALL',
         label: this.transloco.translate('customers.statusFilter.all'),
-        count: currentCounts ? currentCounts.ALL : null,
+        count: counts?.ALL ?? null,
       },
       ...CUSTOMER_STATUS_ORDER.map((statusId) => ({
         id: statusId,
         label: this.transloco.translate(`customers.statuses.${statusId}`),
-        count: currentCounts ? (currentCounts[statusId] ?? 0) : null,
+        count: counts?.[statusId] ?? null,
         tone: CUSTOMER_STATUS_TONE[statusId],
       })),
     ];
@@ -386,6 +388,15 @@ export class CustomersPage implements CanLeaveRecord {
     };
   });
 
+  // Observe the same cached search as the active view; Cards is owned by another package.
+  private readonly statusCounts = resource({
+    params: () => this.ready() && this.current() !== 'board' ? {
+      body: { ...this.effectiveBody(), ...(this.current() === 'table' && this.sort() ? { sort: this.sort()! } : {}) },
+      page: this.page(), limit: this.pageSize(),
+    } : undefined,
+    loader: async ({ params }) => (await searchCustomers(params.body, params.page, params.limit)).counts,
+  });
+
   protected readonly tablePageRows = computed<SelectedCustomerRow[]>(() =>
     (this.tableView()?.items() ?? []).map(toSelectedCustomerRow),
   );
@@ -400,11 +411,13 @@ export class CustomersPage implements CanLeaveRecord {
     effect(() => {
       const branch = this.branchId();
       if (!branch) return;
-      const sources = this.sourcesResource.value() ?? [];
-      const tags = this.tagsResource.value() ?? [];
-      const ownerOptions: FieldOption[] = (this.ownersResource.value() ?? []).map((owner) => ({
-        value: owner.userId,
-        label: owner.name,
+      const sources = this.sourcesResource.hasValue() ? this.sourcesResource.value() : [];
+      const tags = this.tagsResource.hasValue() ? this.tagsResource.value() : [];
+      const statuses = this.staticResource.hasValue() ? this.staticResource.value().enumOptions['customerStatuses'] : undefined;
+      const unavailable = this.unavailableCatalogues().map(({ id }) => id);
+      const ownerOptions: FieldOption[] = (this.ownersResource.hasValue() ? this.ownersResource.value().items : []).map((owner) => ({
+        value: owner.id,
+        label: owner.displayName,
         ...(owner.avatarUrl ? { icon: owner.avatarUrl } : {}),
       }));
 
@@ -414,12 +427,13 @@ export class CustomersPage implements CanLeaveRecord {
           sources,
           tags,
           ownerOptions,
+          statuses,
+          unavailable,
           owners: async (term: string) => {
-            const list =
-              this.ownersResource.value() ?? (await listBranchOwners(branch).catch(() => []));
+            const list = (await listAssignableOwners(branch, 'customer_profiles', 'update', { search: term })).items;
             const mapped: FieldOption[] = list.map((owner) => ({
-              value: owner.userId,
-              label: owner.name,
+              value: owner.id,
+              label: owner.displayName,
               ...(owner.avatarUrl ? { icon: owner.avatarUrl } : {}),
             }));
             const clean = term.trim().toLowerCase();
@@ -500,24 +514,21 @@ export class CustomersPage implements CanLeaveRecord {
 
     effect(() => {
       const openId = this.openParam()?.trim() || null;
+      if (!this.ready() || !this.customerModal()) return;
       if (openId === this.syncedOpenId) return;
       this.syncedOpenId = openId;
       untracked(() => {
         if (openId) {
-          this.customerModal().openCustomer(openId, null);
+          this.customerModal()?.openCustomer(openId, null);
         } else {
-          this.customerModal().syncClosedFromUrl();
+          this.customerModal()?.syncClosedFromUrl();
         }
       });
     });
   }
 
   canDeactivate(): Promise<boolean> {
-    return this.customerModal().canDeactivate();
-  }
-
-  protected onCountsLoaded(next: StatusCounts): void {
-    this.counts.set(next);
+    return this.customerModal()?.canDeactivate() ?? Promise.resolve(true);
   }
 
   protected show(view: string): void {
@@ -636,11 +647,11 @@ export class CustomersPage implements CanLeaveRecord {
 
   protected openCreate(status?: CustomerStatus): void {
     if (!this.canCreate()) return;
-    this.customerModal().openCreate(status ? { status } : undefined);
+    this.customerModal()?.openCreate(status ? { status } : undefined);
   }
 
   protected openCustomer(customer: CustomerBoardItem): void {
-    this.customerModal().openCustomer(customer.id, this.buildNavContext(customer));
+    this.customerModal()?.openCustomer(customer.id, this.buildNavContext(customer));
   }
 
   protected onModalOpenIdChange(id: string | null): void {
@@ -677,6 +688,7 @@ export class CustomersPage implements CanLeaveRecord {
   }
 
   protected refreshActiveView(): void {
+    this.statusCounts.reload();
     this.boardView()?.refresh();
     this.cardsView()?.refresh();
     this.tableView()?.refresh();

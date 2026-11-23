@@ -14,8 +14,8 @@
   [ownerId]="draft().ownerUserId"
   [owners]="ownerOptions()"
   [selfOnly]="isOwnScope()"
-  [readonly]="isReadonly()"
-  [allowSelfDefault]="isCreate()"
+  [readonly]="isReadonly() || lookups.ownersUnavailable()"
+  [allowSelfDefault]="false"
   [fallbackName]="fallbackOwnerName()"
   [error]="ownerError()"
   (ownerIdChange)="onOwnerChange($event)"
@@ -26,7 +26,7 @@
   [options]="statusOptions()"
   labelKey="customerForm.classification.status"
   [hintKey]="
-    lookups.canManageStatus()
+    lookups.statusUnavailable() ? 'customerForm.catalogueDenied' : lookups.canManageStatus()
       ? 'customerForm.classification.statusHint'
       : 'customerForm.classification.statusNoPermissionHint'
   "
@@ -37,6 +37,7 @@
   (valueChange)="onStatusDraftChange($event)"
   (commit)="onStatusCommit($event)"
 />
+<p class="text-12 leading-18 text-text-muted">{{ 'customerForm.server.CUSTOMER_PROFILE_ACTIVATION_REQUIRES_WON' | transloco }}</p>
 
 @if (lookups.sources(); as sources) {
   @let sourceErr = errorFor('acquisitionSourceId');
@@ -251,4 +252,28 @@
       </li>
     }
   </ul>
+}
+
+@if (lookups.sources() === null) {
+  <ui-field [label]="'customerForm.classification.source' | transloco" [hint]="'customerForm.catalogueDenied' | transloco">
+    <input type="text" disabled [value]="'customerForm.catalogueDenied' | transloco" class="w-full bg-transparent text-12 text-text outline-none" />
+  </ui-field>
+}
+
+@if (lookups.tags() === null) {
+  <ui-field [label]="'customerForm.classification.tags' | transloco" [hint]="'customerForm.catalogueDenied' | transloco">
+    <input type="text" disabled [value]="'customerForm.catalogueDenied' | transloco" class="w-full bg-transparent text-12 text-text outline-none" />
+  </ui-field>
+}
+
+@if (lookups.customFieldsUnavailable()) {
+  <ui-field [label]="'customerForm.sections.custom' | transloco" [hint]="'customerForm.catalogueDenied' | transloco">
+    <input type="text" disabled [value]="'customerForm.catalogueDenied' | transloco" class="w-full bg-transparent text-12 text-text outline-none" />
+  </ui-field>
+}
+
+@if (lookups.ownersUnavailable()) {
+  <ui-field [label]="'recordFields.owner.label' | transloco" [hint]="'customerForm.catalogueDenied' | transloco">
+    <input type="text" disabled [value]="'customerForm.catalogueDenied' | transloco" class="w-full bg-transparent text-12 text-text outline-none" />
+  </ui-field>
 }

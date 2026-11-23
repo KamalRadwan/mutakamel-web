@@ -85,7 +85,11 @@
           [attr.aria-label]="'customerForm.more.address' | transloco"
           [attr.aria-describedby]="uid + '-address-hint'"
         >
-          <app-address-fields
+          @if (geoFailed()) {
+            <ui-full-state kind="load-failure" [title]="'customerForm.geoUnavailable' | transloco"
+              [actionLabel]="'customerForm.retry' | transloco" (action)="retryGeo.emit()" />
+          } @else {
+            <app-address-fields
             class="page-address-grid"
             [canAddPlaces]="canAddPlaces"
             [readonly]="readonly()"
@@ -93,6 +97,7 @@
             [value]="draft().address"
             (valueChange)="onAddressChange($event)"
           />
+          }
           @if (hasAddressSelection() && !readonly()) {
             <div class="flex">
               <button type="button" uiButton variant="ghost" size="small" (click)="clearAddress()">
@@ -237,13 +242,18 @@
           [attr.aria-label]="'customerForm.more.address' | transloco"
           [attr.aria-describedby]="uid + '-address-hint'"
         >
-          <app-address-fields
+          @if (geoFailed()) {
+            <ui-full-state kind="load-failure" [title]="'customerForm.geoUnavailable' | transloco"
+              [actionLabel]="'customerForm.retry' | transloco" (action)="retryGeo.emit()" />
+          } @else {
+            <app-address-fields
             [canAddPlaces]="canAddPlaces"
             [readonly]="readonly()"
             [errors]="addressErrors()"
             [value]="draft().address"
             (valueChange)="onAddressChange($event)"
           />
+          }
           @if (hasAddressSelection() && !readonly()) {
             <div class="flex">
               <button type="button" uiButton variant="ghost" size="small" (click)="clearAddress()">

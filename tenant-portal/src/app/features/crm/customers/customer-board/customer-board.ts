@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, input, linkedSignal, output, resource, signal, untracked, viewChild } from '@angular/core';
+import { Component, computed, inject, input, linkedSignal, output, resource, signal, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../core/i18n/translation-events';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerPlus, tablerSearch, tablerUsers } from '@ng-icons/tabler-icons';
@@ -6,6 +6,7 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { Notify } from '../../../../core/notify/notify';
 import { Button } from '../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { ApiError } from '../../settings/shared/settings-api';
 import { RecordBoard } from '../../shared/record/board/record-board';
 import { BoardLabels, BoardLane, BoardMoveEvent } from '../../shared/record/board/record-board.model';
@@ -15,12 +16,14 @@ import {
   canDeleteCustomer,
   canUpdateCustomer,
   customerErrorMessage,
+  canManageCustomerStatus,
+  customerReadState,
+  customerNeedsReload,
+  customerReadOnlyError,
 } from '../customer-card/customer-card';
 import { CUSTOMER_STATUS_TONE } from '../customer-statuses';
 import {
-  canManageStatus,
   deleteCustomer,
-  getCustomer,
   loadBoard,
   loadStatusPage,
   setCustomerColor,
@@ -58,7 +61,7 @@ function dueCounts(items: readonly CustomerBoardItem[]): Record<ActivityBucket |
 
 @Component({
   selector: 'app-customer-board',
-  imports: [NgIcon, TranslocoPipe, Button, ConfirmDialog, CustomerCard, RecordBoard],
+  imports: [NgIcon, TranslocoPipe, Button, ConfirmDialog, FullState, CustomerCard, RecordBoard],
   providers: [provideIcons({ tablerPlus, tablerSearch, tablerUsers })],
   templateUrl: './customer-board.html',
   host: { class: 'flex shrink-0 flex-col' },
@@ -80,7 +83,7 @@ export class CustomerBoard {
   readonly view = output<CustomerBoardItem>();
   readonly activities = output<CustomerBoardItem>();
   readonly clearSearch = output<void>();
-  readonly countsLoaded = output<StatusCounts>();
+  readonly readOnlyDetected = output<void>();
 
   protected readonly skeletonLanes = [1, 2, 3, 4];
   protected readonly skeletonCards = [1, 2, 3];
@@ -89,40 +92,50 @@ export class CustomerBoard {
 
   private readonly refreshTick = signal(0);
   private lastBoard: BoardResponse | undefined;
+  private loadedBranchId: string | undefined;
   private deleteInFlight = false;
 
   private readonly boardResource = resource({
     params: () => (this.ready() ? { body: this.body(), tick: this.refreshTick() } : undefined),
     loader: async ({ params }) => {
+      if (this.loadedBranchId !== params.body.branchId) {
+        this.lastBoard = undefined;
+        this.loadedBranchId = params.body.branchId;
+        this.readOnly.set(false);
+      }
       try {
         const res = await loadBoard(params.body);
-        this.lastBoard = res;
+        if (this.loadedBranchId === params.body.branchId) this.lastBoard = res;
         return res;
       } catch (error) {
         if (error instanceof ApiError && error.status === 400) {
           this.notify.error(this.transloco.translate('customers.search.invalid'));
-          return this.lastBoard;
+          return this.loadedBranchId === params.body.branchId ? this.lastBoard : undefined;
         }
         throw error;
       }
     },
   });
 
-  protected readonly lanes = linkedSignal<BoardResponse | undefined, CustomerBoardLane[]>({
-    source: () => this.boardResource.value(),
-    computation: (res, previous) => res?.statuses ?? previous?.value ?? [],
+  protected readonly lanes = linkedSignal<{ branchId: string; board: BoardResponse | undefined }, CustomerBoardLane[]>({
+    source: () => ({ branchId: this.body().branchId, board: this.boardResource.hasValue() ? this.boardResource.value() : undefined }),
+    computation: ({ branchId, board }, previous) => board?.statuses
+      ?? (previous?.source.branchId === branchId ? previous.value : []),
   });
 
-  private readonly counts = linkedSignal<BoardResponse | undefined, StatusCounts | null>({
-    source: () => this.boardResource.value(),
-    computation: (res, previous) => res?.counts ?? previous?.value ?? null,
-  });
+  private readonly counts = computed<Partial<StatusCounts>>(() =>
+    (this.boardResource.hasValue() ? this.boardResource.value()?.counts : undefined) ?? {},
+  );
+
+  protected readonly laneErrors = signal<Partial<Record<CustomerStatus, string>>>({});
+  private readonly readOnly = signal(false);
+  protected readonly failureState = computed(() => customerReadState(this.boardResource.error(), this.transloco));
 
   protected readonly openCards = signal<Record<string, string>>({});
   protected readonly loadingMore = signal<CustomerStatus | null>(null);
   protected readonly blacklistingName = signal('');
   protected readonly deletingName = signal('');
-  protected readonly deletingHasSourceLead = signal(false);
+  protected readonly deletingError = signal('');
 
   protected readonly loading = this.boardResource.isLoading;
   protected readonly failed = computed(() => !!this.boardResource.error());
@@ -130,16 +143,16 @@ export class CustomerBoard {
   protected retryLoad(): void {
     this.boardResource.reload();
   }
-  protected readonly canCreate = computed(() => canCreateCustomer(this.capabilities()));
-  protected readonly totalItems = computed(() => this.lanes().reduce((sum, lane) => sum + lane.total, 0));
+  protected readonly canCreate = computed(() => !this.readOnly() && canCreateCustomer(this.capabilities()));
+  protected readonly totalItems = computed(() => this.counts().ALL ?? this.lanes().reduce((sum, lane) => sum + lane.items.length, 0));
 
   protected readonly canDragItem = (item: CustomerBoardItem): boolean =>
-    canManageStatus() && canUpdateCustomer(this.capabilities(), item);
+    canManageCustomerStatus(item.branchId) && this.canUpdate(item);
 
   protected readonly boardLanes = computed<BoardLane<CustomerBoardItem>[]>(() => {
     this.i18n();
     const loadingStatus = this.loadingMore();
-    const statusAllowed = canManageStatus();
+    const statusAllowed = !this.readOnly() && canManageCustomerStatus(this.body().branchId);
     const createAllowed = this.canCreate();
 
     return this.lanes().map((lane) => {
@@ -195,25 +208,17 @@ export class CustomerBoard {
     };
   });
 
-  constructor() {
-    effect(() => {
-      const current = this.counts();
-      if (current) {
-        untracked(() => this.countsLoaded.emit(current));
-      }
-    });
-  }
 
   refresh(): void {
     this.refreshTick.update((n) => n + 1);
   }
 
   protected canUpdate(item: CustomerBoardItem): boolean {
-    return canUpdateCustomer(this.capabilities(), item);
+    return !this.readOnly() && canUpdateCustomer(this.capabilities(), item);
   }
 
   protected canDelete(item: CustomerBoardItem): boolean {
-    return canDeleteCustomer(this.capabilities(), item);
+    return !this.readOnly() && canDeleteCustomer(this.capabilities(), item);
   }
 
   protected setExpanded(status: string, customerId: string, expanded: boolean): void {
@@ -257,7 +262,9 @@ export class CustomerBoard {
   }
 
   private async loadMore(lane: CustomerBoardLane): Promise<void> {
+    if (this.loadingMore()) return;
     this.loadingMore.set(lane.status);
+    this.laneErrors.update((errors) => ({ ...errors, [lane.status]: undefined }));
     try {
       const next = await loadStatusPage(lane.status, this.body(), lane.page + 1);
       this.lanes.update((lanes) =>
@@ -271,6 +278,7 @@ export class CustomerBoard {
           ? this.transloco.translate('customers.search.invalid')
           : customerErrorMessage(error, this.transloco, 'customers.empty.loadFailed');
       this.notify.error(message);
+      this.laneErrors.update((errors) => ({ ...errors, [lane.status]: message }));
     } finally {
       this.loadingMore.set(null);
     }
@@ -303,6 +311,7 @@ export class CustomerBoard {
         })),
       );
       this.notify.error(customerErrorMessage(error, this.transloco, 'customers.rate.failed'));
+      this.handleWriteError(error);
     }
   }
 
@@ -333,6 +342,7 @@ export class CustomerBoard {
         })),
       );
       this.notify.error(customerErrorMessage(error, this.transloco, 'customers.color.failed'));
+      this.handleWriteError(error);
     }
   }
 
@@ -340,50 +350,35 @@ export class CustomerBoard {
     if (!this.canDelete(customer) || customer.status === 'BLACKLISTED' || this.deleteInFlight) return;
     this.deleteInFlight = true;
     try {
-      let hasSourceLead = false;
-      try {
-        const detail = await getCustomer(customer.id);
-        hasSourceLead = Boolean(detail.sourceLeadId);
-      } catch (error) {
-        this.notify.error(customerErrorMessage(error, this.transloco, 'customers.delete.failed'));
-        if (error instanceof ApiError && error.status === 404) {
-          this.refresh();
-        }
-        return;
-      }
-
+      this.deletingError.set('');
       this.deletingName.set(customer.displayName);
-      this.deletingHasSourceLead.set(hasSourceLead);
-      if (!(await this.deleteDialog().open())) return;
+      while (await this.deleteDialog().open()) {
+        if (!this.canDelete(customer)) return;
+        const beforeLanes = this.lanes();
+        this.lanes.update((lanes) =>
+          lanes.map((lane) =>
+            lane.items.some((item) => item.id === customer.id)
+              ? {
+                  ...lane,
+                  items: lane.items.filter((item) => item.id !== customer.id),
+                  total: typeof lane.total === 'number' ? Math.max(0, lane.total - 1) : lane.total,
+                }
+              : lane,
+          ),
+        );
 
-      const beforeLanes = this.lanes();
-      const beforeCounts = this.counts();
-      this.lanes.update((lanes) =>
-        lanes.map((lane) =>
-          lane.items.some((item) => item.id === customer.id)
-            ? {
-                ...lane,
-                items: lane.items.filter((item) => item.id !== customer.id),
-                total: Math.max(0, lane.total - 1),
-              }
-            : lane,
-        ),
-      );
-      if (beforeCounts) {
-        this.counts.set({
-          ...beforeCounts,
-          ALL: Math.max(0, beforeCounts.ALL - 1),
-          [customer.status]: Math.max(0, beforeCounts[customer.status] - 1),
-        });
-      }
-
-      try {
-        await deleteCustomer(customer.id);
-        this.notify.success(this.transloco.translate('customers.delete.done'));
-      } catch (error) {
-        this.lanes.set(beforeLanes);
-        this.counts.set(beforeCounts);
-        this.notify.error(customerErrorMessage(error, this.transloco, 'customers.delete.failed'));
+        try {
+          await deleteCustomer(customer.id);
+          this.refresh();
+          this.notify.success(this.transloco.translate('customers.delete.done'));
+          return;
+        } catch (error) {
+          this.lanes.set(beforeLanes);
+          this.notify.error(customerErrorMessage(error, this.transloco, 'customers.delete.failed'));
+          this.handleWriteError(error);
+          if (!(error instanceof ApiError) || error.status !== 409 || !error.code.startsWith('CUSTOMER_PROFILE_')) return;
+          this.deletingError.set(customerErrorMessage(error, this.transloco, 'customers.delete.failed'));
+        }
       }
     } finally {
       this.deleteInFlight = false;
@@ -407,7 +402,7 @@ export class CustomerBoard {
       return;
     }
 
-    if (!canManageStatus()) {
+    if (!canManageCustomerStatus(item.branchId) || !this.canUpdate(item)) {
       board?.revert(customerId);
       this.notify.error(this.transloco.translate('customers.board.deniedStatus'));
       return;
@@ -427,7 +422,12 @@ export class CustomerBoard {
       }
     }
 
-    board?.applyMove(customerId, fromLane.status, toLane.status);
+    if (typeof fromLane.total === 'number' && typeof toLane.total === 'number') {
+      board?.applyMove(customerId, fromLane.status, toLane.status);
+    } else {
+      // The shared optimistic board requires numeric totals. Preserve unknown counts until the response.
+      board?.revert(customerId);
+    }
 
     const statusLabel = this.transloco.translate(`customers.statuses.${toLane.status}`);
     try {
@@ -443,29 +443,21 @@ export class CustomerBoard {
             return {
               ...lane,
               items: lane.items.filter((entry) => entry.id !== customerId),
-              total: Math.max(0, lane.total - 1),
+              total: typeof lane.total === 'number' ? Math.max(0, lane.total - 1) : lane.total,
             };
           }
           if (lane.status === toLane.status) {
             return {
               ...lane,
               items: [updatedItem, ...lane.items],
-              total: lane.total + 1,
+              total: typeof lane.total === 'number' ? lane.total + 1 : lane.total,
             };
           }
           return lane;
         }),
       );
-      this.counts.update((currentCounts) =>
-        currentCounts
-          ? {
-              ...currentCounts,
-              [fromLane.status]: Math.max(0, currentCounts[fromLane.status] - 1),
-              [toLane.status]: currentCounts[toLane.status] + 1,
-            }
-          : currentCounts,
-      );
       this.notify.success(this.transloco.translate('customers.board.moved', { status: statusLabel }));
+      this.refresh();
     } catch (error) {
       board?.revert(customerId);
       if (
@@ -473,9 +465,19 @@ export class CustomerBoard {
         (error.status === 409 || error.code === 'CRM.CUSTOMER_PROFILE.CONCURRENT_UPDATE')
       ) {
         this.notify.error(this.transloco.translate('customers.board.concurrentUpdate'));
+        this.refresh();
         return;
       }
       this.notify.error(customerErrorMessage(error, this.transloco, 'customers.board.moveFailed'));
+      this.handleWriteError(error);
     }
+  }
+
+  private handleWriteError(error: unknown): void {
+    if (customerReadOnlyError(error)) {
+      this.readOnly.set(true);
+      this.readOnlyDetected.emit();
+    }
+    if (customerNeedsReload(error)) this.refresh();
   }
 }

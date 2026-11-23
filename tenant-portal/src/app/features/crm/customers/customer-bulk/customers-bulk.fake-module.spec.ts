@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { resetBulkJobsFake } from '../../../../shared/bulk-jobs/bulk-jobs.fake';
 import {
   getBulkJob,
   listBulkJobItems,
@@ -56,6 +57,7 @@ async function finish(jobId: string): Promise<BulkJob> {
 }
 
 beforeEach(() => {
+  resetBulkJobsFake();
   vi.useFakeTimers();
 });
 

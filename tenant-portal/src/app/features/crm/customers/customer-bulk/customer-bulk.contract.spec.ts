@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { resetBulkJobsFake } from '../../../../shared/bulk-jobs/bulk-jobs.fake';
 import type { TranslocoService } from '@jsverse/transloco';
 import ar from '../../../../../../public/i18n/customer-bulk/ar.json';
 import en from '../../../../../../public/i18n/customer-bulk/en.json';
@@ -80,6 +81,7 @@ async function rejectCode(body: BulkJobSubmit): Promise<string | undefined> {
 }
 
 beforeEach(() => {
+  resetBulkJobsFake();
   vi.useFakeTimers();
 });
 

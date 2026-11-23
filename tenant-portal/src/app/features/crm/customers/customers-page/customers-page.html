@@ -1,3 +1,8 @@
+@if (!canRead()) {
+  <ui-full-state kind="forbidden" [title]="'customers.states.forbidden' | transloco" />
+} @else if (!branchId()) {
+  <ui-full-state kind="provisioning" [title]="'customers.states.chooseBranch' | transloco" />
+} @else {
 <div class="flex shrink-0 items-center gap-8 rounded-10 bg-surface p-8 shadow-card">
   @if (canCreate()) {
     <button type="button" uiButton class="shrink-0" (click)="openCreate()">
@@ -67,6 +72,12 @@
 }
 
 @if (advancedVisible()) {
+  @for (catalogue of unavailableCatalogues(); track catalogue.id) {
+    <ui-field [label]="'customers.search.fields.' + catalogue.id + '.label' | transloco"
+      [hint]="'customers.search.catalogueDenied' | transloco">
+      <input disabled [value]="'customers.search.catalogueDenied' | transloco" />
+    </ui-field>
+  }
   <ui-query-builder
     panelId="customers-advanced-search"
     [fields]="store.fields()"
@@ -97,11 +108,11 @@
       [ready]="ready()"
       [hasFilter]="hasSearch()"
       [capabilities]="capabilities()"
+      (readOnlyDetected)="writeReadOnly.set(true)"
       (create)="openCreate($event)"
       (view)="openCustomer($event)"
       (activities)="openActivities($event)"
       (clearSearch)="clearAllFilters()"
-      (countsLoaded)="onCountsLoaded($event)"
     />
   }
   @case ('cards') {
@@ -111,6 +122,7 @@
       [status]="status()"
       [hasFilter]="hasListFilter()"
       [capabilities]="capabilities()"
+      (readOnlyDetected)="writeReadOnly.set(true)"
       [page]="page()"
       [pageSize]="pageSize()"
       (pageChange)="setPage($event)"
@@ -119,7 +131,6 @@
       (activities)="openActivities($event)"
       (create)="openCreate()"
       (clearSearch)="clearAllFilters()"
-      (countsLoaded)="onCountsLoaded($event)"
     />
   }
   @case ('table') {
@@ -129,6 +140,7 @@
       [status]="status()"
       [hasFilter]="hasListFilter()"
       [capabilities]="capabilities()"
+      (readOnlyDetected)="writeReadOnly.set(true)"
       [selectionEnabled]="canUseBulk()"
       [page]="page()"
       [pageSize]="pageSize()"
@@ -140,7 +152,6 @@
       (activities)="openActivities($event)"
       (create)="openCreate()"
       (clearSearch)="clearAllFilters()"
-      (countsLoaded)="onCountsLoaded($event)"
     />
   }
 }
@@ -177,3 +188,4 @@
   [branchId]="branchId() ?? ''"
   (submitted)="onBulkSubmitted()"
 />
+}

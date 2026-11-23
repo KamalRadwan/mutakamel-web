@@ -935,7 +935,8 @@ export function mapServerErrors(error: unknown, draft?: CustomerDraft): DraftErr
   if (!code) return {};
 
   const errors: DraftErrors = {};
-  const fieldKey = typeof details?.['fieldKey'] === 'string' ? details['fieldKey'] : '';
+  const rawFieldKey = details?.['fieldKey'];
+  const fieldKey = typeof rawFieldKey === 'string' ? rawFieldKey : Array.isArray(rawFieldKey) && typeof rawFieldKey[0] === 'string' ? rawFieldKey[0] : '';
   const field = code === 'CRM_VALIDATION_FAILED' ? validationErrorPath(details) : '';
 
   if (code === 'CUSTOMER_PROFILE_CONTACT_NAME_REQUIRED' || code.endsWith('.CUSTOMER_PROFILE_CONTACT_NAME_REQUIRED')) {

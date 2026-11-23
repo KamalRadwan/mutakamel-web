@@ -19,7 +19,6 @@ import {
   tablerCalendarPlus,
   tablerCheck,
   tablerCircleDot,
-  tablerCircleX,
   tablerMail,
   tablerMap2,
   tablerPhone,
@@ -30,13 +29,14 @@ import { CurrentUser } from '../../../../../core/auth/current-user';
 import { LanguageState } from '../../../../../core/i18n/language';
 import { PluralKeyPipe } from '../../../../../core/i18n/plural';
 import { Notify } from '../../../../../core/notify/notify';
-import { ScopeState } from '../../../../../core/scope/scope';
+import { sessionBranch } from '../../../shared/lookups/session-branch';
 import { BulkJobsTracker } from '../../../../../shared/bulk-jobs/bulk-jobs-tracker';
 import { BulkJobSelection, BulkJobSubmit } from '../../../../../shared/bulk-jobs/bulk-jobs.model';
 import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { DateField } from '../../../../../shared/ui/date-time/date-field';
 import { TimeField } from '../../../../../shared/ui/date-time/time-field';
 import { Dropdown, DropdownOption } from '../../../../../shared/ui/dropdown/dropdown';
+import { FullState } from '../../../../../shared/ui/full-state/full-state';
 import { Field } from '../../../../../shared/ui/field/field';
 import { Segmented, SegmentedOption } from '../../../../../shared/ui/segmented/segmented';
 import { Switch } from '../../../../../shared/ui/switch/switch';
@@ -56,8 +56,8 @@ import {
   toLocalDateTime,
 } from '../../../../../shared/widgets/activities/activity-form/activity-form.model';
 import { BulkRunModal } from '../../../shared/record/bulk/bulk-run-modal/bulk-run-modal';
-import { errorCodeOf } from '../../../settings/shared/settings-api';
-import { getCustomerCapabilities, listBranchOwners } from '../../customers.api';
+import { ApiError, errorCodeOf } from '../../../settings/shared/settings-api';
+import { listCustomerBulkOwners } from '../customer-bulk.api';
 import { CustomerCapabilities, OwnerOption } from '../../customers.model';
 import {
   CUSTOMERS_BULK_APP,
@@ -66,6 +66,8 @@ import {
   SelectedCustomerRow,
   extractBulkErrorParams,
   translateCustomerBulkError,
+  customerBulkReadOnly,
+  customerBulkLoadFailure,
 } from '../customer-bulk.model';
 import { CustomerBulkSubmitKey } from '../customer-bulk-submit-key';
 import { CustomerSelection } from '../customer-selection';
@@ -132,6 +134,7 @@ function parseCustomGapMinutes(raw: string): number | null {
     DateField,
     TimeField,
     Dropdown,
+    FullState,
     Field,
     Segmented,
     Switch,
@@ -148,7 +151,6 @@ function parseCustomGapMinutes(raw: string): number | null {
       tablerCircleDot,
       tablerCheck,
       tablerAlertTriangle,
-      tablerCircleX,
     }),
   ],
   templateUrl: './customer-bulk-activity-modal.html',
@@ -163,7 +165,6 @@ export class CustomerBulkActivityModal {
   private readonly i18n = translationEvents(this.transloco);
   private readonly language = inject(LanguageState).current;
   private readonly currentUser = inject(CurrentUser);
-  private readonly scopeState = inject(ScopeState);
   private readonly notify = inject(Notify);
   private readonly selection = inject(CustomerSelection, { optional: true });
   private readonly tracker = inject(BulkJobsTracker);
@@ -182,8 +183,11 @@ export class CustomerBulkActivityModal {
 
   protected readonly rows = signal<SelectedCustomerRow[]>([]);
   protected readonly owners = signal<OwnerOption[]>([]);
+  protected readonly ownersDenied = signal(false);
   protected readonly resolving = signal(false);
   protected readonly submitting = signal(false);
+  protected readonly readOnly = signal(false);
+  protected readonly loadFailure = signal<string | null>(null);
   protected readonly nowMs = signal(Date.now());
 
   protected readonly type = signal<ActivityType>(DEFAULT_TYPE);
@@ -218,7 +222,10 @@ export class CustomerBulkActivityModal {
   private openSeq = 0;
   private readonly submitKey = new CustomerBulkSubmitKey();
 
-  private readonly effectiveBranchId = computed(() => this.branchId().trim() || this.scopeState.branch().id);
+  private readonly effectiveBranchId = computed(() => {
+    const branchId = sessionBranch()?.branchId ?? '';
+    return !this.branchId() || this.branchId() === branchId ? branchId : '';
+  });
 
   protected readonly displayCount = computed(() =>
     this.resolving() && this.rows().length === 0 ? (this.selection?.count() ?? 0) : this.rows().length,
@@ -437,6 +444,8 @@ export class CustomerBulkActivityModal {
   protected readonly submitBlocked = computed(
     () =>
       this.resolving() ||
+      this.readOnly() ||
+      this.loadFailure() !== null ||
       this.submitting() ||
       this.rows().length === 0 ||
       this.hasValidationIssue(),
@@ -679,6 +688,11 @@ export class CustomerBulkActivityModal {
     return `${startText}–${this.formatTime(end)}`;
   }
 
+  protected retryLoad(): void {
+    this.loadFailure.set(null);
+    void Promise.all([this.loadOwners(this.openSeq), this.resolveRows(this.openSeq, this.rows())]);
+  }
+
   protected async submit(): Promise<void> {
     this.revealAllErrors.set(true);
     if (this.submitBlocked()) return;
@@ -753,6 +767,8 @@ export class CustomerBulkActivityModal {
       this.modal().close();
       this.submitted.emit(res.jobId);
     } catch (error) {
+      this.submitKey.failed(error);
+      this.readOnly.update((value) => value || customerBulkReadOnly(error));
       const code = errorCodeOf(error);
       if (code === 'BULK_JOB_ACTIVE') {
         this.allowClose = true;
@@ -761,6 +777,7 @@ export class CustomerBulkActivityModal {
       }
       const mapped = translateCustomerBulkError(this.transloco, code, extractBulkErrorParams(error));
       this.requestError.set(mapped);
+      this.notify.error(mapped);
       if (code === 'CUSTOMER_BULK_START_IN_PAST') {
         this.serverStartError.set(mapped);
         this.focusStartControl();
@@ -773,6 +790,7 @@ export class CustomerBulkActivityModal {
   private async initOpen(rows?: readonly SelectedCustomerRow[]): Promise<void> {
     const seq = ++this.openSeq;
     this.submitKey.reset();
+    this.loadFailure.set(null);
     this.allowClose = false;
     this.resetForm();
 
@@ -786,23 +804,27 @@ export class CustomerBulkActivityModal {
 
   private async loadOwners(seq: number): Promise<void> {
     const branchId = this.effectiveBranchId();
+    this.ownersDenied.set(false);
     try {
-      const [rawOwners, resolvedCaps] = await Promise.all([
-        listBranchOwners(branchId),
-        this.capabilities() && this.capabilities()!.branchId === branchId
-          ? Promise.resolve(this.capabilities())
-          : getCustomerCapabilities(branchId).catch(() => null),
-      ]);
+      const allowed = await listCustomerBulkOwners(branchId);
       if (seq !== this.openSeq) return;
-      const ownerFilter = resolvedCaps?.customerProfiles.update?.ownerUserIds ?? null;
-      const allowed = ownerFilter ? rawOwners.filter((o) => ownerFilter.includes(o.userId)) : rawOwners;
       this.owners.set(allowed);
       if (this.assigneeMode() === 'other' && !this.chosenAssigneeId()) {
         this.chosenAssigneeId.set(allowed[0]?.userId ?? '');
       }
-    } catch {
+    } catch (error) {
       if (seq !== this.openSeq) return;
+      const failure = customerBulkLoadFailure(error);
+      if (failure !== null) {
+        this.loadFailure.set(failure);
+        return;
+      }
       this.owners.set([]);
+      this.ownersDenied.set(error instanceof ApiError && error.status === 403);
+      const code = errorCodeOf(error);
+      const message = translateCustomerBulkError(this.transloco, code, extractBulkErrorParams(error));
+      this.requestError.set(message);
+      this.notify.error(message);
     }
   }
 
@@ -824,6 +846,11 @@ export class CustomerBulkActivityModal {
       this.rows.set(resolved);
     } catch (error) {
       if (seq !== this.openSeq) return;
+      const failure = customerBulkLoadFailure(error);
+      if (failure !== null) {
+        this.loadFailure.set(failure);
+        return;
+      }
       const code = errorCodeOf(error);
       this.notify.error(translateCustomerBulkError(this.transloco, code, extractBulkErrorParams(error)));
       this.allowClose = true;

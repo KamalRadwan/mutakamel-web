@@ -1,18 +1,16 @@
-import { Injectable, computed, resource, signal } from '@angular/core';
+import { Injectable, computed, inject, resource, signal } from '@angular/core';
+import { TenantScopeState } from '../../../../core/scope/tenant-scope';
+import { can } from '../../../../shared/widgets/dashboard/analytics-permissions';
 import { GeoCountry } from '../../../../core/geo/geo.model';
 import { ApiError } from '../../settings/shared/settings-api';
 import {
-  canManageStatus,
-  canManageTags,
   getCustomerCapabilities,
-  listBranchOwners,
-  listBranches,
-  listCountries,
-  listCustomerCustomFields,
-  listCustomerStatusOptions,
-  listSources,
-  listTags,
 } from '../customers.api';
+import {
+  canManageFormStatus, listFormBranches as listBranches, listFormOwners,
+  listFormCustomFields as listCustomerCustomFields, listFormStatuses as listCustomerStatusOptions,
+  listFormSources as listSources, listFormTags as listTags, listFormCurrencies, listFormCountries,
+} from './customer-lookups.api';
 import {
   BranchOption,
   CustomerCapabilities,
@@ -40,6 +38,7 @@ async function loadNullable<T>(loader: () => Promise<T[]>): Promise<T[] | null> 
 }
 
 async function loadCapabilities(branchId: string): Promise<CustomerCapabilities | null> {
+  if (!can('crm.customer_profiles.read')) return null;
   try {
     return await getCustomerCapabilities(branchId);
   } catch {
@@ -49,11 +48,13 @@ async function loadCapabilities(branchId: string): Promise<CustomerCapabilities 
 
 @Injectable()
 export class CustomerLookups {
+  private readonly tenant = inject(TenantScopeState);
   private readonly branchId = signal<string | null>(null);
   private readonly mode = signal<'create' | 'edit' | 'view'>('create');
   private readonly addedTags = signal<TagSummary[]>([]);
 
   private readonly branchesResource = resource({
+    params: () => this.tenant.selection(),
     loader: () => loadList(listBranches),
   });
 
@@ -66,7 +67,7 @@ export class CustomerLookups {
   });
 
   private readonly statusOptionsResource = resource({
-    loader: () => loadList(listCustomerStatusOptions),
+    loader: () => loadNullable(listCustomerStatusOptions),
   });
 
   private readonly customFieldsResource = resource({
@@ -74,8 +75,14 @@ export class CustomerLookups {
   });
 
   private readonly countriesResource = resource({
-    loader: () => loadList(listCountries),
+    loader: listFormCountries,
   });
+  private readonly currenciesResource = resource({ loader: listFormCurrencies });
+  readonly currencies = computed(() => this.currenciesResource.hasValue() ? this.currenciesResource.value() : []);
+  readonly geoFailed = computed(() => this.countriesResource.error() !== undefined);
+  readonly loading = computed(() => this.branchesResource.isLoading() || this.statusOptionsResource.isLoading()
+    || this.customFieldsResource.isLoading() || this.capabilitiesResource.isLoading());
+  readonly customFieldsUnavailable = computed(() => this.customFieldsResource.hasValue() && this.customFieldsResource.value() === null);
 
   private readonly capabilitiesResource = resource({
     params: () => ({ branchId: this.branchId() }),
@@ -83,8 +90,8 @@ export class CustomerLookups {
   });
 
   private readonly ownersResource = resource({
-    params: () => ({ branchId: this.branchId() }),
-    loader: ({ params }) => (params.branchId ? loadList(() => listBranchOwners(params.branchId!)) : Promise.resolve([])),
+    params: () => ({ branchId: this.branchId(), mode: this.mode() }),
+    loader: ({ params }) => (params.branchId ? loadNullable(() => listFormOwners(params.branchId!, params.mode === 'create' ? 'create' : 'update')) : Promise.resolve([])),
   });
 
   readonly branches = computed<BranchOption[]>(() =>
@@ -109,8 +116,9 @@ export class CustomerLookups {
   });
 
   readonly statusOptions = computed<CustomerStatusOption[]>(() =>
-    this.statusOptionsResource.hasValue() ? this.statusOptionsResource.value() : [],
+    (this.statusOptionsResource.hasValue() ? this.statusOptionsResource.value() : []) ?? [],
   );
+  readonly statusUnavailable = computed(() => this.statusOptionsResource.hasValue() && this.statusOptionsResource.value() === null);
 
   readonly customFields = computed<CustomerCustomField[] | null>(() =>
     this.customFieldsResource.hasValue() ? this.customFieldsResource.value() : [],
@@ -126,15 +134,16 @@ export class CustomerLookups {
 
   readonly ownersLoading = computed(() => this.ownersResource.isLoading());
 
-  readonly canManageStatus = signal(canManageStatus()).asReadonly();
-  readonly canCreateTag = signal(canManageTags()).asReadonly();
+  readonly canManageStatus = computed(() => { this.tenant.me(); return canManageFormStatus(); });
+  readonly canCreateTag = computed(() => { this.tenant.me(); return can('crm.tags.manage'); });
+  readonly ownersUnavailable = computed(() => this.ownersResource.hasValue() && this.ownersResource.value() === null);
 
   readonly canCreate = computed(() => (this.capabilities()?.customerProfiles.create ?? null) !== null);
   readonly canUpdate = computed(() => (this.capabilities()?.customerProfiles.update ?? null) !== null);
   readonly canDelete = computed(() => (this.capabilities()?.customerProfiles.delete ?? null) !== null);
 
   readonly owners = computed<OwnerOption[]>(() => {
-    const raw = this.ownersResource.hasValue() ? this.ownersResource.value() : [];
+    const raw = (this.ownersResource.hasValue() ? this.ownersResource.value() : []) ?? [];
     const caps = this.capabilities();
     if (!caps) return [];
     const scope = this.mode() === 'create' ? caps.customerProfiles.create : caps.customerProfiles.update;
@@ -155,4 +164,6 @@ export class CustomerLookups {
   addTag(tag: TagSummary): void {
     this.addedTags.update((list) => [...list.filter((item) => item.id !== tag.id), tag]);
   }
+
+  retryGeo(): void { this.countriesResource.reload(); }
 }

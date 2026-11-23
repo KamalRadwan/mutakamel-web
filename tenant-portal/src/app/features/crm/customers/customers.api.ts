@@ -1,38 +1,30 @@
 import { listCountries as listGeoCountries } from '../../../core/geo/geo.api';
 import { GeoCountry } from '../../../core/geo/geo.model';
+import { ApiError, isRetryableWriteError } from '../../../core/api/api-errors';
+import { newIdempotencyKey } from '../../../core/api/idempotency';
+import { type CoreWriteMethod } from '../../../core/api/core-http';
+import { crmHttp, crmQueries, type CrmHttpTransport } from '../shared/crm-http';
+import { runInCrm } from '../shared/crm-runtime';
+import { sessionBranch } from '../shared/lookups/session-branch';
 import {
-  fakeAttachCustomerTags,
   fakeCanExport,
   fakeCanManageStatus,
   fakeCanManageTags,
-  fakeChangeCustomerContact,
-  fakeCheckDuplicates,
-  fakeCreateCustomer,
-  fakeDeleteCustomer,
-  fakeDetachCustomerTag,
-  fakeGetCustomer,
-  fakeGetCustomerCapabilities,
   fakeListBranchOwners,
   fakeListBranches,
   fakeListCurrencies,
   fakeListCustomerCustomFields,
   fakeListCustomerStatusOptions,
-  fakeListCustomerTags,
   fakeListSources,
   fakeListTags,
-  fakeLoadBoard,
-  fakeLoadStatusPage,
-  fakePatchCustomer,
-  fakeSearchCustomerProfiles,
-  fakeSetCustomerColor,
-  fakeSetCustomerRating,
-  fakeSetCustomerStatus,
 } from './customers.fake';
 import {
   BoardLane,
   BoardResponse,
   BranchOption,
   CUSTOMER_LIST_LIMIT,
+  CUSTOMER_BOARD_LIMIT,
+  CustomerBoardItem,
   CardColor,
   ContactChangeBody,
   CreateCustomerBody,
@@ -104,9 +96,15 @@ export const CUSTOMER_ERROR_KEYS: Record<string, string> = {
   'GW.IDEM.MISMATCH': 'customers.errors.GW.IDEM.MISMATCH',
 };
 
-/** POST /api/tenant/crm/v1/customer-profiles/board — returns all status lanes (limit 50) and counts. */
-export function loadBoard(body: CustomerSearchBody): Promise<BoardResponse> {
-  return fakeLoadBoard(body);
+/** No scope headers: branchId is in the body. Wave B returns status counts independently of lanes. */
+export async function loadBoard(body: CustomerSearchBody): Promise<BoardResponse> {
+  const query = imageSearchBody(body, 1, CUSTOMER_BOARD_LIMIT);
+  const result = await crmQueries().fetchQuery({
+    queryKey: [...customerQueryKey, 'board', query],
+    queryFn: () => customerRequest<BoardResponse>('POST', '/customer-profiles/board', query),
+  });
+  rememberCustomerTokens(result.statuses.flatMap((lane) => lane.items));
+  return result;
 }
 
 /** POST /api/tenant/crm/v1/customer-profiles/board/statuses/:status — load the next page for one status lane. */
@@ -115,41 +113,75 @@ export function loadStatusPage(
   body: CustomerSearchBody,
   page: number,
 ): Promise<BoardLane> {
-  return fakeLoadStatusPage(status, body, page);
+  const query = imageSearchBody(body, Math.max(2, page), CUSTOMER_BOARD_LIMIT);
+  return crmQueries().fetchQuery({
+    queryKey: [...customerQueryKey, 'lane', status, query],
+    queryFn: async () => {
+      // No scope headers: branchId is in the body, status in the route.
+      const result = await customerRequest<BoardLane>('POST', `/customer-profiles/board/statuses/${status}`, query);
+      rememberCustomerTokens(result.items);
+      return result;
+    },
+  });
 }
 
-/** POST /api/tenant/crm/v1/customer-profiles/search — paged list search (with optional status counts). */
-export function searchCustomers(
+/** No scope headers: branchId is in the body. Wave B search returns the status-filter counts. */
+export async function searchCustomers(
   body: CustomerSearchBody,
   page = body.page ?? 1,
   limit = body.limit ?? CUSTOMER_LIST_LIMIT,
 ): Promise<SearchResponse> {
-  return fakeSearchCustomerProfiles(body, page, limit);
+  const query = { ...imageSearchBody(body, page, limit), includeStatusCounts: true };
+  const result = await crmQueries().fetchQuery({
+    queryKey: [...customerQueryKey, 'search', query],
+    queryFn: () => customerRequest<SearchResponse>('POST', '/customer-profiles/search', query),
+  });
+  rememberCustomerTokens(result.items);
+  return result;
 }
 
 /** GET /api/tenant/crm/v1/customer-profiles/:id */
-export function getCustomer(id: string): Promise<CustomerDetail> {
-  return fakeGetCustomer(id);
+export async function getCustomer(id: string): Promise<CustomerDetail> {
+  // No scope headers: the record route resolves its branch.
+  const detail = await crmQueries().fetchQuery({
+    queryKey: [...customerQueryKey, 'detail', id],
+    staleTime: 0,
+    queryFn: () => crmHttp().read<CustomerDetail>(`/customer-profiles/${id}`),
+  });
+  rememberCustomerTokens([detail]);
+  return detail;
 }
 
 /** POST /api/tenant/crm/v1/customer-profiles (header x-idempotency-key UUIDv7) */
-export function createCustomer(body: CreateCustomerBody, idempotencyKey: string): Promise<CustomerDetail> {
-  return fakeCreateCustomer(body, idempotencyKey);
+export async function createCustomer(body: CreateCustomerBody, idempotencyKey: string): Promise<CustomerDetail> {
+  // No scope headers: branchId is in the create body.
+  const saved = await customerRequest<CustomerDetail>('POST', '/customer-profiles', imageCreateBody(body), idempotencyKey);
+  rememberCustomerTokens([saved]);
+  await refreshCustomerQueries();
+  return saved;
 }
 
 /** PATCH /api/tenant/crm/v1/customer-profiles/:id */
-export function patchCustomer(id: string, body: UpdateCustomerBody): Promise<CustomerDetail> {
-  return fakePatchCustomer(id, body);
+export async function patchCustomer(id: string, body: UpdateCustomerBody): Promise<CustomerDetail> {
+  if (!body.expectedUpdatedAt) throw new ApiError(409, 'CRM.CUSTOMER_PROFILE.CONCURRENT_UPDATE');
+  // Contacts are saved individually through changeCustomerContact, never as a replacement list.
+  const { contacts: _contacts, contactChange: _change, ...patch } = body;
+  const allowed = pickCustomerFields(patch);
+  // No scope headers: the record route resolves its branch.
+  const saved = await customerRequest<CustomerDetail>('PATCH', `/customer-profiles/${id}`, allowed);
+  rememberCustomerTokens([saved]);
+  await refreshCustomerQueries();
+  return saved;
 }
 
 /** PATCH /api/tenant/crm/v1/customer-profiles/:id { rating } */
 export function setCustomerRating(id: string, rating: number): Promise<CustomerDetail> {
-  return fakeSetCustomerRating(id, rating);
+  return writeCustomerInline(id, { rating });
 }
 
 /** PATCH /api/tenant/crm/v1/customer-profiles/:id { cardColor } */
 export function setCustomerColor(id: string, cardColor: CardColor | null): Promise<CustomerDetail> {
-  return fakeSetCustomerColor(id, cardColor);
+  return writeCustomerInline(id, { cardColor });
 }
 
 /** PATCH /api/tenant/crm/v1/customer-profiles/:id { status, expectedUpdatedAt } */
@@ -158,41 +190,138 @@ export function setCustomerStatus(
   status: CustomerStatus,
   expectedUpdatedAt?: string,
 ): Promise<CustomerDetail> {
-  return fakeSetCustomerStatus(id, status, expectedUpdatedAt);
+  return writeCustomerInline(id, { status, expectedUpdatedAt });
 }
 
 /** DELETE /api/tenant/crm/v1/customer-profiles/:id (body { reason }) */
-export function deleteCustomer(id: string, reason?: string): Promise<void> {
-  return fakeDeleteCustomer(id, reason);
+export async function deleteCustomer(id: string, reason?: string): Promise<void> {
+  // No scope headers: the service resolves the record's branch.
+  await customerRequest<void>('DELETE', `/customer-profiles/${id}`, reason === undefined ? {} : { reason });
+  await refreshCustomerQueries();
 }
 
 /** PATCH /api/tenant/crm/v1/customer-profiles/:id { contactChange, expectedUpdatedAt } */
-export function changeCustomerContact(
+export async function changeCustomerContact(
   id: string,
   contactChange: ContactChangeBody,
   expectedUpdatedAt?: string,
 ): Promise<CustomerDetail> {
-  return fakeChangeCustomerContact(id, contactChange, expectedUpdatedAt);
+  if (!expectedUpdatedAt) throw new ApiError(409, 'CRM.CUSTOMER_PROFILE.CONCURRENT_UPDATE');
+  // No scope headers: the record route resolves its branch. One contact operation per PATCH.
+  const saved = await customerRequest<CustomerDetail>('PATCH', `/customer-profiles/${id}`, {
+    expectedUpdatedAt, contactChange,
+  });
+  rememberCustomerTokens([saved]);
+  await refreshCustomerQueries();
+  return saved;
 }
 
 /** GET /api/tenant/crm/v1/customer-profiles/:id/tags */
 export function listCustomerTags(id: string): Promise<TagView[]> {
-  return fakeListCustomerTags(id);
+  // No scope headers: the parent record resolves its branch.
+  return crmQueries().fetchQuery({
+    queryKey: [...customerQueryKey, 'tags', id],
+    queryFn: () => crmHttp().read(`/customer-profiles/${id}/tags`),
+  });
 }
 
 /** POST /api/tenant/crm/v1/customer-profiles/:id/tags */
-export function attachCustomerTags(id: string, tagIds: string[]): Promise<TagView[]> {
-  return fakeAttachCustomerTags(id, tagIds);
+export async function attachCustomerTags(id: string, tagIds: string[]): Promise<TagView[]> {
+  // No scope headers: the parent record resolves its branch.
+  try {
+    return await customerRequest<TagView[]>('POST', `/customer-profiles/${id}/tags`, { tagIds });
+  } finally {
+    await refreshCustomerQueries();
+  }
 }
 
 /** DELETE /api/tenant/crm/v1/customer-profiles/:id/tags/:tagId */
-export function detachCustomerTag(id: string, tagId: string): Promise<void> {
-  return fakeDetachCustomerTag(id, tagId);
+export async function detachCustomerTag(id: string, tagId: string): Promise<void> {
+  // No scope headers: the parent record resolves its branch.
+  try {
+    await customerRequest<void>('DELETE', `/customer-profiles/${id}/tags/${tagId}`, undefined);
+  } finally {
+    await refreshCustomerQueries();
+  }
 }
 
 /** GET /api/tenant/crm/v1/customer-profiles/capabilities?branchId=:branchId */
 export function getCustomerCapabilities(branchId: string): Promise<CustomerCapabilities> {
-  return fakeGetCustomerCapabilities(branchId);
+  const scope = runInCrm(() => sessionBranch());
+  if (!scope || scope.branchId !== branchId) return Promise.reject(new ApiError(403, 'BRANCH_CONTEXT_REQUIRED'));
+  // BRANCH_REQUIRED: both headers, validated against the selected session branch.
+  return crmQueries().fetchQuery({
+    queryKey: [...customerQueryKey, 'capabilities', scope],
+    queryFn: () => crmHttp().read('/customer-profiles/capabilities', { branchId }, { scope }),
+  });
+}
+
+const customerQueryKey = ['crm-customers'] as const;
+const customerActions = new WeakMap<CrmHttpTransport, Map<string, { body: string; key: string; blocked?: boolean }>>();
+const customerTokens = new WeakMap<CrmHttpTransport, Map<string, string>>();
+
+/** Keep the public inline signatures; their stale tokens come only from loaded list rows. */
+function rememberCustomerTokens(items: readonly CustomerBoardItem[]): void {
+  const http = crmHttp();
+  let tokens = customerTokens.get(http);
+  if (!tokens) customerTokens.set(http, (tokens = new Map()));
+  for (const item of items) tokens.set(item.id, item.updatedAt);
+}
+
+function imageSearchBody(body: CustomerSearchBody, page: number, limit: number): CustomerSearchBody {
+  const { branchId, search, searchField, tagIds, status, sort } = body;
+  const filterTree = body.filterTree ?? (body.filter?.length ? { op: 'AND' as const, children: body.filter } : undefined);
+  return {
+    branchId,
+    ...(search !== undefined ? { search } : {}),
+    ...(searchField ? { searchField } : {}),
+    ...(filterTree ? { filterTree } : {}),
+    ...(tagIds ? { tagIds } : {}),
+    ...(status ? { status } : {}),
+    ...(sort ? { sort } : {}),
+    page,
+    limit,
+  };
+}
+
+async function writeCustomerInline(id: string, patch: { rating?: number; cardColor?: CardColor | null; status?: CustomerStatus; expectedUpdatedAt?: string }): Promise<CustomerDetail> {
+  const expectedUpdatedAt = patch.expectedUpdatedAt ?? customerTokens.get(crmHttp())?.get(id);
+  if (!expectedUpdatedAt) throw new ApiError(409, 'CRM.CUSTOMER_PROFILE.CONCURRENT_UPDATE');
+  // No scope headers: record branch is resolved by the server; always send the loaded stale token.
+  const saved = await customerRequest<CustomerDetail>('PATCH', `/customer-profiles/${id}`, { ...patch, expectedUpdatedAt });
+  rememberCustomerTokens([saved]);
+  await refreshCustomerQueries();
+  return saved;
+}
+
+async function customerRequest<T>(method: CoreWriteMethod, path: string, body: unknown, suppliedKey?: string): Promise<T> {
+  const http = crmHttp();
+  let actions = customerActions.get(http);
+  if (!actions) customerActions.set(http, (actions = new Map()));
+  const action = `${method} ${path}`;
+  const bodyJson = JSON.stringify(body) ?? '';
+  const previous = actions.get(action);
+  if (previous?.blocked && previous.body === bodyJson) throw new ApiError(409, 'GW.IDEM.MISMATCH');
+  const key = suppliedKey ?? (previous?.body === bodyJson ? previous.key : newIdempotencyKey());
+  actions.delete(action);
+  try {
+    return (await crmQueries().getMutationCache().build(crmQueries(), {
+      mutationFn: () => http.write<T>(method, path, body, { key }),
+      retry: false,
+    }).execute(undefined)).data;
+  } catch (error) {
+    if (error instanceof ApiError && (error.code === 'GW.IDEM.MISMATCH' || error.code.endsWith('_IDEMPOTENCY_MISMATCH'))) {
+      actions.set(action, { body: bodyJson, key, blocked: true });
+    } else if (isRetryableWriteError(error) || (error instanceof ApiError && error.status === 401)) {
+      actions.set(action, { body: bodyJson, key });
+    }
+    throw error;
+  }
+}
+
+async function refreshCustomerQueries(): Promise<void> {
+  await crmQueries().cancelQueries({ queryKey: customerQueryKey });
+  await crmQueries().invalidateQueries({ queryKey: customerQueryKey });
 }
 
 /** GET /api/tenant/crm/v1/custom-fields?ownerType=CUSTOMER_PROFILE */
@@ -226,7 +355,35 @@ export function canExport(): boolean {
  * unavailable, the strip hides quietly and saving stays allowed (the server enforces).
  */
 export function checkDuplicates(probe: DuplicateCheckProbe): Promise<DuplicateCheckResponse> {
-  return fakeCheckDuplicates(probe);
+  // No scope headers: branchId is in the probe; this is deliberately the Leads route.
+  return crmQueries().fetchQuery({
+    queryKey: [...customerQueryKey, 'duplicates', probe],
+    queryFn: () => customerRequest('POST', '/leads/duplicate-check', probe),
+  });
+}
+
+const customerFieldNames = [
+  'expectedUpdatedAt', 'displayName', 'legalName', 'status', 'rating', 'cardColor',
+  'ownerUserId', 'acquisitionSourceId', 'companyName', 'taxNumber',
+  'commercialRegistrationNumber', 'companyPhones', 'companyEmail', 'companyWebsite',
+  'description', 'primaryContact', 'customFields', 'address',
+] as const;
+
+function pickCustomerFields<T extends UpdateCustomerBody>(body: T, includeToken = true): Partial<T> {
+  return Object.fromEntries(customerFieldNames
+    .filter((key) => (includeToken || key !== 'expectedUpdatedAt') && body[key] !== undefined)
+    .map((key) => [key, body[key]])) as Partial<T>;
+}
+
+function imageCreateBody(body: CreateCustomerBody): CreateCustomerBody {
+  const fields = pickCustomerFields(body, false);
+  return {
+    ...fields,
+    branchId: body.branchId,
+    profileType: body.profileType,
+    ...(body.tagIds ? { tagIds: body.tagIds } : {}),
+    ...(body.profileType === 'CORPORATE' && body.contacts ? { contacts: body.contacts } : {}),
+  };
 }
 
 /** GET /api/tenant/core/v1/branches */

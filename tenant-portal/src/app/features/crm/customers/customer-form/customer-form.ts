@@ -25,7 +25,8 @@ import {
   tablerTags,
   tablerUser,
 } from '@ng-icons/tabler-icons';
-import { ScopeState } from '../../../../core/scope/scope';
+import { TenantScopeState } from '../../../../core/scope/tenant-scope';
+import { sessionBranch } from '../../shared/lookups/session-branch';
 import { RecordLayout } from '../../../../shared/ui/record-layout/record-layout';
 import { SectionBar } from '../../../../shared/ui/section-bar/section-bar';
 import { PhoneActionSource } from '../../../../shared/widgets/phone-actions/phone-actions';
@@ -43,7 +44,7 @@ import { checkDuplicates } from '../customers.api';
 import { CUSTOMER_LIMITS, CardColor, CustomerStatus } from '../customers.model';
 import { CustomerDraft, DraftErrors } from './customer-draft';
 import { CustomerLookups } from './customer-lookups';
-import { CustomerClassification, pickCompanyBranchId } from './sections/classification/customer-classification';
+import { CustomerClassification } from './sections/classification/customer-classification';
 import { CustomerCompany } from './sections/company/customer-company';
 import { CustomerIdentity } from './sections/identity/customer-identity';
 import { CustomerMore } from './sections/more/customer-more';
@@ -103,7 +104,7 @@ function maxForContactField(fieldPath: string): number | undefined {
     CustomerCompany,
     CustomerMore,
   ],
-  providers: [
+  viewProviders: [
     CustomerLookups,
     provideTranslocoScope(
       { scope: 'customer-form', alias: 'customerForm' },
@@ -132,7 +133,7 @@ export class CustomerForm {
   private readonly injector = inject(Injector);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
-  private readonly scope = inject(ScopeState);
+  private readonly tenant = inject(TenantScopeState);
   readonly lookups = inject(CustomerLookups);
 
   private readonly identitySection = viewChild(CustomerIdentity);
@@ -282,24 +283,15 @@ export class CustomerForm {
 
     effect(() => {
       if (this.mode() !== 'create') return;
-      const branches = this.lookups.branches();
       const current = this.draft();
-      if (current.branchId || branches.length === 0) return;
-      const sessionCompany = this.scope.company();
-      const nextBranchId =
-        pickCompanyBranchId(
-          sessionCompany,
-          sessionCompany,
-          this.scope.branch(),
-          this.scope.companies(),
-          branches,
-        ) ?? branches[0].id;
-      const nextCompanyId = current.companyId ?? sessionCompany.id;
+      this.tenant.selection();
+      const selected = sessionBranch();
+      if (!selected || current.branchId === selected.branchId) return;
       untracked(() => {
         this.draft.update((d) => ({
           ...d,
-          companyId: d.companyId ?? nextCompanyId,
-          branchId: d.branchId ?? nextBranchId,
+          companyId: selected.companyId,
+          branchId: selected.branchId,
         }));
       });
     });

@@ -1598,7 +1598,7 @@ function assertStatusChangeAllowed(nextStatus: CustomerStatus | undefined, curre
 }
 
 /** POST /api/tenant/crm/v1/customer-profiles/board */
-export async function fakeLoadBoard(body: CustomerSearchBody): Promise<BoardResponse> {
+export async function fakeLoadBoard(body: CustomerSearchBody): Promise<BoardResponse & { counts: StatusCounts }> {
   await customerDelay();
   assertBranchContext(body.branchId);
   validateSearchBody(body, true);

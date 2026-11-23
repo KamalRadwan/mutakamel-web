@@ -1,4 +1,6 @@
-import { inject, signal } from '@angular/core';
+import { inject, signal, resource } from '@angular/core';
+import { settingsTimeZone } from '../../settings/shared/settings-time-zone';
+import { runInCrm } from '../../shared/crm-runtime';
 import { CurrentUser } from '../../../../core/auth/current-user';
 import { FieldOption, rememberFieldOptions } from '../../../../shared/query-builder/query.model';
 import { CUSTOMER_DEFAULT_SORT, CustomerSearchBody } from '../customers.model';
@@ -18,6 +20,9 @@ export type CustomerSearchStore = RecordSearchStore<CustomerSearchInitContext, C
 export function createCustomerSearchStore(): CustomerSearchStore {
   const currentUser = inject(CurrentUser, { optional: true });
   const loadedOwners = signal<FieldOption[]>([]);
+  const branch = signal('');
+  const timeZone = resource({ params: () => branch() || undefined,
+    loader: () => runInCrm(() => settingsTimeZone()).catch(() => null) });
   let ownersLoadSeq = 0;
 
   const store = createRecordSearchStore<CustomerSearchInitContext, CustomerSearchBody>({
@@ -29,6 +34,9 @@ export function createCustomerSearchStore(): CustomerSearchStore {
         ownerOptions: loadedOwners().length > 0 ? loadedOwners() : ctx.ownerOptions,
         language,
         t,
+        statuses: ctx.statuses,
+        unavailable: ctx.unavailable,
+        dateHint: timeZone.value() ? undefined : t('customers.dates.utcHint'),
       }),
     compile: (query, ctx, { currentUserId, timeZone }) => {
       const compiled = compileCustomerQuery(query, {
@@ -51,7 +59,7 @@ export function createCustomerSearchStore(): CustomerSearchStore {
     queryToFacets: (query, _ctx, { fields, t }) => queryToFacets(query, fields, t),
     rejectedKeyPrefix: 'customers.search.rejected.',
     currentUserId: () => currentUser?.userId() ?? '',
-    timeZone: () => currentUser?.timeZone() || 'Africa/Cairo',
+    timeZone: () => timeZone.value() ?? 'UTC',
     initialCtx: {
       branchId: '',
       sources: [],
@@ -80,6 +88,8 @@ export function createCustomerSearchStore(): CustomerSearchStore {
   };
 
   store.init = (ctx: CustomerSearchInitContext) => {
+    if (branch() !== ctx.branchId) loadedOwners.set([]);
+    branch.set(ctx.branchId);
     const seq = ++ownersLoadSeq;
     if (ctx.ownerOptions?.length) {
       cacheOwners(ctx.ownerOptions);

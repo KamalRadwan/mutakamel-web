@@ -20,6 +20,7 @@ import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerCheck, tablerChevronDown, tablerTrendingUp } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../../../core/i18n/language';
 import { ScopeBranch, ScopeCompany, ScopeState } from '../../../../../../core/scope/scope';
+import { TenantScopeState } from '../../../../../../core/scope/tenant-scope';
 import { Field } from '../../../../../../shared/ui/field/field';
 import { rectInPage, viewport } from '../../../../../../shared/ui/overlay/zoom';
 import { RECORD_PAGE_GRID } from '../../../../../../shared/ui/record-layout/record-layout';
@@ -178,6 +179,7 @@ export class CustomerClassification {
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly scope = inject(ScopeState);
+  private readonly tenant = inject(TenantScopeState);
   private readonly sourceTrigger = viewChild<ElementRef<HTMLButtonElement>>('sourceTrigger');
   private readonly menuListRef = viewChild<ElementRef<HTMLElement>>('menuList');
 
@@ -208,35 +210,15 @@ export class CustomerClassification {
 
   protected readonly isCreate = computed(() => this.mode() === 'create');
   protected readonly isReadonly = computed(() => this.readonly());
-  protected readonly canEditBranch = computed(() => this.isCreate() && !this.isReadonly());
-  protected readonly canEditStatus = computed(() => !this.isReadonly() && this.lookups.canManageStatus());
+  protected readonly canEditBranch = computed(() => false);
+  protected readonly canEditStatus = computed(() => !this.isReadonly() && !this.lookups.statusUnavailable() && this.lookups.canManageStatus());
 
   protected readonly activeCompany = computed<ScopeCompany | null>(() => {
-    const companies = this.scope.companies();
-    const allBranches = this.lookups.branches();
-    const branchId = this.draft().branchId;
-    const picked = this.pickedCompany();
-
-    if (picked && picked.branchId === branchId) {
-      const match = companies.find((c) => c.id === picked.companyId);
-      if (match) return match;
-    }
-
-    const explicitCompanyId = this.draft().companyId;
-    if (explicitCompanyId) {
-      const explicitMatch = companies.find((c) => c.id === explicitCompanyId);
-      if (explicitMatch) return explicitMatch;
-    }
-
-    if (branchId && allBranches.length > 0) {
-      const matched = companyForBranch(branchId, companies, allBranches);
-      if (matched) return matched;
-    }
-
-    if (this.isCreate()) {
-      return this.scope.company();
-    }
-    return null;
+    const companyId = this.tenant.selection()?.companyId;
+    if (!companyId) return null;
+    const branch = this.lookups.branches().find((item) => item.id === this.draft().branchId);
+    const name = branch?.companyName || companyId;
+    return { id: companyId, nameEn: name, nameAr: name, branches: [] };
   });
 
   protected readonly activeCompanyId = computed(() => this.activeCompany()?.id ?? '');
@@ -263,11 +245,7 @@ export class CustomerClassification {
   });
 
   protected readonly companyOptions = computed<Option[]>(() => {
-    const ar = this.language() === 'ar';
-    const list: Option[] = this.scope.companies().map((company) => ({
-      id: company.id,
-      label: ar ? company.nameAr : company.nameEn,
-    }));
+    const list: Option[] = [];
     const activeId = this.scopeCompanyId();
     if (activeId && !list.some((item) => item.id === activeId)) {
       list.unshift({ id: activeId, label: this.readonlyCompanyName() || activeId });
@@ -276,10 +254,7 @@ export class CustomerClassification {
   });
 
   private readonly filteredBranches = computed<BranchOption[]>(() => {
-    const allBranches = this.lookups.branches();
-    const company = this.activeCompany();
-    if (!company) return allBranches;
-    return branchesForCompany(company, this.scope.companies(), allBranches);
+    return this.lookups.branches();
   });
 
   protected readonly branchOptions = computed<Option[]>(() => {

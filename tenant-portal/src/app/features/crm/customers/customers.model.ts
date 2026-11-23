@@ -226,7 +226,7 @@ export type StatusCounts = Record<'ALL' | CustomerStatus, number>;
 
 export interface BoardResponse {
   statuses: BoardLane[];
-  counts: StatusCounts;
+  counts?: StatusCounts;
 }
 
 export interface SearchResponse extends Page<CustomerRow> {

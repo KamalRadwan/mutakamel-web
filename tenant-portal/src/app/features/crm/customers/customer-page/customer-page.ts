@@ -41,7 +41,12 @@ import {
 import { filter } from 'rxjs';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
-import { StaffSession } from '../../../workspace/staff/shared/staff-session';
+import { TenantScopeState } from '../../../../core/scope/tenant-scope';
+import { can } from '../../../../shared/widgets/dashboard/analytics-permissions';
+import { FullState, FullStateKind } from '../../../../shared/ui/full-state/full-state';
+import { sessionBranch } from '../../shared/lookups/session-branch';
+import { customerRecordError } from '../customer-form/customer-errors';
+import { canManageFormStatus, listFormOwners } from '../customer-form/customer-lookups.api';
 import { ActionItem, ActionSelection, ActionSwatch } from '../../../../shared/ui/actions-menu/actions-menu';
 import { Button } from '../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
@@ -53,8 +58,6 @@ import { PartyCalls } from '../../../../shared/widgets/party-calls/party-calls';
 import { getPartyCallsSummary } from '../../../../shared/widgets/party-calls/party-calls.api';
 import { RecordAttachments } from '../../../../shared/widgets/record-attachments/record-attachments';
 import {
-  canCreateRecordAttachments,
-  canDeleteRecordAttachments,
   countRecordAttachments,
 } from '../../../../shared/widgets/record-attachments/record-attachments.api';
 import { RecordHistory } from '../../../../shared/widgets/record-history/record-history';
@@ -75,7 +78,6 @@ import {
   canCreateCustomer,
   canDeleteCustomer,
   canUpdateCustomer,
-  customerErrorMessage,
   customerStatusBadgeClass,
   formatCustomerDate,
 } from '../customer-card/customer-card';
@@ -88,23 +90,20 @@ import {
   draftsEqual,
   emptyDraft,
   mapServerErrors,
-  toContactChangeBody,
   toCreateBody,
   toPatchBody,
   validateDraft,
 } from '../customer-form/customer-draft';
 import { CUSTOMER_PAGE_SECTION_ERRORS, CustomerForm } from '../customer-form/customer-form';
+import { CustomerContactSaveError, contactsAfterChange, hasCustomerContactChanges, saveCustomerContacts } from '../customer-form/customer-contact-save';
 import { isManualStatus } from '../customer-statuses';
 import {
   attachCustomerTags,
-  canManageStatus,
-  changeCustomerContact,
   createCustomer,
   deleteCustomer,
   detachCustomerTag,
   getCustomer,
   getCustomerCapabilities,
-  listBranchOwners,
   patchCustomer,
   setCustomerColor,
   setCustomerRating,
@@ -177,6 +176,7 @@ function rebaseDraft(oldBase: CustomerDraft, freshBase: CustomerDraft, currentDr
     RecordAttachments,
     RecordHistory,
     PartyCalls,
+    FullState,
   ],
   providers: [
     provideTranslocoScope(
@@ -219,7 +219,7 @@ export class CustomerPage implements CanLeaveRecord {
   private readonly location = inject(Location);
   private readonly injector = inject(Injector);
   private readonly notify = inject(Notify);
-  private readonly session = inject(StaffSession);
+  private readonly tenant = inject(TenantScopeState);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly draftStore = inject(RecordDraftStore);
@@ -247,6 +247,13 @@ export class CustomerPage implements CanLeaveRecord {
   protected readonly loading = signal(false);
   protected readonly loadFailed = signal(false);
   protected readonly scopeDenied = signal(false);
+  protected readonly loadKind = signal<FullStateKind>('load-failure');
+  protected readonly loadCorrelation = signal<string | null>(null);
+  protected readonly loadMessage = signal('');
+  protected readonly writeReadonly = signal(false);
+  protected readonly reloadRequired = signal(false);
+  protected readonly branchMissing = computed(() => { this.tenant.selection(); return !sessionBranch(); });
+  protected readonly canRead = computed(() => { this.tenant.me(); return can('crm.customer_profiles.read'); });
   protected readonly saving = signal(false);
   protected readonly deleting = signal(false);
   protected readonly instantBusy = signal(false);
@@ -326,26 +333,22 @@ export class CustomerPage implements CanLeaveRecord {
   private readonly lookupsReady = computed(() => {
     const l = this.lookups();
     if (!l) return false;
-    if (l.branches().length === 0 || l.statusOptions().length === 0) return false;
-    const branchId = this.branchId();
-    if (branchId && l.capabilities() === null && !this.capabilitiesFailed()) return false;
-    if (branchId && l.ownersLoading()) return false;
-    return true;
+    return !l.loading();
   });
 
   protected readonly showSkeleton = computed(
-    () => this.loading() || (!this.loadFailed() && !this.scopeDenied() && (!this.scopesReady() || !this.lookupsSettled())),
+    () => !this.branchMissing() && (this.loading() || (!this.loadFailed() && !this.scopeDenied() && (!this.scopesReady() || !this.lookupsSettled()))),
   );
 
   /** "Log activity" and the activities tab follow the activity-create permission, not customer update. */
-  protected readonly canLogActivity = computed(() =>
-    this.session.can('activities.create', { branchId: this.detail()?.branchId ?? null }),
-  );
+  protected readonly canLogActivity = computed(() => { this.tenant.me(); return can('activities.create'); });
 
   protected readonly canEdit = computed(() => {
+    this.tenant.me();
+    if (!this.canRead() || this.branchMissing() || this.writeReadonly() || this.reloadRequired()) return false;
     if (this.mode() === 'create') {
       const cap = this.capabilities();
-      return cap ? canCreateCustomer(cap) : true;
+      return cap ? canCreateCustomer(cap) : false;
     }
     const current = this.detail();
     if (!current) return false;
@@ -353,6 +356,7 @@ export class CustomerPage implements CanLeaveRecord {
   });
 
   protected readonly canDelete = computed(() => {
+    if (!this.canRead() || this.writeReadonly() || this.reloadRequired() || this.branchMissing()) return false;
     if (this.mode() !== 'edit' || this.showSkeleton() || this.loadFailed() || this.scopeDenied()) {
       return false;
     }
@@ -361,11 +365,11 @@ export class CustomerPage implements CanLeaveRecord {
   });
 
   protected readonly canUploadAttachments = computed(
-    () => Boolean(this.detail()) && canCreateRecordAttachments(),
+    () => { this.tenant.me(); return Boolean(this.detail()) && can('crm.attachments.create'); },
   );
 
   protected readonly canDeleteAttachments = computed(
-    () => Boolean(this.detail()) && canDeleteRecordAttachments(),
+    () => { this.tenant.me(); return Boolean(this.detail()) && can('crm.attachments.delete'); },
   );
 
   protected readonly errors = computed<DraftErrors>(() => {
@@ -864,7 +868,7 @@ export class CustomerPage implements CanLeaveRecord {
 
         const statusQuery = this.route.snapshot.queryParamMap.get('status') as CustomerStatus | null;
         const preset: Partial<CustomerDraft> | undefined =
-          !carried && statusQuery && isManualStatus(statusQuery) && canManageStatus()
+          !carried && statusQuery && isManualStatus(statusQuery) && canManageFormStatus()
             ? { status: statusQuery }
             : undefined;
         const fresh = emptyDraft(preset);
@@ -1087,6 +1091,7 @@ export class CustomerPage implements CanLeaveRecord {
   }
 
   protected retryLoad(): void {
+    if (this.reloadRequired()) { window.location.reload(); return; }
     const id = this.customerId();
     if (!id) return;
     this.lookupsSettled.set(false);
@@ -1145,7 +1150,7 @@ export class CustomerPage implements CanLeaveRecord {
       this.detail.set(prevDetail);
       this.base.set(prevBase);
       this.draft.set(prevDraft);
-      this.notify.error(customerErrorMessage(error, this.transloco, 'customers.rate.failed'));
+      this.toastWriteError(error);
     } finally {
       this.instantBusy.set(false);
     }
@@ -1177,7 +1182,7 @@ export class CustomerPage implements CanLeaveRecord {
       this.detail.set(prevDetail);
       this.base.set(prevBase);
       this.draft.set(prevDraft);
-      this.notify.error(customerErrorMessage(error, this.transloco, 'customers.color.failed'));
+      this.toastWriteError(error);
     } finally {
       this.instantBusy.set(false);
     }
@@ -1194,7 +1199,7 @@ export class CustomerPage implements CanLeaveRecord {
     if (
       !current ||
       !this.canEdit() ||
-      !canManageStatus() ||
+      !canManageFormStatus() ||
       this.instantBusy() ||
       nextStatus === 'ACTIVE_CUSTOMER' ||
       nextStatus === current.status
@@ -1229,7 +1234,7 @@ export class CustomerPage implements CanLeaveRecord {
       this.detail.set(prevDetail);
       this.base.set(prevBase);
       this.draft.set(prevDraft);
-      this.notify.error(customerErrorMessage(error, this.transloco, 'customers.board.moveFailed'));
+      this.toastWriteError(error);
     } finally {
       this.instantBusy.set(false);
     }
@@ -1300,15 +1305,18 @@ export class CustomerPage implements CanLeaveRecord {
       this.bypassGuard = true;
       await this.router.navigate(['/crm/customers'], { queryParams: this.backQueryParams });
     } catch (error) {
+      const mapped = customerRecordError(error, this.transloco);
+      if (mapped.readOnly) this.writeReadonly.set(true);
+      if (mapped.reloadRequired) this.reloadRequired.set(true);
       if (error instanceof ApiError && error.status === 409) {
-        this.deleteConflictMessage.set(customerErrorMessage(error, this.transloco, 'customers.delete.failed'));
+        this.deleteConflictMessage.set(mapped.message);
         return;
       }
       const dialog = this.deleteDialog().nativeElement;
       if (dialog.open) {
         dialog.close();
       }
-      this.notify.error(customerErrorMessage(error, this.transloco, 'customers.delete.failed'));
+      this.toastWriteError(error);
     } finally {
       this.deleting.set(false);
       this.bypassGuard = false;
@@ -1338,7 +1346,7 @@ export class CustomerPage implements CanLeaveRecord {
   private async refreshBranchOwners(branchId: string): Promise<void> {
     const seq = ++this.ownersSeq;
     try {
-      const owners = await listBranchOwners(branchId);
+      const owners = await listFormOwners(branchId, 'update');
       if (seq !== this.ownersSeq || this.currentBranchId() !== branchId) return;
       this.branchOwners.set(owners);
       this.loadedOwnersBranchId = branchId;
@@ -1355,6 +1363,15 @@ export class CustomerPage implements CanLeaveRecord {
     this.loading.set(true);
     this.loadFailed.set(false);
     this.scopeDenied.set(false);
+    this.reloadRequired.set(false);
+    this.writeReadonly.set(false);
+    this.loadCorrelation.set(null);
+    this.loadMessage.set('');
+    if (this.branchMissing() || !can('crm.customer_profiles.read')) {
+      this.scopeDenied.set(true);
+      this.loading.set(false);
+      return;
+    }
     try {
       const fresh = await getCustomer(id);
       if (seq !== this.loadSeq) return;
@@ -1369,9 +1386,10 @@ export class CustomerPage implements CanLeaveRecord {
         caps = await getCustomerCapabilities(fresh.branchId);
         if (seq !== this.loadSeq) return;
         this.capabilitiesFailed.set(false);
-      } catch {
+      } catch (error) {
         if (seq !== this.loadSeq) return;
         this.capabilitiesFailed.set(true);
+        if (error instanceof ApiError && error.status === 403) this.scopeDenied.set(true);
       }
       this.capabilities.set(caps);
       this.detail.set(fresh);
@@ -1427,8 +1445,8 @@ export class CustomerPage implements CanLeaveRecord {
           }
           return;
         }
-        this.bypassGuard = true;
-        await this.router.navigate(['/not-found'], { replaceUrl: true });
+        this.loadKind.set('not-found');
+        this.loadFailed.set(true);
         return;
       }
       if (error instanceof ApiError && (error.status === 403 || error.code === 'CRM_SCOPED_PERMISSION_DENIED')) {
@@ -1436,6 +1454,10 @@ export class CustomerPage implements CanLeaveRecord {
         return;
       }
       this.loadFailed.set(true);
+      const failure = customerRecordError(error, this.transloco);
+      this.loadKind.set(failure.kind);
+      this.loadCorrelation.set(failure.correlationId);
+      this.loadMessage.set(failure.message);
     } finally {
       if (seq === this.loadSeq) {
         this.loading.set(false);
@@ -1471,7 +1493,7 @@ export class CustomerPage implements CanLeaveRecord {
 
   private async refreshCapabilities(branchId: string | null): Promise<void> {
     const seq = ++this.capSeq;
-    if (!branchId) {
+    if (!branchId || this.branchMissing() || !can('crm.customer_profiles.read')) {
       this.capabilities.set(null);
       this.capabilitiesFailed.set(false);
       return;
@@ -1491,6 +1513,7 @@ export class CustomerPage implements CanLeaveRecord {
   }
 
   private async saveCreate(navigateAfterCreate = true): Promise<boolean> {
+    if (this.reloadRequired() || this.lookups()?.loading() || this.lookups()?.customFieldsUnavailable()) return false;
     this.submitted.set(true);
     this.serverErrors.set({});
     const validation = validateDraft(this.draft(), 'create', this.lookups()?.customFields() ?? []);
@@ -1542,6 +1565,7 @@ export class CustomerPage implements CanLeaveRecord {
   }
 
   private async saveEdit(): Promise<boolean> {
+    if (this.lookups()?.loading() || this.lookups()?.customFieldsUnavailable()) return false;
     const current = this.detail();
     const expectedUpdatedAt = this.updatedAt();
     if (!current || !expectedUpdatedAt) return false;
@@ -1564,7 +1588,7 @@ export class CustomerPage implements CanLeaveRecord {
     const hasFieldPatch = Object.keys(body).length > 1;
     const hasTagChanges = tagDiff.added.length > 0 || tagDiff.removed.length > 0;
 
-    if (!hasFieldPatch && !hasTagChanges) {
+    if (!hasFieldPatch && !hasTagChanges && !hasCustomerContactChanges(baseSnapshot.contacts, draftSnapshot.contacts)) {
       this.submitted.set(false);
       return true;
     }
@@ -1578,6 +1602,9 @@ export class CustomerPage implements CanLeaveRecord {
         patchedFields = true;
       }
 
+      latest = await saveCustomerContacts({ ...latest, updatedAt: patchedFields ? latest.updatedAt : expectedUpdatedAt },
+        baseSnapshot.contacts, draftSnapshot.contacts);
+
       if (hasTagChanges) {
         try {
           if (tagDiff.added.length > 0) {
@@ -1588,13 +1615,21 @@ export class CustomerPage implements CanLeaveRecord {
           }
           latest = await getCustomer(current.id);
         } catch (tagError) {
-          if (patchedFields) {
-            const partialBase = draftFromDetail(latest, baseSnapshot.companyId);
-            this.detail.set(latest);
-            this.base.set(partialBase);
-            this.draft.set({ ...structuredClone(partialBase), tagIds: [...draftSnapshot.tagIds] });
-            this.updatedAt.set(latest.updatedAt);
-            this.historyRefresh.update((v) => v + 1);
+          try {
+            const fresh = await getCustomer(current.id);
+            const freshBase = draftFromDetail(fresh, baseSnapshot.companyId);
+            this.detail.set(fresh);
+            this.base.set(freshBase);
+            this.draft.set(rebaseDraft(baseSnapshot, freshBase, draftSnapshot));
+            this.updatedAt.set(fresh.updatedAt);
+          } catch {
+            if (patchedFields) {
+              const partialBase = draftFromDetail(latest, baseSnapshot.companyId);
+              this.detail.set(latest);
+              this.base.set(partialBase);
+              this.draft.set({ ...structuredClone(partialBase), tagIds: [...draftSnapshot.tagIds] });
+              this.updatedAt.set(latest.updatedAt);
+            }
           }
           this.handleSaveError(tagError);
           return false;
@@ -1614,6 +1649,10 @@ export class CustomerPage implements CanLeaveRecord {
       this.notify.success(this.transloco.translate('recordPage.saved'));
       return true;
     } catch (error) {
+      if (error instanceof CustomerContactSaveError) {
+        await this.handlePartialContacts(error);
+        return false;
+      }
       if (error instanceof ApiError && error.code === 'CRM.CUSTOMER_PROFILE.CONCURRENT_UPDATE') {
         this.saving.set(false);
         return await this.handleConflict(current.id);
@@ -1645,22 +1684,10 @@ export class CustomerPage implements CanLeaveRecord {
         return false;
       }
 
-      const oldBase = this.base();
-      const rebased = rebaseDraft(oldBase, freshDraft, this.draft());
-      this.detail.set(fresh);
-      this.base.set(freshDraft);
-      this.draft.set(rebased);
       this.updatedAt.set(fresh.updatedAt);
-
-      if (draftsEqual(freshDraft, rebased)) {
-        this.submitted.set(false);
-        this.historyRefresh.update((v) => v + 1);
-        this.notify.success(this.transloco.translate('recordPage.saved'));
-        return true;
-      }
-      return await this.saveEdit();
+      return false;
     } catch (error) {
-      this.notify.error(customerErrorMessage(error, this.transloco, 'customerForm.server.generic'));
+      this.toastWriteError(error);
       return false;
     }
   }
@@ -1675,7 +1702,8 @@ export class CustomerPage implements CanLeaveRecord {
     const prevContactIds = current.contacts.map((c) => c.partyId).join(',');
     this.instantBusy.set(true);
     try {
-      const updated = await changeCustomerContact(current.id, toContactChangeBody(change), expectedUpdatedAt);
+      const updated = await saveCustomerContacts({ ...current, updatedAt: expectedUpdatedAt },
+        this.base().contacts, contactsAfterChange(this.draft().contacts, change));
       if (this.detail()?.id !== current.id) return {};
       const oldBase = this.base();
       const userDraft = this.draft();
@@ -1692,46 +1720,42 @@ export class CustomerPage implements CanLeaveRecord {
       this.historyRefresh.update((v) => v + 1);
       return null;
     } catch (error) {
+      if (error instanceof CustomerContactSaveError) {
+        await this.handlePartialContacts(error);
+        return this.mapContactErrors(error.error, change);
+      }
       if (error instanceof ApiError && error.code === 'CRM.CUSTOMER_PROFILE.CONCURRENT_UPDATE') {
         this.instantBusy.set(false);
-        return await this.handleContactConflict(current.id, change);
+        await this.handleConflict(current.id);
+        return {};
       }
-      this.notify.error(customerErrorMessage(error, this.transloco, 'customerForm.server.generic'));
+      this.toastWriteError(error);
       return this.mapContactErrors(error, change);
     } finally {
       this.instantBusy.set(false);
     }
   }
 
-  private async handleContactConflict(customerId: string, change: ContactChange): Promise<ContactErrors | null> {
-    const choice = await this.openConflictDialog();
-    if (choice === 'dismiss') return {};
-    try {
-      const fresh = await getCustomer(customerId);
-      const freshDraft = draftFromDetail(fresh, this.base().companyId);
-      if (choice === 'reload') {
-        this.detail.set(fresh);
-        this.base.set(freshDraft);
-        this.draft.set(structuredClone(freshDraft));
-        this.updatedAt.set(fresh.updatedAt);
-        this.submitted.set(false);
-        this.serverErrors.set({});
-        this.formRevision.update((v) => v + 1);
-        this.historyRefresh.update((v) => v + 1);
-        return {};
-      }
-
-      const oldBase = this.base();
-      const rebased = rebaseDraft(oldBase, freshDraft, this.draft());
-      rebased.contacts = freshDraft.contacts.map((c) => ({ ...c, phones: [...c.phones] }));
-      this.detail.set(fresh);
-      this.base.set(freshDraft);
+  private async handlePartialContacts(error: CustomerContactSaveError): Promise<void> {
+    const oldBase = this.base();
+    if (error.fresh) {
+      const freshBase = draftFromDetail(error.fresh, oldBase.companyId);
+      const rebased = rebaseDraft(oldBase, freshBase, this.draft());
+      rebased.contacts = error.remaining;
+      this.detail.set(error.fresh);
+      this.base.set(freshBase);
       this.draft.set(rebased);
-      this.updatedAt.set(fresh.updatedAt);
-      return await this.onSaveContact(change);
-    } catch (error) {
-      this.notify.error(customerErrorMessage(error, this.transloco, 'customerForm.server.generic'));
-      return {};
+      this.updatedAt.set(error.fresh.updatedAt);
+      this.historyRefresh.update((value) => value + 1);
+      invalidateRelatedCounts('CUSTOMER_PROFILE', error.fresh.id);
+    } else {
+      this.draft.update((draft) => ({ ...draft, contacts: error.remaining }));
+    }
+    this.toastWriteError(error.error, error.saved);
+    if (error.error instanceof ApiError && error.error.code === 'CRM.CUSTOMER_PROFILE.CONCURRENT_UPDATE') {
+      this.instantBusy.set(false);
+      this.saving.set(false);
+      await this.handleConflict(this.detail()!.id);
     }
   }
 
@@ -1793,8 +1817,25 @@ export class CustomerPage implements CanLeaveRecord {
     resolve?.(choice);
   }
 
+  private toastWriteError(error: unknown, saved?: readonly string[]): void {
+    const mapped = customerRecordError(error, this.transloco, this.draft());
+    if (mapped.readOnly) this.writeReadonly.set(true);
+    if (mapped.reloadRequired) this.reloadRequired.set(true);
+    this.notify.error(mapped.message, saved
+      ? [this.transloco.translate('customerForm.server.notSaved'),
+        ...(saved.length ? [`${this.transloco.translate('recordForm.contacts.saved')}: ${saved.join('; ')}`] : [])].join(' ')
+      : '');
+  }
+
   private handleSaveError(error: unknown): void {
-    const fieldErrors = mapServerErrors(error, this.draft());
+    const mapped = customerRecordError(error, this.transloco, this.draft());
+    if (this.mode() === 'create' && !mapped.keepKey) {
+      this.createIdempotencyKey = null;
+      this.lastCreateFingerprint = null;
+    }
+    if (mapped.readOnly) this.writeReadonly.set(true);
+    if (mapped.reloadRequired) this.reloadRequired.set(true);
+    const fieldErrors = mapped.fields;
     const errKeys = Object.keys(fieldErrors);
     const contactsOnly = errKeys.length > 0 && errKeys.every((key) => key === 'contacts' || key.startsWith('contacts.'));
 
@@ -1818,6 +1859,6 @@ export class CustomerPage implements CanLeaveRecord {
       }
     }
 
-    this.notify.error(customerErrorMessage(error, this.transloco, 'customerForm.server.generic'));
+    this.notify.error(mapped.message);
   }
 }

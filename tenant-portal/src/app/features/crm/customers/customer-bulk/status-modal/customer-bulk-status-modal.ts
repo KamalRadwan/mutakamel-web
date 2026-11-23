@@ -2,12 +2,13 @@ import { Component, ElementRef, computed, inject, input, output, signal, viewChi
 import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { tablerAlertTriangle, tablerArrowsExchange, tablerCircleX } from '@ng-icons/tabler-icons';
+import { tablerAlertTriangle, tablerArrowsExchange } from '@ng-icons/tabler-icons';
 import { Notify } from '../../../../../core/notify/notify';
 import { PluralKeyPipe } from '../../../../../core/i18n/plural';
-import { ScopeState } from '../../../../../core/scope/scope';
+import { sessionBranch } from '../../../shared/lookups/session-branch';
 import { BulkJobsTracker } from '../../../../../shared/bulk-jobs/bulk-jobs-tracker';
 import { BulkJobSelection, BulkJobSubmit } from '../../../../../shared/bulk-jobs/bulk-jobs.model';
+import { FullState } from '../../../../../shared/ui/full-state/full-state';
 import { Field } from '../../../../../shared/ui/field/field';
 import { BulkRunModal } from '../../../shared/record/bulk/bulk-run-modal/bulk-run-modal';
 import { errorCodeOf } from '../../../settings/shared/settings-api';
@@ -19,14 +20,17 @@ import {
   SelectedCustomerRow,
   extractBulkErrorParams,
   translateCustomerBulkError,
+  customerBulkReadOnly,
+  customerBulkLoadFailure,
 } from '../customer-bulk.model';
+import { canManageCustomerBulkStatus } from '../customer-bulk-access';
 import { CustomerBulkSubmitKey } from '../customer-bulk-submit-key';
 import { CustomerSelection } from '../customer-selection';
 
 @Component({
   selector: 'app-customer-bulk-status-modal',
-  imports: [NgIcon, TranslocoPipe, PluralKeyPipe, BulkRunModal, Field],
-  providers: [provideIcons({ tablerArrowsExchange, tablerAlertTriangle, tablerCircleX })],
+  imports: [NgIcon, TranslocoPipe, PluralKeyPipe, BulkRunModal, Field, FullState],
+  providers: [provideIcons({ tablerArrowsExchange, tablerAlertTriangle })],
   templateUrl: './customer-bulk-status-modal.html',
 })
 export class CustomerBulkStatusModal {
@@ -34,7 +38,6 @@ export class CustomerBulkStatusModal {
   protected readonly uid = `customer-bulk-status-${++CustomerBulkStatusModal.nextId}`;
 
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
-  private readonly scopeState = inject(ScopeState);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
@@ -52,13 +55,18 @@ export class CustomerBulkStatusModal {
   protected readonly rows = signal<SelectedCustomerRow[]>([]);
   protected readonly resolving = signal(false);
   protected readonly submitting = signal(false);
+  protected readonly readOnly = signal(false);
+  protected readonly loadFailure = signal<string | null>(null);
   protected readonly selectedStatus = signal<ManualCustomerStatus | null>(null);
   protected readonly requestError = signal<string | null>(null);
 
   private openSeq = 0;
   private readonly submitKey = new CustomerBulkSubmitKey();
 
-  private readonly effectiveBranchId = computed(() => this.branchId().trim() || this.scopeState.branch().id);
+  private readonly effectiveBranchId = computed(() => {
+    const branchId = sessionBranch()?.branchId ?? '';
+    return !this.branchId() || this.branchId() === branchId ? branchId : '';
+  });
 
   protected readonly displayCount = computed(() =>
     this.resolving() && this.rows().length === 0 ? (this.selection?.count() ?? 0) : this.rows().length,
@@ -74,6 +82,8 @@ export class CustomerBulkStatusModal {
 
   protected readonly canSubmit = computed(
     () =>
+      !this.readOnly() &&
+      this.loadFailure() === null &&
       !this.submitting() &&
       !this.resolving() &&
       this.selectedStatus() !== null &&
@@ -128,10 +138,20 @@ export class CustomerBulkStatusModal {
     this.requestError.set(null);
   }
 
+  protected retryLoad(): void {
+    void this.initOpen();
+  }
+
   protected async submit(): Promise<void> {
     if (!this.canSubmit()) return;
     const status = this.selectedStatus();
     if (!status) return;
+    if (!canManageCustomerBulkStatus(this.effectiveBranchId())) {
+      const message = this.transloco.translate('customerBulk.codes.CUSTOMER_PROFILE_STATUS_MANAGE_REQUIRED');
+      this.requestError.set(message);
+      this.notify.error(message);
+      return;
+    }
 
     const selection: BulkJobSelection =
       this.selection && this.selection.count() > 0
@@ -153,13 +173,17 @@ export class CustomerBulkStatusModal {
       this.close();
       this.submitted.emit(res.jobId);
     } catch (error) {
+      this.submitKey.failed(error);
+      this.readOnly.update((value) => value || customerBulkReadOnly(error));
       const code = errorCodeOf(error);
       if (code === 'BULK_JOB_ACTIVE') {
         this.close();
         return;
       }
       this.i18n();
-      this.requestError.set(translateCustomerBulkError(this.transloco, code, extractBulkErrorParams(error)));
+      const message = translateCustomerBulkError(this.transloco, code, extractBulkErrorParams(error));
+      this.requestError.set(message);
+      this.notify.error(message);
     } finally {
       this.submitting.set(false);
     }
@@ -168,6 +192,7 @@ export class CustomerBulkStatusModal {
   private async initOpen(rows?: readonly SelectedCustomerRow[]): Promise<void> {
     const seq = ++this.openSeq;
     this.submitKey.reset();
+    this.loadFailure.set(null);
     const mapped = rows ? [...rows] : [];
     this.selectedStatus.set(null);
     this.requestError.set(null);
@@ -192,6 +217,11 @@ export class CustomerBulkStatusModal {
       this.rows.set(resolved);
     } catch (error) {
       if (seq !== this.openSeq) return;
+      const failure = customerBulkLoadFailure(error);
+      if (failure !== null) {
+        this.loadFailure.set(failure);
+        return;
+      }
       const code = errorCodeOf(error);
       this.notify.error(translateCustomerBulkError(this.transloco, code, extractBulkErrorParams(error)));
       this.close();

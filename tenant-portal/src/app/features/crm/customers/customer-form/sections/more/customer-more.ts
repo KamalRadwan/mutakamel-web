@@ -1,4 +1,5 @@
-import { Component, computed, inject, input, model } from '@angular/core';
+import { Component, computed, inject, input, model, output } from '@angular/core';
+import { FullState } from '../../../../../../shared/ui/full-state/full-state';
 import { translationEvents } from '../../../../../../core/i18n/translation-events';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { AddressFields, AddressValue } from '../../../../../../shared/ui/address-fields/address-fields';
@@ -8,7 +9,7 @@ import { RECORD_PAGE_GRID } from '../../../../../../shared/ui/record-layout/reco
 import { CUSTOMER_LIMITS } from '../../../customers.model';
 import { CustomerDraft, DraftErrors, emptyAddress, hasGeoAddress } from '../../customer-draft';
 
-const CAN_ADD_PLACES = true;
+const CAN_ADD_PLACES = false;
 
 const GEO_KEYS: readonly (keyof Pick<AddressValue, 'countryId' | 'stateId' | 'cityId' | 'districtId'>)[] = [
   'countryId',
@@ -28,7 +29,7 @@ function codePointLength(value: string): number {
 
 @Component({
   selector: 'app-customer-more',
-  imports: [TranslocoPipe, Button, Field, AddressFields],
+  imports: [TranslocoPipe, Button, Field, AddressFields, FullState],
   providers: [provideTranslocoScope({ scope: 'customer-form', alias: 'customerForm' })],
   templateUrl: './customer-more.html',
   styles: [
@@ -73,6 +74,8 @@ export class CustomerMore {
   readonly errors = input<DraftErrors>({});
   readonly readonly = input(false);
   readonly legacyAddress = input<string | null>(null);
+  readonly geoFailed = input(false);
+  readonly retryGeo = output<void>();
 
   protected readonly showLegal = computed(() => this.draft().profileType === 'CORPORATE');
   protected readonly hasAddressSelection = computed(() => hasGeoAddress(this.draft().address));
