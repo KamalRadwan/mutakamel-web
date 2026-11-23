@@ -1,6 +1,7 @@
 import { DOCUMENT } from '@angular/common';
 import {
   Component,
+  DestroyRef,
   ElementRef,
   Injector,
   afterNextRender,
@@ -22,7 +23,6 @@ import {
   tablerFileText,
   tablerFileTypePdf,
   tablerFileWord,
-  tablerLock,
   tablerPaperclip,
   tablerPhoto,
   tablerTrash,
@@ -30,10 +30,16 @@ import {
 } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../core/i18n/language';
 import { Notify } from '../../../core/notify/notify';
+import { ApiError, correlationIdOf, isRetryableWriteError } from '../../../core/api/api-errors';
+import { TenantScopeState } from '../../../core/scope/tenant-scope';
 import { Button } from '../../ui/button/button';
 import { ConfirmDialog } from '../../ui/confirm-dialog/confirm-dialog';
 import { FileDrop } from '../../ui/file-drop/file-drop';
+import { Field } from '../../ui/field/field';
+import { FullState } from '../../ui/full-state/full-state';
 import {
+  canCreateRecordAttachments,
+  canDeleteRecordAttachments,
   deleteRecordAttachment,
   listRecordAttachments,
   recordAttachmentDownloadUrl,
@@ -60,6 +66,7 @@ interface UploadQueueItem {
   status: 'queued' | 'uploading' | 'failed';
   progress: number;
   error: string | null;
+  retryable: boolean;
 }
 
 function initialsOf(name: string): string {
@@ -73,7 +80,7 @@ function initialsOf(name: string): string {
 
 @Component({
   selector: 'app-record-attachments',
-  imports: [NgIcon, TranslocoPipe, Button, ConfirmDialog, FileDrop],
+  imports: [NgIcon, TranslocoPipe, Button, ConfirmDialog, FileDrop, Field, FullState],
   viewProviders: [
     provideTranslocoScope({ scope: 'record-attachments', alias: 'recordAttachments' }),
   ],
@@ -85,7 +92,6 @@ function initialsOf(name: string): string {
       tablerFileText,
       tablerFileTypePdf,
       tablerFileWord,
-      tablerLock,
       tablerPaperclip,
       tablerPhoto,
       tablerTrash,
@@ -100,6 +106,7 @@ export class RecordAttachments {
   private readonly injector = inject(Injector);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
+  private readonly scope = inject(TenantScopeState);
   protected readonly language = inject(LanguageState).current;
 
   private readonly confirmDialog = viewChild.required(ConfirmDialog);
@@ -110,13 +117,24 @@ export class RecordAttachments {
   readonly sourceId = input.required<string>();
   readonly branchId = input<string | null>(null);
   readonly canEdit = input<boolean | undefined>(undefined);
+  readonly canCreate = input<boolean | undefined>(undefined);
   readonly canUpload = input<boolean | undefined>(undefined);
   readonly canDelete = input<boolean | undefined>(undefined);
   readonly uploaderName = input<((userId: string) => string | null | undefined) | undefined>(undefined);
   readonly countChange = output<number>();
 
-  protected readonly allowUpload = computed(() => this.canUpload() ?? this.canEdit() ?? true);
-  protected readonly allowDelete = computed(() => this.canDelete() ?? this.canEdit() ?? true);
+  protected readonly readOnly = signal(false);
+  protected readonly allowUpload = computed(() =>
+    !this.readOnly() && (this.canCreate() ?? this.canUpload() ?? this.canEdit() ?? canCreateRecordAttachments()),
+  );
+  protected readonly allowDelete = computed(() =>
+    !this.readOnly() && (this.canDelete() ?? this.canEdit() ?? canDeleteRecordAttachments()),
+  );
+  protected readonly activeBranch = computed(() => {
+    const branchId = this.scope.selection()?.branchId;
+    if (!branchId || !this.scope.branchCompanies().has(branchId)) return null;
+    return this.branchId() === branchId ? branchId : null;
+  });
 
   protected readonly accept = ATTACHMENT_ACCEPT;
   protected readonly maxBytes = ATTACHMENT_MAX_BYTES;
@@ -130,6 +148,7 @@ export class RecordAttachments {
   protected readonly loadingMore = signal(false);
   protected readonly denied = signal(false);
   protected readonly loadFailed = signal(false);
+  protected readonly loadCorrelationId = signal<string | null>(null);
 
   protected readonly uploads = signal<UploadQueueItem[]>([]);
   protected readonly deletingName = signal('');
@@ -140,7 +159,7 @@ export class RecordAttachments {
     () =>
       !this.denied() &&
       !this.loadFailed() &&
-      (this.branchId() === null || (this.loading() && this.items().length === 0)),
+      !!this.activeBranch() && this.loading() && this.items().length === 0,
   );
 
   private lastRecordKey: string | null = null;
@@ -150,11 +169,15 @@ export class RecordAttachments {
   private uploadCounter = 0;
 
   constructor() {
+    inject(DestroyRef).onDestroy(() => {
+      this.loadSeq++;
+      this.queueSeq++;
+    });
     effect(() => {
       const sourceType = this.sourceType();
       const sourceId = this.sourceId();
-      const branchId = this.branchId();
-      const key = `${sourceType}:${sourceId}`;
+      const branchId = this.activeBranch();
+      const key = `${sourceType}:${branchId}:${sourceId}`;
 
       if (this.lastRecordKey !== null && this.lastRecordKey !== key) {
         this.resetForRecordChange();
@@ -163,7 +186,7 @@ export class RecordAttachments {
 
       if (!branchId || !sourceId) {
         this.loadSeq++;
-        this.loading.set(true);
+        this.loading.set(false);
         this.denied.set(false);
         this.loadFailed.set(false);
         return;
@@ -174,10 +197,10 @@ export class RecordAttachments {
   }
 
   protected onPicked(file: File): void {
-    const branchId = this.branchId();
+    const branchId = this.activeBranch();
     const sourceId = this.sourceId();
     const sourceType = this.sourceType();
-    if (!branchId || !sourceId || !this.allowUpload() || this.denied()) return;
+    if (!branchId || !sourceId || !this.allowUpload() || this.denied() || this.loading() || this.loadFailed()) return;
 
     const item: UploadQueueItem = {
       id: `upload-${++this.uploadCounter}`,
@@ -189,6 +212,7 @@ export class RecordAttachments {
       status: 'queued',
       progress: 0,
       error: null,
+      retryable: false,
     };
     this.uploads.update((list) => [...list, item]);
     void this.processQueue();
@@ -211,9 +235,10 @@ export class RecordAttachments {
   }
 
   protected retryUpload(id: string): void {
+    if (!this.allowUpload() || this.denied() || !this.activeBranch()) return;
     this.uploads.update((list) =>
       list.map((item) =>
-        item.id === id && item.status === 'failed'
+        item.id === id && item.status === 'failed' && item.retryable
           ? { ...item, status: 'queued', progress: 0, error: null }
           : item,
       ),
@@ -222,20 +247,21 @@ export class RecordAttachments {
   }
 
   protected reload(): void {
-    const branchId = this.branchId();
+    const branchId = this.activeBranch();
     const sourceId = this.sourceId();
     if (!branchId || !sourceId) return;
     void this.loadPage(this.sourceType(), branchId, sourceId, 1, false);
   }
 
   protected loadMore(): void {
-    const branchId = this.branchId();
+    const branchId = this.activeBranch();
     const sourceId = this.sourceId();
     if (!branchId || !sourceId || this.loadingMore() || !this.hasNext()) return;
     void this.loadPage(this.sourceType(), branchId, sourceId, this.page() + 1, true);
   }
 
   protected async download(row: RecordAttachment): Promise<void> {
+    if (!this.activeBranch() || this.denied()) return;
     if (this.downloadingId() === row.id) return;
     this.downloadingId.set(row.id);
     try {
@@ -247,9 +273,6 @@ export class RecordAttachments {
       this.document.body.appendChild(link);
       link.click();
       link.remove();
-      if (url.startsWith('blob:')) {
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-      }
     } catch (error) {
       this.notify.error(this.translateError(error));
     } finally {
@@ -260,16 +283,20 @@ export class RecordAttachments {
   }
 
   protected async remove(row: RecordAttachment): Promise<void> {
-    if (!this.allowDelete() || this.deletingId() === row.id) return;
+    if (!this.activeBranch() || this.denied() || !this.allowDelete() || this.deletingId() !== null) return;
     const seq = this.queueSeq;
     this.deletingName.set(row.fileName);
     if (!(await this.confirmDialog().open())) return;
-    if (seq !== this.queueSeq) return;
+    if (seq !== this.queueSeq || !this.allowDelete()) return;
 
     this.deletingId.set(row.id);
     try {
       await deleteRecordAttachment(row.id);
       if (seq !== this.queueSeq) return;
+      this.loadSeq++;
+      this.loading.set(false);
+      this.loadingMore.set(false);
+      this.loadFailed.set(false);
       const prevList = this.items();
       const removedIndex = prevList.findIndex((item) => item.id === row.id);
       this.items.set(prevList.filter((item) => item.id !== row.id));
@@ -277,6 +304,8 @@ export class RecordAttachments {
       this.total.set(nextTotal);
       this.countChange.emit(nextTotal);
       this.notify.success(this.transloco.translate('recordAttachments.deleted'));
+      // Offset pages shift after deletion; restart before asking for the next page.
+      if (this.hasNext()) this.reload();
       afterNextRender(
         () => {
           if (seq !== this.queueSeq) return;
@@ -292,6 +321,7 @@ export class RecordAttachments {
       );
     } catch (error) {
       if (seq === this.queueSeq) {
+        this.handleWriteError(error);
         this.notify.error(this.translateError(error));
       }
     } finally {
@@ -344,6 +374,9 @@ export class RecordAttachments {
     this.hasNext.set(false);
     this.denied.set(false);
     this.loadFailed.set(false);
+    this.readOnly.set(false);
+    this.loadCorrelationId.set(null);
+    this.loadingMore.set(false);
     this.deletingId.set(null);
     this.downloadingId.set(null);
   }
@@ -362,6 +395,7 @@ export class RecordAttachments {
       this.loading.set(true);
       this.denied.set(false);
       this.loadFailed.set(false);
+      this.loadCorrelationId.set(null);
     }
 
     try {
@@ -380,10 +414,9 @@ export class RecordAttachments {
       if (seq !== this.loadSeq) return;
       if (this.errorStatusOf(error) === 403) {
         this.denied.set(true);
-      } else if (append) {
-        this.notify.error(this.translateError(error));
       } else {
         this.loadFailed.set(true);
+        this.loadCorrelationId.set(correlationIdOf(error));
       }
     } finally {
       if (seq === this.loadSeq) {
@@ -394,6 +427,7 @@ export class RecordAttachments {
   }
 
   private async processQueue(): Promise<void> {
+    if (!this.allowUpload() || this.denied() || !this.activeBranch()) return;
     const seq = this.queueSeq;
     if (this.uploadingSeq === seq) return;
 
@@ -421,18 +455,25 @@ export class RecordAttachments {
       );
       if (seq !== this.queueSeq) return;
 
+      this.loadSeq++;
+      this.loading.set(false);
+      this.loadingMore.set(false);
+      this.loadFailed.set(false);
       this.uploads.update((list) => list.filter((item) => item.id !== next.id));
+      const alreadyListed = this.items().some((item) => item.id === created.id);
       this.items.update((list) => [created, ...list.filter((item) => item.id !== created.id)]);
-      const nextTotal = this.total() + 1;
+      const nextTotal = this.total() + (alreadyListed ? 0 : 1);
       this.total.set(nextTotal);
       this.countChange.emit(nextTotal);
       this.notify.success(this.transloco.translate('recordAttachments.uploaded'));
     } catch (error) {
       if (seq !== this.queueSeq) return;
       const message = this.translateError(error);
+      this.handleWriteError(error);
+      const retryable = isRetryableWriteError(error) || (error instanceof ApiError && error.status === 401);
       this.uploads.update((list) =>
         list.map((item) =>
-          item.id === next.id ? { ...item, status: 'failed', progress: 0, error: message } : item,
+          item.id === next.id ? { ...item, status: 'failed', progress: 0, error: message, retryable } : item,
         ),
       );
       this.notify.error(message);
@@ -462,14 +503,17 @@ export class RecordAttachments {
 
   private translateError(error: unknown): string {
     const code = this.errorCodeOf(error);
-    if (code) {
-      const key = `recordAttachments.errors.${code}`;
-      const translated = this.transloco.translate(key);
-      if (translated && translated !== key) {
-        return translated;
-      }
-    }
     const status = this.errorStatusOf(error);
+    if (status === 401) return this.transloco.translate('recordAttachments.errors.notSaved');
+    if (status === 429) {
+      const delay = error instanceof ApiError ? error.details?.['retryAfterSeconds'] : undefined;
+      const seconds = Array.isArray(delay) ? delay[0] : delay;
+      return this.transloco.translate(`recordAttachments.errors.${seconds ? 'rateLimitedIn' : 'rateLimited'}`, { seconds });
+    }
+    if (this.isMismatch(code)) return this.transloco.translate('recordAttachments.errors.idempotencyMismatch');
+    if (status === 403 && code?.startsWith('CRM_') && code.endsWith('_DISABLED')) {
+      return this.transloco.translate('recordAttachments.errors.moduleDisabled');
+    }
     if (status === 413) {
       return this.transloco.translate('recordAttachments.errors.CRM_ATTACHMENT_FILE_TOO_LARGE');
     }
@@ -479,13 +523,29 @@ export class RecordAttachments {
     if (status === 507) {
       return this.transloco.translate('recordAttachments.errors.STORAGE_CAPACITY_EXCEEDED');
     }
+    const knownCodes = [
+      'CRM_ATTACHMENT_FILE_EMPTY', 'CRM_ATTACHMENT_NOT_FOUND', 'CRM_ATTACHMENT_FILE_REQUIRED',
+      'CRM_ATTACHMENT_INVALID', 'CRM_ATTACHMENT_FILE_NOT_FOUND', 'CRM_SOURCE_NOT_FOUND',
+      'CRM_SOURCE_BRANCH_MISMATCH', 'CRM_SUBSCRIPTION_READ_ONLY', 'SEAT_OVER_CAPACITY_READ_ONLY',
+      'CRM_VALIDATION_FAILED', 'GW.IDEM.MISSING', 'GW.IDEM.BAD_VALUE', 'GW.IDEM.IN_FLIGHT',
+    ];
+    if (code && knownCodes.includes(code)) return this.transloco.translate(`recordAttachments.errors.${code}`);
     if (status === 403) {
       return this.transloco.translate('recordAttachments.errors.CRM_SCOPED_PERMISSION_DENIED');
     }
-    const settingsGeneric = this.transloco.translate('settings.errors.generic');
-    if (settingsGeneric && settingsGeneric !== 'settings.errors.generic') {
-      return settingsGeneric;
-    }
     return this.transloco.translate('recordAttachments.errors.generic');
+  }
+
+  private isMismatch(code: string | null): boolean {
+    return code === 'GW.IDEM.MISMATCH' || !!code?.endsWith('_IDEMPOTENCY_MISMATCH');
+  }
+
+  private handleWriteError(error: unknown): void {
+    const code = this.errorCodeOf(error);
+    if (code === 'CRM_SUBSCRIPTION_READ_ONLY' || code === 'SEAT_OVER_CAPACITY_READ_ONLY' ||
+        (this.errorStatusOf(error) === 403 && code?.startsWith('CRM_') && code.endsWith('_DISABLED'))) {
+      this.readOnly.set(true);
+    }
+    if (this.isMismatch(code)) this.reload();
   }
 }

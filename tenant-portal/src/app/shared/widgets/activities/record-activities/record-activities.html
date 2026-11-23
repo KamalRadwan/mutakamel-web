@@ -355,13 +355,11 @@
 
 <app-activity-outcome [busy]="outcomeBusy()" />
 
-<ui-confirm-dialog
-  #conflictDialog
-  tone="warning"
-  [title]="'activities.conflict.title' | transloco"
-  [text]="'activities.conflict.text' | transloco"
-  [confirmLabel]="'activities.conflict.reload' | transloco"
-  [cancelLabel]="'activities.conflict.keep' | transloco"
+<ui-conflict-dialog
+  [open]="conflictOpen()"
+  (openChange)="onConflictOpenChange($event)"
+  (reload)="resolveConflict(true)"
+  (keepEditing)="resolveConflict(false)"
 />
 
 <ui-confirm-dialog

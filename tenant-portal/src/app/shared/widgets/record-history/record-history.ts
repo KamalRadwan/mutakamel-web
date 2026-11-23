@@ -5,10 +5,12 @@ import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerArrowRight, tablerLock } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../core/i18n/language';
 import { Notify } from '../../../core/notify/notify';
+import { ApiError, correlationIdOf, errorMessage } from '../../../core/api/api-errors';
+import { FullState } from '../../ui/full-state/full-state';
 import { Button } from '../../ui/button/button';
 import { Field } from '../../ui/field/field';
 import { Segmented, SegmentedOption } from '../../ui/segmented/segmented';
-import { listRecordHistory } from './record-history.api';
+import { RecordHistoryApi } from './record-history.api';
 import {
   DEFAULT_HISTORY_CATEGORIES,
   HistoryCategoryOption,
@@ -35,6 +37,7 @@ interface HistoryItemVm {
   timeLabel: string;
   fullDateTime: string;
   failedText: string | null;
+  missingOutcome: boolean;
   diffCount: number;
   visibleDiffRows: readonly HistoryDiffRowVm[];
   expanded: boolean;
@@ -151,17 +154,9 @@ function mergeHistoryItems(existing: readonly HistoryItem[], incoming: readonly 
   });
 }
 
-function errorStatusOf(error: unknown): number | null {
-  if (typeof error === 'object' && error !== null && 'status' in error) {
-    const status = (error as { status: unknown }).status;
-    if (typeof status === 'number') return status;
-  }
-  return null;
-}
-
 @Component({
   selector: 'app-record-history',
-  imports: [NgIcon, TranslocoPipe, Button, Field, Segmented],
+  imports: [NgIcon, TranslocoPipe, Button, Field, Segmented, FullState],
   viewProviders: [
     provideTranslocoScope(
       { scope: 'record-history', alias: 'recordHistory' },
@@ -181,6 +176,7 @@ export class RecordHistory {
   private readonly i18n = translationEvents(this.transloco);
   private readonly language = inject(LanguageState).current;
   private readonly notify = inject(Notify);
+  private readonly api = inject(RecordHistoryApi);
 
   readonly entityTypes = input.required<readonly string[]>();
   readonly entityId = input.required<string>();
@@ -198,6 +194,7 @@ export class RecordHistory {
   protected readonly loadingMore = signal(false);
   protected readonly denied = signal(false);
   protected readonly loadFailed = signal(false);
+  protected readonly loadCorrelationId = signal<string | null>(null);
   private readonly expandedIds = signal<ReadonlySet<string>>(new Set());
 
   private loadSeq = 0;
@@ -282,6 +279,7 @@ export class RecordHistory {
                 reason: item.reason?.trim() || this.transloco.translate('recordHistory.none'),
               })
             : null,
+        missingOutcome: item.outcome === null,
         diffCount: allDiffs.length,
         visibleDiffRows: isExpanded ? allDiffs : allDiffs.slice(0, MAX_COLLAPSED_DIFFS),
         expanded: isExpanded,
@@ -378,7 +376,7 @@ export class RecordHistory {
       const pages = await Promise.all(
         pending.map(async ([type, cursor]) => ({
           type,
-          page: await listRecordHistory(type, entityId, partyIds, { category, cursor, limit: 25 }),
+          page: await this.api.listRecordHistory(type, entityId, partyIds, { category, cursor, limit: 25 }),
         })),
       );
       if (seq !== this.loadSeq) return;
@@ -391,10 +389,10 @@ export class RecordHistory {
       this.hasMore.set(Object.values(this.cursorsByType).some((cursor) => cursor !== null));
     } catch (error) {
       if (seq !== this.loadSeq) return;
-      if (errorStatusOf(error) === 403) {
+      if (error instanceof ApiError && error.status === 403 && !['TENANT_MAINTENANCE_ACTIVE', 'TENANT_MAINTENANCE_RELEASE_REQUIRED'].includes(error.code)) {
         this.denied.set(true);
       } else {
-        this.notify.error(this.transloco.translate('recordHistory.loadFailed'));
+        this.notify.error(errorMessage(error, 'recordHistory', this.transloco));
       }
     } finally {
       if (seq === this.loadSeq) {
@@ -420,6 +418,7 @@ export class RecordHistory {
     this.loadingMore.set(false);
     this.denied.set(false);
     this.loadFailed.set(false);
+    this.loadCorrelationId.set(null);
     this.items.set([]);
     this.cursorsByType = {};
     this.hasMore.set(false);
@@ -433,7 +432,7 @@ export class RecordHistory {
       const pages = await Promise.all(
         types.map(async (type) => ({
           type,
-          page: await listRecordHistory(type, entityId, partyIds, { category, limit: 25 }),
+          page: await this.api.listRecordHistory(type, entityId, partyIds, { category, limit: 25 }),
         })),
       );
       if (seq !== this.loadSeq) return;
@@ -449,10 +448,14 @@ export class RecordHistory {
       this.hasMore.set(Object.values(nextCursors).some((cursor) => cursor !== null));
     } catch (error) {
       if (seq !== this.loadSeq) return;
-      if (errorStatusOf(error) === 403) {
+      if (error instanceof ApiError && error.status === 403 && !['TENANT_MAINTENANCE_ACTIVE', 'TENANT_MAINTENANCE_RELEASE_REQUIRED'].includes(error.code)) {
         this.denied.set(true);
       } else {
         this.loadFailed.set(true);
+        this.loadCorrelationId.set(correlationIdOf(error));
+        if (error instanceof ApiError && [403, 429, 503].includes(error.status)) {
+          this.notify.error(errorMessage(error, 'recordHistory', this.transloco));
+        }
       }
     } finally {
       if (seq === this.loadSeq) {
@@ -600,6 +603,9 @@ export class RecordHistory {
     if (value === null || value === undefined || value === '[NOT_RECORDED]') {
       return none;
     }
+
+    if (value === '[REDACTED]') return this.transloco.translate('recordHistory.redacted');
+    if (value === '[TRUNCATED]') return this.transloco.translate('recordHistory.truncated');
 
     if (subjectKind === 'activity' && field === 'status') {
       const raw = String(value);

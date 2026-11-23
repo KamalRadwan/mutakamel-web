@@ -15,6 +15,12 @@ export type ActivityInitialStatus = 'PLANNED' | 'IN_PROGRESS' | 'DONE';
 export type ActivityFormDirection = ActivityDirection | '';
 
 export type ActivityFormField =
+  | 'type'
+  | 'assigneeUserId'
+  | 'status'
+  | 'priority'
+  | 'direction'
+  | 'reminder'
   | 'subject'
   | 'start'
   | 'end'

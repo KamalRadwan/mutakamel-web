@@ -1,141 +1,168 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import {
-  activitySummary,
-  cancelActivity,
-  completeActivity,
-  createActivity,
-  getActivity,
-  listActivities,
-  listActivityTypes,
-  listAssignees,
-  setActivityStatus,
-  updateActivity,
-} from './activities.api';
+import { DOCUMENT, signal } from '@angular/core';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { TestBed } from '@angular/core/testing';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ApiError } from '../../../core/api/api-errors';
+import { TenantScopeState } from '../../../core/scope/tenant-scope';
+import { ActivitiesApi, activitySummary, listActivities } from './activities.api';
 import { resetActivitiesFake, setFakeActivitiesDelay } from './activities.fake';
-import { ActivityError, CreateActivity } from './activities.model';
+import type { Activity, ActivityListParams, ActivitySummaryScope, CreateActivity } from './activities.model';
 
-const KEY_A = '0192b7ea-7c4f-7a7d-9c9f-51c7f2b3aa10';
+const path = '/api/tenant/core/v1';
+const meta = { page: 1, limit: 20, total: 0, totalPages: 1, hasNext: false, hasPrev: false };
+const body: CreateActivity = { target: { app: 'CRM', type: 'LEAD', id: 'lead-1' }, type: 'CALL',
+  subject: 'Call back', dueAt: '2026-12-01T10:00:00.000Z' };
+const activity = { id: 'activity-1', version: 3, ...body } as unknown as Activity;
+const dayStart = '2026-11-23T00:00:00.000Z';
+const dayEnd = '2026-11-24T00:00:00.000Z';
 
-function future(hours: number): string {
-  return new Date(Date.now() + hours * 3_600_000).toISOString();
-}
-
-function body(overrides: Partial<CreateActivity> = {}): CreateActivity {
-  return {
-    target: { app: 'CRM', type: 'LEAD', id: 'lead-001' },
-    type: 'CALL',
-    subject: 'Call back',
-    dueAt: future(2),
-    ...overrides,
-  };
-}
-
-async function rejection(promise: Promise<unknown>): Promise<ActivityError> {
-  try {
-    await promise;
-  } catch (error) {
-    expect(error).toBeInstanceOf(ActivityError);
-    return error as ActivityError;
-  }
-  throw new Error('expected a rejection');
-}
-
-describe('activities.api contract (core-app tenant/activities)', () => {
+describe('ActivitiesApi', () => {
+  let api: ActivitiesApi;
+  let http: HttpTestingController;
+  let cookie: string;
   beforeEach(() => {
+    TestBed.configureTestingModule({ providers: [
+      provideHttpClient(), provideHttpClientTesting(),
+      { provide: TenantScopeState, useValue: { me: signal({ id: 'user-1' }), selection: signal(null) } },
+    ] });
+    const document = TestBed.inject(DOCUMENT);
+    cookie = `${document.location.protocol === 'https:' ? '__Host-mutakamel-tenant-csrf' : 'mutakamel-http-tenant-csrf'}=proof`;
+    vi.spyOn(document, 'cookie', 'get').mockImplementation(() => cookie);
+    api = TestBed.inject(ActivitiesApi);
+    http = TestBed.inject(HttpTestingController);
+  });
+  afterEach(() => { http.verify(); vi.restoreAllMocks(); });
+
+  function request(route: string) {
+    const found = http.expectOne((req) => req.url === path + route);
+    expect(found.request.withCredentials).toBe(true);
+    return found;
+  }
+
+  it('listActivities returns a CorePage', async () => {
+    const result = api.listActivities({ page: 1, limit: 20, statuses: ['PLANNED', 'IN_PROGRESS'] });
+    const req = request('/activities');
+    expect(req.request.params.getAll('statuses')).toEqual(['PLANNED', 'IN_PROGRESS']);
+    expect(req.request.headers.has('x-idempotency-key')).toBe(false);
+    req.flush({ success: true, data: [], meta });
+    await expect(result).resolves.toEqual({ data: [], meta });
+  });
+
+  it('summary sends only summary keys', async () => {
+    const scope = { statuses: ['DONE'], overdue: true, search: 'Call', types: ['CALL'] } as ActivitySummaryScope;
+    const result = api.activitySummary(scope, dayStart, dayEnd);
+    const req = request('/activities/summary');
+    expect(req.request.params.keys().sort()).toEqual(['dayEnd', 'dayStart', 'search', 'types']);
+    req.flush({ success: true, data: { byStatus: [] } });
+    await result;
+  });
+
+  it('summary maps the target selector to wire keys', async () => {
+    const result = api.activitySummary({ app: 'CRM', type: 'LEAD', id: 'lead-1' }, dayStart, dayEnd);
+    const req = request('/activities/summary');
+    expect(req.request.params.get('targetApp')).toBe('CRM');
+    expect(req.request.params.get('targetType')).toBe('LEAD');
+    expect(req.request.params.get('targetId')).toBe('lead-1');
+    for (const key of ['app', 'type', 'id']) expect(req.request.params.has(key)).toBe(false);
+    req.flush({ success: true, data: { byStatus: [] } });
+    await result;
+  });
+
+  it('calendar strips due dates and uses the range', async () => {
+    const result = api.listActivityCalendar({ from: dayStart, to: dayEnd, dueFrom: dayStart, dueTo: dayEnd });
+    const req = request('/activities/calendar');
+    expect(req.request.params.keys().sort()).toEqual(['from', 'to']);
+    req.flush({ success: true, data: { items: [], truncated: false } });
+    await expect(result).resolves.toEqual({ items: [], truncated: false });
+  });
+
+  it('links targets types assignees and get routes', async () => {
+    const targets = api.listActivityTargets({ targetApp: 'CRM', targetType: 'LEAD', search: 'a' });
+    request('/activities/targets').flush({ success: true, data: [] });
+    await expect(targets).resolves.toEqual([]);
+    const types = api.listActivityTypes();
+    request('/activity-types').flush({ success: true, data: [{ key: 'CALL', label: 'Call' }] });
+    await types;
+    const assignees = api.listAssignees({ targetApp: 'CRM', targetType: 'LEAD', targetId: 'lead-1' });
+    request('/activities/assignees').flush({ success: true, data: [] });
+    await assignees;
+    const get = api.getActivity('activity-1');
+    request('/activities/activity-1').flush({ success: true, data: activity }, { headers: { ETag: '"3"' } });
+    await expect(get).resolves.toEqual(activity);
+  });
+
+  it('writes send key CSRF and If-Match', async () => {
+    const calls = [
+      { route: '/activities', method: 'POST', run: () => api.createActivity(body), body },
+      { route: '/activities/activity-1', method: 'PATCH', run: () => api.updateActivity('activity-1', 3, { subject: 'Changed' }), body: { subject: 'Changed' } },
+      { route: '/activities/activity-1/status', method: 'POST', run: () => api.setActivityStatus('activity-1', 3, 'IN_PROGRESS'), body: { status: 'IN_PROGRESS' } },
+      { route: '/activities/activity-1/complete', method: 'POST', run: () => api.completeActivity('activity-1', 3, 'Done'), body: { outcome: 'Done' } },
+      { route: '/activities/activity-1/cancel', method: 'POST', run: () => api.cancelActivity('activity-1', 3, 'Later'), body: { reason: 'Later' } },
+    ];
+    const keys: string[] = [];
+    for (const call of calls) {
+      const result = call.run();
+      const req = request(call.route);
+      const key = req.request.headers.get('x-idempotency-key')!;
+      expect(key).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+      keys.push(key);
+      expect(req.request.headers.get('x-csrf-token')).toBe('proof');
+      expect(req.request.headers.get('If-Match')).toBe(call.route === '/activities' ? null : '"3"');
+      expect(req.request.method).toBe(call.method);
+      expect(req.request.body).toEqual(call.body);
+      req.flush({ success: true, data: activity }, { status: call.route === '/activities' ? 201 : 200, statusText: 'OK' });
+      await expect(result).resolves.toEqual(activity);
+    }
+    expect(new Set(keys).size).toBe(calls.length);
+  });
+
+  it('a missing CSRF cookie sends no write', async () => {
+    cookie = '';
+    await expect(api.createActivity(body)).rejects.toEqual(new ApiError(403, 'GW.AUTH.CSRF_INVALID'));
+    http.expectNone((req) => req.method !== 'GET');
+  });
+
+  it('rejects a malformed success envelope', async () => {
+    const result = api.listActivities();
+    const rejection = expect(result).rejects.toEqual(new ApiError(502, 'COMMON.GENERIC.INTERNAL_ERROR'));
+    request('/activities').flush({ data: [] });
+    await rejection;
+  });
+
+  it.each([
+    [400, 'CORE_VALIDATION_FAILED'], [401, 'COMMON.GENERIC.UNAUTHORIZED'],
+    [403, 'MISSING_REQUIRED_PERMISSIONS'], [404, 'ACTIVITY_NOT_FOUND'],
+    [409, 'ACTIVITY_VERSION_CONFLICT'], [409, 'ACTIVITY_TERMINAL'],
+    [409, 'ACTIVITY_IDEMPOTENCY_IN_FLIGHT'], [422, 'ACTIVITY_INVALID'],
+    [422, 'ACTIVITY_IDEMPOTENCY_MISMATCH'], [428, 'ACTIVITY_VERSION_REQUIRED'],
+    [503, 'ACCESS_POLICY_UNAVAILABLE'], [503, 'ACTIVITY_TARGET_RESOLVER_UNAVAILABLE'],
+  ])('keeps HTTP status %s and code %s', async (status, errorCode) => {
+    const result = api.listActivities();
+    const rejection = expect(result).rejects.toMatchObject({ status, code: errorCode, correlationId: 'reference-1' });
+    request('/activities').flush({ errorCode, correlationId: 'reference-1' }, { status, statusText: 'Error' });
+    await rejection;
+  });
+
+  it('maps lost connection and Retry-After through CoreHttp', async () => {
+    const lost = api.listActivities();
+    const rejection = expect(lost).rejects.toMatchObject({ status: 0, code: 'NETWORK_ERROR' });
+    request('/activities').error(new ProgressEvent('error'));
+    await rejection;
+    const limited = api.listActivities({ search: 'other' } satisfies ActivityListParams);
+    const limitRejection = expect(limited).rejects.toMatchObject({ status: 429, details: { retryAfterSeconds: ['9'] } });
+    request('/activities').flush({ code: 'GW.RATE.LIMIT_EXCEEDED' }, { status: 429, statusText: 'Limited', headers: { 'Retry-After': '9' } });
+    await limitRejection;
+  });
+});
+
+describe('activities api', () => {
+  it('CRM plain exports stay available', async () => {
     resetActivitiesFake();
     setFakeActivitiesDelay(0);
-  });
-  afterEach(() => resetActivitiesFake());
-
-  it('returns the offset page shape and validates limit as a DTO error (400)', async () => {
-    const page = await listActivities({ limit: 5 });
-    expect(Object.keys(page).sort()).toEqual(['data', 'meta']);
-    expect(Object.keys(page.meta).sort()).toEqual(['hasNext', 'hasPrev', 'limit', 'page', 'total', 'totalPages']);
-    expect(page.data.length).toBeLessThanOrEqual(5);
-    const error = await rejection(listActivities({ limit: 101 }));
-    expect([error.status, error.code, error.field]).toEqual([400, 'CORE_VALIDATION_FAILED', 'limit']);
-    expect(error.details).toEqual({ limit: [expect.any(String)] });
-  });
-
-  it('requires dayStart and dayEnd on the summary (400) and caps the span at 48h (422)', async () => {
-    expect((await rejection(activitySummary({}))).status).toBe(400);
-    const start = new Date();
-    const end = new Date(start.getTime() + 49 * 3_600_000);
-    const error = await rejection(activitySummary({}, start.toISOString(), end.toISOString()));
-    expect([error.status, error.code, error.field]).toEqual([422, 'ACTIVITY_INVALID', undefined]);
-  });
-
-  it('serves the backend activity type catalogue', async () => {
-    const types = await listActivityTypes();
-    expect(types.find((t) => t.key === 'TODO')).toEqual({
-      key: 'TODO',
-      label: 'To-do',
-      icon: 'check-square',
-      defaultPriority: 'NORMAL',
-    });
-    expect(types.every((t) => t.defaultPriority === 'NORMAL')).toBe(true);
-  });
-
-  it('requires the assignee target (400)', async () => {
-    const error = await rejection(listAssignees(undefined as never));
-    expect([error.status, error.code]).toEqual([400, 'CORE_VALIDATION_FAILED']);
-    const list = await listAssignees({ targetApp: 'CRM', targetType: 'LEAD', targetId: 'lead-001' });
-    expect(list.length).toBeGreaterThan(0);
-  });
-
-  it('rejects DTO violations as 400 with field details and business rules as 422 without a field', async () => {
-    const tooLong = await rejection(createActivity(body({ subject: 'x'.repeat(181) })));
-    expect([tooLong.status, tooLong.code, tooLong.field]).toEqual([400, 'CORE_VALIDATION_FAILED', 'subject']);
-    const blank = await rejection(createActivity(body({ subject: '   ' })));
-    expect(blank.field).toBe('subject');
-    const url = await rejection(createActivity(body({ meetingUrl: 'ftp://x' })));
-    expect(url.details).toEqual({ meetingUrl: [expect.any(String)] });
-    const past = await rejection(createActivity(body({ dueAt: new Date(Date.now() - 60_000).toISOString() })));
-    expect([past.status, past.code, past.field]).toEqual([422, 'ACTIVITY_INVALID', undefined]);
-    const tuple = await rejection(createActivity(body({ target: { app: 'CORE', type: 'LEAD', id: 'x' } })));
-    expect([tuple.status, tuple.code]).toEqual([422, 'ACTIVITY_INVALID']);
-  });
-
-  it('enforces the UUIDv7 idempotency key, replays the same request and refuses a different one', async () => {
-    const bad = await rejection(createActivity(body(), 'not-a-uuid'));
-    expect([bad.status, bad.code]).toEqual([422, 'ACTIVITY_IDEMPOTENCY_KEY_INVALID']);
-    const request = body();
-    const first = await createActivity(request, KEY_A);
-    const replay = await createActivity({ ...request }, KEY_A);
-    expect(replay.id).toBe(first.id);
-    const mismatch = await rejection(createActivity({ ...request, subject: 'Other' }, KEY_A));
-    expect([mismatch.status, mismatch.code]).toEqual([422, 'ACTIVITY_IDEMPOTENCY_MISMATCH']);
-    expect((await listActivities({ limit: 100 })).data.filter((a) => a.id === first.id)).toHaveLength(1);
-  });
-
-  it('checks If-Match (428), then 404, then version (409) before the terminal state (409)', async () => {
-    const created = await createActivity(body());
-    expect((await rejection(updateActivity(created.id, 0, { subject: 'x' }))).status).toBe(428);
-    expect((await rejection(updateActivity('act-999', 1, { subject: 'x' }))).code).toBe('ACTIVITY_NOT_FOUND');
-    const done = await completeActivity(created.id, created.version, 'ok');
-    expect(done.version).toBe(created.version + 1);
-    const stale = await rejection(cancelActivity(created.id, created.version));
-    expect([stale.status, stale.code]).toEqual([409, 'ACTIVITY_VERSION_CONFLICT']);
-    const terminal = await rejection(cancelActivity(created.id, done.version));
-    expect([terminal.status, terminal.code]).toEqual([409, 'ACTIVITY_TERMINAL']);
-  });
-
-  it('does not bump the version for an unchanged update or the current status', async () => {
-    const created = await createActivity(body());
-    const same = await updateActivity(created.id, created.version, { subject: created.subject });
-    expect(same.version).toBe(created.version);
-    const status = await setActivityStatus(created.id, created.version, 'PLANNED');
-    expect(status.version).toBe(created.version);
-    const empty = await rejection(updateActivity(created.id, created.version, {}));
-    expect([empty.status, empty.code]).toEqual([422, 'ACTIVITY_INVALID']);
-    expect((await getActivity(created.id)).version).toBe(created.version);
-  });
-
-  it('stores the cancellation reason trimmed in outcome and validates its length as `reason`', async () => {
-    const created = await createActivity(body());
-    const tooLong = await rejection(cancelActivity(created.id, created.version, 'x'.repeat(2001)));
-    expect(tooLong.field).toBe('reason');
-    const cancelled = await cancelActivity(created.id, created.version, '  no answer  ');
-    expect([cancelled.status, cancelled.outcome]).toEqual(['CANCELLED', 'no answer']);
+    const page = await listActivities({ limit: 1 });
+    expect(page.data.length).toBeLessThanOrEqual(1);
+    await expect(activitySummary({ app: 'CRM', type: 'LEAD', id: 'lead-001' }, dayStart, dayEnd)).resolves.toHaveProperty('byStatus');
+    resetActivitiesFake();
   });
 });

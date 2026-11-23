@@ -1,4 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { signal } from '@angular/core';
+import { TestBed } from '@angular/core/testing';
+import { TenantScopeState } from '../../../core/scope/tenant-scope';
+import { RecordHistoryApi } from './record-history.api';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { AuditEvent, AuditHistoryGroup } from '../../../features/workspace/operations/audit-log/audit-log.api';
 import {
   historyItemFromEvent,
@@ -80,5 +86,40 @@ describe('record-history.api over the audit-log wrappers', () => {
   it('routes a Lead to the record history route and returns its seeded events (the fake accepts lead-* ids)', async () => {
     const page = await listRecordHistory('Lead', 'lead-001', []);
     expect(page.items.length).toBeGreaterThan(0);
+  });
+});
+
+describe('RecordHistoryApi', () => {
+  let api: RecordHistoryApi;
+  let http: HttpTestingController;
+  beforeEach(() => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting(), { provide: TenantScopeState, useValue: { me: signal(null), selection: signal(null) } }] });
+    api = TestBed.inject(RecordHistoryApi); http = TestBed.inject(HttpTestingController);
+  });
+  afterEach(() => http.verify());
+  it('entity history unwraps the page', async () => {
+    const pending = api.listRecordHistory('Party', V7(1), []);
+    http.expectOne((r) => r.url === `/api/tenant/core/v1/audit/entities/Party/${V7(1)}`).flush({ success: true, data: { items: [], nextCursor: 'cursor-1' } });
+    await expect(pending).resolves.toEqual({ items: [], nextCursor: 'cursor-1' });
+  });
+  it('uses the lead route without party ids and the related entity route with CSV', async () => {
+    const lead = api.listRecordHistory('Lead', V7(1), [V7(2)], { category: 'stages', cursor: 'cursor-1' });
+    const request = http.expectOne((r) => r.url.endsWith(`/records/CRM/LEAD/${V7(1)}/history`));
+    expect(request.request.params.has('relatedPartyIds')).toBe(false);
+    expect(request.request.params.get('historyCategory')).toBe('lead');
+    expect(request.request.params.get('cursor')).toBe('cursor-1');
+    request.flush({ success: true, data: { items: [item({ id: 'a', action: 'LEAD_STAGE_CHANGED' }), item({ id: 'b' })], nextCursor: 'next' } });
+    expect((await lead).items.map((row) => row.id)).toEqual(['a']);
+    const related = api.listRecordHistory('CustomerProfile', V7(1), [V7(2), V7(3)], { category: 'contact' });
+    const relatedRequest = http.expectOne((r) => r.url.endsWith(`/entities/CustomerProfile/${V7(1)}`));
+    expect(relatedRequest.request.params.get('relatedPartyIds')).toBe(`${V7(2)},${V7(3)}`);
+    relatedRequest.flush({ success: true, data: { items: [], nextCursor: null } });
+    await related;
+  });
+});
+
+describe('record-history api', () => {
+  it('CRM plain export stays available', async () => {
+    await expect(listRecordHistory('Lead', 'lead-001', [], { limit: 1 })).resolves.toMatchObject({ items: expect.any(Array) });
   });
 });

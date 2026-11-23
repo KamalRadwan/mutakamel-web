@@ -47,6 +47,7 @@ export class CallLogRow {
   readonly canCallBack = input(true);
   readonly callBackDisabled = input(false);
   readonly busy = input(false);
+  readonly timeZone = input<string | undefined>(undefined);
 
   readonly callBack = output<CallLogRowModel>();
   readonly openRecord = output<NonNullable<CallLogRowModel['record']>>();
@@ -59,8 +60,8 @@ export class CallLogRow {
     const row = this.item();
     return row.record?.label || row.name || row.number;
   });
-  protected readonly timeText = computed(() => formatCallTime(this.item().startedAt));
-  protected readonly dateTimeText = computed(() => formatCallDateTime(this.item().startedAt, this.language.current()));
+  protected readonly timeText = computed(() => formatCallTime(this.item().startedAt, this.timeZone()));
+  protected readonly dateTimeText = computed(() => formatCallDateTime(this.item().startedAt, this.language.current(), this.timeZone()));
   protected readonly durationText = computed(() => formatCallDuration(this.item()));
   protected readonly recordRoute = computed(() => callRecordRoute(this.item().record));
 

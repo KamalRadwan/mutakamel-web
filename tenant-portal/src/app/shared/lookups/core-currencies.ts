@@ -3,10 +3,11 @@
  * by currency (e.g. CRM report filters). Owners of the currency screens use settings/currencies.api.
  * GET /api/tenant/core/v1/currencies?page&limit(<=100)&status=ACTIVE&sortBy=code&sortDir=ASC
  * [currencies.currency.read] -> Core envelope, a paged CorePage { data: Currency[], meta }.
- * Reads every page from the same fake the Currencies settings screen uses, so both show one list.
+ * Consumers check the tenant-wide read permission before calling this lookup.
  */
-import type { CorePage } from '../../core/api/core-page';
-import { fakeListCurrencies } from '../../features/workspace/settings/currencies/currencies.fake';
+import { inject } from '@angular/core';
+import { QueryClient } from '@tanstack/angular-query';
+import { CoreHttp } from '../../core/api/core-http';
 import type { Currency } from '../../features/workspace/settings/currencies/currencies.model';
 
 export type CoreCurrency = Currency;
@@ -14,19 +15,28 @@ export type CoreCurrency = Currency;
 /** CurrencyQueryDto allows at most 100 rows per page. */
 const PAGE_LIMIT = 100;
 
-/** Every active Core currency, ordered by code. */
+/** Every active Core currency, ordered by code. Call in an Angular injection context. */
 export async function listActiveCoreCurrencies(): Promise<CoreCurrency[]> {
+  const http = inject(CoreHttp);
+  // Keep each lookup's in-flight pages separate across session changes.
+  const queries = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0, networkMode: 'always' } },
+  });
   const all: CoreCurrency[] = [];
   for (let page = 1; ; page++) {
-    const result: CorePage<CoreCurrency> = await fakeListCurrencies({
-      page,
-      limit: PAGE_LIMIT,
-      status: 'ACTIVE',
-      sortBy: 'code',
-      sortDir: 'ASC',
+    // Tenant catalogue read: no organization scope headers.
+    const result = await queries.fetchQuery({
+      queryKey: ['core-currencies', page],
+      queryFn: () => http.readPage<CoreCurrency>('/api/tenant/core/v1/currencies', {
+        page,
+        limit: PAGE_LIMIT,
+        status: 'ACTIVE',
+        sortBy: 'code',
+        sortDir: 'ASC',
+      }),
     });
     all.push(...result.data.filter((currency) => currency.status === 'ACTIVE'));
-    if (!result.meta.hasNext || result.data.length === 0) return all;
+    if (!result.meta.hasNext) return all;
   }
 }
 

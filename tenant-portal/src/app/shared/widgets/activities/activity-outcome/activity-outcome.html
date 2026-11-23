@@ -51,7 +51,7 @@
       [hint]="(mode() === 'cancel' ? 'activities.hints.cancelReason' : 'activities.hints.completeOutcome') | transloco"
       [count]="text().length"
       [max]="maxLength"
-      [error]="overLimit() ? ('activities.validation.maxLength' | transloco: { max: maxLength }) : null"
+      [error]="overLimit() ? ('activities.validation.maxLength' | transloco: { max: maxLength }) : serverError()"
     >
       <textarea
         #textarea

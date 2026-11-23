@@ -1,10 +1,11 @@
-import { Component, DestroyRef, computed, effect, inject, input, output, untracked } from '@angular/core';
+import { Component, DestroyRef, Injector, computed, inject, input, output, runInInjectionContext } from '@angular/core';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { PhoneState } from '../../../core/phone/phone';
+import { settingsTimeZone } from '../../../features/crm/settings/shared/settings-time-zone';
 import { CallLogColumn, CallLogLoader, CallLogRow } from '../call-log/call-log.model';
 import { CallLogTable } from '../call-log/call-log-table/call-log-table';
 import { getPartyCallsSummary, listPartyCalls, toCallLogTypeParam } from './party-calls.api';
-import { PartyCallPartyType, toPartyCallLogRow } from './party-calls.model';
+import { toPartyCallLogRow } from './party-calls.model';
 
 const PARTY_CALL_COLUMNS: readonly CallLogColumn[] = ['type', 'owner', 'date', 'duration', 'actions'];
 
@@ -18,6 +19,9 @@ const PARTY_CALL_COLUMNS: readonly CallLogColumn[] = ['type', 'owner', 'date', '
 export class PartyCalls {
   protected readonly phone = inject(PhoneState);
   private readonly transloco = inject(TranslocoService);
+  private readonly injector = inject(Injector);
+  private readonly destroyRef = inject(DestroyRef);
+  protected readonly resolveTimeZone = () => runInInjectionContext(this.injector, settingsTimeZone);
 
   readonly partyType = input.required<'LEAD' | 'CUSTOMER_PROFILE' | 'PARTY' | 'OPPORTUNITY'>();
   readonly partyId = input.required<string>();
@@ -28,46 +32,42 @@ export class PartyCalls {
 
   protected readonly columns: CallLogColumn[] = [...PARTY_CALL_COLUMNS];
 
-  private summarySeq = 0;
-
   protected readonly loadCalls = computed<CallLogLoader>(() => {
     const partyType = this.partyType();
     const partyId = this.partyId();
     return async (query) => {
-      const result = await listPartyCalls({
-        partyType,
-        partyId,
-        page: query.page,
-        limit: query.limit,
-        type: toCallLogTypeParam(query.types),
-        from: query.from,
-        to: query.to,
-        q: query.q,
-      });
-      return {
-        data: result.data.map(toPartyCallLogRow),
-        meta: result.meta,
-      };
+      try {
+        const [result, summary] = await Promise.all([
+          listPartyCalls({
+            partyType,
+            partyId,
+            page: query.page,
+            limit: query.limit,
+            type: toCallLogTypeParam(query.types),
+            from: query.from,
+            to: query.to,
+            q: query.q,
+          }),
+          getPartyCallsSummary({ partyType, partyId }),
+        ]);
+        if (!this.destroyRef.destroyed && this.partyType() === partyType && this.partyId() === partyId) {
+          this.total.emit(summary.total);
+          this.missed.emit(summary.missed);
+        }
+        return { data: result.data.map(toPartyCallLogRow), meta: result.meta };
+      } catch (error) {
+        if (typeof error === 'object' && error !== null && 'status' in error && error.status === 404
+          && !this.destroyRef.destroyed && this.partyType() === partyType && this.partyId() === partyId) {
+          this.total.emit(0);
+          this.missed.emit(0);
+        }
+        throw error;
+      }
     };
   });
 
   protected readonly errorText = (status: number): string | null =>
     status === 404 ? this.transloco.translate('partyCalls.errors.notFound') : null;
-
-  constructor() {
-    effect(() => {
-      const partyType = this.partyType();
-      const partyId = this.partyId();
-      this.reloadToken();
-      untracked(() => {
-        void this.refreshSummary(partyType, partyId);
-      });
-    });
-
-    inject(DestroyRef).onDestroy(() => {
-      this.summarySeq++;
-    });
-  }
 
   protected onCallBack(row: CallLogRow): void {
     void this.phone.call(row.number, {
@@ -75,21 +75,5 @@ export class PartyCalls {
       id: this.partyId(),
       label: this.partyLabel(),
     });
-  }
-
-  private async refreshSummary(partyType: PartyCallPartyType, partyId: string): Promise<void> {
-    const seq = ++this.summarySeq;
-    try {
-      const summary = await getPartyCallsSummary({ partyType, partyId });
-      if (seq !== this.summarySeq) return;
-      this.total.emit(summary.total);
-      this.missed.emit(summary.missed);
-    } catch (error) {
-      if (seq !== this.summarySeq) return;
-      if (typeof error === 'object' && error !== null && 'status' in error && (error as { status: unknown }).status === 404) {
-        this.total.emit(0);
-        this.missed.emit(0);
-      }
-    }
   }
 }

@@ -1,15 +1,21 @@
 <div class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
-  @if (allowUpload() && !denied()) {
-    <ui-file-drop
-      [accept]="accept"
-      [maxBytes]="maxBytes"
-      [title]="'recordAttachments.drop.title' | transloco"
+  @if (allowUpload() && !denied() && activeBranch()) {
+    <ui-field
+      size="bare"
+      [label]="'recordAttachments.uploadLabel' | transloco"
       [hint]="'recordAttachments.drop.hint' | transloco"
-      [browseLabel]="'recordAttachments.drop.browse' | transloco"
-      [disabled]="branchId() === null"
-      (picked)="onPicked($event)"
-      (rejected)="onRejected($event)"
-    />
+    >
+      <ui-file-drop
+        [accept]="accept"
+        [maxBytes]="maxBytes"
+        [title]="'recordAttachments.drop.title' | transloco"
+        [hint]="'recordAttachments.drop.hint' | transloco"
+        [browseLabel]="'recordAttachments.drop.browse' | transloco"
+        [disabled]="loading() || loadFailed()"
+        (picked)="onPicked($event)"
+        (rejected)="onRejected($event)"
+      />
+    </ui-field>
   }
 
   @if (!denied() && uploads().length > 0) {
@@ -65,9 +71,11 @@
             </button>
           } @else if (up.status === 'failed') {
             <div class="flex shrink-0 items-center gap-4">
-              <button type="button" uiButton variant="ghost" size="small" (click)="retryUpload(up.id)">
-                {{ 'recordAttachments.retry' | transloco }}
-              </button>
+              @if (up.retryable && allowUpload()) {
+                <button type="button" uiButton variant="ghost" size="small" (click)="retryUpload(up.id)">
+                  {{ 'recordAttachments.retry' | transloco }}
+                </button>
+              }
               <button
                 type="button"
                 class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
@@ -84,22 +92,18 @@
     </div>
   }
 
-  @if (denied()) {
-    <div class="flex flex-col items-center justify-center gap-6 py-16 text-center">
-      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-orange text-on-icon">
-        <ng-icon name="tablerLock" size="18" aria-hidden="true" />
-      </span>
-      <p class="max-w-modal-confirm text-12 leading-18 text-text-muted">
-        {{ 'recordAttachments.denied' | transloco }}
-      </p>
-    </div>
+  @if (!activeBranch()) {
+    <ui-full-state kind="forbidden" [title]="'recordAttachments.chooseBranch' | transloco" />
+  } @else if (denied()) {
+    <ui-full-state kind="forbidden" [title]="'recordAttachments.denied' | transloco" />
   } @else if (loadFailed()) {
-    <div class="flex flex-col items-center justify-center gap-8 p-16 text-center" role="alert">
-      <p class="text-12 leading-18 text-text-muted">{{ 'recordAttachments.loadFailed' | transloco }}</p>
-      <button type="button" uiButton variant="secondary" size="small" (click)="reload()">
-        {{ 'recordAttachments.tryAgain' | transloco }}
-      </button>
-    </div>
+    <ui-full-state
+      kind="load-failure"
+      [title]="'recordAttachments.loadFailed' | transloco"
+      [text]="loadCorrelationId() ? ('recordAttachments.correlation' | transloco: { id: loadCorrelationId() }) : ''"
+      [actionLabel]="'recordAttachments.tryAgain' | transloco"
+      (action)="reload()"
+    />
   } @else if (!showSkeleton() && items().length === 0) {
     @if (allowUpload()) {
       <p class="p-16 text-center text-12 leading-18 text-text-muted">{{ 'recordAttachments.empty.title' | transloco }}</p>

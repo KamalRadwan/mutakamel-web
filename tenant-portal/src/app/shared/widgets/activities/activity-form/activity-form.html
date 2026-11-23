@@ -4,9 +4,12 @@
     size="bare"
     [label]="'activities.form.type' | transloco"
     [hint]="'activities.hints.type' | transloco"
+    [for]="uid + '-type'"
+    [error]="errorText('type')"
   >
     <div
       role="radiogroup"
+      [attr.aria-describedby]="describedBy('type')"
       [attr.aria-label]="'activities.form.type' | transloco"
       class="grid grid-cols-7 gap-6"
     >
@@ -70,16 +73,24 @@
     size="bare"
     [label]="'activities.form.assignee' | transloco"
     [hint]="'activities.hints.assignee' | transloco"
+    [for]="uid + '-assigneeUserId'"
+    [error]="errorText('assigneeUserId')"
   >
     <ui-dropdown
       class="w-full"
       [options]="assigneeOptions()"
       [value]="formValue().assigneeUserId"
       [label]="'activities.form.assignee' | transloco"
+      [attr.aria-describedby]="describedBy('assigneeUserId')"
       (valueChange)="setAssignee($event)"
     />
   </ui-field>
-  @if (formValue().assigneeUserId !== currentUserId) {
+  @if (assigneesFailed()) {
+    <button type="button" uiButton size="small" variant="ghost" (click)="retryAssignees()">
+      {{ 'activities.form.retryAssignees' | transloco }}
+    </button>
+  }
+  @if (formValue().assigneeUserId !== currentUserId()) {
     <button
       type="button"
       class="mt-2 cursor-pointer self-start rounded-4 text-12 leading-16 text-accent outline-none hover:underline focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
@@ -133,11 +144,14 @@
           size="bare"
           [label]="'activities.form.reminder' | transloco"
           [hint]="'activities.hints.reminder' | transloco"
+          [for]="uid + '-reminder'"
+          [error]="errorText('reminder')"
         >
           <ui-dropdown
             [options]="reminderOptions()"
             [value]="formValue().reminder"
             [label]="'activities.form.reminder' | transloco"
+            [attr.aria-describedby]="describedBy('reminder')"
             (valueChange)="setReminder($event)"
           />
         </ui-field>
@@ -235,11 +249,14 @@
       size="bare"
       [label]="'activities.form.status' | transloco"
       [hint]="'activities.hints.status' | transloco"
+      [for]="uid + '-status'"
+      [error]="errorText('status')"
     >
       <ui-segmented
         class="self-start"
         [options]="statusOptions()"
         [label]="'activities.form.status' | transloco"
+        [attr.aria-describedby]="describedBy('status')"
         [value]="formValue().status"
         (valueChange)="setStatus($event)"
       />
@@ -254,11 +271,14 @@
       size="bare"
       [label]="'activities.form.priority' | transloco"
       [hint]="'activities.hints.priority' | transloco"
+      [for]="uid + '-priority'"
+      [error]="errorText('priority')"
     >
       <ui-segmented
         class="self-start"
         [options]="priorityOptions()"
         [label]="'activities.form.priority' | transloco"
+        [attr.aria-describedby]="describedBy('priority')"
         [value]="formValue().priority"
         (valueChange)="setPriority($event)"
       />
@@ -271,11 +291,14 @@
         size="bare"
         [label]="'activities.form.direction' | transloco"
         [hint]="'activities.hints.direction' | transloco"
+        [for]="uid + '-direction'"
+        [error]="errorText('direction')"
       >
         <ui-segmented
           class="self-start"
           [options]="directionOptions()"
           [label]="'activities.form.direction' | transloco"
+          [attr.aria-describedby]="describedBy('direction')"
           [value]="formValue().direction"
           (valueChange)="setDirection($event)"
         />

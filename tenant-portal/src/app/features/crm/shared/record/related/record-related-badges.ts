@@ -13,6 +13,8 @@ import {
   tablerUserSearch,
 } from '@ng-icons/tabler-icons';
 import { filter } from 'rxjs';
+import { FullState } from '../../../../../shared/ui/full-state/full-state';
+import { crmSettingsError } from '../../../settings/shared/settings-api';
 import { relatedCounts, relatedCountsRevision } from './related-records.api';
 import {
   DEFAULT_RELATED_KINDS,
@@ -30,7 +32,7 @@ interface RelatedBadgeItem {
   kind: RelatedKind;
   icon: string;
   label: string;
-  count: number;
+  count: number | '—';
   ariaLabel: string;
   target: RelatedLinkTarget;
   urlTree: UrlTree;
@@ -102,9 +104,9 @@ function isRouteRegistered(routes: Routes, commands: readonly string[]): boolean
 
 @Component({
   selector: 'app-record-related-badges',
-  imports: [NgIcon, TranslocoPipe],
+  imports: [NgIcon, TranslocoPipe, FullState],
+  viewProviders: [provideTranslocoScope({ scope: 'record-related', alias: 'recordRelated' })],
   providers: [
-    provideTranslocoScope({ scope: 'record-related', alias: 'recordRelated' }),
     provideIcons({
       tablerUserSearch,
       tablerTargetArrow,
@@ -165,6 +167,19 @@ export class RecordRelatedBadges {
 
   protected readonly loading = computed(() => this.countsResource.isLoading());
 
+  protected readonly loadError = computed(() => {
+    this.i18n();
+    const error = this.countsResource.error();
+    if (!error) return null;
+    const translations = this.transloco.getTranslation(this.transloco.getActiveLang());
+    return crmSettingsError((key, params) => Object.hasOwn(translations, key)
+      ? this.transloco.translate(key, params) : key, error, 'recordRelated');
+  });
+
+  protected retry(): void {
+    this.countsResource.reload();
+  }
+
   private readonly loadedCounts = computed<Partial<RelatedCounts> | null>(() => {
     if (this.countsResource.error() || !this.countsResource.hasValue()) return null;
     return this.countsResource.value() ?? null;
@@ -186,19 +201,20 @@ export class RecordRelatedBadges {
     const result: RelatedBadgeItem[] = [];
     for (const kind of this.kinds()) {
       const rawCount = data[kind];
-      if (typeof rawCount !== 'number' || !Number.isFinite(rawCount)) continue;
+      if (rawCount !== null && (typeof rawCount !== 'number' || !Number.isFinite(rawCount))) continue;
+      const count = rawCount === null ? '—' : rawCount;
 
       const meta = RELATED_KIND_META[kind];
       const label = this.transloco.translate(meta.labelKey);
       const ariaLabel = this.transloco.translate('recordRelated.badgeAria', {
         label,
-        count: rawCount,
+        count,
       });
 
       const linkFn = customLinks[kind] ?? RELATED_LIST_LINKS[kind];
       const target = linkFn({ recordId, partyId, partyLabel, recordType });
       const routeAvailable = isRouteRegistered(this.router.config, target.commands);
-      const isLink = rawCount > 0 && routeAvailable;
+      const isLink = rawCount !== null && rawCount > 0 && routeAvailable;
       const urlTree = this.router.createUrlTree(target.commands, { queryParams: target.queryParams });
       const serialized = this.router.serializeUrl(urlTree);
       const href = this.locationStrategy ? this.locationStrategy.prepareExternalUrl(serialized) : serialized;
@@ -207,20 +223,20 @@ export class RecordRelatedBadges {
         kind,
         icon: meta.icon,
         label,
-        count: rawCount,
+        count,
         ariaLabel,
         target,
         urlTree,
         href,
         isLink,
-        unavailableTitle: routeAvailable ? null : unavailableText,
+        unavailableTitle: rawCount === null || !routeAvailable ? unavailableText : null,
       });
     }
 
     return result;
   });
 
-  protected readonly visible = computed(() => this.loading() || this.items().length > 0);
+  protected readonly visible = computed(() => this.loading() || !!this.loadError() || this.items().length > 0);
 
   constructor() {
     effect((onCleanup) => {

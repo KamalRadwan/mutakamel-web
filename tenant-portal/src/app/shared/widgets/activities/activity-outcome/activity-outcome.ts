@@ -104,6 +104,8 @@ export class ActivityOutcome {
 
   protected readonly overLimit = computed(() => this.text().length > this.maxLength);
 
+  private submit: ((value: string | null) => Promise<boolean>) | null = null;
+  protected readonly serverError = signal<string | null>(null);
   private lastKey: string | null = null;
   private resolver: ((value: string | null | undefined) => void) | null = null;
 
@@ -111,8 +113,10 @@ export class ActivityOutcome {
     inject(DestroyRef).onDestroy(() => this.settle(undefined));
   }
 
-  open(activity: Activity, mode: OutcomeMode = 'complete'): Promise<string | null | undefined> {
+  open(activity: Activity, mode: OutcomeMode = 'complete', submit?: (value: string | null) => Promise<boolean>): Promise<string | null | undefined> {
     this.settle(undefined);
+    this.submit = submit ?? null;
+    this.serverError.set(null);
     const nextKey = `${activity.id}:${mode}`;
     if (this.lastKey !== nextKey) {
       this.text.set('');
@@ -125,6 +129,15 @@ export class ActivityOutcome {
     return new Promise<string | null | undefined>((resolve) => {
       this.resolver = resolve;
     });
+  }
+
+  clearNote(): void {
+    this.text.set('');
+    this.serverError.set(null);
+  }
+
+  setServerError(message: string): void {
+    this.serverError.set(message);
   }
 
   close(): void {
@@ -149,13 +162,15 @@ export class ActivityOutcome {
   }
 
   protected onInput(event: Event): void {
+    this.serverError.set(null);
     this.text.set((event.target as HTMLTextAreaElement).value);
   }
 
-  protected confirm(): void {
+  protected async confirm(): Promise<void> {
     if (this.busy() || this.overLimit()) return;
     const trimmed = this.text().trim();
     const value = trimmed.length > 0 ? trimmed : null;
+    if (this.submit && !(await this.submit(value))) return;
     const resolve = this.resolver;
     this.resolver = null;
     this.modal().close();

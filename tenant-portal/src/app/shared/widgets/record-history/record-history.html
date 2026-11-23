@@ -1,3 +1,4 @@
+@if (!denied()) {
 <div class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
   @if (!denied()) {
     <ui-field size="bare" [label]="'recordHistory.filter.label' | transloco" [hint]="'recordHistory.filter.hint' | transloco">
@@ -26,23 +27,14 @@
         </div>
       }
     </div>
-  } @else if (denied()) {
-    <div class="flex flex-col items-center justify-center gap-6 py-16 text-center">
-      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-orange text-on-icon">
-        <ng-icon name="tablerLock" size="18" aria-hidden="true" />
-      </span>
-      <h3 class="text-13 leading-18 font-medium text-text">{{ 'recordHistory.denied.title' | transloco }}</h3>
-      <p class="max-w-modal-confirm text-12 leading-18 text-text-muted">
-        {{ 'recordHistory.denied.text' | transloco }}
-      </p>
-    </div>
   } @else if (loadFailed()) {
-    <div class="flex flex-col items-center justify-center gap-8 py-16 text-center">
-      <p class="text-12 leading-18 text-text-muted">{{ 'recordHistory.loadFailed' | transloco }}</p>
-      <button type="button" uiButton variant="secondary" size="small" (click)="retry()">
-        {{ 'recordHistory.retry' | transloco }}
-      </button>
-    </div>
+    <ui-full-state
+      kind="load-failure"
+      [title]="'recordHistory.loadFailed' | transloco"
+      [text]="loadCorrelationId() ? (('recordHistory.supportRef' | transloco) + ': ' + loadCorrelationId()) : ''"
+      [actionLabel]="'recordHistory.retry' | transloco"
+      (action)="retry()"
+    />
   } @else if (dayGroups().length === 0) {
     <p class="py-16 text-center text-12 leading-18 text-text-muted">{{ 'recordHistory.empty' | transloco }}</p>
   } @else {
@@ -78,6 +70,9 @@
                       }
                     </div>
 
+                    @if (item.missingOutcome) {
+                      <span class="inline-flex h-badge self-start items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium text-on-neutral-soft">—</span>
+                    }
                     @if (item.failedText) {
                       <p class="text-11 leading-16 text-danger-text">{{ item.failedText }}</p>
                     }
@@ -154,3 +149,5 @@
     }
   }
 </div>
+
+}

@@ -30,6 +30,9 @@ import {
   tablerUsers,
   tablerX,
 } from '@ng-icons/tabler-icons';
+import { ApiError, fieldErrorsOf, isRetryableWriteError, isValidationError } from '../../../../core/api/api-errors';
+import { newIdempotencyKey } from '../../../../core/api/idempotency';
+import { TenantScopeState } from '../../../../core/scope/tenant-scope';
 import { CurrentUser } from '../../../../core/auth/current-user';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Button } from '../../../ui/button/button';
@@ -38,13 +41,12 @@ import { TimeField } from '../../../ui/date-time/time-field';
 import { Dropdown, DropdownOption } from '../../../ui/dropdown/dropdown';
 import { Field } from '../../../ui/field/field';
 import { Segmented, SegmentedOption } from '../../../ui/segmented/segmented';
-import { createActivity, listAssignees, updateActivity } from '../activities.api';
+import { ActivitiesApi } from '../activities.api';
 import {
   ACTIVITY_TYPES,
   Activity,
   ActivityDirection,
   ActivityAssigneesParams,
-  ActivityError,
   ActivityPriority,
   ActivityType,
   Assignee,
@@ -76,13 +78,11 @@ import {
   fromLocalDateTime,
   isCreateDirty,
   isValidMeetingLink,
-  rebaseFormValue,
   resetValueForAnother,
   toLocalDateTime,
   validateActivityForm,
 } from './activity-form.model';
 
-const FAKE_CURRENT_USER_ID = 'u1';
 const PRIORITIES: readonly ActivityPriority[] = ['LOW', 'NORMAL', 'HIGH', 'URGENT'];
 const PRIORITY_DOTS: Record<ActivityPriority, string> = {
   LOW: 'bg-status-none',
@@ -98,6 +98,12 @@ const STATUS_DOTS: Record<ActivityInitialStatus, string> = {
 const DIRECTIONS: ReadonlyArray<ActivityDirection | ''> = ['', 'INBOUND', 'OUTBOUND', 'INTERNAL'];
 
 const API_FIELD_MAP: Record<string, ActivityFormField | undefined> = {
+  type: 'type',
+  assigneeUserId: 'assigneeUserId',
+  status: 'status',
+  priority: 'priority',
+  direction: 'direction',
+  reminderOffsetMinutes: 'reminder',
   subject: 'subject',
   dueAt: 'start',
   endsAt: 'end',
@@ -140,6 +146,8 @@ export class ActivityForm {
   private readonly i18n = translationEvents(this.transloco);
   private readonly language = inject(LanguageState).current;
   private readonly currentUser = inject(CurrentUser);
+  private readonly scope = inject(TenantScopeState);
+  private readonly api = inject(ActivitiesApi);
   private readonly typeButtons = viewChildren<ElementRef<HTMLButtonElement>>('typeBtn');
 
   readonly mode = input<'create' | 'edit'>('create');
@@ -147,24 +155,28 @@ export class ActivityForm {
   readonly target = input<{ app: TargetApp; type: string; id: string; label: string } | null>(null);
   readonly initialType = input<ActivityType>('TODO');
 
-  protected readonly currentUserId = FAKE_CURRENT_USER_ID;
+  protected readonly currentUserId = computed(() => this.scope.me()?.id ?? '');
   protected readonly activityTypes = ACTIVITY_TYPES;
   protected readonly typeLook = TYPE_LOOK;
   protected readonly limits = LIMITS;
 
   private readonly assignees = signal<Assignee[]>([
-    { id: FAKE_CURRENT_USER_ID, name: this.currentUser.user().displayName },
+    { id: this.currentUserId(), name: this.currentUser.user().displayName },
   ]);
   protected readonly currentBaseActivity = signal<Activity | null>(null);
-  protected readonly formValue = signal<ActivityFormValue>(createInitialValue('TODO', FAKE_CURRENT_USER_ID));
+  protected readonly formValue = signal<ActivityFormValue>(createInitialValue('TODO', this.currentUserId()));
   private readonly touched = signal<Partial<Record<ActivityFormField, boolean>>>({});
   private readonly revealAllErrors = signal(false);
   private readonly serverErrors = signal<Partial<Record<ActivityFormField, string>>>({});
   private readonly saveTick = signal(0);
   private readonly savingState = signal(false);
 
+  protected readonly assigneesFailed = signal(false);
+  private pendingSave: { key: string; bodyJson: string } | null = null;
+
   private lastInitializedMode: 'create' | 'edit' | null = null;
   private lastInitializedType: ActivityType | null = null;
+  private lastInitializedTarget: string | null = null;
 
   readonly dirty: Signal<boolean> = computed(() => {
     if (this.mode() === 'edit') {
@@ -215,7 +227,7 @@ export class ActivityForm {
         : list;
     return all.map((user) => ({
       value: user.id,
-      label: user.id === this.currentUserId ? `${user.name} ${meSuffix}` : user.name,
+      label: user.id === this.currentUserId() ? `${user.name} ${meSuffix}` : user.name,
     }));
   });
 
@@ -320,15 +332,7 @@ export class ActivityForm {
       const selector = this.assigneeTarget();
       if (!selector) return;
       untracked(() => {
-        listAssignees(selector)
-          .then((list) => {
-            if (list.length > 0 && this.assigneeTarget() === selector) {
-              this.assignees.set(list);
-            }
-          })
-          .catch(() => {
-            // 403 without activities.assign: keep the current list (the form defaults to the current user).
-          });
+        void this.loadAssignees(selector);
       });
     });
 
@@ -336,6 +340,8 @@ export class ActivityForm {
       const mode = this.mode();
       const activity = this.activity();
       const initialType = this.initialType();
+      const target = this.target();
+      const targetKey = target ? `${target.app}:${target.type}:${target.id}` : null;
 
       untracked(() => {
         if (mode === 'edit') {
@@ -354,11 +360,13 @@ export class ActivityForm {
           return;
         }
 
-        if (this.lastInitializedMode !== 'create' || this.lastInitializedType !== initialType) {
+        if (this.lastInitializedMode !== 'create' || this.lastInitializedType !== initialType || this.lastInitializedTarget !== targetKey) {
           this.lastInitializedMode = 'create';
+          this.lastInitializedTarget = targetKey;
+          this.pendingSave = null;
           this.lastInitializedType = initialType;
           this.currentBaseActivity.set(null);
-          this.formValue.set(createInitialValue(initialType, this.currentUserId));
+          this.formValue.set(createInitialValue(initialType, this.currentUserId()));
           this.resetValidationState();
         }
       });
@@ -401,14 +409,14 @@ export class ActivityForm {
     if (mode === 'create') {
       const targetInfo = this.target();
       if (!targetInfo) {
-        throw new ActivityError('ACTIVITY_INVALID');
+        throw new ApiError(422, 'ACTIVITY_INVALID');
       }
       const body = buildCreateBody(
         current,
         { app: targetInfo.app, type: targetInfo.type, id: targetInfo.id },
-        this.currentUserId,
+        this.currentUserId(),
       );
-      return this.executeSave(() => createActivity(body));
+      return this.executeSave({ action: 'create', body }, (key) => this.api.createActivity(body, key));
     }
 
     if (!base) {
@@ -418,7 +426,7 @@ export class ActivityForm {
     if (Object.keys(changes).length === 0) {
       return null;
     }
-    const updated = await this.executeSave(() => updateActivity(base.id, base.version, changes));
+    const updated = await this.executeSave({ action: 'update', id: base.id, version: base.version, body: changes }, (key) => this.api.updateActivity(base.id, base.version, changes, key));
     if (updated) {
       this.reload(updated);
     }
@@ -426,22 +434,20 @@ export class ActivityForm {
   }
 
   resetForAnother(): void {
+    this.pendingSave = null;
     this.formValue.update((current) => resetValueForAnother(current));
     this.resetValidationState();
   }
 
   rebase(fresh: Activity): void {
-    const oldBase = this.currentBaseActivity() ?? this.activity();
-    this.currentBaseActivity.set(fresh);
-    if (oldBase) {
-      this.formValue.update((current) => rebaseFormValue(oldBase, fresh, current));
-    } else {
-      this.formValue.set(activityToFormValue(fresh));
-    }
+    const base = this.currentBaseActivity();
+    this.currentBaseActivity.set(base ? { ...base, version: fresh.version } : fresh);
+    this.pendingSave = null;
     this.serverErrors.set({});
   }
 
   reload(fresh: Activity): void {
+    this.pendingSave = null;
     this.currentBaseActivity.set(fresh);
     this.formValue.set(activityToFormValue(fresh));
     this.resetValidationState();
@@ -505,10 +511,11 @@ export class ActivityForm {
 
   protected setAssignee(assigneeUserId: string): void {
     this.formValue.update((current) => ({ ...current, assigneeUserId }));
+    this.clearServerError('assigneeUserId');
   }
 
   protected assignToMe(): void {
-    this.setAssignee(this.currentUserId);
+    this.setAssignee(this.currentUserId());
   }
 
   protected onStartDateChange(nextDate: string | null): void {
@@ -596,21 +603,25 @@ export class ActivityForm {
   protected setStatus(value: string | null): void {
     if (value !== 'PLANNED' && value !== 'IN_PROGRESS' && value !== 'DONE') return;
     this.formValue.update((current) => applyStatusChange(current, value));
+    this.clearServerError('status');
     this.clearServerError('start');
   }
 
   protected setPriority(value: string | null): void {
     if (value !== 'LOW' && value !== 'NORMAL' && value !== 'HIGH' && value !== 'URGENT') return;
     this.formValue.update((current) => ({ ...current, priority: value }));
+    this.clearServerError('priority');
   }
 
   protected setReminder(reminder: string): void {
     this.formValue.update((current) => ({ ...current, reminder }));
+    this.clearServerError('reminder');
   }
 
   protected setDirection(value: string | null): void {
     if (value !== '' && value !== 'INBOUND' && value !== 'OUTBOUND' && value !== 'INTERNAL') return;
     this.formValue.update((current) => ({ ...current, direction: value }));
+    this.clearServerError('direction');
   }
 
   protected markTouched(field: ActivityFormField): void {
@@ -641,18 +652,44 @@ export class ActivityForm {
     }).format(date);
   }
 
-  private async executeSave(request: () => Promise<Activity>): Promise<Activity | null> {
+  protected retryAssignees(): void {
+    const target = this.assigneeTarget();
+    if (target) void this.loadAssignees(target);
+  }
+
+  private async loadAssignees(target: ActivityAssigneesParams): Promise<void> {
+    this.assigneesFailed.set(false);
+    this.assignees.set([{ id: this.currentUserId(), name: this.currentUser.user().displayName }]);
+    try {
+      const list = await this.api.listAssignees(target);
+      if (this.assigneeTarget() === target) this.assignees.set(list);
+    } catch (error) {
+      if (this.assigneeTarget() !== target) return;
+      // A user without assignment permission can still create an activity assigned to themselves.
+      this.assigneesFailed.set(!(error instanceof ApiError && error.status === 403));
+    }
+  }
+
+  private async executeSave(action: unknown, request: (key: string) => Promise<Activity>): Promise<Activity | null> {
+    const bodyJson = JSON.stringify(action);
+    if (this.pendingSave?.bodyJson !== bodyJson) this.pendingSave = { key: newIdempotencyKey(), bodyJson };
     this.savingState.set(true);
     try {
-      return await request();
+      const result = await request(this.pendingSave.key);
+      this.pendingSave = null;
+      return result;
     } catch (error) {
-      // Only CORE_VALIDATION_FAILED carries field details (DTO property path); ACTIVITY_INVALID is message-only.
-      if (error instanceof ActivityError && error.code === 'CORE_VALIDATION_FAILED' && error.field) {
-        const mapped = API_FIELD_MAP[error.field];
-        if (mapped) {
-          this.serverErrors.update((current) => ({ ...current, [mapped]: error.code }));
-          return null;
+      if (!isRetryableWriteError(error) && !(error instanceof ApiError && error.status === 401)) this.pendingSave = null;
+      if (isValidationError(error)) {
+        const fields = fieldErrorsOf(error);
+        let mappedAny = false;
+        for (const field of Object.keys(fields)) {
+          const mapped = API_FIELD_MAP[field];
+          if (!mapped) continue;
+          this.serverErrors.update((current) => ({ ...current, [mapped]: 'CORE_VALIDATION_FAILED' }));
+          mappedAny = true;
         }
+        if (mappedAny) return null;
       }
       throw error;
     } finally {

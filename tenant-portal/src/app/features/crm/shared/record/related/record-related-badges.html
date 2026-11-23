@@ -1,41 +1,51 @@
-<nav
-  [class]="layout() === 'modal' ? 'flex flex-wrap items-center gap-6' : 'flex flex-wrap items-center gap-8'"
-  [attr.aria-label]="'recordRelated.label' | transloco"
-  [attr.aria-busy]="loading() ? 'true' : null"
->
-  @if (loading()) {
-    @for (kind of kinds(); track kind) {
-      <span
-        class="inline-flex h-badge w-preset shrink-0 animate-pulse rounded-8 bg-neutral-soft motion-reduce:animate-none"
-        aria-hidden="true"
-      ></span>
-    }
-  } @else {
-    @for (item of items(); track item.kind) {
-      @if (item.isLink) {
-        <a
-          [attr.href]="item.href"
-          class="inline-flex h-badge shrink-0 cursor-pointer items-center gap-4 rounded-8 bg-brand-soft px-8 text-12 leading-16 font-medium whitespace-nowrap text-on-brand-soft outline-none transition-colors duration-fast ease-enter hover:bg-brand hover:text-on-brand focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
-          [attr.aria-label]="item.ariaLabel"
-          (click)="onLinkClick(item, $event)"
-        >
-          <ng-icon [name]="item.icon" size="12" class="shrink-0" aria-hidden="true" />
-          <span>{{ item.label }}</span>
-          <bdi dir="ltr" class="tabular-nums">{{ item.count }}</bdi>
-        </a>
-      } @else {
+@if (loadError(); as error) {
+  <ui-full-state
+    [kind]="error.kind"
+    [title]="error.message"
+    [text]="error.correlationId ?? ''"
+    [actionLabel]="'session.loadFailed.retry' | transloco"
+    (action)="retry()"
+  />
+} @else {
+  <nav
+    [class]="layout() === 'modal' ? 'flex flex-wrap items-center gap-6' : 'flex flex-wrap items-center gap-8'"
+    [attr.aria-label]="'recordRelated.label' | transloco"
+    [attr.aria-busy]="loading() ? 'true' : null"
+  >
+    @if (loading()) {
+      @for (kind of kinds(); track kind) {
         <span
-          role="link"
-          aria-disabled="true"
-          class="inline-flex h-badge shrink-0 items-center gap-4 rounded-8 bg-neutral-soft px-8 text-12 leading-16 font-medium whitespace-nowrap text-text-muted"
-          [attr.aria-label]="item.ariaLabel"
-          [attr.title]="item.unavailableTitle"
-        >
-          <ng-icon [name]="item.icon" size="12" class="shrink-0" aria-hidden="true" />
-          <span>{{ item.label }}</span>
-          <bdi dir="ltr" class="tabular-nums">{{ item.count }}</bdi>
-        </span>
+          class="inline-flex h-badge w-preset shrink-0 animate-pulse rounded-8 bg-neutral-soft motion-reduce:animate-none"
+          aria-hidden="true"
+        ></span>
+      }
+    } @else {
+      @for (item of items(); track item.kind) {
+        @if (item.isLink) {
+          <a
+            [attr.href]="item.href"
+            class="inline-flex h-badge shrink-0 cursor-pointer items-center gap-4 rounded-8 bg-brand-soft px-8 text-12 leading-16 font-medium whitespace-nowrap text-on-brand-soft outline-none transition-colors duration-fast ease-enter hover:bg-brand hover:text-on-brand focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [attr.aria-label]="item.ariaLabel"
+            (click)="onLinkClick(item, $event)"
+          >
+            <ng-icon [name]="item.icon" size="12" class="shrink-0" aria-hidden="true" />
+            <span>{{ item.label }}</span>
+            <bdi dir="ltr" class="tabular-nums">{{ item.count }}</bdi>
+          </a>
+        } @else {
+          <span
+            role="link"
+            aria-disabled="true"
+            class="inline-flex h-badge shrink-0 items-center gap-4 rounded-8 bg-neutral-soft px-8 text-12 leading-16 font-medium whitespace-nowrap text-text-muted"
+            [attr.aria-label]="item.ariaLabel"
+            [attr.title]="item.unavailableTitle"
+          >
+            <ng-icon [name]="item.icon" size="12" class="shrink-0" aria-hidden="true" />
+            <span>{{ item.label }}</span>
+            <bdi dir="ltr" class="tabular-nums">{{ item.count }}</bdi>
+          </span>
+        }
       }
     }
-  }
-</nav>
+  </nav>
+}

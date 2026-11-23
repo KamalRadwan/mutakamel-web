@@ -2,8 +2,11 @@ import { Component, DestroyRef, computed, effect, inject, input, output, signal,
 import { translationEvents } from '../../../../core/i18n/translation-events';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { tablerFilter, tablerHistory, tablerRefresh, tablerSearch, tablerX } from '@ng-icons/tabler-icons';
+import { tablerFilter, tablerHistory, tablerSearch, tablerX } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../core/i18n/language';
+import { correlationIdOf, errorMessage } from '../../../../core/api/api-errors';
+import { resolveDate } from '../../../query-builder/query-dates';
+import { FullState } from '../../../ui/full-state/full-state';
 import { Button } from '../../../ui/button/button';
 import { DateField } from '../../../ui/date-time/date-field';
 import { Dropdown, DropdownOption } from '../../../ui/dropdown/dropdown';
@@ -37,12 +40,12 @@ let nextTableId = 0;
 
 @Component({
   selector: 'app-call-log-table',
-  imports: [TranslocoPipe, NgIcon, Field, Dropdown, DateField, Button, Pagination, CallLogRow],
+  imports: [TranslocoPipe, NgIcon, Field, Dropdown, DateField, Button, Pagination, CallLogRow, FullState],
   viewProviders: [
     provideTranslocoScope({ scope: 'call-log', alias: 'callLog' }),
   ],
   providers: [
-    provideIcons({ tablerHistory, tablerFilter, tablerRefresh, tablerSearch, tablerX }),
+    provideIcons({ tablerHistory, tablerFilter, tablerSearch, tablerX }),
   ],
   templateUrl: './call-log-table.html',
   host: { class: 'flex h-full min-h-0 flex-1 flex-col gap-8 overflow-hidden' },
@@ -59,6 +62,7 @@ export class CallLogTable {
   readonly pageSizes = input<number[]>([20, 50, 100]);
   readonly reloadToken = input(0);
   readonly errorText = input<(status: number) => string | null>(() => null);
+  readonly resolveTimeZone = input<(() => Promise<string | null>) | null>(null);
 
   readonly callBack = output<CallLogRowModel>();
   readonly openRecord = output<NonNullable<CallLogRowModel['record']>>();
@@ -80,6 +84,18 @@ export class CallLogTable {
   protected readonly loading = signal(false);
   protected readonly failed = signal(false);
   protected readonly errorStatus = signal<number | null>(null);
+  protected readonly loadError = signal<unknown>(null);
+  protected readonly timeZone = signal<string | undefined>(undefined);
+  protected readonly failureText = computed(() => {
+    this.i18n();
+    const error = this.loadError();
+    const translations = this.transloco.getTranslation(this.transloco.getActiveLang());
+    const message = errorMessage(error, 'callLog', (key, params) =>
+      Object.hasOwn(translations, key) ? this.transloco.translate(key, params) : key,
+    );
+    const correlationId = correlationIdOf(error);
+    return correlationId ? `${message} (${correlationId})` : message;
+  });
 
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
   private requestSeq = 0;
@@ -273,6 +289,7 @@ export class CallLogTable {
     this.loading.set(true);
     this.failed.set(false);
     this.errorStatus.set(null);
+    this.loadError.set(null);
 
     const type = this.selectedType();
     const from = this.fromDate();
@@ -280,12 +297,16 @@ export class CallLogTable {
     const q = this.debouncedQuery();
 
     try {
+      const resolveZone = this.resolveTimeZone();
+      const zone = resolveZone ? (await resolveZone()) ?? 'UTC' : undefined;
+      if (seq !== this.requestSeq) return;
+      this.timeZone.set(zone);
       const result = await loader({
         page: this.page(),
         limit: this.pageSize(),
         types: type !== 'ALL' ? [type] : undefined,
-        from: from ? startOfDayIso(from) : undefined,
-        to: to ? endOfDayIso(to) : undefined,
+        from: from ? startOfDayIso(from, zone) : undefined,
+        to: to ? endOfDayIso(to, zone) : undefined,
         q: q || undefined,
       });
       if (seq !== this.requestSeq) return;
@@ -294,6 +315,7 @@ export class CallLogTable {
     } catch (error) {
       if (seq !== this.requestSeq) return;
       this.errorStatus.set(extractErrorStatus(error));
+      this.loadError.set(error);
       this.failed.set(true);
     } finally {
       if (seq === this.requestSeq) {
@@ -320,12 +342,14 @@ function normalizeSearchQuery(raw: string): string {
   return trimmed;
 }
 
-function startOfDayIso(isoDate: string): string {
+function startOfDayIso(isoDate: string, timeZone?: string): string {
+  if (timeZone) return new Date(resolveDate('on', isoDate, timeZone).gte!).toISOString();
   const [y, m, d] = isoDate.split('-').map(Number);
   return new Date(y, m - 1, d, 0, 0, 0, 0).toISOString();
 }
 
-function endOfDayIso(isoDate: string): string {
+function endOfDayIso(isoDate: string, timeZone?: string): string {
+  if (timeZone) return new Date(new Date(resolveDate('on', isoDate, timeZone).lt!).getTime() - 1).toISOString();
   const [y, m, d] = isoDate.split('-').map(Number);
   return new Date(y, m - 1, d, 23, 59, 59, 999).toISOString();
 }

@@ -1,4 +1,4 @@
-import { Component, computed, inject, output, signal, viewChild } from '@angular/core';
+import { Component, DestroyRef, computed, inject, output, signal, viewChild } from '@angular/core';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
@@ -20,18 +20,12 @@ import { Notify } from '../../../../core/notify/notify';
 import { Button } from '../../../ui/button/button';
 import { ConfirmDialog } from '../../../ui/confirm-dialog/confirm-dialog';
 import { Modal } from '../../../ui/modal/modal';
-import {
-  activitySummary,
-  cancelActivity,
-  completeActivity,
-  countActivities,
-  getActivity,
-  listActivities,
-  setActivityStatus,
-} from '../activities.api';
+import { ActivitiesApi } from '../activities.api';
+import { ApiError, errorMessage, fieldErrorsOf, isValidationError, isRetryableWriteError, writeErrorMessage } from '../../../../core/api/api-errors';
+import { newIdempotencyKey } from '../../../../core/api/idempotency';
+import { ConflictDialog } from '../../../ui/conflict-dialog/conflict-dialog';
 import {
   Activity,
-  ActivityError,
   ActivitySummary,
   ActivityType,
   DueState,
@@ -65,7 +59,7 @@ const DUE_EDGE: Record<DueState, string> = {
 
 @Component({
   selector: 'app-record-activities',
-  imports: [NgIcon, TranslocoPipe, Button, ConfirmDialog, Modal, ActivityForm, ActivityOutcome],
+  imports: [NgIcon, TranslocoPipe, Button, ConfirmDialog, ConflictDialog, Modal, ActivityForm, ActivityOutcome],
   viewProviders: [
     provideTranslocoScope('activities'),
   ],
@@ -91,13 +85,16 @@ export class RecordActivities {
   private static nextId = 0;
   protected readonly uid = `record-activities-${++RecordActivities.nextId}`;
 
+  private readonly api = inject(ActivitiesApi);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly language = inject(LanguageState).current;
 
   private readonly modal = viewChild.required(Modal);
   private readonly outcomeModal = viewChild.required(ActivityOutcome);
-  private readonly conflictDialog = viewChild.required<ConfirmDialog>('conflictDialog');
+  protected readonly conflictOpen = signal(false);
+  private conflictChoice: ((reload: boolean) => void) | null = null;
+  private pendingAction: { key: string; bodyJson: string } | null = null;
   private readonly discardDialog = viewChild.required<ConfirmDialog>('discardDialog');
   private readonly activityForm = viewChild(ActivityForm);
 
@@ -132,6 +129,10 @@ export class RecordActivities {
   private allowClose = false;
   private confirmingDiscard = false;
   private loadSeq = 0;
+
+  constructor() {
+    inject(DestroyRef).onDestroy(() => this.resolveConflict(false));
+  }
 
   open(
     record: RecordTarget,
@@ -227,7 +228,7 @@ export class RecordActivities {
     if (this.actionBusy()) return;
     this.actionBusy.set(true);
     try {
-      const fresh = await getActivity(activity.id);
+      const fresh = await this.api.getActivity(activity.id);
       this.editingActivity.set(fresh);
       this.screen.set('edit');
     } catch (error) {
@@ -254,7 +255,7 @@ export class RecordActivities {
         this.screen.set('open');
       }
     } catch (error) {
-      this.showErrorToast(error);
+      this.showErrorToast(error, true);
       await this.refreshData();
     }
   }
@@ -271,10 +272,10 @@ export class RecordActivities {
       await this.refreshData();
       this.changed.emit();
     } catch (error) {
-      if (error instanceof ActivityError && error.code === 'ACTIVITY_VERSION_CONFLICT') {
-        const reloadChosen = await this.conflictDialog().open();
+      if (error instanceof ApiError && error.code === 'ACTIVITY_VERSION_CONFLICT') {
+        const reloadChosen = await this.chooseConflict();
         try {
-          const fresh = await getActivity(current.id);
+          const fresh = await this.api.getActivity(current.id);
           this.editingActivity.set(fresh);
           if (reloadChosen) {
             form.reload(fresh);
@@ -283,14 +284,12 @@ export class RecordActivities {
           }
         } catch (err) {
           this.showErrorToast(err);
-          this.screen.set('open');
-          this.editingActivity.set(null);
         }
         await this.refreshData();
         return;
       }
-      this.showErrorToast(error);
-      if (error instanceof ActivityError && (error.code === 'ACTIVITY_TERMINAL' || error.code === 'ACTIVITY_NOT_FOUND')) {
+      this.showErrorToast(error, true);
+      if (error instanceof ApiError && (error.code === 'ACTIVITY_TERMINAL' || error.code === 'ACTIVITY_NOT_FOUND')) {
         this.screen.set('open');
         this.editingActivity.set(null);
       }
@@ -302,7 +301,8 @@ export class RecordActivities {
     if (this.actionBusy()) return;
     this.actionBusy.set(true);
     try {
-      const updated = await setActivityStatus(activity.id, activity.version, nextStatus);
+      const updated = await this.writeAction({ id: activity.id, version: activity.version, status: nextStatus }, (key) =>
+        this.api.setActivityStatus(activity.id, activity.version, nextStatus, key));
       this.editingActivity.set(updated);
       const form = this.activityForm();
       if (form) {
@@ -317,7 +317,6 @@ export class RecordActivities {
       await this.refreshData();
       this.changed.emit();
     } catch (error) {
-      this.showErrorToast(error);
       await this.reloadOrExitEdit(activity.id, error);
       await this.refreshData();
     } finally {
@@ -327,35 +326,63 @@ export class RecordActivities {
 
   protected async finishActivity(activity: Activity, mode: 'complete' | 'cancel'): Promise<void> {
     if (this.actionBusy() || this.outcomeBusy()) return;
-    const note = await this.outcomeModal().open(activity, mode);
-    if (note === undefined) return;
-    this.outcomeBusy.set(true);
-    this.actionBusy.set(true);
-    try {
-      if (mode === 'complete') {
-        await completeActivity(activity.id, activity.version, note);
-      } else {
-        await cancelActivity(activity.id, activity.version, note);
+    await this.outcomeModal().open(activity, mode, async (note) => {
+      this.outcomeBusy.set(true);
+      this.actionBusy.set(true);
+      try {
+        if (mode === 'complete') {
+          await this.writeAction({ id: activity.id, version: activity.version, outcome: note }, (key) =>
+            this.api.completeActivity(activity.id, activity.version, note, key));
+        } else {
+          await this.writeAction({ id: activity.id, version: activity.version, reason: note }, (key) =>
+            this.api.cancelActivity(activity.id, activity.version, note, key));
+        }
+        this.notify.success(this.transloco.translate(mode === 'complete' ? 'activities.toasts.completed' : 'activities.toasts.cancelled'));
+        if (this.editingActivity()?.id === activity.id) {
+          this.screen.set('open');
+          this.editingActivity.set(null);
+        }
+        await this.refreshData();
+        this.changed.emit();
+        return true;
+      } catch (error) {
+        const fields = fieldErrorsOf(error);
+        if (isValidationError(error) && (fields['outcome'] || fields['reason'])) {
+          this.outcomeModal().setServerError(this.transloco.translate('activities.errors.CORE_VALIDATION_FAILED'));
+          return false;
+        }
+        if (error instanceof ApiError && error.code === 'ACTIVITY_VERSION_CONFLICT') {
+          const reload = await this.chooseConflict();
+          try {
+            activity = await this.api.getActivity(activity.id);
+            if (this.editingActivity()?.id === activity.id) {
+              this.editingActivity.set(activity);
+              if (reload) this.activityForm()?.reload(activity);
+              else this.activityForm()?.rebase(activity);
+            }
+            if (reload) {
+              this.outcomeModal().clearNote();
+              await this.refreshData();
+              return true;
+            }
+          } catch (freshError) {
+            this.showErrorToast(freshError);
+          }
+          return false;
+        }
+        this.showErrorToast(error, true);
+        if (error instanceof ApiError && (error.code === 'ACTIVITY_TERMINAL' || error.status === 404)) {
+          this.screen.set('open');
+          this.editingActivity.set(null);
+          await this.refreshData();
+          return true;
+        }
+        return false;
+      } finally {
+        this.outcomeBusy.set(false);
+        this.actionBusy.set(false);
       }
-      this.notify.success(
-        this.transloco.translate(mode === 'complete' ? 'activities.toasts.completed' : 'activities.toasts.cancelled'),
-      );
-      if (this.screen() === 'edit' && this.editingActivity()?.id === activity.id) {
-        this.screen.set('open');
-        this.editingActivity.set(null);
-      }
-      await this.refreshData();
-      this.changed.emit();
-    } catch (error) {
-      this.showErrorToast(error);
-      if (this.screen() === 'edit' && this.editingActivity()?.id === activity.id) {
-        await this.reloadOrExitEdit(activity.id, error);
-      }
-      await this.refreshData();
-    } finally {
-      this.outcomeBusy.set(false);
-      this.actionBusy.set(false);
-    }
+    });
   }
 
   protected onModalClosed(): void {
@@ -389,22 +416,26 @@ export class RecordActivities {
   }
 
   private async reloadOrExitEdit(id: string, error: unknown): Promise<void> {
-    if (error instanceof ActivityError && error.code === 'ACTIVITY_VERSION_CONFLICT') {
+    if (error instanceof ApiError && error.code === 'ACTIVITY_VERSION_CONFLICT') {
+      const reload = await this.chooseConflict();
       try {
-        const fresh = await getActivity(id);
+        const fresh = await this.api.getActivity(id);
         this.editingActivity.set(fresh);
         const form = this.activityForm();
         if (form) {
-          if (form.dirty()) form.rebase(fresh);
-          else form.reload(fresh);
+          if (reload) form.reload(fresh);
+          else form.rebase(fresh);
         }
         return;
       } catch (err) {
         this.showErrorToast(err);
       }
     }
-    this.screen.set('open');
-    this.editingActivity.set(null);
+    this.showErrorToast(error, true);
+    if (error instanceof ApiError && (error.code === 'ACTIVITY_TERMINAL' || error.status === 404)) {
+      this.screen.set('open');
+      this.editingActivity.set(null);
+    }
   }
 
   private async refreshData(): Promise<void> {
@@ -417,8 +448,8 @@ export class RecordActivities {
     const dayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();
     try {
       const [summary, openPage, total] = await Promise.all([
-        activitySummary(targetRecord, dayStart, dayEnd),
-        listActivities({
+        this.api.activitySummary(targetRecord, dayStart, dayEnd),
+        this.api.listActivities({
           targetApp: targetRecord.app,
           targetType: targetRecord.type,
           targetId: targetRecord.id,
@@ -426,14 +457,16 @@ export class RecordActivities {
           page: 1,
           limit: 100,
         }),
-        countActivities(targetRecord),
+        this.api.listActivities({
+          targetApp: targetRecord.app, targetType: targetRecord.type, targetId: targetRecord.id, limit: 1,
+        }),
       ]);
       if (seq !== this.loadSeq || this.record()?.id !== targetRecord.id) return;
       const sorted = [...openPage.data].sort((a, b) => Date.parse(a.dueAt) - Date.parse(b.dueAt));
       this.summary.set(summary);
       this.openActivities.set(sorted);
       this.openCount.set(openPage.meta.total);
-      this.totalCount.set(total);
+      this.totalCount.set(total.meta.total);
     } catch (error) {
       if (seq === this.loadSeq) {
         this.showErrorToast(error);
@@ -445,8 +478,38 @@ export class RecordActivities {
     }
   }
 
-  private showErrorToast(error: unknown): void {
-    const key = error instanceof ActivityError ? `activities.errors.${error.code}` : 'activities.errors.generic';
-    this.notify.error(this.transloco.translate(key));
+  protected onConflictOpenChange(open: boolean): void {
+    this.conflictOpen.set(open);
+    if (!open) this.resolveConflict(false);
+  }
+
+  protected resolveConflict(reload: boolean): void {
+    this.conflictOpen.set(false);
+    this.conflictChoice?.(reload);
+    this.conflictChoice = null;
+  }
+
+  private chooseConflict(): Promise<boolean> {
+    this.conflictOpen.set(true);
+    return new Promise((resolve) => { this.conflictChoice = resolve; });
+  }
+
+  private async writeAction(action: unknown, request: (key: string) => Promise<Activity>): Promise<Activity> {
+    const bodyJson = JSON.stringify(action);
+    if (this.pendingAction?.bodyJson !== bodyJson) this.pendingAction = { key: newIdempotencyKey(), bodyJson };
+    try {
+      const result = await request(this.pendingAction.key);
+      this.pendingAction = null;
+      return result;
+    } catch (error) {
+      if (!isRetryableWriteError(error) && !(error instanceof ApiError && error.status === 401)) this.pendingAction = null;
+      throw error;
+    }
+  }
+
+  private showErrorToast(error: unknown, write = false): void {
+    this.notify.error(write
+      ? writeErrorMessage(error, 'activities', this.transloco)
+      : errorMessage(error, 'activities', this.transloco));
   }
 }

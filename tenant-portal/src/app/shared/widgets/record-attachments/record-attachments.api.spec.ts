@@ -1,83 +1,138 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { FAKE_COMPANIES } from '../../../core/scope/scope.fake';
-import { deleteRecordAttachment, listRecordAttachments, uploadRecordAttachment } from './record-attachments.api';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { TestBed } from '@angular/core/testing';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { CoreHttp } from '../../../core/api/core-http';
+import { ApiError } from '../../../core/api/api-errors';
+import { CrmHttp, bindCrmHttpForTest, crmQueries } from '../../../features/crm/shared/crm-http';
+import { bindAnalyticsPermissions } from '../dashboard/analytics-permissions';
 import {
-  resetRecordAttachmentsFake,
-  setFakeAttachmentFlags,
-  setFakeAttachmentsDelay,
-} from './record-attachments.fake';
-import { RecordAttachmentError } from './record-attachments.model';
+  canCreateRecordAttachments, canDeleteRecordAttachments, countRecordAttachments,
+  deleteRecordAttachment, listRecordAttachments, recordAttachmentDownloadUrl, uploadRecordAttachment,
+} from './record-attachments.api';
+import type { RecordAttachment, RecordAttachmentPage } from './record-attachments.model';
 
-const BRANCH = FAKE_COMPANIES[0].branches[0].id;
-const OTHER_BRANCH = FAKE_COMPANIES[0].branches[1].id;
+const BRANCH = '0192b7ea-7c4f-7a7d-9c9f-51c7f2b3aa01';
+const SOURCE = '0192b7ea-7c4f-7a7d-9c9f-51c7f2b3aa02';
 const KEY = '0192b7ea-7c4f-7a7d-9c9f-51c7f2b3aa20';
+const BASE = '/api/tenant/crm/v1';
+const ROW: RecordAttachment = {
+  id: KEY, branchId: BRANCH, sourceType: 'LEAD', sourceId: SOURCE,
+  fileName: 'offer.pdf', mimeType: 'application/pdf', sizeBytes: 3, uploadedByUserId: SOURCE,
+  createdAt: '2026-11-20T10:00:00Z', updatedAt: '2026-11-20T10:00:00Z',
+};
+const PAGE: RecordAttachmentPage = {
+  items: [ROW], total: 31, page: 2, limit: 20, totalPages: 2, hasNext: false, hasPrev: true,
+};
 
-function pdf(name = 'offer.pdf', size = 10): File {
-  return new File([new Uint8Array(size)], name, { type: 'application/pdf' });
-}
-
-async function rejection(promise: Promise<unknown>): Promise<RecordAttachmentError> {
-  try {
-    await promise;
-  } catch (error) {
-    expect(error).toBeInstanceOf(RecordAttachmentError);
-    return error as RecordAttachmentError;
-  }
-  throw new Error('expected a rejection');
-}
-
-describe('record-attachments.api contract (crm-app notes-attachments)', () => {
+describe('RecordAttachmentsApi', () => {
+  let http: HttpTestingController;
+  let dispose: () => void;
   beforeEach(() => {
-    resetRecordAttachmentsFake();
-    setFakeAttachmentsDelay(0);
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting(), CoreHttp, CrmHttp] });
+    http = TestBed.inject(HttpTestingController);
+    dispose = bindCrmHttpForTest(TestBed.inject(CrmHttp));
+    document.cookie = '__Host-mutakamel-tenant-csrf=test-csrf; Path=/; Secure';
+    document.cookie = 'mutakamel-http-tenant-csrf=test-csrf; Path=/';
   });
-  afterEach(() => resetRecordAttachmentsFake());
-
-  it('lists the seeded lead files on the session branch with the PaginatedResult shape', async () => {
-    const page = await listRecordAttachments('LEAD', BRANCH, 'lead-001', 1, 2);
-    expect(page).toMatchObject({ total: 3, page: 1, limit: 2, totalPages: 2, hasNext: true, hasPrev: false });
-    const empty = await listRecordAttachments('LEAD', BRANCH, 'lead-404');
-    expect([empty.total, empty.totalPages, empty.hasNext]).toEqual([0, 0, false]);
-    const beyond = await listRecordAttachments('LEAD', BRANCH, 'lead-001', 5, 2);
-    expect([beyond.page, beyond.items.length, beyond.hasPrev]).toEqual([5, 0, true]);
-  });
-
-  it('rejects an out-of-range limit (400) and a source in another branch (422)', async () => {
-    const limit = await rejection(listRecordAttachments('LEAD', BRANCH, 'lead-001', 1, 101));
-    expect([limit.status, limit.code]).toEqual([400, 'CRM_VALIDATION_FAILED']);
-    const branch = await rejection(listRecordAttachments('LEAD', OTHER_BRANCH, 'lead-001'));
-    expect([branch.status, branch.code]).toEqual([422, 'CRM_SOURCE_BRANCH_MISMATCH']);
+  afterEach(() => {
+    http.verify();
+    dispose();
+    crmQueries().clear();
+    bindAnalyticsPermissions(() => []);
+    vi.restoreAllMocks();
+    document.cookie = '__Host-mutakamel-tenant-csrf=; Path=/; Secure; Max-Age=0';
+    document.cookie = 'mutakamel-http-tenant-csrf=; Path=/; Max-Age=0';
   });
 
-  it('maps file errors to the controller statuses', async () => {
-    expect((await rejection(uploadRecordAttachment('LEAD', BRANCH, 'lead-001', pdf('a.pdf', 0)))).status).toBe(400);
-    const invalid = await rejection(uploadRecordAttachment('LEAD', BRANCH, 'lead-001', pdf('a.png')));
-    expect([invalid.status, invalid.code]).toEqual([422, 'CRM_ATTACHMENT_INVALID']);
-    const type = await rejection(
-      uploadRecordAttachment('LEAD', BRANCH, 'lead-001', new File(['x'], 'a.exe', { type: 'application/x-msdownload' })),
-    );
-    expect([type.status, type.code]).toEqual([415, 'CRM_ATTACHMENT_FILE_TYPE_UNSUPPORTED']);
+  function noScope(headers: { has(name: string): boolean }): void {
+    expect(headers.has('x-mutakamel-company-id')).toBe(false);
+    expect(headers.has('x-mutakamel-branch-id')).toBe(false);
+  }
+
+  it('lists and counts bare CRM pages by source without scope headers', async () => {
+    const page = listRecordAttachments('LEAD', BRANCH, SOURCE, 2);
+    const req = http.expectOne(r => r.url === BASE + '/attachments');
+    expect(req.request.params.keys().sort()).toEqual(['branchId', 'limit', 'page', 'sourceId', 'sourceType']);
+    expect(req.request.params.get('branchId')).toBe(BRANCH);
+    expect(req.request.params.get('sourceType')).toBe('LEAD');
+    expect(req.request.params.get('sourceId')).toBe(SOURCE);
+    expect(req.request.params.get('page')).toBe('2');
+    expect(req.request.params.get('limit')).toBe('20');
+    expect(req.request.withCredentials).toBe(true);
+    noScope(req.request.headers);
+    req.flush(PAGE);
+    expect(await page).toEqual(PAGE);
+    const count = countRecordAttachments('CUSTOMER_PROFILE', BRANCH, SOURCE);
+    const countReq = http.expectOne(r => r.url === BASE + '/attachments');
+    expect(countReq.request.params.get('limit')).toBe('1');
+    expect(countReq.request.params.get('page')).toBe('1');
+    expect(countReq.request.params.get('sourceType')).toBe('CUSTOMER_PROFILE');
+    noScope(countReq.request.headers);
+    countReq.flush({ ...PAGE, items: [], total: 31 });
+    expect(await count).toBe(31);
   });
 
-  it('enforces the gateway idempotency key and replays the stored 201', async () => {
-    const missing = await rejection(uploadRecordAttachment('LEAD', BRANCH, 'lead-001', pdf(), undefined, ''));
-    expect([missing.status, missing.code]).toEqual([400, 'GW.IDEM.MISSING']);
-    const bad = await rejection(uploadRecordAttachment('LEAD', BRANCH, 'lead-001', pdf(), undefined, 'abc'));
-    expect([bad.status, bad.code]).toEqual([400, 'GW.IDEM.BAD_VALUE']);
-    const first = await uploadRecordAttachment('LEAD', BRANCH, 'lead-001', pdf(), undefined, KEY);
-    const replay = await uploadRecordAttachment('LEAD', BRANCH, 'lead-001', pdf(), undefined, KEY);
-    expect(replay.id).toBe(first.id);
-    const mismatch = await rejection(uploadRecordAttachment('LEAD', BRANCH, 'lead-001', pdf('other.pdf'), undefined, KEY));
-    expect([mismatch.status, mismatch.code]).toEqual([422, 'GW.IDEM.MISMATCH']);
-    expect((await listRecordAttachments('LEAD', BRANCH, 'lead-001')).total).toBe(4);
+  it('upload body and key', async () => {
+    const cancel = vi.spyOn(crmQueries(), 'cancelQueries');
+    const invalidate = vi.spyOn(crmQueries(), 'invalidateQueries');
+    const progress = vi.fn();
+    const file = new File(['pdf'], 'offer.pdf', { type: 'application/pdf' });
+    const result = uploadRecordAttachment('OPPORTUNITY', BRANCH, SOURCE, file, progress, KEY);
+    const req = http.expectOne(BASE + '/attachments/upload');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.headers.get('x-idempotency-key')).toBe(KEY);
+    expect(req.request.headers.has('Content-Type')).toBe(false);
+    expect(req.request.withCredentials).toBe(true);
+    noScope(req.request.headers);
+    const body = req.request.body as FormData;
+    expect(Array.from(body.keys()).sort()).toEqual(['branchId', 'file', 'sourceId', 'sourceType']);
+    for (const name of ['branchId', 'file', 'sourceId', 'sourceType']) expect(body.getAll(name)).toHaveLength(1);
+    expect(body.get('branchId')).toBe(BRANCH);
+    expect(body.get('sourceType')).toBe('OPPORTUNITY');
+    expect(body.get('sourceId')).toBe(SOURCE);
+    expect((body.get('file') as File).name).toBe('offer.pdf');
+    expect((body.get('file') as File).size).toBe(3);
+    expect((body.get('file') as File).type).toBe('application/pdf');
+    req.flush(ROW, { status: 201, statusText: 'Created' });
+    expect(await result).toEqual(ROW);
+    expect(progress.mock.calls).toEqual([[0], [100]]);
+    expect(cancel).toHaveBeenCalledWith({ queryKey: ['crm-record-attachments'] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['crm-record-attachments'] });
   });
 
-  it('uses CRM_PERMISSION_DENIED for a missing route permission and the read-only code first', async () => {
-    setFakeAttachmentFlags({ canRead: false });
-    expect((await rejection(listRecordAttachments('LEAD', BRANCH, 'lead-001'))).code).toBe('CRM_PERMISSION_DENIED');
-    setFakeAttachmentFlags({ canRead: true, readOnly: true });
-    expect((await rejection(deleteRecordAttachment('att-001'))).code).toBe('CRM_SUBSCRIPTION_READ_ONLY');
-    setFakeAttachmentFlags({ readOnly: false, canDelete: false });
-    expect((await rejection(deleteRecordAttachment('att-001'))).code).toBe('CRM_PERMISSION_DENIED');
+  it('download url', async () => {
+    const url = await recordAttachmentDownloadUrl(KEY);
+    expect(url).toBe(BASE + '/attachments/' + KEY + '/download');
+    expect(new URL(url, window.location.href).origin).toBe(window.location.origin);
+    expect(await recordAttachmentDownloadUrl('unsafe/id')).toContain('unsafe%2Fid');
+    http.expectNone(r => r.url.includes('/download'));
+  });
+
+  it('sends a delete key, reuses it after ambiguous failure, and accepts 404', async () => {
+    const first = deleteRecordAttachment(KEY);
+    const failed = expect(first).rejects.toBeInstanceOf(ApiError);
+    const req = http.expectOne(BASE + '/attachments/' + KEY);
+    expect(req.request.method).toBe('DELETE');
+    expect(req.request.body).toBeNull();
+    const key = req.request.headers.get('x-idempotency-key');
+    expect(key).toMatch(/^[\da-f]{8}-[\da-f]{4}-7[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/);
+    noScope(req.request.headers);
+    req.flush({ errorCode: 'INTERNAL_ERROR' }, { status: 500, statusText: 'Server Error' });
+    await failed;
+    const retried = deleteRecordAttachment(KEY);
+    const retry = http.expectOne(BASE + '/attachments/' + KEY);
+    expect(retry.request.headers.get('x-idempotency-key')).toBe(key);
+    noScope(retry.request.headers);
+    retry.flush({ errorCode: 'CRM_ATTACHMENT_NOT_FOUND' }, { status: 404, statusText: 'Not Found' });
+    await expect(retried).resolves.toBeUndefined();
+  });
+
+  it('uses real scoped session keys for permission fallbacks', () => {
+    expect(canCreateRecordAttachments()).toBe(false);
+    expect(canDeleteRecordAttachments()).toBe(false);
+    bindAnalyticsPermissions(() => ['crm.attachments.create.own', 'crm.attachments.delete.team']);
+    expect(canCreateRecordAttachments()).toBe(true);
+    expect(canDeleteRecordAttachments()).toBe(true);
   });
 });

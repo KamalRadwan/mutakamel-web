@@ -126,19 +126,25 @@ export function formatCallDuration(item: Pick<CallLogRow, 'type' | 'durationSeco
   return hours > 0 ? `${hours}:${mm}:${ss}` : `${mm}:${ss}`;
 }
 
-export function formatCallTime(iso: string | null): string {
+export function formatCallTime(iso: string | null, timeZone?: string): string {
   if (!iso) return '';
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '00:00';
+  if (timeZone) return new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(date);
   const hh = String(date.getHours()).padStart(2, '0');
   const mm = String(date.getMinutes()).padStart(2, '0');
   return `${hh}:${mm}`;
 }
 
-export function formatCallDateTime(iso: string | null, lang: 'ar' | 'en'): string {
+export function formatCallDateTime(iso: string | null, lang: 'ar' | 'en', timeZone?: string): string {
   if (!iso) return '';
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
+  if (timeZone) {
+    const parts = new Intl.DateTimeFormat(`${lang}-u-nu-latn`, { timeZone, day: 'numeric', month: 'short', year: 'numeric' }).formatToParts(date);
+    const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value;
+    return `${part('day')} ${part('month')} ${part('year')} · ${formatCallTime(iso, timeZone)}`;
+  }
   const day = date.getDate();
   const month = new Intl.DateTimeFormat(`${lang}-u-nu-latn`, { month: 'short' }).format(date);
   const year = date.getFullYear();

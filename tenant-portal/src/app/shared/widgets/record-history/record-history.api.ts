@@ -1,3 +1,4 @@
+import { inject, Service } from '@angular/core';
 // Backend: core-app/src/tenant/audit (tenant-audit.controller.ts, record-history.controller.ts). The routes are
 // wrapped once, in the Audit log feature; this widget maps their pages to the timeline's `HistoryPage`.
 // NOTE: shared/widgets importing a feature goes against the folder rule (imports go down); the owner asked for one
@@ -9,10 +10,9 @@ import {
   AuditHistoryCategory,
   AuditHistoryGroup,
   computeEventDiff,
-  listEntityAuditEvents,
-  listRelatedEntityHistory,
-  listRecordHistory as listAuditRecordHistory,
+  AuditLogApi,
 } from '../../../features/workspace/operations/audit-log/audit-log.api';
+import { fakeListEntityAuditEvents, fakeListRelatedEntityHistory, fakeListRecordHistory as fakeListAuditRecordHistory } from '../../../features/workspace/operations/audit-log/audit-log.fake';
 import { HistoryItem, HistoryPage, HistorySubjectKind, ListRecordHistoryOptions } from './record-history.model';
 
 const UUID_V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -103,7 +103,17 @@ function keepPage(items: HistoryItem[], nextCursor: string | null, plan: History
  * Errors pass through as the audit-log `ApiError(status, code)`: 400 AUDIT_QUERY_INVALID,
  * 403 MISSING_REQUIRED_PERMISSIONS, 404 ACTIVITY_NOT_FOUND (unknown lead).
  */
-export async function listRecordHistory(
+@Service()
+export class RecordHistoryApi {
+  private readonly audit = inject(AuditLogApi);
+
+  listRecordHistory(entityType: string, entityId: string, partyIds: readonly string[], options: ListRecordHistoryOptions = {}): Promise<HistoryPage> {
+    return readHistory(this.audit, entityType, entityId, partyIds, options);
+  }
+}
+
+async function readHistory(
+  audit: Pick<AuditLogApi, 'listRecordHistory' | 'listRelatedEntityHistory' | 'listEntityAuditEvents'>,
   entityType: string,
   entityId: string,
   partyIds: readonly string[],
@@ -114,7 +124,7 @@ export async function listRecordHistory(
   const limit = options.limit ?? AUDIT_LIMITS.defaultLimit;
 
   if (entityType === 'Lead') {
-    const page = await listAuditRecordHistory(
+    const page = await audit.listRecordHistory(
       { targetApp: 'CRM', targetType: 'LEAD', targetId: entityId },
       { cursor, limit, historyCategory: plan.backend },
     );
@@ -123,7 +133,7 @@ export async function listRecordHistory(
 
   const relatedPartyIds = relatedPartyIdsFor(partyIds);
   if (relatedPartyIds.length > 0) {
-    const page = await listRelatedEntityHistory(entityType, entityId, {
+    const page = await audit.listRelatedEntityHistory(entityType, entityId, {
       relatedPartyIds,
       historyCategory: plan.backend,
       cursor,
@@ -132,9 +142,23 @@ export async function listRecordHistory(
     return keepPage(page.items.map(historyItemFromGroup), page.nextCursor, plan);
   }
 
-  const page = await listEntityAuditEvents(entityType, entityId, { cursor, limit });
+  const page = await audit.listEntityAuditEvents(entityType, entityId, { cursor, limit });
   const flatPlan: HistoryCategoryPlan = plan.backend
     ? { keep: (item) => item.subjectKind === plan.backend && (!plan.keep || plan.keep(item)) }
     : plan;
   return keepPage(page.items.map(historyItemFromEvent), page.nextCursor, flatPlan);
+}
+
+// FAKE-ONLY for features/crm/leads/lead-page/lead-history-tab/lead-history.api.ts (unused; controller item)
+export function listRecordHistory(
+  entityType: string,
+  entityId: string,
+  partyIds: readonly string[],
+  options: ListRecordHistoryOptions = {},
+): Promise<HistoryPage> {
+  return readHistory({
+      listRecordHistory: fakeListAuditRecordHistory,
+      listRelatedEntityHistory: fakeListRelatedEntityHistory,
+      listEntityAuditEvents: fakeListEntityAuditEvents,
+  }, entityType, entityId, partyIds, options);
 }

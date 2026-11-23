@@ -40,7 +40,7 @@ export interface HistoryItem {
   createdAt: string;
   actorLabel: string | null;
   actorType: string;
-  outcome: HistoryOutcome;
+  outcome: HistoryOutcome | null;
   reason: string | null;
   diff: HistoryDiffEntry[];
 }
