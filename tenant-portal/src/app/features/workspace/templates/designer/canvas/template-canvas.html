@@ -6,9 +6,20 @@
   class="flex min-h-0 flex-1 flex-col outline-none focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-focus-halo-strong"
   (keydown)="onKeydown($event)"
 >
+  @if (zoneOverflow()) {
+    <p
+      role="alert"
+      class="shrink-0 border-b border-danger-border bg-danger-soft px-12 py-4 text-12 text-danger-text"
+    >
+      {{ 'tplDesigner.hybrid.overflow' | transloco }}
+      <bdi dir="ltr">TEMPLATE_ABSOLUTE_ZONE_OVERFLOW</bdi>
+    </p>
+  }
   @if (!isEmail() && state.currentPage(); as page) {
     <div class="flex h-ruler shrink-0">
-      <div class="size-ruler shrink-0 border-r border-b border-border bg-surface" aria-hidden="true"></div>
+      <div class="size-ruler shrink-0 border-r border-b border-border bg-surface"
+        aria-hidden="true"
+      ></div>
       <app-tpl-ruler
         class="min-w-0 flex-1"
         orientation="H"
@@ -35,7 +46,9 @@
     <div
       #scrollArea
       class="relative min-h-0 min-w-0 flex-1 overflow-auto p-16"
-      [style.background-color]="isEmail() ? (state.document()?.email?.backgroundColor ?? null) : null"
+      [style.background-color]="
+        isEmail() ? (state.document()?.email?.backgroundColor ?? null) : null
+      "
       (scroll)="onScroll()"
       (wheel)="onWheel($event)"
       (pointermove)="onPointerMove($event)"
@@ -121,6 +134,7 @@
               @let margins = flowMarginsPx();
               <div
                 class="relative isolate z-0 flex min-h-full flex-col"
+                [style.min-height.px]="paperSizePx().height"
                 [style.padding-top]="margins?.paddingTop"
                 [style.padding-right]="margins?.paddingRight"
                 [style.padding-bottom]="margins?.paddingBottom"
@@ -150,10 +164,12 @@
                 [style.top.px]="target.top"
                 [style.width.px]="target.width"
                 [style.height.px]="target.height"
+                [style.transform]="'rotate(' + (target.rotationDeg ?? 0) + 'deg)'"
               >
-                @for (h of handles; track h.id) {
+                @for (h of handles(); track h.id) {
                   <div
-                    class="pointer-events-auto absolute size-canvas-handle -translate-x-1/2 -translate-y-1/2 rounded-2 border border-brand bg-paper"
+                    class="pointer-events-auto absolute size-canvas-handle -translate-x-1/2 -translate-y-1/2 touch-none rounded-2 border border-brand bg-paper"
+                    [attr.data-resize-handle]="h.id"
                     [class]="h.cursorClass"
                     [style.left]="h.leftPct"
                     [style.top]="h.topPct"
@@ -164,6 +180,15 @@
             }
 
             <!-- Snap guides -->
+            @if (dropIndicator(); as indicator) {
+              <div
+                class="pointer-events-none absolute z-sticky h-2 bg-brand"
+                [style.top.px]="indicator.top"
+                [style.left.px]="indicator.left"
+                [style.width.px]="indicator.width"
+                aria-hidden="true"
+              ></div>
+            }
             @for (guide of snapGuides(); track $index) {
               @let pos = guidePosPx(guide);
               @if (guide.axis === 'X') {
@@ -172,7 +197,8 @@
                   [style.left.px]="pos"
                   aria-hidden="true"
                 >
-                  <span class="absolute top-6 left-4 inline-flex h-tooltip items-center rounded-6 bg-tooltip-bg px-8 text-12 leading-20 whitespace-nowrap text-on-tooltip">
+                  <span class="absolute top-6 left-4 inline-flex h-tooltip items-center rounded-6 bg-tooltip-bg px-8 text-12 leading-20 whitespace-nowrap text-on-tooltip"
+                  >
                     {{ guideLabel(guide) }}
                   </span>
                 </div>
@@ -182,7 +208,8 @@
                   [style.top.px]="pos"
                   aria-hidden="true"
                 >
-                  <span class="absolute top-4 left-6 inline-flex h-tooltip items-center rounded-6 bg-tooltip-bg px-8 text-12 leading-20 whitespace-nowrap text-on-tooltip">
+                  <span class="absolute top-4 left-6 inline-flex h-tooltip items-center rounded-6 bg-tooltip-bg px-8 text-12 leading-20 whitespace-nowrap text-on-tooltip"
+                  >
                     {{ guideLabel(guide) }}
                   </span>
                 </div>

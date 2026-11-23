@@ -23,6 +23,7 @@ import type {
 } from '../../../templates.model';
 import { DesignerState } from '../../designer-state';
 import { frameToPx, mmToPx } from '../../geometry';
+import { canResizeFlow, hybridZone, printableBox, zoneBox } from '../../hybrid-ops';
 
 interface StaticTableCellSlot {
   id: string;
@@ -88,12 +89,15 @@ export class NodeView {
   readonly zoom = input.required<number>();
   readonly movingIds = input<ReadonlySet<string>>(new Set());
   readonly dragOffsetPx = input<{ dx: number; dy: number } | null>(null);
-  readonly resizeOverrideMm = input<{ nodeId: string; x: number; y: number; width: number; height: number } | null>(null);
+  readonly resizeOverrideMm = input<{ nodeId: string; x: number; y: number; width: number; height: number;
+  } | null>(null);
 
   readonly nodePointerDown = output<{ event: PointerEvent; nodeId: string }>();
   readonly nodeDoubleClick = output<string>();
 
-  protected readonly node = computed<TemplateNode | null>(() => this.doc().nodes[this.nodeId()] ?? null);
+  protected readonly node = computed<TemplateNode | null>(
+    () => this.doc().nodes[this.nodeId()] ?? null,
+  );
 
   protected readonly isSelfMoving = computed(() => this.movingIds().has(this.nodeId()));
 
@@ -107,6 +111,36 @@ export class NodeView {
   protected readonly isSelected = computed(() => this.state.selectedIds().includes(this.nodeId()));
 
   protected readonly isAbsolute = computed(() => this.node()?.layout.kind === 'ABSOLUTE');
+  protected readonly isHybridZone = computed(
+    () =>
+      this.doc().layoutMode === 'HYBRID_DOCUMENT' &&
+      (this.node()?.type === 'header' || this.node()?.type === 'footer'),
+  );
+  protected readonly movementHint = computed(() => {
+    const node = this.node();
+    if (!node) return '';
+    const key = this.state.readOnly()
+      ? 'readOnly'
+      : node.locked
+        ? 'locked'
+        : node.type === 'header' || node.type === 'footer'
+          ? 'zoneHint'
+          : node.layout.kind === 'ABSOLUTE'
+            ? 'freeHint'
+            : node.type === 'column' ? 'columnResize' : canResizeFlow(node)
+              ? 'flowHint'
+              : 'sizeUnavailable';
+    return this.transloco.translate(`tplDesigner.hybrid.${key}`);
+  });
+  protected readonly draggable = computed(() => {
+    const node = this.node();
+    return Boolean(
+      node &&
+      !node.locked &&
+      !this.state.readOnly() &&
+          (node.layout.kind === 'ABSOLUTE' || (node.parentId && !['column', 'header', 'footer'].includes(node.type) && this.doc().nodes[node.parentId]?.type !== 'row')),
+    );
+  });
 
   protected readonly paperColors = computed(() => {
     const theme = this.doc().theme;
@@ -127,6 +161,23 @@ export class NodeView {
     const node = this.node();
     if (!node) return null;
     const zoom = this.zoom();
+
+    if (
+      this.doc().layoutMode === 'HYBRID_DOCUMENT' &&
+      (node.type === 'header' || node.type === 'footer')
+    ) {
+      const box = zoneBox(this.doc(), node);
+      return {
+        position: 'absolute',
+        left: `${mmToPx(box.x, zoom)}px`,
+        top: `${mmToPx(box.y, zoom)}px`,
+        width: `${mmToPx(box.width, zoom)}px`,
+        height: `${mmToPx(box.height, zoom)}px`,
+        minHeight: null,
+        zIndex: null,
+        transform: null,
+      };
+    }
 
     if (node.layout.kind === 'ABSOLUTE') {
       const override = this.resizeOverrideMm();
@@ -178,6 +229,20 @@ export class NodeView {
           : `${flow.minHeight.value * zoom}px`;
     } else if (node.type === 'header' || node.type === 'footer') {
       minHeightCss = `${mmToPx(node.props.heightMm, zoom)}px`;
+    }
+
+    const preview = this.resizeOverrideMm();
+    if (preview?.nodeId === node.id) {
+      widthCss = `${mmToPx(preview.width, zoom)}px`;
+      minHeightCss = `${mmToPx(preview.height, zoom)}px`;
+    }
+    if (
+      this.doc().layoutMode === 'HYBRID_DOCUMENT' &&
+      node.type === 'container' &&
+      node.props.semanticRole === 'BODY'
+    ) {
+      const doc = this.doc();
+      minHeightCss = `${mmToPx(printableBox(doc).height - (hybridZone(doc, 'header')?.props.heightMm ?? 0) - (hybridZone(doc, 'footer')?.props.heightMm ?? 0), zoom)}px`;
     }
 
     return {

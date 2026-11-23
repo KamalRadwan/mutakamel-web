@@ -166,7 +166,9 @@
             [value]="'tplFields.pageSetup.imageBackgroundValue' | transloco"
           />
           @if (!state.readOnly()) {
-            <button type="button" uiButton variant="ghost" size="small" (click)="removeAssetBackground()">
+            <button type="button" uiButton variant="ghost" size="small"
+              (click)="removeAssetBackground()"
+            >
               <ng-icon name="tablerTrash" size="14" aria-hidden="true" />
               <span>{{ 'tplFields.pageSetup.removeBackground' | transloco }}</span>
             </button>
@@ -217,6 +219,42 @@
         }
       }
 
+      @if (state.layoutMode() === 'HYBRID_DOCUMENT') {
+        @for (type of ['header', 'footer']; track type) {
+          <ui-field
+            [for]="'tpl-zone-' + type"
+            [label]="'tplDesigner.hybrid.' + type | transloco"
+            [hint]="'tplDesigner.hybrid.zoneHeightHint' | transloco"
+          >
+            <input
+              [id]="'tpl-zone-' + type"
+              type="number"
+              min="1"
+              max="80"
+              step="0.1"
+              [readOnly]="state.readOnly()"
+              [value]="type === 'header' ? zoneHeights().header : zoneHeights().footer"
+              (input)="setHeight(type === 'header' ? 'header' : 'footer', $event)"
+            />
+          </ui-field>
+          @if (isFlowZone(type)) {
+            <ui-checkbox
+              [disabled]="state.readOnly()"
+              [checked]="type === 'header' ? enableFree().header : enableFree().footer"
+              (checkedChange)="setFree(type, $event)"
+              >{{ 'tplDesigner.hybrid.enableFree' | transloco }}</ui-checkbox
+            >
+          }
+        }
+        @if (zoneError(); as error) {
+          <p role="alert" class="col-span-2 text-12 text-danger-text">{{ error }}</p>
+        }
+        @if (zoneConversionError()) {
+          <p role="alert" class="col-span-2 text-12 text-danger-text">
+            {{ 'tplDesigner.hybrid.measurementRequired' | transloco }}
+          </p>
+        }
+      }
       @if (showApplyAll()) {
         <ui-field
           size="bare"
@@ -241,7 +279,8 @@
     </div>
 
     <!-- Bottom: N7 page diagram -->
-    <figure class="flex flex-col items-center gap-6 rounded-10 border border-border bg-surface-muted p-10">
+    <figure class="flex flex-col items-center gap-6 rounded-10 border border-border bg-surface-muted p-10"
+    >
       <figcaption class="text-12 font-medium text-text-muted">
         {{ 'tplFields.pageSetup.diagramLabel' | transloco }}
       </figcaption>

@@ -35,7 +35,9 @@
         [attr.aria-label]="'tplTools.ribbon.text' | transloco"
         [attr.aria-disabled]="sText.state !== 'ENABLED' ? 'true' : null"
         [attr.aria-description]="reasonText(sText.reasonKey)"
-        [title]="reasonText(sText.reasonKey) ?? ('tplTools.ribbon.text' | transloco)"
+        [title]="
+          reasonText(sText.reasonKey) ?? insertionHint() ?? ('tplTools.ribbon.text' | transloco)
+        "
         [attr.tabindex]="tabIndexFor('text')"
         (focus)="activeToolKey.set('text')"
         (click)="insertText()"
@@ -55,7 +57,9 @@
         [attr.aria-label]="'tplTools.ribbon.image' | transloco"
         [attr.aria-disabled]="sImage.state !== 'ENABLED' ? 'true' : null"
         [attr.aria-description]="reasonText(sImage.reasonKey)"
-        [title]="reasonText(sImage.reasonKey) ?? ('tplTools.ribbon.image' | transloco)"
+        [title]="
+          reasonText(sImage.reasonKey) ?? insertionHint() ?? ('tplTools.ribbon.image' | transloco)
+        "
         [attr.tabindex]="tabIndexFor('image')"
         (focus)="activeToolKey.set('image')"
         (click)="runToolCommand('IMAGE', 'insertImage')"
@@ -75,7 +79,10 @@
         [attr.aria-label]="'tplTools.ribbon.dataField' | transloco"
         [attr.aria-disabled]="sField.state !== 'ENABLED' ? 'true' : null"
         [attr.aria-description]="reasonText(sField.reasonKey)"
-        [title]="reasonText(sField.reasonKey) ?? ('tplTools.ribbon.dataField' | transloco)"
+        [title]="
+          reasonText(sField.reasonKey) ??
+          insertionHint() ?? ('tplTools.ribbon.dataField' | transloco)
+        "
         [attr.tabindex]="tabIndexFor('dataField')"
         (focus)="activeToolKey.set('dataField')"
         (click)="runToolCommand('DATA_FIELD', 'insertDataField')"
@@ -157,7 +164,9 @@
         [attr.aria-label]="'tplTools.ribbon.line' | transloco"
         [attr.aria-disabled]="sLine.state !== 'ENABLED' ? 'true' : null"
         [attr.aria-description]="reasonText(sLine.reasonKey)"
-        [title]="reasonText(sLine.reasonKey) ?? ('tplTools.ribbon.line' | transloco)"
+        [title]="
+          reasonText(sLine.reasonKey) ?? insertionHint() ?? ('tplTools.ribbon.line' | transloco)
+        "
         [attr.tabindex]="tabIndexFor('line')"
         (focus)="activeToolKey.set('line')"
         (click)="insertLine()"
@@ -353,9 +362,20 @@
               </ui-field>
             }
             @case ('layoutTag') {
-              <span class="px-4 text-11 leading-16 font-medium whitespace-nowrap text-on-neutral-soft">
-                {{ layoutLabel() }}
-              </span>
+              @if (state.layoutMode() === 'HYBRID_DOCUMENT') {
+                <button
+                  type="button"
+                  class="cursor-pointer rounded-6 px-4 text-11 leading-16 font-medium whitespace-nowrap text-on-neutral-soft outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  [title]="'tplDesigner.hybrid.explanation' | transloco"
+                  (click)="openConversion()"
+                >
+                  {{ layoutLabel() }}
+                </button>
+              } @else {
+                <span class="px-4 text-11 leading-16 font-medium whitespace-nowrap text-on-neutral-soft"
+                  >{{ layoutLabel() }}</span
+                >
+              }
             }
             @case ('pageSetup') {
               @if (toolId !== firstVisibleSegmentId()) {
@@ -442,7 +462,10 @@
                 type="button"
                 data-ribbon-tool="fullscreen"
                 class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
-                [class]="state.fullscreen() ? 'bg-brand text-on-brand hover:bg-brand-hover active:bg-brand-pressed' : 'text-text hover:bg-surface active:bg-border'"
+                [class]="
+                  state.fullscreen()
+                    ? 'bg-brand text-on-brand hover:bg-brand-hover active:bg-brand-pressed' : 'text-text hover:bg-surface active:bg-border'
+                "
                 [attr.aria-pressed]="state.fullscreen()"
                 [attr.aria-label]="fullscreenLabel()"
                 [title]="fullscreenLabel()"
@@ -500,7 +523,9 @@
           [attr.role]="item.selected !== undefined ? 'menuitemradio' : 'menuitem'"
           [attr.aria-checked]="item.selected !== undefined ? item.selected : null"
           class="flex h-menu-item w-full cursor-pointer items-center justify-between gap-8 whitespace-nowrap rounded-6 px-8 text-12 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
-          [class]="item.selected ? 'bg-brand-soft text-on-brand-soft' : 'text-text hover:bg-row-hover'"
+          [class]="
+            item.selected ? 'bg-brand-soft text-on-brand-soft' : 'text-text hover:bg-row-hover'
+          "
           [disabled]="item.disabled === true"
           [title]="item.tooltip || ''"
           (click)="onMenuRowClick(item)"

@@ -63,5 +63,41 @@
     "absoluteOnly": "Available on a fixed canvas only.",
     "notInZone": "Not allowed in the header or footer.",
     "saveFirst": "Save first"
+  },
+  "hybrid": {
+    "header": "Header",
+    "footer": "Footer",
+    "positionLabel": "Position",
+    "position": {
+      "FLOW": "In flow",
+      "header": "Free (header)",
+      "footer": "Free (footer)"
+    },
+    "positionHint": "Body items stay in flow. Set header/footer heights in Page setup to enable free positioning there.",
+    "positionUnavailable": "This structural item cannot change position mode.",
+    "groupInFlow": "Groups cannot be converted to flow. Use Convert layout for the document.",
+    "rotationInFlow": "Set rotation to zero before moving this item into flow.",
+    "pageFieldInFlow": "Page fields must remain in a header or footer.",
+    "typeInZone": "This item type is not allowed in a header or footer.",
+    "configureZone": "Set this zone’s height in Page setup first.",
+    "flowZone": "Enable free positioning for this zone in Page setup.",
+    "zoneHint": "Header/footer zone. Select it, then add an item to this zone.",
+    "freeHint": "Drag to move. Resize with the handles. Arrow keys: 1 mm; Shift: 5 mm.",
+    "flowHint": "Drag to reorder in flow or drop into a fixed header/footer. Side handles change width; the bottom handle changes minimum height.",
+    "sizeUnavailable": "This structural item has no resize handles; use its properties to change its layout.",
+    "readOnly": "This document is read-only.",
+    "locked": "Unlock this item to move or resize it.",
+    "zoneHeightHint": "Height in mm (1–80). Enter a height to add a fixed zone; existing zones keep their content. Blank keeps the current zone.",
+    "zoneHeightError": "Header and footer heights must be between 1 and 80 mm.",
+    "explanation": "Hybrid: body items stay in flow; fixed headers and footers allow free positioning. Click to open Convert layout (also in ⋯). Choose Fixed canvas for free positioning everywhere.",
+    "insert": {
+      "FLOW": "Adds to the body in flow. Then click a fixed header/footer to place it freely, or drag to reorder.",
+      "header": "Adds freely positioned content to the header. Drag or resize it inside the zone.",
+      "footer": "Adds freely positioned content to the footer. Drag or resize it inside the zone."
+    },
+    "overflow": "An item extends beyond its fixed zone. Move or resize it to fit.",
+    "enableFree": "Enable free positioning",
+    "measurementRequired": "The current content must be visible and measurable before converting this zone.",
+    "columnResize": "Column width follows its row percentages. Use the bottom handle to change minimum height."
   }
 }

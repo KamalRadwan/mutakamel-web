@@ -18,6 +18,9 @@ import type {
 } from '../../../templates.model';
 import { TemplatePageDiagram } from '../../../create/page-diagram/page-diagram';
 import { DesignerState } from '../../designer-state';
+import { enableFixedZone, hybridZone, setZoneHeight } from '../../hybrid-ops';
+import { pxToMm, type RectMm } from '../../geometry';
+import { rectInPage } from '../../../../../../shared/ui/overlay/zoom';
 import { PRESET_DIMENSIONS_MM, isValidSafeColor, normalizeSafeColor } from '../field-helpers';
 
 type BgMode = 'NONE' | 'SOLID';
@@ -35,7 +38,11 @@ interface PageSetupFormModel {
 
 @Component({
   selector: 'app-tpl-page-setup-modal',
-  imports: [FormField, NgIcon, TranslocoPipe, Button, Checkbox, Dropdown, Field, Modal, TemplatePageDiagram],
+  imports: [
+    FormField,
+    NgIcon, TranslocoPipe, Button, Checkbox, Dropdown, Field, Modal,
+    TemplatePageDiagram,
+  ],
   providers: [provideIcons({ tablerCheck, tablerFileDescription, tablerTrash })],
   templateUrl: './page-setup-modal.html',
   host: { class: 'contents' },
@@ -52,6 +59,42 @@ export class PageSetupModal {
   protected readonly orientation = signal<TemplatePageOrientation>('PORTRAIT');
   protected readonly bgMode = signal<BgMode>('NONE');
   protected readonly hasAssetBg = signal(false);
+
+  protected readonly zoneHeights = signal<{ header: number | null; footer: number | null }>({
+    header: null,
+    footer: null,
+  });
+  protected readonly enableFree = signal({ header: false, footer: false });
+  protected readonly zoneConversionError = signal(false);
+  protected isFlowZone(type: string): boolean {
+    const doc = this.state.document();
+    return Boolean(
+      doc &&
+      (type === 'header' || type === 'footer') &&
+      hybridZone(doc, type)?.props.zoneMode === 'FLOW',
+    );
+  }
+  protected setFree(type: string, value: boolean): void {
+    if (type !== 'header' && type !== 'footer') return;
+    this.enableFree.update((modes) => ({ ...modes, [type]: value }));
+    this.zoneConversionError.set(false);
+  }
+  protected readonly zoneError = computed(() => {
+    if (this.state.layoutMode() !== 'HYBRID_DOCUMENT') return null;
+    const heights = this.zoneHeights();
+    return Object.values(heights).some(
+      (height) => height !== null && (!Number.isFinite(height) || height < 1 || height > 80),
+    )
+      ? this.transloco.translate('tplDesigner.hybrid.zoneHeightError')
+      : null;
+  });
+  protected setHeight(type: 'header' | 'footer', event: Event): void {
+    const value = (event.target as HTMLInputElement).value;
+    this.zoneHeights.update((heights) => ({
+      ...heights,
+      [type]: value === '' ? null : Number(value),
+    }));
+  }
 
   protected readonly pageModel = signal<PageSetupFormModel>({
     customWidthMm: 210,
@@ -74,6 +117,12 @@ export class PageSetupModal {
     const doc = this.state.document();
     const page = this.state.currentPage();
     if (!doc || !page || this.state.channel() !== 'PRINT') return;
+    this.zoneHeights.set({
+      header: hybridZone(doc, 'header')?.props.heightMm ?? null,
+      footer: hybridZone(doc, 'footer')?.props.heightMm ?? null,
+    });
+    this.enableFree.set({ header: false, footer: false });
+    this.zoneConversionError.set(false);
 
     this.preset.set(page.preset);
     this.orientation.set(page.orientation);
@@ -117,14 +166,16 @@ export class PageSetupModal {
     }));
   });
 
-  protected readonly orientationOptions = computed<DropdownOption<TemplatePageOrientation>[]>(() => {
+  protected readonly orientationOptions = computed<DropdownOption<TemplatePageOrientation>[]>(
+    () => {
     this.language();
     this.i18n();
     return (['PORTRAIT', 'LANDSCAPE'] as const).map((o) => ({
       value: o,
       label: this.transloco.translate(`tplFields.pageSetup.orientations.${o}`),
     }));
-  });
+    },
+  );
 
   protected readonly bgModeOptions = computed<DropdownOption<BgMode>[]>(() => {
     this.language();
@@ -137,7 +188,9 @@ export class PageSetupModal {
 
   protected readonly showApplyAll = computed(() => {
     const doc = this.state.document();
-    return Boolean(doc?.layoutMode === 'FIXED_CANVAS' && doc.canvasPages && doc.canvasPages.length > 1);
+    return Boolean(
+      doc?.layoutMode === 'FIXED_CANVAS' && doc.canvasPages && doc.canvasPages.length > 1,
+    );
   });
 
   protected readonly docIsRtl = computed(() => {
@@ -170,6 +223,13 @@ export class PageSetupModal {
   private readonly reservedZoneHeightMm = computed(() => {
     const doc = this.state.document();
     if (!doc || doc.layoutMode === 'FIXED_CANVAS') return 0;
+    if (doc.layoutMode === 'HYBRID_DOCUMENT') {
+      const heights = this.zoneHeights();
+      return (
+        (heights.header ?? hybridZone(doc, 'header')?.props.heightMm ?? 0) +
+        (heights.footer ?? hybridZone(doc, 'footer')?.props.heightMm ?? 0)
+      );
+    }
     let total = 0;
     for (const rootId of doc.rootNodeIds) {
       const node = doc.nodes[rootId];
@@ -184,7 +244,10 @@ export class PageSetupModal {
     this.language();
     this.i18n();
     if (this.preset() !== 'CUSTOM') return null;
-    const hasParse = this.pageForm.customWidthMm().errors().some((e) => e.kind === 'parse');
+    const hasParse = this.pageForm
+      .customWidthMm()
+      .errors()
+      .some((e) => e.kind === 'parse');
     const w = this.pageModel().customWidthMm;
     if (hasParse || w === null || !Number.isFinite(w) || w < 50 || w > 500) {
       return this.transloco.translate('tplFields.pageSetup.widthRange');
@@ -196,7 +259,10 @@ export class PageSetupModal {
     this.language();
     this.i18n();
     if (this.preset() !== 'CUSTOM') return null;
-    const hasParse = this.pageForm.customHeightMm().errors().some((e) => e.kind === 'parse');
+    const hasParse = this.pageForm
+      .customHeightMm()
+      .errors()
+      .some((e) => e.kind === 'parse');
     const h = this.pageModel().customHeightMm;
     if (hasParse || h === null || !Number.isFinite(h) || h < 50 || h > 1000) {
       return this.transloco.translate('tplFields.pageSetup.heightRange');
@@ -233,12 +299,18 @@ export class PageSetupModal {
     this.marginFieldError(this.pageModel().marginEndMm, this.pageForm.marginEndMm),
   );
   protected readonly marginBottomError = computed(() => {
-    const baseErr = this.marginFieldError(this.pageModel().marginBottomMm, this.pageForm.marginBottomMm);
+    const baseErr = this.marginFieldError(
+      this.pageModel().marginBottomMm,
+      this.pageForm.marginBottomMm,
+    );
     if (baseErr) return baseErr;
     return this.bodyHeightOverflowError();
   });
   protected readonly marginStartError = computed(() => {
-    const baseErr = this.marginFieldError(this.pageModel().marginStartMm, this.pageForm.marginStartMm);
+    const baseErr = this.marginFieldError(
+      this.pageModel().marginStartMm,
+      this.pageForm.marginStartMm,
+    );
     if (baseErr) return baseErr;
     return this.bodyWidthOverflowError();
   });
@@ -252,8 +324,12 @@ export class PageSetupModal {
 
   protected readonly canApply = computed(() => {
     if (this.state.readOnly()) return false;
+    if (this.zoneError()) return false;
     if (this.widthError() || this.heightError()) return false;
-    if (this.marginTopError() || this.marginEndError() || this.marginBottomError() || this.marginStartError()) {
+    if (
+      this.marginTopError() || this.marginEndError() || this.marginBottomError() ||
+      this.marginStartError()
+    ) {
       return false;
     }
     if (this.bodyHeightOverflowError() || this.bodyWidthOverflowError() || this.bgColorError()) return false;
@@ -326,6 +402,41 @@ export class PageSetupModal {
 
     const pageIdx = this.state.pageIndex();
     const allPages = this.pageModel().applyAllPages;
+    const measured = new Map<string, RectMm>();
+    const documentModel = this.state.document();
+    if (documentModel?.layoutMode === 'HYBRID_DOCUMENT') {
+      for (const type of ['header', 'footer'] as const) {
+        const zone = hybridZone(documentModel, type);
+        if (!zone || !this.enableFree()[type]) continue;
+        const zoneElement = document.querySelector<HTMLElement>(
+          `[data-node-id="${CSS.escape(zone.id)}"]`,
+        );
+        if (!zoneElement) {
+          this.zoneConversionError.set(true);
+          return;
+        }
+        const origin = rectInPage(zoneElement);
+        for (const id of zone.childIds) {
+          const el = document.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(id)}"]`);
+          if (!el) {
+            this.zoneConversionError.set(true);
+            return;
+          }
+          const box = rectInPage(el),
+            zoom = this.state.zoom();
+          if (box.width <= 0 || box.height <= 0) {
+            this.zoneConversionError.set(true);
+            return;
+          }
+          measured.set(id, {
+            x: Math.max(0, pxToMm(box.left - origin.left, zoom)),
+            y: Math.max(0, pxToMm(box.top - origin.top, zoom)),
+            width: pxToMm(box.width, zoom),
+            height: pxToMm(box.height, zoom),
+          });
+        }
+      }
+    }
 
     this.state.apply('updatePageSetup', (doc) => {
       if (doc.layoutMode === 'FIXED_CANVAS' && doc.canvasPages && doc.canvasPages.length > 0) {
@@ -339,6 +450,19 @@ export class PageSetupModal {
         }
       } else {
         doc.page = nextPage;
+        if (doc.layoutMode === 'HYBRID_DOCUMENT') {
+          // Apply both existing reservations together before checking a newly added zone.
+          for (const type of ['header', 'footer'] as const) {
+            const zone = hybridZone(doc, type),
+              height = this.zoneHeights()[type];
+            if (zone && height !== null) zone.props.heightMm = height;
+          }
+          for (const type of ['header', 'footer'] as const) {
+            const height = this.zoneHeights()[type];
+            if (height !== null) setZoneHeight(doc, type, height);
+            if (this.enableFree()[type]) enableFixedZone(doc, type, measured);
+          }
+        }
       }
     });
 
@@ -355,7 +479,9 @@ export class PageSetupModal {
   ): string | null {
     this.language();
     this.i18n();
-    const hasParse = field().errors().some((e) => e.kind === 'parse');
+    const hasParse = field()
+      .errors()
+      .some((e) => e.kind === 'parse');
     if (hasParse || value === null || !Number.isFinite(value) || value < 0 || value > 100) {
       return this.transloco.translate('tplFields.pageSetup.marginRange');
     }

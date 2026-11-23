@@ -1,9 +1,11 @@
 import { DOCUMENT } from '@angular/common';
-import { Component, DestroyRef, effect, inject } from '@angular/core';
+import { Component, DestroyRef, effect, inject, untracked, viewChild } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { provideTranslocoScope, TranslocoPipe } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { tablerFileSearch, tablerLock, tablerRefresh, tablerTemplate } from '@ng-icons/tabler-icons';
+import { tablerFileSearch, tablerLock, tablerRefresh,
+  tablerTemplate,
+} from '@ng-icons/tabler-icons';
 import { Button } from '../../../../../shared/ui/button/button';
 import { TemplateCanvas } from '../../designer/canvas/template-canvas';
 import { DesignerState } from '../../designer/designer-state';
@@ -15,6 +17,7 @@ import { StatusBar } from '../../designer/status-bar/status-bar';
 import { TablesHost } from '../../designer/tables/tables-host';
 import { ToolsHost } from '../../designer/tools/tools-host';
 import { TemplatePageService } from '../template-page.service';
+import { TemplateDuplicateModal } from '../../create';
 
 @Component({
   selector: 'app-design-tab',
@@ -30,6 +33,7 @@ import { TemplatePageService } from '../template-page.service';
     FieldsHost,
     TablesHost,
     EmailHost,
+    TemplateDuplicateModal,
   ],
   providers: [
     provideTranslocoScope(
@@ -54,8 +58,20 @@ export class DesignTab {
   private readonly route = inject(ActivatedRoute);
   private readonly pageService = inject(TemplatePageService);
   protected readonly state = inject(DesignerState);
+  private readonly conversionModal = viewChild(TemplateDuplicateModal);
 
   constructor() {
+    effect(() => {
+      const command = this.state.command();
+      if (command?.cmd.kind !== 'openConvertLayout') return;
+      untracked(() =>
+        this.conversionModal()?.open({
+          templateId: this.state.templateId(),
+          convertLayout: true,
+          draftDirty: this.pageService.dirty(),
+        }),
+      );
+    });
     effect(() => {
       const id =
         this.pageService.definition()?.templateId ??

@@ -17,6 +17,7 @@ import {
   printableRectMm,
   roundMm,
 } from './geometry';
+import { absoluteBounds, clampAbsoluteFrame, clampToBounds, nodeZone } from './hybrid-geometry';
 
 export type NewTemplateNode = TemplateNode extends infer N
   ? N extends TemplateNode
@@ -46,7 +47,9 @@ export function newDesignerUuid(): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-export function currentPageConfig(doc: TemplateDocumentV1, pageIndex: number): TemplatePageConfig | null {
+export function currentPageConfig(
+  doc: TemplateDocumentV1, pageIndex: number,
+): TemplatePageConfig | null {
   if (doc.layoutMode === 'FIXED_CANVAS' && doc.canvasPages && doc.canvasPages.length > 0) {
     const safeIdx = Math.max(0, Math.min(pageIndex, doc.canvasPages.length - 1));
     return doc.canvasPages[safeIdx].page;
@@ -68,7 +71,9 @@ export function syncCanvasPagesRootIds(doc: TemplateDocumentV1): void {
   }
 }
 
-export function collectSubtreeIds(doc: TemplateDocumentV1, rootId: string, out: string[] = []): string[] {
+export function collectSubtreeIds(
+  doc: TemplateDocumentV1, rootId: string, out: string[] = [],
+): string[] {
   const node = doc.nodes[rootId];
   if (!node) return out;
   out.push(rootId);
@@ -197,7 +202,9 @@ export function isInHeaderOrFooterZone(doc: TemplateDocumentV1, nodeId: string):
   return false;
 }
 
-function defaultAbsoluteSizeMm(type: TemplateNodeType, printableWidthMm: number): { width: number; height: number } {
+function defaultAbsoluteSizeMm(
+  type: TemplateNodeType, printableWidthMm: number,
+): { width: number; height: number } {
   switch (type) {
     case 'text':
       return { width: 60, height: 8 };
@@ -237,13 +244,58 @@ export function insertNodeInDocument(
   input: NewTemplateNode,
   pageIndex: number,
   selectedIds: readonly string[],
-  at?: { parentId?: string | null; index?: number },
+  at?: { parentId?: string | null; index?: number; x?: number; y?: number },
 ): string {
   const id = newDesignerUuid();
   const isFixedCanvas = doc.layoutMode === 'FIXED_CANVAS';
 
   let parentId: string | null = at?.parentId ?? null;
   let insertIndex = at?.index;
+
+  const selected = doc.nodes[selectedIds[selectedIds.length - 1]];
+  const zone = at?.parentId
+    ? doc.nodes[at.parentId]
+    : selected
+      ? nodeZone(doc, selected.id)
+      : undefined;
+  if (at?.parentId && (zone?.type === 'header' || zone?.type === 'footer') &&
+      ['button', 'dynamicTable', 'totals', 'pageBreak', 'header', 'footer', 'column'].includes(input.type)) return '';
+  if (
+    doc.layoutMode === 'HYBRID_DOCUMENT' &&
+    (zone?.type === 'header' || zone?.type === 'footer') &&
+    zone.props.zoneMode === 'FIXED' &&
+    !['button', 'dynamicTable', 'totals', 'pageBreak', 'header', 'footer', 'group'].includes(
+      input.type,
+    )
+  ) {
+    const page = currentPageConfig(doc, pageIndex);
+    const availableWidth = page ? printableRectMm(page).width : 0;
+    const size = defaultAbsoluteSizeMm(input.type, availableWidth);
+    const frame = clampToBounds(
+      { x: at?.x ?? 0, y: at?.y ?? 0, ...size },
+      { x: 0, y: 0, width: availableWidth, height: zone.props.heightMm },
+    );
+    const node = {
+      ...input,
+      id,
+      parentId: zone.id,
+      childIds: [],
+      locked: input.locked ?? false,
+      hidden: input.hidden ?? false,
+      layout: {
+        kind: 'ABSOLUTE',
+        unit: 'MM',
+        ...frame,
+        rotationDeg: 0,
+        zIndex: clamp(maxZIndexOnPage(doc, pageIndex) + 1, 0, 1000),
+      },
+      style: input.style ?? {},
+    } as TemplateNode;
+    doc.nodes[id] = node;
+    zone.childIds.push(id);
+    normalizeFlowOrders(doc);
+    return id;
+  }
 
   if (isFixedCanvas) {
     const page = currentPageConfig(doc, pageIndex);
@@ -398,7 +450,9 @@ export function removeNodesFromDocument(
   for (const id of toDelete) {
     const node = doc.nodes[id];
     if (node?.parentId && !toDelete.has(node.parentId) && doc.nodes[node.parentId]) {
-      doc.nodes[node.parentId].childIds = doc.nodes[node.parentId].childIds.filter((cid) => !toDelete.has(cid));
+      doc.nodes[node.parentId].childIds = doc.nodes[node.parentId].childIds.filter(
+        (cid) => !toDelete.has(cid),
+      );
     }
   }
 
@@ -547,9 +601,10 @@ export function duplicateNodesInDocument(
   for (const oldId of subtreeIds) {
     const source = doc.nodes[oldId];
     const copy = structuredClone(source);
-    const newId = idMap.get(oldId)!;
+    const newId = idMap.get(oldId);
+    if (!newId) continue;
     copy.id = newId;
-    copy.parentId = source.parentId && idMap.has(source.parentId) ? idMap.get(source.parentId)! : source.parentId;
+    copy.parentId = source.parentId ? idMap.get(source.parentId) ?? source.parentId : null;
     copy.childIds = source.childIds.map((cid) => idMap.get(cid) ?? cid);
 
     if (copy.layout.kind === 'ABSOLUTE') {
@@ -574,7 +629,8 @@ export function duplicateNodesInDocument(
           columnId: colMap.get(cell.columnId) ?? cell.columnId,
           value:
             cell.value.kind === 'FORMULA'
-              ? { ...cell.value, expression: rewriteFormulaRefs(cell.value.expression, formulaIdMap) }
+              ? { ...cell.value, expression: rewriteFormulaRefs(cell.value.expression, formulaIdMap),
+                }
               : cell.value,
         })),
       }));
@@ -609,7 +665,8 @@ export function duplicateNodesInDocument(
   }
 
   for (const oldTopId of topIds) {
-    const newTopId = idMap.get(oldTopId)!;
+    const newTopId = idMap.get(oldTopId);
+    if (!newTopId) continue;
     newTopIds.push(newTopId);
     const source = doc.nodes[oldTopId];
     const copy = doc.nodes[newTopId];
@@ -661,13 +718,16 @@ export function updateFrameInDocument(
     const node = doc.nodes[id];
     if (!node || node.locked || node.layout.kind !== 'ABSOLUTE') continue;
 
-    const next = clampFrameMm({
+    let next = clampFrameMm({
       x: change.x !== undefined ? change.x : node.layout.x + (change.dx ?? 0),
       y: change.y !== undefined ? change.y : node.layout.y + (change.dy ?? 0),
       width: change.width !== undefined ? change.width : node.layout.width,
       height: change.height !== undefined ? change.height : node.layout.height,
       rotationDeg: change.rotationDeg !== undefined ? change.rotationDeg : node.layout.rotationDeg,
     });
+
+    const bounds = absoluteBounds(doc, node);
+    if (bounds) next = { ...next, ...clampAbsoluteFrame(next, bounds, next.rotationDeg) };
 
     node.layout = {
       ...node.layout,
@@ -717,15 +777,11 @@ export function arrangeNodesInDocument(
   const isMovable = (id: string) => selectedSet.has(id) && !doc.nodes[id]?.locked;
 
   if (op === 'FRONT') {
-    ordered = [
-      ...ordered.filter((id) => !isMovable(id)),
-      ...ordered.filter((id) => isMovable(id)),
-    ];
+    ordered = [...ordered.filter((id) => !isMovable(id)),
+      ...ordered.filter((id) => isMovable(id))];
   } else if (op === 'BACK') {
-    ordered = [
-      ...ordered.filter((id) => isMovable(id)),
-      ...ordered.filter((id) => !isMovable(id)),
-    ];
+    ordered = [...ordered.filter((id) => isMovable(id)),
+      ...ordered.filter((id) => !isMovable(id))];
   } else if (op === 'FORWARD') {
     for (let i = ordered.length - 2; i >= 0; i--) {
       if (isMovable(ordered[i]) && !isMovable(ordered[i + 1])) {
@@ -757,7 +813,8 @@ export function alignNodesInDocument(
 ): boolean {
   const targets = ids
     .map((id) => doc.nodes[id])
-    .filter((node): node is TemplateNode => Boolean(node && !node.locked && node.layout.kind === 'ABSOLUTE'));
+    .filter((node): node is TemplateNode => Boolean(node && !node.locked && node.layout.kind === 'ABSOLUTE'),
+    );
 
   if (targets.length === 0) return false;
 

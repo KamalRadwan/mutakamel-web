@@ -34,6 +34,11 @@ import {
 import { LanguageState } from '../../../../../core/i18n/language';
 import { Button } from '../../../../../shared/ui/button/button';
 import { Field } from '../../../../../shared/ui/field/field';
+import { Dropdown, type DropdownOption } from '../../../../../shared/ui/dropdown/dropdown';
+import { moveNodeToPosition, positionError, printableBox, type PositionMode } from '../hybrid-ops';
+import { rootZoom } from '../../../../../shared/ui/overlay/zoom';
+import { pxToMm } from '../geometry';
+import { nodeZone } from '../hybrid-geometry';
 import type { TemplateNode, TemplateNodeType } from '../../templates.model';
 import { DesignerState } from '../designer-state';
 
@@ -103,7 +108,7 @@ function normalizeNumericInput(raw: string): string {
 
 @Component({
   selector: 'app-tpl-selection-bar',
-  imports: [NgIcon, TranslocoPipe, Button, Field],
+  imports: [NgIcon, TranslocoPipe, Button, Field, Dropdown],
   providers: [
     provideIcons({
       tablerTypography,
@@ -138,6 +143,46 @@ function normalizeNumericInput(raw: string): string {
   templateUrl: './selection-bar.html',
 })
 export class SelectionBar {
+  protected readonly position = computed<PositionMode>(() => {
+    const node = this.singleNode();
+    const doc = this.state.document();
+    return doc && node ? (nodeZone(doc, node.id)?.type ?? 'FLOW') : 'FLOW';
+  });
+  protected readonly positionOptions = computed<DropdownOption<PositionMode>[]>(() => {
+    this.language();
+    this.i18n();
+    const doc = this.state.document(),
+      node = this.singleNode();
+    return (['FLOW', 'header', 'footer'] as const).map((mode) => {
+      const reason = doc && node ? positionError(doc, node, mode) : 'positionUnavailable';
+      return {
+        value: mode,
+        label: this.transloco.translate(`tplDesigner.hybrid.position.${mode}`),
+        disabled: reason !== null,
+        title: this.transloco.translate(`tplDesigner.hybrid.${reason ?? 'positionHint'}`),
+      };
+    });
+  });
+  protected readonly positionHint = computed(() => {
+    const doc = this.state.document(),
+      node = this.singleNode();
+    const reason = doc && node ? positionError(doc, node, this.position()) : null;
+    return this.transloco.translate(`tplDesigner.hybrid.${reason ?? 'positionHint'}`);
+  });
+  protected changePosition(mode: PositionMode): void {
+    const node = this.singleNode(),
+      doc = this.state.document();
+    if (!node || !doc || mode === this.position()) return;
+    const el = document.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(node.id)}"]`);
+    const rect = el?.getBoundingClientRect();
+    const zoom = this.state.zoom();
+    const width = rect ? pxToMm(rect.width / rootZoom(), zoom) : printableBox(doc).width;
+    const height = rect ? pxToMm(rect.height / rootZoom(), zoom) : 0;
+    this.state.pendingPlacement.set(null);
+    this.state.apply('changePosition', (next) => {
+      moveNodeToPosition(next, node.id, mode, { x: 0, y: 0, width, height });
+    });
+  }
   private static nextId = 0;
   protected readonly uid = `tpl-sel-bar-${++SelectionBar.nextId}`;
 
@@ -187,22 +232,28 @@ export class SelectionBar {
     };
   });
 
-  protected readonly typeAction = computed<{ kind: string; icon: string; labelKey: string } | null>(() => {
+  protected readonly typeAction = computed<{ kind: string; icon: string; labelKey: string } | null>(
+    () => {
     const node = this.singleNode();
     if (!node) return null;
     switch (node.type) {
       case 'image':
-        return { kind: 'replaceImage', icon: 'tablerPhoto', labelKey: 'tplTools.bar.replaceImage' };
+        return { kind: 'replaceImage', icon: 'tablerPhoto', labelKey: 'tplTools.bar.replaceImage',
+          };
       case 'text':
       case 'richText':
-        return { kind: 'editTextContent', icon: 'tablerTypography', labelKey: 'tplTools.bar.editText' };
+        return { kind: 'editTextContent', icon: 'tablerTypography', labelKey: 'tplTools.bar.editText',
+          };
       case 'dataField':
-        return { kind: 'editBinding', icon: 'tablerBraces', labelKey: 'tplTools.bar.fieldSettings' };
+        return { kind: 'editBinding', icon: 'tablerBraces', labelKey: 'tplTools.bar.fieldSettings',
+          };
       case 'staticTable':
       case 'dynamicTable':
-        return { kind: 'openTableSettings', icon: 'tablerTable', labelKey: 'tplTools.bar.tableSettings' };
+        return { kind: 'openTableSettings', icon: 'tablerTable', labelKey: 'tplTools.bar.tableSettings',
+          };
       case 'formula':
-        return { kind: 'editFormula', icon: 'tablerMathFunction', labelKey: 'tplTools.bar.editFormula' };
+        return { kind: 'editFormula', icon: 'tablerMathFunction', labelKey: 'tplTools.bar.editFormula',
+          };
       case 'totals':
         return { kind: 'openTotals', icon: 'tablerSum', labelKey: 'tplTools.bar.totalsSettings' };
       case 'link':
@@ -211,7 +262,8 @@ export class SelectionBar {
       default:
         return null;
     }
-  });
+    },
+  );
 
   protected readonly hasAbsoluteInMulti = computed(() =>
     this.selectedNodes().some((n) => n.layout.kind === 'ABSOLUTE'),
@@ -345,7 +397,9 @@ export class SelectionBar {
     this.state.run({ kind: 'openVisibility', nodeId });
   }
 
-  protected alignSelected(edge: 'START' | 'CENTER_H' | 'END' | 'TOP' | 'CENTER_V' | 'BOTTOM'): void {
+  protected alignSelected(
+    edge: 'START' | 'CENTER_H' | 'END' | 'TOP' | 'CENTER_V' | 'BOTTOM',
+  ): void {
     if (this.state.readOnly() || !this.hasUnlockedAbsoluteInMulti()) return;
     this.state.align(this.state.selectedIds(), edge);
   }

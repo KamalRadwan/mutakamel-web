@@ -10,14 +10,35 @@
         >
           <ng-icon [name]="visual.icon" size="14" aria-hidden="true" />
         </span>
-        <span class="max-w-tpl-node-name truncate text-12 leading-18 font-medium text-on-brand-soft" [title]="singleName()">
+        <span class="max-w-tpl-node-name truncate text-12 leading-18 font-medium text-on-brand-soft"
+          [title]="singleName()"
+        >
           {{ singleName() }}
         </span>
       </div>
 
+      @if (state.layoutMode() === 'HYBRID_DOCUMENT') {
+        <ui-field
+          size="bare"
+          class="shrink-0"
+          [label]="'tplDesigner.hybrid.positionLabel' | transloco"
+          [hint]="positionHint()"
+        >
+          <ui-dropdown
+            size="field"
+            [label]="'tplDesigner.hybrid.positionLabel' | transloco"
+            [value]="position()"
+            [options]="positionOptions()"
+            [disabled]="state.readOnly() || node.locked"
+            (valueChange)="changePosition($event)"
+          />
+        </ui-field>
+      }
       @if (state.readOnly()) {
         <span class="flex-1"></span>
-        <button type="button" uiButton variant="secondary" size="small" (click)="openProperties(node.id)">
+        <button type="button" uiButton variant="secondary" size="small"
+          (click)="openProperties(node.id)"
+        >
           <ng-icon name="tablerAdjustmentsHorizontal" size="14" aria-hidden="true" />
           {{ 'tplTools.bar.properties' | transloco }}
         </button>
@@ -127,7 +148,9 @@
                   class="h-full min-w-0 flex-1 bg-transparent text-12 font-medium tabular-nums text-text outline-none read-only:text-text-muted"
                   [readOnly]="node.locked"
                   [attr.aria-invalid]="invalidField() === 'width' ? 'true' : null"
-                  [attr.aria-errormessage]="invalidField() === 'width' ? uid + '-frame-error' : null"
+                  [attr.aria-errormessage]="
+                    invalidField() === 'width' ? uid + '-frame-error' : null
+                  "
                   [value]="draftW()"
                   (input)="onFrameInput('width', $event)"
                   (keydown.enter)="commitFrame('width', $event)"
@@ -163,7 +186,9 @@
                   class="h-full min-w-0 flex-1 bg-transparent text-12 font-medium tabular-nums text-text outline-none read-only:text-text-muted"
                   [readOnly]="node.locked"
                   [attr.aria-invalid]="invalidField() === 'height' ? 'true' : null"
-                  [attr.aria-errormessage]="invalidField() === 'height' ? uid + '-frame-error' : null"
+                  [attr.aria-errormessage]="
+                    invalidField() === 'height' ? uid + '-frame-error' : null
+                  "
                   [value]="draftH()"
                   (input)="onFrameInput('height', $event)"
                   (keydown.enter)="commitFrame('height', $event)"
@@ -199,7 +224,9 @@
                   class="h-full min-w-0 flex-1 bg-transparent text-12 font-medium tabular-nums text-text outline-none read-only:text-text-muted"
                   [readOnly]="node.locked"
                   [attr.aria-invalid]="invalidField() === 'rotationDeg' ? 'true' : null"
-                  [attr.aria-errormessage]="invalidField() === 'rotationDeg' ? uid + '-frame-error' : null"
+                  [attr.aria-errormessage]="
+                    invalidField() === 'rotationDeg' ? uid + '-frame-error' : null
+                  "
                   [value]="draftRot()"
                   (input)="onFrameInput('rotationDeg', $event)"
                   (keydown.enter)="commitFrame('rotationDeg', $event)"
@@ -260,18 +287,23 @@
         <!-- Type-specific action + Properties + Visibility + Duplicate + Delete -->
         <div class="flex shrink-0 flex-nowrap items-center gap-6">
           @if (typeAction(); as action) {
-            <button type="button" uiButton variant="secondary" size="small" (click)="runTypeAction(node.id, action.kind)">
+            <button type="button" uiButton variant="secondary" size="small" (click)="runTypeAction(node.id, action.kind)"
+            >
               <ng-icon [name]="action.icon" size="14" aria-hidden="true" />
               {{ action.labelKey | transloco }}
             </button>
           }
 
-          <button type="button" uiButton variant="secondary" size="small" (click)="openProperties(node.id)">
+          <button type="button" uiButton variant="secondary" size="small"
+            (click)="openProperties(node.id)"
+          >
             <ng-icon name="tablerAdjustmentsHorizontal" size="14" aria-hidden="true" />
             {{ 'tplTools.bar.properties' | transloco }}
           </button>
 
-          <button type="button" uiButton variant="secondary" size="small" (click)="openVisibility(node.id)">
+          <button type="button" uiButton variant="secondary" size="small"
+            (click)="openVisibility(node.id)"
+          >
             <ng-icon name="tablerEyeOff" size="14" aria-hidden="true" />
             {{ 'tplTools.bar.visibility' | transloco }}
           </button>
@@ -302,7 +334,8 @@
     } @else if (selectedNodes().length > 1) {
       <!-- Multiple selection -->
       <div class="flex shrink-0 items-center gap-8">
-        <span class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-blue text-on-icon">
+        <span class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-blue text-on-icon"
+        >
           <ng-icon name="tablerStack2" size="14" aria-hidden="true" />
         </span>
         <span class="text-12 leading-18 font-medium whitespace-nowrap text-on-brand-soft">
@@ -407,7 +440,8 @@
     }
   </div>
   @if (frameError(); as err) {
-    <p [id]="uid + '-frame-error'" role="alert" class="mt-2 flex items-center gap-3 px-10 text-11 leading-16 text-danger-text">
+    <p [id]="uid + '-frame-error'" role="alert" class="mt-2 flex items-center gap-3 px-10 text-11 leading-16 text-danger-text"
+    >
       <ng-icon name="tablerCircleX" size="11" aria-hidden="true" />
       <span>{{ err }}</span>
     </p>

@@ -3,7 +3,10 @@
   @let bStyle = boxStyle();
   <div
     [attr.data-node-id]="n.id"
-    [class]="isAbsolute() ? 'select-none' : 'relative select-none'"
+    class="touch-none select-none"
+    [class.cursor-move]="draggable()"
+    [class.cursor-default]="!draggable()"
+    [title]="movementHint()"
     [style.position]="fStyle?.position"
     [style.left]="fStyle?.left"
     [style.top]="fStyle?.top"
@@ -15,6 +18,16 @@
     (pointerdown)="onPointerDown($event)"
     (dblclick)="onDoubleClick($event)"
   >
+    @if (isHybridZone()) {
+      <div
+        class="pointer-events-none absolute inset-0 border border-dashed border-border-field"
+        aria-hidden="true"
+      ></div>
+      <span
+        class="pointer-events-none absolute start-2 top-0 z-sticky rounded-2 bg-surface px-4 text-11 text-text-muted"
+        >{{ 'tplDesigner.hybrid.' + n.type | transloco }}</span
+      >
+    }
     <div
       class="relative h-full w-full"
       [attr.dir]="docDir()"
@@ -63,9 +76,14 @@
                   <p [style.text-align]="block.attrs?.textAlign?.toLowerCase() ?? null">
                     @for (inl of block.content ?? []; track $index) {
                       @if (inl.type === 'text') {
-                        <span [class]="markClasses(inl.marks)" [style.font-weight]="markFontWeight(inl.marks)">{{ inl.text }}</span>
+                        <span [class]="markClasses(inl.marks)"
+                          [style.font-weight]="markFontWeight(inl.marks)"
+                          >{{ inl.text }}</span
+                        >
                       } @else if (inl.type === 'variable') {
-                        <span class="text-brand-text underline decoration-dotted">«{{ state.fieldLabel(inl.attrs.binding.path) }}»</span>
+                        <span class="text-brand-text underline decoration-dotted"
+                          >«{{ state.fieldLabel(inl.attrs.binding.path) }}»</span
+                        >
                       } @else if (inl.type === 'hardBreak') {
                         <br />
                       }
@@ -75,14 +93,23 @@
                 @case ('heading') {
                   <div
                     [style.font-weight]="700"
-                    [style.font-size.em]="block.attrs.level === 1 ? 1.5 : block.attrs.level === 2 ? 1.25 : 1.1"
-                    [style.text-align]="block.attrs.textAlign ? block.attrs.textAlign.toLowerCase() : null"
+                    [style.font-size.em]="
+                      block.attrs.level === 1 ? 1.5 : block.attrs.level === 2 ? 1.25 : 1.1
+                    "
+                    [style.text-align]="
+                      block.attrs.textAlign ? block.attrs.textAlign.toLowerCase() : null
+                    "
                   >
                     @for (inl of block.content ?? []; track $index) {
                       @if (inl.type === 'text') {
-                        <span [class]="markClasses(inl.marks)" [style.font-weight]="markFontWeight(inl.marks)">{{ inl.text }}</span>
+                        <span [class]="markClasses(inl.marks)"
+                          [style.font-weight]="markFontWeight(inl.marks)"
+                          >{{ inl.text }}</span
+                        >
                       } @else if (inl.type === 'variable') {
-                        <span class="text-brand-text underline decoration-dotted">«{{ state.fieldLabel(inl.attrs.binding.path) }}»</span>
+                        <span class="text-brand-text underline decoration-dotted"
+                          >«{{ state.fieldLabel(inl.attrs.binding.path) }}»</span
+                        >
                       } @else if (inl.type === 'hardBreak') {
                         <br />
                       }
@@ -95,9 +122,14 @@
                       <li>
                         @for (inl of li.content[0].content ?? []; track $index) {
                           @if (inl.type === 'text') {
-                            <span [class]="markClasses(inl.marks)" [style.font-weight]="markFontWeight(inl.marks)">{{ inl.text }}</span>
+                            <span [class]="markClasses(inl.marks)"
+                              [style.font-weight]="markFontWeight(inl.marks)"
+                              >{{ inl.text }}</span
+                            >
                           } @else if (inl.type === 'variable') {
-                            <span class="text-brand-text underline decoration-dotted">«{{ state.fieldLabel(inl.attrs.binding.path) }}»</span>
+                            <span class="text-brand-text underline decoration-dotted"
+                              >«{{ state.fieldLabel(inl.attrs.binding.path) }}»</span
+                            >
                           } @else if (inl.type === 'hardBreak') {
                             <br />
                           }
@@ -112,9 +144,14 @@
                       <li>
                         @for (inl of li.content[0].content ?? []; track $index) {
                           @if (inl.type === 'text') {
-                            <span [class]="markClasses(inl.marks)" [style.font-weight]="markFontWeight(inl.marks)">{{ inl.text }}</span>
+                            <span [class]="markClasses(inl.marks)"
+                              [style.font-weight]="markFontWeight(inl.marks)"
+                              >{{ inl.text }}</span
+                            >
                           } @else if (inl.type === 'variable') {
-                            <span class="text-brand-text underline decoration-dotted">«{{ state.fieldLabel(inl.attrs.binding.path) }}»</span>
+                            <span class="text-brand-text underline decoration-dotted"
+                              >«{{ state.fieldLabel(inl.attrs.binding.path) }}»</span
+                            >
                           } @else if (inl.type === 'hardBreak') {
                             <br />
                           }
@@ -135,7 +172,9 @@
                 {{ n.props.label }}{{ n.props.labelPosition === 'ABOVE' ? '' : (n.props.separator ?? ': ') }}
               </span>
             }
-            <span class="text-brand-text underline decoration-dotted">«{{ state.fieldLabel(n.binding.path) }}»</span>
+            <span class="text-brand-text underline decoration-dotted"
+              >«{{ state.fieldLabel(n.binding.path) }}»</span
+            >
           </div>
         }
 
@@ -159,13 +198,17 @@
               <span class="truncate max-w-full">{{ 'tplDesigner.canvas.imageUnavailable' | transloco }}</span>
             </div>
           } @else {
-            <div class="h-full w-full animate-pulse rounded-4" [style.background-color]="paperColors().muted"></div>
+            <div class="h-full w-full animate-pulse rounded-4"
+              [style.background-color]="paperColors().muted"
+            ></div>
           }
         }
 
         @case ('divider') {
           <div class="flex h-full w-full items-center">
-            <div class="w-full" [style.border-top-width]="dividerStyle().borderTopWidth" [style.border-top-style]="dividerStyle().borderTopStyle" [style.border-top-color]="dividerStyle().borderTopColor"></div>
+            <div class="w-full" [style.border-top-width]="dividerStyle().borderTopWidth" [style.border-top-style]="dividerStyle().borderTopStyle"
+              [style.border-top-color]="dividerStyle().borderTopColor"
+            ></div>
           </div>
         }
 
@@ -246,8 +289,12 @@
         }
 
         @case ('header') {
-          <div class="relative flex-1 border border-dashed" [style.border-color]="paperColors().line">
-            <span class="pointer-events-none absolute top-2 start-4 text-11" [style.color]="paperColors().mutedText">
+          <div class="relative flex-1 border border-dashed"
+            [style.border-color]="paperColors().line"
+          >
+            <span class="pointer-events-none absolute top-2 start-4 text-11"
+              [style.color]="paperColors().mutedText"
+            >
               {{ 'tplDesigner.node.header' | transloco }}
             </span>
             @for (childId of n.childIds; track childId) {
@@ -267,8 +314,12 @@
         }
 
         @case ('footer') {
-          <div class="relative flex-1 border border-dashed" [style.border-color]="paperColors().line">
-            <span class="pointer-events-none absolute top-2 start-4 text-11" [style.color]="paperColors().mutedText">
+          <div class="relative flex-1 border border-dashed"
+            [style.border-color]="paperColors().line"
+          >
+            <span class="pointer-events-none absolute top-2 start-4 text-11"
+              [style.color]="paperColors().mutedText"
+            >
               {{ 'tplDesigner.node.footer' | transloco }}
             </span>
             @for (childId of n.childIds; track childId) {
@@ -303,14 +354,20 @@
                 @for (row of tbl.rows; track row.id; let rIdx = $index) {
                   <tr [style.height.px]="row.heightPx">
                     @for (slot of row.cells; track slot.id) {
-                      @let cs = cellStyleCss(slot.column, slot.style, rIdx === 0 && !!slot.column.headerStyle, n.props.stripedRows && rIdx % 2 === 1);
+                      @let cs =
+                        cellStyleCss(
+                          slot.column,
+                          slot.style, rIdx === 0 && !!slot.column.headerStyle, n.props.stripedRows && rIdx % 2 === 1
+                        );
                       <ng-template #staticCellValue>
                         @switch (slot.value.kind) {
                           @case ('TEXT') {
                             <span>{{ slot.value.value }}</span>
                           }
                           @case ('BINDING') {
-                            <span class="text-brand-text underline decoration-dotted">«{{ state.fieldLabel(slot.value.binding.path) }}»</span>
+                            <span class="text-brand-text underline decoration-dotted"
+                              >«{{ state.fieldLabel(slot.value.binding.path) }}»</span
+                            >
                           }
                           @case ('FORMULA') {
                             <span>ƒ {{ formulaLabel(slot.value.expression) }}</span>
@@ -395,7 +452,9 @@
                           <span>{{ col.header.value }}</span>
                         }
                         @case ('BINDING') {
-                          <span class="underline decoration-dotted">«{{ state.fieldLabel(col.header.binding.path) }}»</span>
+                          <span class="underline decoration-dotted"
+                            >«{{ state.fieldLabel(col.header.binding.path) }}»</span
+                          >
                         }
                         @case ('FORMULA') {
                           <span>ƒ {{ formulaLabel(col.header.expression) }}</span>
@@ -419,7 +478,10 @@
                       >
                         @switch (cell.value.kind) {
                           @case ('TEXT') { <span>{{ cell.value.value }}</span> }
-                          @case ('BINDING') { <span class="text-brand-text underline decoration-dotted">«{{ state.fieldLabel(cell.value.binding.path) }}»</span> }
+                          @case ('BINDING') { <span class="text-brand-text underline decoration-dotted"
+                              >«{{ state.fieldLabel(cell.value.binding.path) }}»</span
+                            >
+                          }
                           @case ('FORMULA') { <span>ƒ {{ formulaLabel(cell.value.expression) }}</span> }
                         }
                       </td>
@@ -456,7 +518,9 @@
                               <span>{{ val.value }}</span>
                             }
                             @case ('BINDING') {
-                              <span class="underline decoration-dotted">«{{ state.fieldLabel(val.binding.path) }}»</span>
+                              <span class="underline decoration-dotted"
+                                >«{{ state.fieldLabel(val.binding.path) }}»</span
+                              >
                             }
                             @case ('FORMULA') {
                               <span>ƒ {{ formulaLabel(val.expression) }}</span>
@@ -480,7 +544,10 @@
                       >
                         @switch (cell.value.kind) {
                           @case ('TEXT') { <span>{{ cell.value.value }}</span> }
-                          @case ('BINDING') { <span class="text-brand-text underline decoration-dotted">«{{ state.fieldLabel(cell.value.binding.path) }}»</span> }
+                          @case ('BINDING') { <span class="text-brand-text underline decoration-dotted"
+                              >«{{ state.fieldLabel(cell.value.binding.path) }}»</span
+                            >
+                          }
                           @case ('FORMULA') { <span>ƒ {{ formulaLabel(cell.value.expression) }}</span> }
                         }
                       </td>
@@ -511,12 +578,24 @@
                 @if (row.visible) {
                   <tr
                     [style.color]="row.emphasis === 'GRAND_TOTAL' ? paperColors().surface : null"
-                    [style.background-color]="row.emphasis === 'GRAND_TOTAL' ? paperColors().accent : null"
-                    [style.font-weight]="row.emphasis === 'GRAND_TOTAL' ? 700 : row.emphasis === 'STRONG' ? 600 : 400"
+                    [style.background-color]="
+                      row.emphasis === 'GRAND_TOTAL' ? paperColors().accent : null
+                    "
+                    [style.font-weight]="
+                      row.emphasis === 'GRAND_TOTAL' ? 700 : row.emphasis === 'STRONG' ? 600 : 400
+                    "
                   >
-                    <td class="border px-6 py-3 text-start" [style.border-color]="paperColors().line">{{ row.label }}</td>
+                    <td class="border px-6 py-3 text-start"
+                      [style.border-color]="paperColors().line"
+                    >
+                      {{ row.label }}
+                    </td>
                     <td class="border px-6 py-3 text-end" [style.border-color]="paperColors().line">
-                      <span [class]="row.emphasis === 'GRAND_TOTAL' ? 'underline decoration-dotted' : 'text-brand-text underline decoration-dotted'">
+                      <span
+                        [class]="
+                          row.emphasis === 'GRAND_TOTAL' ? 'underline decoration-dotted' : 'text-brand-text underline decoration-dotted'
+                        "
+                      >
                         «{{ state.fieldLabel(row.binding.path) }}»
                       </span>
                     </td>
@@ -528,7 +607,9 @@
         }
 
         @case ('formula') {
-          <div class="truncate">ƒ {{ n.name?.trim() || ('tplDesigner.canvas.formula' | transloco) }}</div>
+          <div class="truncate">
+            ƒ {{ n.name?.trim() || ('tplDesigner.canvas.formula' | transloco) }}
+          </div>
         }
 
         @case ('link') {
@@ -537,7 +618,9 @@
               @if (seg.kind === 'TEXT') {
                 <span>{{ seg.value }}</span>
               } @else {
-                <span class="underline decoration-dotted">«{{ state.fieldLabel(seg.binding.path) }}»</span>
+                <span class="underline decoration-dotted"
+                  >«{{ state.fieldLabel(seg.binding.path) }}»</span
+                >
               }
             }
           </span>
@@ -568,9 +651,13 @@
 
         @case ('pageBreak') {
           <div class="my-6 flex items-center gap-8">
-            <span class="h-border flex-1 border-t border-dashed" [style.border-color]="paperColors().line"></span>
+            <span class="h-border flex-1 border-t border-dashed"
+              [style.border-color]="paperColors().line"
+            ></span>
             <span class="text-11" [style.color]="paperColors().mutedText">{{ 'tplDesigner.node.pageBreak' | transloco }}</span>
-            <span class="h-border flex-1 border-t border-dashed" [style.border-color]="paperColors().line"></span>
+            <span class="h-border flex-1 border-t border-dashed"
+              [style.border-color]="paperColors().line"
+            ></span>
           </div>
         }
 
@@ -589,7 +676,9 @@
 
     <!-- Status indicators (hidden / locked). Physical right on purpose: the designer canvas is dir="ltr". -->
     @if (n.hidden || (n.locked && isSelected())) {
-      <div class="pointer-events-none absolute top-2 right-2 flex items-center gap-2" aria-hidden="true">
+      <div class="pointer-events-none absolute top-2 right-2 flex items-center gap-2"
+        aria-hidden="true"
+      >
         @if (n.hidden) {
           <span
             class="inline-flex size-counter items-center justify-center rounded-4 border bg-paper shadow-card"
@@ -613,7 +702,9 @@
 
     <!-- Selection outline -->
     @if (isSelected()) {
-      <div class="pointer-events-none absolute inset-0 border border-brand" aria-hidden="true"></div>
+      <div class="pointer-events-none absolute inset-0 border border-brand"
+        aria-hidden="true"
+      ></div>
     }
   </div>
 }

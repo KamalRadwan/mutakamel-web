@@ -1,4 +1,6 @@
-import { DestroyRef, Injectable, Signal, WritableSignal, computed, effect, inject, signal } from '@angular/core';
+import { DestroyRef, Injectable, Signal, WritableSignal, computed, effect, inject,
+  signal,
+} from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
 import { isRetryableWriteError, writeErrorMessage } from '../../../../core/api/api-errors';
 import { LanguageState } from '../../../../core/i18n/language';
@@ -49,6 +51,7 @@ export type BindingFormat = TemplateBindingFormat;
 export type { DesignerTool, NewTemplateNode };
 
 export type DesignerCommand =
+  | { kind: 'openConvertLayout' }
   | { kind: 'insertText' }
   | { kind: 'insertLine' }
   | { kind: 'insertImage' }
@@ -159,8 +162,12 @@ export class DesignerState {
 
   readonly templateId: Signal<string> = this._templateId.asReadonly();
   readonly document: Signal<TemplateDocumentV1 | null> = this._document.asReadonly();
-  readonly layoutMode: Signal<LayoutMode | null> = computed(() => this._document()?.layoutMode ?? null);
-  readonly channel: Signal<'PRINT' | 'EMAIL' | null> = computed(() => this._document()?.outputChannel ?? null);
+  readonly layoutMode: Signal<LayoutMode | null> = computed(
+    () => this._document()?.layoutMode ?? null,
+  );
+  readonly channel: Signal<'PRINT' | 'EMAIL' | null> = computed(
+    () => this._document()?.outputChannel ?? null,
+  );
   readonly schema: Signal<DataSourceSchema | null> = this._schema.asReadonly();
   readonly schemaFailed: Signal<boolean> = this._schemaFailed.asReadonly();
 
@@ -168,7 +175,9 @@ export class DesignerState {
     if (this._versionReadOnly()) return true;
     const def = this._definition() ?? this.pageService.definition();
     if (!def) return true;
-    return this.pageService.draftAccessForbidden() || def.lifecycleStatus === 'ARCHIVED' || def.capabilities.update.state !== 'ENABLED';
+    return (
+      this.pageService.draftAccessForbidden() || def.lifecycleStatus === 'ARCHIVED' || def.capabilities.update.state !== 'ENABLED'
+    );
   });
 
   readonly pageIndex: WritableSignal<number> = signal(0);
@@ -220,11 +229,19 @@ export class DesignerState {
     return this.docJson() !== this.baseJson();
   });
 
-  readonly canUndo: Signal<boolean> = computed(() => !this.readOnly() && this._undoStack().length > 0);
-  readonly canRedo: Signal<boolean> = computed(() => !this.readOnly() && this._redoStack().length > 0);
+  readonly canUndo: Signal<boolean> = computed(
+    () => !this.readOnly() && this._undoStack().length > 0,
+  );
+  readonly canRedo: Signal<boolean> = computed(
+    () => !this.readOnly() && this._redoStack().length > 0,
+  );
   readonly command: Signal<{ seq: number; cmd: DesignerCommand } | null> = this._command.asReadonly();
 
   constructor() {
+    effect(() => {
+      const pending = this.pendingPlacement();
+      if (pending && !this._document()?.nodes[pending]) this.pendingPlacement.set(null);
+    });
     this.pageService.registerDraftEditor({
       dirty: this.dirty,
       save: () => this.save(),
@@ -398,7 +415,10 @@ export class DesignerState {
           this._document.set(null);
           return;
         }
-        const version = await this.templatesApi.getVersion(templateId, def.currentPublishedVersion.templateVersionId);
+        const version = await this.templatesApi.getVersion(
+          templateId,
+          def.currentPublishedVersion.templateVersionId,
+        );
         if (this.destroyed || seq !== this.loadSeq) return;
         loadedSchemaVersion = version.dataSourceSchemaVersion === 2 ? 2 : 1;
         expectedSchemaChecksum = version.dataSourceSchemaChecksum;
@@ -411,7 +431,11 @@ export class DesignerState {
       this.zoom.set(1);
       this.zoomMode.set('MANUAL');
 
-      await this.loadSchemaFor(def, resolvedDoc.dataSourceKey, loadedSchemaVersion, expectedSchemaChecksum, seq);
+      await this.loadSchemaFor(
+        def,
+        resolvedDoc.dataSourceKey, loadedSchemaVersion, expectedSchemaChecksum,
+        seq,
+      );
     } catch (error) {
       if (this.destroyed || seq !== this.loadSeq) return;
       const { status, code, correlationId } = errorDetailsOf(error);
@@ -544,14 +568,18 @@ export class DesignerState {
 
   updateFrame(
     ids: readonly string[],
-    change: { dx?: number; dy?: number; x?: number; y?: number; width?: number; height?: number; rotationDeg?: number },
+    change: { dx?: number; dy?: number; x?: number; y?: number; width?: number; height?: number; rotationDeg?: number;
+    },
   ): void {
     this.apply('updateFrame', (doc) => {
       let nextChange = change;
-      if ((change.dx !== undefined || change.dy !== undefined) && change.x === undefined && change.y === undefined) {
+      if (
+        (change.dx !== undefined || change.dy !== undefined) && change.x === undefined && change.y === undefined
+      ) {
         const movable = ids
           .map((id) => doc.nodes[id])
-          .filter((n): n is TemplateNode => Boolean(n && !n.locked && n.layout.kind === 'ABSOLUTE'));
+          .filter((n): n is TemplateNode => Boolean(n && !n.locked && n.layout.kind === 'ABSOLUTE'),
+          );
         if (movable.length > 0) {
           let minDx = -Infinity;
           let maxDx = Infinity;
@@ -564,7 +592,8 @@ export class DesignerState {
             minDy = Math.max(minDy, -n.layout.y);
             maxDy = Math.min(maxDy, 1000 - n.layout.y);
           }
-          const clampVal = (v: number, lo: number, hi: number) => (lo <= hi ? Math.min(hi, Math.max(lo, v)) : v);
+          const clampVal = (v: number, lo: number, hi: number) =>
+            lo <= hi ? Math.min(hi, Math.max(lo, v)) : v;
           nextChange = {
             ...change,
             ...(change.dx !== undefined ? { dx: clampVal(change.dx, minDx, maxDx) } : {}),
@@ -576,7 +605,11 @@ export class DesignerState {
     });
   }
 
-  insertNode(node: NewTemplateNode, at?: { parentId?: string | null; index?: number }): string {
+  readonly pendingPlacement = signal<string | null>(null);
+
+  insertNode(
+    node: NewTemplateNode, at?: { parentId?: string | null; index?: number; x?: number; y?: number },
+  ): string {
     if (this.readOnly() || !this._document()) return '';
     let newId = '';
     this.apply('insertNode', (doc) => {
@@ -584,6 +617,7 @@ export class DesignerState {
     });
     if (newId) {
       this._selectedIds.set([newId]);
+      if (this.layoutMode() === 'HYBRID_DOCUMENT') this.pendingPlacement.set(newId);
     }
     return newId;
   }
@@ -629,7 +663,9 @@ export class DesignerState {
     });
   }
 
-  align(ids: readonly string[], edge: 'START' | 'CENTER_H' | 'END' | 'TOP' | 'CENTER_V' | 'BOTTOM'): void {
+  align(
+    ids: readonly string[], edge: 'START' | 'CENTER_H' | 'END' | 'TOP' | 'CENTER_V' | 'BOTTOM',
+  ): void {
     const page = this.currentPage();
     if (!page) return;
     this.apply('align', (doc) => {
@@ -657,7 +693,10 @@ export class DesignerState {
 
     const prev = stack[stack.length - 1];
     this._undoStack.set(stack.slice(0, -1));
-    this._redoStack.update((redo) => [...redo.slice(-(MAX_UNDO_STEPS - 1)), structuredClone(current)]);
+    this._redoStack.update((redo) => [
+      ...redo.slice(-(MAX_UNDO_STEPS - 1)),
+      structuredClone(current),
+    ]);
     this._document.set(structuredClone(prev));
     this._selectedIds.update((sel) => sel.filter((id) => Boolean(prev.nodes[id])));
   }
@@ -670,7 +709,10 @@ export class DesignerState {
 
     const next = stack[stack.length - 1];
     this._redoStack.set(stack.slice(0, -1));
-    this._undoStack.update((undo) => [...undo.slice(-(MAX_UNDO_STEPS - 1)), structuredClone(current)]);
+    this._undoStack.update((undo) => [
+      ...undo.slice(-(MAX_UNDO_STEPS - 1)),
+      structuredClone(current),
+    ]);
     this._document.set(structuredClone(next));
     this._selectedIds.update((sel) => sel.filter((id) => Boolean(next.nodes[id])));
   }

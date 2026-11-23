@@ -32,6 +32,18 @@ import {
   snapResizeMm,
 } from '../geometry';
 import { currentPageRootNodeIds, collectPageNodes } from '../document-ops';
+import {
+  absoluteBounds,
+  canResizeFlow,
+  clampAbsoluteFrame,
+  hybridZone,
+  moveNodeToPosition,
+  printableBox,
+  reorderFlow,
+  resizeFlow,
+  zoneBox,
+  type PositionMode,
+} from '../hybrid-ops';
 import { Ruler } from '../ruler/ruler';
 import { NodeView } from './node-view/node-view';
 
@@ -55,6 +67,25 @@ const RESIZE_HANDLES: readonly HandleDescriptor[] = [
 
 type DragSession =
   | {
+      kind: 'flowMove';
+      pointerId: number;
+      nodeId: string;
+      startClientX: number;
+      startClientY: number;
+      moved: boolean;
+    }
+  | {
+      kind: 'flowResize';
+      pointerId: number;
+      nodeId: string;
+      handle: ResizeHandle;
+      startClientX: number;
+      startClientY: number;
+      startRect: RectMm;
+      availableWidth: number;
+      moved: boolean;
+    }
+  | {
       kind: 'move';
       pointerId: number;
       startClientX: number;
@@ -68,6 +99,7 @@ type DragSession =
     }
   | {
       kind: 'resize';
+      rotationDeg: number;
       pointerId: number;
       nodeId: string;
       handle: ResizeHandle;
@@ -108,7 +140,23 @@ export class TemplateCanvas implements AfterViewInit {
   private readonly paperRef = viewChild<ElementRef<HTMLElement>>('paperEl');
   private readonly canvasRootRef = viewChild<ElementRef<HTMLElement>>('canvasRoot');
 
-  protected readonly handles = RESIZE_HANDLES;
+  protected readonly handles = computed(() =>
+    this.state.primary()?.layout.kind === 'FLOW'
+      ? RESIZE_HANDLES.filter((handle) => (this.state.primary()?.type === 'column' ? ['S'] : ['E', 'W', 'S']).includes(handle.id))
+      : RESIZE_HANDLES,
+  );
+  private readonly measuredFlow = signal<{
+    nodeId: string;
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+    rotationDeg: number;
+  } | null>(null);
+  protected readonly dropIndicator = signal<{ top: number; left: number; width: number } | null>(
+    null,
+  );
+  private flowBeforeId: string | null = null;
   protected readonly scrollLeft = signal(0);
   protected readonly scrollTop = signal(0);
   protected readonly paperOffsetX = signal(16);
@@ -122,15 +170,39 @@ export class TemplateCanvas implements AfterViewInit {
     height: number;
   } | null>(null);
   protected readonly snapGuides = signal<SnapGuide[]>([]);
-  protected readonly marqueePx = signal<{ left: number; top: number; width: number; height: number } | null>(null);
+  protected readonly marqueePx = signal<{ left: number; top: number; width: number; height: number;
+  } | null>(null);
   protected readonly liveAnnouncement = signal('');
 
   private dragSession: DragSession | null = null;
   private lastHandledNodeParam: string | null = null;
   private readonly queryParams = toSignal(this.route.queryParamMap);
 
-  protected readonly isEmail = computed(() => this.state.channel() === 'EMAIL' || this.state.layoutMode() === 'EMAIL_FLOW');
+  protected readonly isEmail = computed(
+    () => this.state.channel() === 'EMAIL' || this.state.layoutMode() === 'EMAIL_FLOW',
+  );
   protected readonly isFixedCanvas = computed(() => this.state.layoutMode() === 'FIXED_CANVAS');
+  protected readonly zoneOverflow = computed(() => {
+    const doc = this.state.document();
+    if (!doc || doc.layoutMode !== 'HYBRID_DOCUMENT') return false;
+    return Object.values(doc.nodes).some((node) => {
+      if (node.layout.kind !== 'ABSOLUTE') return false;
+      const bounds = absoluteBounds(doc, node);
+      if (!bounds) return false;
+      const frame = node.layout,
+        radians = (frame.rotationDeg * Math.PI) / 180;
+      const width =
+        Math.abs(frame.width * Math.cos(radians)) + Math.abs(frame.height * Math.sin(radians));
+      const height =
+        Math.abs(frame.width * Math.sin(radians)) + Math.abs(frame.height * Math.cos(radians));
+      return (
+        frame.x + frame.width / 2 - width / 2 < -0.001 ||
+        frame.y + frame.height / 2 - height / 2 < -0.001 ||
+        frame.x + frame.width / 2 + width / 2 > bounds.width + 0.001 ||
+        frame.y + frame.height / 2 + height / 2 > bounds.height + 0.001
+      );
+    });
+  });
   protected readonly docDir = computed<'ltr' | 'rtl'>(() => {
     const doc = this.state.document();
     if (!doc) return 'ltr';
@@ -175,13 +247,14 @@ export class TemplateCanvas implements AfterViewInit {
 
   protected readonly flowMarginsPx = computed(() => {
     const page = this.state.currentPage();
+    const doc = this.state.document();
     const zoom = this.state.zoom();
     if (!page) return null;
     const rtl = this.docDir() === 'rtl';
     return {
-      paddingTop: `${mmToPx(page.marginMm.top, zoom)}px`,
+      paddingTop: `${mmToPx(page.marginMm.top + (doc?.layoutMode === 'HYBRID_DOCUMENT' ? (hybridZone(doc, 'header')?.props.heightMm ?? 0) : 0), zoom)}px`,
       paddingRight: `${mmToPx(rtl ? page.marginMm.start : page.marginMm.end, zoom)}px`,
-      paddingBottom: `${mmToPx(page.marginMm.bottom, zoom)}px`,
+      paddingBottom: `${mmToPx(page.marginMm.bottom + (doc?.layoutMode === 'HYBRID_DOCUMENT' ? (hybridZone(doc, 'footer')?.props.heightMm ?? 0) : 0), zoom)}px`,
       paddingLeft: `${mmToPx(rtl ? page.marginMm.end : page.marginMm.start, zoom)}px`,
     };
   });
@@ -214,7 +287,11 @@ export class TemplateCanvas implements AfterViewInit {
     const sel = this.state.selectedNodes();
     if (sel.length !== 1) return null;
     const node = sel[0];
-    if (node.locked || node.layout.kind !== 'ABSOLUTE' || node.layout.rotationDeg !== 0) return null;
+    if (node.locked) return null;
+    if (node.layout.kind === 'FLOW') {
+      const measured = this.measuredFlow();
+      return canResizeFlow(node) && measured?.nodeId === node.id ? measured : null;
+    }
     const preview = this.resizePreview();
     const rect =
       preview && preview.nodeId === node.id
@@ -232,6 +309,7 @@ export class TemplateCanvas implements AfterViewInit {
 
     return {
       nodeId: node.id,
+      rotationDeg: node.layout.rotationDeg,
       left: mmToPx(rect.x + anc.x, zoom) + (drag?.dx ?? 0),
       top: mmToPx(rect.y + anc.y, zoom) + (drag?.dy ?? 0),
       width: mmToPx(rect.width, zoom),
@@ -252,6 +330,12 @@ export class TemplateCanvas implements AfterViewInit {
   });
 
   constructor() {
+    effect(() => {
+      this.state.document();
+      this.state.selectedIds();
+      this.state.zoom();
+      afterNextRender(() => this.measureFlowSelection(), { injector: this.injector });
+    });
     // Request background asset when page uses an image background
     effect(() => {
       const bg = this.state.currentPage()?.background;
@@ -296,7 +380,9 @@ export class TemplateCanvas implements AfterViewInit {
       this.state.select([targetId], 'replace');
 
       requestAnimationFrame(() => {
-        const el = this.paperRef()?.nativeElement.querySelector(`[data-node-id="${CSS.escape(targetId)}"]`);
+        const el = this.paperRef()?.nativeElement.querySelector(
+          `[data-node-id="${CSS.escape(targetId)}"]`,
+        );
         if (el instanceof HTMLElement) {
           el.scrollIntoView({ block: 'center', inline: 'center' });
         }
@@ -363,8 +449,14 @@ export class TemplateCanvas implements AfterViewInit {
         const sRectAfter = rectInPage(scrollArea);
         const newPaperOffsetX = pRectAfter.left - sRectAfter.left + scrollArea.scrollLeft;
         const newPaperOffsetY = pRectAfter.top - sRectAfter.top + scrollArea.scrollTop;
-        scrollArea.scrollLeft = Math.max(0, newPaperOffsetX + paperPointX * nextZoom - cursorInViewportX);
-        scrollArea.scrollTop = Math.max(0, newPaperOffsetY + paperPointY * nextZoom - cursorInViewportY);
+        scrollArea.scrollLeft = Math.max(
+          0,
+          newPaperOffsetX + paperPointX * nextZoom - cursorInViewportX,
+        );
+        scrollArea.scrollTop = Math.max(
+          0,
+          newPaperOffsetY + paperPointY * nextZoom - cursorInViewportY,
+        );
         this.scrollLeft.set(scrollArea.scrollLeft);
         this.scrollTop.set(scrollArea.scrollTop);
         this.measureOffsets();
@@ -385,6 +477,8 @@ export class TemplateCanvas implements AfterViewInit {
     const paperX = event.clientX / z - rect.left;
     const paperY = event.clientY / z - rect.top;
 
+    if (this.placePending(event)) return;
+
     scrollArea.setPointerCapture(event.pointerId);
     this.dragSession = {
       kind: 'marquee',
@@ -400,11 +494,15 @@ export class TemplateCanvas implements AfterViewInit {
     const { event, nodeId } = payload;
     if (event.button !== 0) return;
     event.stopPropagation();
+    event.preventDefault();
     this.canvasRootRef()?.nativeElement.focus({ preventScroll: true });
 
     const doc = this.state.document();
     const node = doc?.nodes[nodeId];
     if (!doc || !node) return;
+
+    if (['header', 'footer', 'container'].includes(node.type) && this.placePending(event)) return;
+    this.state.pendingPlacement.set(null);
 
     if (event.shiftKey) {
       this.state.select([nodeId], 'toggle');
@@ -412,11 +510,31 @@ export class TemplateCanvas implements AfterViewInit {
       this.state.select([nodeId], 'replace');
     }
 
-    if (this.state.readOnly() || node.locked || node.layout.kind !== 'ABSOLUTE') {
+    if (this.state.readOnly() || node.locked) {
+      return;
+    }
+    if (node.layout.kind === 'FLOW') {
+      if (
+        !node.parentId ||
+        ['column', 'header', 'footer'].includes(node.type) ||
+        doc.nodes[node.parentId]?.type === 'row'
+      )
+        return;
+      this.scrollAreaRef()?.nativeElement.setPointerCapture(event.pointerId);
+      this.dragSession = {
+        kind: 'flowMove',
+        pointerId: event.pointerId,
+        nodeId,
+        startClientX: event.clientX,
+        startClientY: event.clientY,
+        moved: false,
+      };
       return;
     }
 
-    const movingNodes = this.state.selectedNodes().filter((n) => !n.locked && n.layout.kind === 'ABSOLUTE');
+    const movingNodes = this.state
+      .selectedNodes()
+      .filter((n) => !n.locked && n.layout.kind === 'ABSOLUTE');
     if (movingNodes.length === 0) return;
 
     const startFrames = new Map<string, RectMm>();
@@ -458,15 +576,46 @@ export class TemplateCanvas implements AfterViewInit {
     const page = this.state.currentPage();
     if (event.button !== 0 || !target || !doc) return;
     event.stopPropagation();
+    event.preventDefault();
+    this.state.pendingPlacement.set(null);
 
     const node = doc.nodes[target.nodeId];
-    if (!node || node.locked || node.layout.kind !== 'ABSOLUTE') return;
+    if (!node || node.locked) return;
+    if (node.layout.kind === 'FLOW') {
+      if (!canResizeFlow(node) || !['E', 'W', 'S'].includes(handle)) return;
+      const el = this.nodeElement(node.id);
+      const parent = node.parentId ? this.nodeElement(node.parentId) : null;
+      const zoom = this.state.zoom();
+      const availableWidth = parent
+        ? pxToMm(parent.getBoundingClientRect().width / rootZoom(), zoom)
+        : printableBox(doc).width;
+      if (!el) return;
+      this.scrollAreaRef()?.nativeElement.setPointerCapture(event.pointerId);
+      this.dragSession = {
+        kind: 'flowResize',
+        pointerId: event.pointerId,
+        nodeId: node.id,
+        handle,
+        startClientX: event.clientX,
+        startClientY: event.clientY,
+        startRect: {
+          x: 0,
+          y: 0,
+          width: pxToMm(target.width, zoom),
+          height: pxToMm(target.height, zoom),
+        },
+        availableWidth,
+        moved: false,
+      };
+      return;
+    }
 
     const targets = page ? this.buildPaperSnapTargets(doc, page, new Set([node.id])) : [];
 
     this.scrollAreaRef()?.nativeElement.setPointerCapture(event.pointerId);
     this.dragSession = {
       kind: 'resize',
+      rotationDeg: node.layout.rotationDeg,
       pointerId: event.pointerId,
       nodeId: node.id,
       handle,
@@ -490,6 +639,61 @@ export class TemplateCanvas implements AfterViewInit {
 
     const z = rootZoom();
     const zoom = this.state.zoom();
+
+    if (session.kind === 'flowMove') {
+      if (
+        Math.hypot(event.clientX - session.startClientX, event.clientY - session.startClientY) / z <
+        3
+      )
+        return;
+      session.moved = true;
+      const doc = this.state.document();
+      const node = doc?.nodes[session.nodeId];
+      const parent = node?.parentId ? doc?.nodes[node.parentId] : undefined;
+      const paper = this.paperRef()?.nativeElement;
+      if (!doc || !node || !parent || !paper) return;
+      const siblings = parent.childIds
+        .filter((id) => id !== node.id)
+        .map((id) => ({ id, el: this.nodeElement(id) }))
+        .filter((entry) => entry.el !== null);
+      const before = siblings.find((entry) => {
+        const rect = entry.el?.getBoundingClientRect();
+        return rect ? event.clientY < rect.top + rect.height / 2 : false;
+      });
+      this.flowBeforeId = before?.id ?? null;
+      const anchor = before?.el ?? siblings[siblings.length - 1]?.el ?? this.nodeElement(node.id);
+      if (anchor) {
+        const rect = rectInPage(anchor),
+          paperRect = rectInPage(paper);
+        this.dropIndicator.set({
+          top: (before ? rect.top : rect.bottom) - paperRect.top,
+          left: rect.left - paperRect.left,
+          width: rect.width,
+        });
+      }
+      return;
+    }
+    if (session.kind === 'flowResize') {
+      const dx = pxToMm((event.clientX - session.startClientX) / z, zoom);
+      const dy = pxToMm((event.clientY - session.startClientY) / z, zoom);
+      if (Math.hypot(dx, dy) < 0.1) return;
+      session.moved = true;
+      const width = clamp(
+        session.startRect.width + (session.handle === 'W' ? -dx : session.handle === 'E' ? dx : 0),
+        0.001,
+        session.availableWidth,
+      );
+      const height = clamp(
+        session.startRect.height + (session.handle === 'S' ? dy : 0),
+        0.001,
+        1000,
+      );
+      this.resizePreview.set({ nodeId: session.nodeId, x: 0, y: 0, width, height });
+      this.measuredFlow.update((frame) =>
+        frame ? { ...frame, width: mmToPx(width, zoom), height: mmToPx(height, zoom) } : null,
+      );
+      return;
+    }
 
     if (session.kind === 'move') {
       const dxPx = (event.clientX - session.startClientX) / z;
@@ -524,14 +728,26 @@ export class TemplateCanvas implements AfterViewInit {
       let maxDx = Infinity;
       let minDy = -Infinity;
       let maxDy = Infinity;
-      for (const frame of session.startFrames.values()) {
+      for (const [id, frame] of session.startFrames) {
+        const doc = this.state.document();
+        const node = doc?.nodes[id];
+        const bounds = doc && node ? absoluteBounds(doc, node) : null;
         minDx = Math.max(minDx, -frame.x);
-        maxDx = Math.min(maxDx, 500 - frame.x);
+        maxDx = Math.min(maxDx, (bounds?.width ?? 500) - frame.x - (bounds ? frame.width : 0));
         minDy = Math.max(minDy, -frame.y);
-        maxDy = Math.min(maxDy, 1000 - frame.y);
+        maxDy = Math.min(maxDy, (bounds?.height ?? 1000) - frame.y - (bounds ? frame.height : 0));
       }
       if (minDx <= maxDx) dxMm = roundMm(clamp(dxMm, minDx, maxDx));
       if (minDy <= maxDy) dyMm = roundMm(clamp(dyMm, minDy, maxDy));
+
+      const doc = this.state.document();
+      const primary = doc?.nodes[session.primaryId];
+      const bounds = doc && primary ? absoluteBounds(doc, primary) : null;
+      if (session.movingIds.length === 1 && primaryStart && primary?.layout.kind === 'ABSOLUTE' && bounds && primary.layout.rotationDeg !== 0) {
+        const frame = clampAbsoluteFrame({ ...primaryStart, x: primaryStart.x + dxMm, y: primaryStart.y + dyMm }, bounds, primary.layout.rotationDeg);
+        dxMm = frame.x - primaryStart.x;
+        dyMm = frame.y - primaryStart.y;
+      }
 
       this.dragOffsetMm.set({ dx: dxMm, dy: dyMm });
       return;
@@ -543,16 +759,43 @@ export class TemplateCanvas implements AfterViewInit {
       if (!session.moved && Math.hypot(dxPx, dyPx) < 3) return;
       session.moved = true;
 
+      const angle = (session.rotationDeg * Math.PI) / 180;
+      const dx = pxToMm(dxPx, zoom),
+        dy = pxToMm(dyPx, zoom);
       let rect = this.resizeFrameClampedMm(
         session.startRect,
         session.handle,
-        pxToMm(dxPx, zoom),
-        pxToMm(dyPx, zoom),
+        dx * Math.cos(angle) + dy * Math.sin(angle),
+        -dx * Math.sin(angle) + dy * Math.cos(angle),
         event.shiftKey,
         1,
       );
 
-      if (!event.altKey && session.targets.length > 0 && !event.shiftKey) {
+      if (session.rotationDeg !== 0) {
+        const start = session.startRect;
+        const cx = rect.x + rect.width / 2 - start.x - start.width / 2;
+        const cy = rect.y + rect.height / 2 - start.y - start.height / 2;
+        rect = {
+          ...rect,
+          x:
+            start.x +
+            start.width / 2 +
+            cx * Math.cos(angle) -
+            cy * Math.sin(angle) -
+            rect.width / 2,
+          y:
+            start.y +
+            start.height / 2 +
+            cx * Math.sin(angle) +
+            cy * Math.cos(angle) -
+            rect.height / 2,
+        };
+      }
+      if (
+        session.rotationDeg === 0 &&
+        !event.altKey && session.targets.length > 0 &&
+        !event.shiftKey
+      ) {
         const snap = snapResizeMm(
           {
             ...rect,
@@ -577,6 +820,10 @@ export class TemplateCanvas implements AfterViewInit {
         this.snapGuides.set([]);
       }
 
+      const doc = this.state.document();
+      const node = doc?.nodes[session.nodeId];
+      const bounds = doc && node ? absoluteBounds(doc, node) : null;
+      if (bounds) rect = clampAbsoluteFrame(rect, bounds, session.rotationDeg);
       this.resizePreview.set({ nodeId: session.nodeId, ...rect });
       return;
     }
@@ -587,7 +834,10 @@ export class TemplateCanvas implements AfterViewInit {
       const rect = rectInPage(paper);
       const currX = event.clientX / z - rect.left;
       const currY = event.clientY / z - rect.top;
-      if (!session.moved && Math.hypot(currX - session.startPaperX, currY - session.startPaperY) < 3) return;
+      if (
+        !session.moved && Math.hypot(currX - session.startPaperX, currY - session.startPaperY) < 3
+      )
+        return;
       session.moved = true;
 
       const left = Math.min(session.startPaperX, currX);
@@ -602,11 +852,56 @@ export class TemplateCanvas implements AfterViewInit {
     const session = this.dragSession;
     if (!session || event.pointerId !== session.pointerId) return;
     this.dragSession = null;
+    const scrollArea = this.scrollAreaRef()?.nativeElement;
+    if (scrollArea?.hasPointerCapture(event.pointerId))
+      scrollArea.releasePointerCapture(event.pointerId);
+    if (event.type === 'pointercancel') {
+      this.dragOffsetMm.set(null);
+      this.resizePreview.set(null);
+      this.snapGuides.set([]);
+      this.dropIndicator.set(null);
+      this.marqueePx.set(null);
+      this.measureFlowSelection();
+      return;
+    }
+    if (session.kind === 'flowMove') {
+      this.dropIndicator.set(null);
+      if (!session.moved) return;
+      const mode = this.positionAt(event);
+      if (mode === 'header' || mode === 'footer') this.convertAt(session.nodeId, mode, event);
+      else
+        this.state.apply('reorderFlow', (doc) => {
+          reorderFlow(doc, session.nodeId, this.flowBeforeId);
+        });
+      return;
+    }
+    if (session.kind === 'flowResize') {
+      const preview = this.resizePreview();
+      this.resizePreview.set(null);
+      if (session.moved && preview)
+        this.state.apply('resizeFlow', (doc) => {
+          resizeFlow(doc, session.nodeId, preview.width, preview.height, session.availableWidth);
+        });
+      return;
+    }
 
     if (session.kind === 'move') {
       const off = this.dragOffsetMm();
       this.dragOffsetMm.set(null);
       this.snapGuides.set([]);
+      if (
+        session.moved &&
+        this.state.layoutMode() === 'HYBRID_DOCUMENT' &&
+        session.movingIds.length === 1
+      ) {
+        const mode = this.positionAt(event);
+        const node = this.state.document()?.nodes[session.primaryId];
+        const parent = node?.parentId ? this.state.document()?.nodes[node.parentId] : undefined;
+        if (mode && mode !== parent?.type) {
+          this.convertAt(session.primaryId, mode, event);
+          return;
+        }
+      }
       if (session.moved && off && (off.dx !== 0 || off.dy !== 0)) {
         this.state.updateFrame(session.movingIds, { dx: off.dx, dy: off.dy });
         const movedPrimary = this.state.document()?.nodes[session.primaryId];
@@ -682,7 +977,9 @@ export class TemplateCanvas implements AfterViewInit {
 
   protected onKeydown(event: KeyboardEvent): void {
     const target = event.target as HTMLElement | null;
-    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+    if (
+      target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
+    ) {
       return;
     }
 
@@ -731,7 +1028,9 @@ export class TemplateCanvas implements AfterViewInit {
         event.preventDefault();
         const targetNode = pageNodes[nextIdx];
         this.state.select([targetNode.id], 'replace');
-        const el = this.paperRef()?.nativeElement.querySelector(`[data-node-id="${CSS.escape(targetNode.id)}"]`);
+        const el = this.paperRef()?.nativeElement.querySelector(
+          `[data-node-id="${CSS.escape(targetNode.id)}"]`,
+        );
         if (el instanceof HTMLElement) {
           el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
         }
@@ -739,6 +1038,7 @@ export class TemplateCanvas implements AfterViewInit {
       return;
     }
     if (key === 'Escape') {
+      this.state.pendingPlacement.set(null);
       if (this.state.fullscreen()) {
         event.preventDefault();
         this.state.fullscreen.set(false);
@@ -770,7 +1070,7 @@ export class TemplateCanvas implements AfterViewInit {
       return;
     }
 
-    const step = event.shiftKey ? 10 : 1;
+    const step = event.shiftKey ? 5 : 1;
     let dx = 0;
     let dy = 0;
     if (key === 'ArrowLeft') dx = -step;
@@ -779,7 +1079,9 @@ export class TemplateCanvas implements AfterViewInit {
     else if (key === 'ArrowDown') dy = step;
 
     if (dx !== 0 || dy !== 0) {
-      const absSelected = this.state.selectedNodes().filter((n) => !n.locked && n.layout.kind === 'ABSOLUTE');
+      const absSelected = this.state
+        .selectedNodes()
+        .filter((n) => !n.locked && n.layout.kind === 'ABSOLUTE');
       if (absSelected.length === 0) return;
       event.preventDefault();
       this.state.updateFrame(
@@ -887,6 +1189,85 @@ export class TemplateCanvas implements AfterViewInit {
     this.paperOffsetY.set(pRect.top - sRect.top + scrollArea.scrollTop);
   }
 
+  private nodeElement(id: string): HTMLElement | null {
+    return (
+      this.paperRef()?.nativeElement.querySelector<HTMLElement>(
+        `[data-node-id="${CSS.escape(id)}"]`,
+      ) ?? null
+    );
+  }
+
+  private measureFlowSelection(): void {
+    const node = this.state.primary();
+    const paper = this.paperRef()?.nativeElement;
+    const el = node ? this.nodeElement(node.id) : null;
+    if (!node || node.layout.kind !== 'FLOW' || !paper || !el) {
+      this.measuredFlow.set(null);
+      return;
+    }
+    const rect = rectInPage(el),
+      paperRect = rectInPage(paper);
+    this.measuredFlow.set({
+      nodeId: node.id,
+      left: rect.left - paperRect.left,
+      top: rect.top - paperRect.top,
+      width: rect.width,
+      height: rect.height,
+      rotationDeg: 0,
+    });
+  }
+
+  private positionAt(event: PointerEvent): PositionMode | null {
+    const doc = this.state.document();
+    const paper = this.paperRef()?.nativeElement;
+    if (!doc || doc.layoutMode !== 'HYBRID_DOCUMENT' || !paper) return null;
+    const rect = rectInPage(paper),
+      z = rootZoom(),
+      zoom = this.state.zoom();
+    const x = pxToMm(event.clientX / z - rect.left, zoom);
+    const y = pxToMm(event.clientY / z - rect.top, zoom);
+    const print = printableBox(doc);
+    if (x < print.x || x > print.x + print.width || y < print.y || y > print.y + print.height)
+      return null;
+    for (const type of ['header', 'footer'] as const) {
+      const zone = hybridZone(doc, type);
+      if (!zone) continue;
+      const box = zoneBox(doc, zone);
+      if (y >= box.y && y <= box.y + box.height) return type;
+    }
+    return 'FLOW';
+  }
+
+  private convertAt(id: string, mode: PositionMode, event: PointerEvent): void {
+    const paper = this.paperRef()?.nativeElement;
+    const el = this.nodeElement(id);
+    const current = this.state.document();
+    if (!paper || !el || !current) return;
+    const rect = rectInPage(el),
+      paperRect = rectInPage(paper),
+      zoom = this.state.zoom();
+    const zone = mode === 'FLOW' ? undefined : hybridZone(current, mode);
+    const origin = zone ? zoneBox(current, zone) : printableBox(current);
+    const measured = {
+      x: pxToMm(event.clientX / rootZoom() - paperRect.left, zoom) - origin.x,
+      y: pxToMm(event.clientY / rootZoom() - paperRect.top, zoom) - origin.y,
+      width: pxToMm(rect.width, zoom),
+      height: pxToMm(rect.height, zoom),
+    };
+    this.state.apply('changePosition', (doc) => {
+      moveNodeToPosition(doc, id, mode, measured);
+    });
+  }
+
+  private placePending(event: PointerEvent): boolean {
+    const id = this.state.pendingPlacement();
+    const mode = this.positionAt(event);
+    if (!id || !mode || this.state.readOnly()) return false;
+    this.state.pendingPlacement.set(null);
+    this.convertAt(id, mode, event);
+    return true;
+  }
+
   private ancestorOffsetMm(doc: TemplateDocumentV1, node: TemplateNode): { x: number; y: number } {
     let x = 0;
     let y = 0;
@@ -895,6 +1276,13 @@ export class TemplateCanvas implements AfterViewInit {
       if (cursor.layout.kind === 'ABSOLUTE') {
         x += cursor.layout.x;
         y += cursor.layout.y;
+      } else if (
+        doc.layoutMode === 'HYBRID_DOCUMENT' &&
+        (cursor.type === 'header' || cursor.type === 'footer')
+      ) {
+        const box = zoneBox(doc, cursor);
+        x += box.x;
+        y += box.y;
       }
       cursor = cursor.parentId ? doc.nodes[cursor.parentId] : undefined;
     }
@@ -935,7 +1323,17 @@ export class TemplateCanvas implements AfterViewInit {
         });
       }
     }
-    return buildSnapTargets(this.pageForPhysicalMargins(page), paperNodes);
+    const targets = buildSnapTargets(this.pageForPhysicalMargins(page), paperNodes);
+    if (doc.layoutMode === 'HYBRID_DOCUMENT') {
+      for (const type of ['header', 'footer'] as const) {
+        const zone = hybridZone(doc, type);
+        if (!zone) continue;
+        const box = zoneBox(doc, zone);
+        for (const y of [box.y, box.y + box.height / 2, box.y + box.height])
+          targets.push({ axis: 'Y', posMm: y, reason: 'margin' });
+      }
+    }
+    return targets;
   }
 
   private resizeFrameClampedMm(

@@ -3,6 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { TranslocoService, provideTransloco, type Translation } from '@jsverse/transloco';
 import { firstValueFrom, of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -27,6 +28,9 @@ import type {
   TemplateVersionDetail,
 } from '../templates.model';
 import { DesignerState } from './designer-state';
+import { TemplateCanvas } from './canvas/template-canvas';
+import { mmToPx } from './geometry';
+import { hybridZone, moveNodeToPosition, setZoneHeight } from './hybrid-ops';
 
 class TestTranslocoLoader {
   getTranslation(lang: string) {
@@ -114,7 +118,9 @@ function makeDocument(overrides: Partial<TemplateDocumentV1> = {}): TemplateDocu
   };
 }
 
-function makeDefinition(overrides: Partial<TemplateDefinitionDetail> = {}): TemplateDefinitionDetail {
+function makeDefinition(
+  overrides: Partial<TemplateDefinitionDetail> = {},
+): TemplateDefinitionDetail {
   return {
     templateId: TEMPLATE_ID,
     thumbnail: { state: 'PENDING', sourceChecksum: CONTENT_CHECKSUM },
@@ -209,7 +215,9 @@ function makeDraft(overrides: Partial<TemplateDraftDto> = {}): TemplateDraftDto 
   };
 }
 
-function makeSchema(overrides: Partial<TemplateDataSourceSchemaDto> = {}): TemplateDataSourceSchemaDto {
+function makeSchema(
+  overrides: Partial<TemplateDataSourceSchemaDto> = {},
+): TemplateDataSourceSchemaDto {
   return {
     adapterKey: 'TRADE_QUOTATION_PRINT_V1',
     productionAssignmentEnabled: true,
@@ -295,7 +303,8 @@ describe('DesignerState', () => {
   let revokeObjectUrlMock: ReturnType<typeof vi.fn>;
 
   const notify = { info: vi.fn(), success: vi.fn(), warning: vi.fn(), error: vi.fn() };
-  const me = signal({ id: 'actor-1', isTenantOwner: true, permissions: ['templates.read', 'templates.update'], permissionScopes: {} });
+  const me = signal({ id: 'actor-1', isTenantOwner: true, permissions: ['templates.read', 'templates.update'], permissionScopes: {},
+  });
   const selection = signal<{ companyId: string; branchId: string | null } | null>(null);
 
   beforeEach(async () => {
@@ -309,19 +318,23 @@ describe('DesignerState', () => {
     let seq = 0;
     createObjectUrlMock = vi.fn(() => `blob:designer-${++seq}`);
     revokeObjectUrlMock = vi.fn();
-    Object.defineProperty(URL, 'createObjectURL', { configurable: true, writable: true, value: createObjectUrlMock });
-    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, writable: true, value: revokeObjectUrlMock });
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, writable: true, value: createObjectUrlMock,
+    });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, writable: true, value: revokeObjectUrlMock,
+    });
 
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
         provideTransloco({
-          config: { availableLangs: ['en'], defaultLang: 'en', missingHandler: { logMissingKey: false } },
+          config: { availableLangs: ['en'], defaultLang: 'en', missingHandler: { logMissingKey: false },
+          },
           loader: TestTranslocoLoader,
         }),
         TemplatePageService,
         DesignerState,
+        provideRouter([]),
         { provide: TenantScopeState, useValue: { me, selection } },
         { provide: ScopeState, useValue: { companies: signal([]) } },
         { provide: LanguageState, useValue: { current: signal('en') } },
@@ -397,6 +410,290 @@ describe('DesignerState', () => {
     await initPromise;
   }
 
+  function pointer(target: Element, type: string, x: number, y: number, altKey = true): void {
+    const event = new MouseEvent(type, {
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+      clientX: x,
+      clientY: y,
+      altKey,
+    });
+    Object.defineProperty(event, 'pointerId', { value: 7 });
+    target.dispatchEvent(event);
+  }
+
+  async function canvas() {
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe() {}
+        disconnect() {}
+      },
+    );
+    const fixture = TestBed.createComponent(TemplateCanvas);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const root: HTMLElement = fixture.nativeElement;
+    const scroll = root.querySelector('.overflow-auto');
+    if (!(scroll instanceof HTMLElement)) throw new Error('Scroll area missing');
+    const capture = vi.fn();
+    Object.defineProperty(scroll, 'setPointerCapture', { configurable: true, value: capture });
+    Object.defineProperty(scroll, 'hasPointerCapture', { configurable: true, value: () => true });
+    Object.defineProperty(scroll, 'releasePointerCapture', { configurable: true, value: vi.fn() });
+    return { fixture, root, scroll, capture };
+  }
+
+  it('Fixed canvas pointer gestures move and resize at view/canvas zoom in RTL, with undo and 5 mm Shift nudge', async () => {
+    await loadEditableQuotation();
+    state.apply('fixedFixture', (doc) => {
+      doc.layoutMode = 'FIXED_CANVAS';
+      doc.direction = 'RTL';
+      doc.nodes[TEXT_ID].layout = {
+        kind: 'ABSOLUTE',
+        unit: 'MM',
+        x: 20,
+        y: 30,
+        width: 60,
+        height: 8,
+        rotationDeg: 0,
+        zIndex: 1,
+      };
+    });
+    state.zoom.set(2);
+    const previousZoom = document.documentElement.style.zoom;
+    document.documentElement.style.zoom = '1.2';
+    try {
+      const { fixture, root, scroll, capture } = await canvas();
+      const node = root.querySelector(`[data-node-id="${TEXT_ID}"]`);
+      if (!node) throw new Error('Text node missing');
+      pointer(node, 'pointerdown', 100, 100);
+      pointer(scroll, 'pointermove', 100 + mmToPx(10, 2) * 1.2, 100 + mmToPx(5, 2) * 1.2);
+      pointer(scroll, 'pointerup', 100 + mmToPx(10, 2) * 1.2, 100 + mmToPx(5, 2) * 1.2);
+      expect(capture).toHaveBeenCalledWith(7);
+      expect(state.document()?.nodes[TEXT_ID].layout).toMatchObject({
+        x: 30,
+        y: 35,
+        width: 60,
+        height: 8,
+      });
+      fixture.detectChanges();
+      expect(root.querySelectorAll('[data-resize-handle]').length).toBe(8);
+      const handle = root.querySelector('[data-resize-handle="SE"]');
+      if (!handle) throw new Error('Resize handle missing');
+      pointer(handle, 'pointerdown', 100, 100);
+      pointer(scroll, 'pointermove', 100 + mmToPx(12, 2) * 1.2, 100 + mmToPx(4, 2) * 1.2);
+      pointer(scroll, 'pointerup', 100 + mmToPx(12, 2) * 1.2, 100 + mmToPx(4, 2) * 1.2);
+      expect(state.document()?.nodes[TEXT_ID].layout).toMatchObject({
+        x: 30,
+        y: 35,
+        width: 72,
+        height: 12,
+      });
+      state.undo();
+      expect(state.document()?.nodes[TEXT_ID].layout).toMatchObject({ width: 60, height: 8 });
+      root
+        .querySelector('[role="application"]')
+        ?.dispatchEvent(
+          new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight', shiftKey: true }),
+        );
+      expect(state.document()?.nodes[TEXT_ID].layout).toMatchObject({ x: 35 });
+    } finally {
+      document.documentElement.style.zoom = previousZoom;
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('Hybrid zone pointer move/resize clamps to its height and undo restores the frame', async () => {
+    await loadEditableQuotation();
+    state.apply('zoneFixture', (doc) => {
+      setZoneHeight(doc, 'header', 20);
+      moveNodeToPosition(doc, TEXT_ID, 'header', { x: 10, y: 2, width: 60, height: 8 });
+    });
+    const { fixture, root, scroll } = await canvas();
+    const node = root.querySelector(`[data-node-id="${TEXT_ID}"]`);
+    if (!node) throw new Error('Text missing');
+    pointer(node, 'pointerdown', 50, 50);
+    pointer(scroll, 'pointermove', 10000, 10000);
+    pointer(scroll, 'pointerup', 10000, 10000);
+    expect(state.document()?.nodes[TEXT_ID].layout).toMatchObject({ x: 126, y: 12 });
+    fixture.detectChanges();
+    const handle = root.querySelector('[data-resize-handle="SE"]');
+    if (!handle) throw new Error('Handle missing');
+    pointer(handle, 'pointerdown', 50, 50);
+    pointer(scroll, 'pointermove', 10000, 10000);
+    pointer(scroll, 'pointerup', 10000, 10000);
+    const layout = state.document()?.nodes[TEXT_ID].layout;
+    expect(layout?.kind).toBe('ABSOLUTE');
+    if (layout?.kind === 'ABSOLUTE') {
+      expect(layout.x + layout.width).toBeLessThanOrEqual(186);
+      expect(layout.y + layout.height).toBeLessThanOrEqual(20);
+    }
+    state.undo();
+    expect(state.document()?.nodes[TEXT_ID].layout).toMatchObject({
+      x: 126,
+      y: 12,
+      width: 60,
+      height: 8,
+    });
+    expect(hybridZone(state.document() ?? makeDocument(), 'header')?.props.heightMm).toBe(20);
+    vi.unstubAllGlobals();
+  });
+
+  it('flow canvas handles resize width/minimum height, reorders by pointer and restores both with undo', async () => {
+    await loadEditableQuotation();
+    const secondId = state.insertNode({ type: 'text', props: { text: 'Second' } });
+    state.pendingPlacement.set(null);
+    state.select([TEXT_ID], 'replace');
+    const { fixture, root, scroll } = await canvas();
+    const node = root.querySelector(`[data-node-id="${TEXT_ID}"]`);
+    const second = root.querySelector(`[data-node-id="${secondId}"]`);
+    const body = root.querySelector(`[data-node-id="${BODY_ID}"]`);
+    const paper = root.querySelector('.bg-paper.shadow-card');
+    if (
+      !(node instanceof HTMLElement) ||
+      !(second instanceof HTMLElement) ||
+      !(body instanceof HTMLElement) ||
+      !(paper instanceof HTMLElement)
+    )
+      throw new Error('Canvas nodes missing');
+    vi.spyOn(paper, 'getBoundingClientRect').mockReturnValue(
+      new DOMRect(0, 0, mmToPx(210), mmToPx(297)),
+    );
+    vi.spyOn(body, 'getBoundingClientRect').mockReturnValue(
+      new DOMRect(mmToPx(12), mmToPx(12), mmToPx(186), mmToPx(273)),
+    );
+    vi.spyOn(node, 'getBoundingClientRect').mockReturnValue(
+      new DOMRect(mmToPx(12), mmToPx(12), mmToPx(60), mmToPx(8)),
+    );
+    vi.spyOn(second, 'getBoundingClientRect').mockReturnValue(
+      new DOMRect(mmToPx(12), mmToPx(25), mmToPx(60), mmToPx(8)),
+    );
+    state.select([], 'replace');
+    fixture.detectChanges();
+    state.select([TEXT_ID], 'replace');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(
+      [...root.querySelectorAll('[data-resize-handle]')].map((handle) =>
+        handle.getAttribute('data-resize-handle'),
+      ),
+    ).toEqual(['E', 'S', 'W']);
+    const east = root.querySelector('[data-resize-handle="E"]');
+    if (!east) throw new Error('Flow width handle missing');
+    pointer(east, 'pointerdown', 100, 100);
+    pointer(scroll, 'pointermove', 100 + mmToPx(10), 100);
+    pointer(scroll, 'pointerup', 100 + mmToPx(10), 100);
+    expect(state.document()?.nodes[TEXT_ID].layout).toMatchObject({
+      kind: 'FLOW',
+      width: { value: 70, unit: 'MM' },
+      minHeight: { value: 8, unit: 'MM' },
+    });
+    state.undo();
+    expect(state.document()?.nodes[TEXT_ID].layout).toEqual({ kind: 'FLOW', order: 0 });
+    pointer(node, 'pointerdown', 100, 50);
+    pointer(scroll, 'pointermove', 100, 200);
+    fixture.detectChanges();
+    expect(root.querySelector('.h-2.bg-brand')).not.toBeNull();
+    pointer(scroll, 'pointerup', 100, 200);
+    expect(state.document()?.nodes[BODY_ID].childIds).toEqual([secondId, TEXT_ID]);
+    state.undo();
+    expect(state.document()?.nodes[BODY_ID].childIds).toEqual([TEXT_ID, secondId]);
+    vi.unstubAllGlobals();
+  });
+
+  it('Hybrid free items snap to the zone edge and undo restores their position', async () => {
+    await loadEditableQuotation();
+    state.apply('zoneFixture', (doc) => {
+      setZoneHeight(doc, 'header', 20);
+      moveNodeToPosition(doc, TEXT_ID, 'header', { x: 10, y: 2, width: 60, height: 8 });
+    });
+    const { fixture, root, scroll } = await canvas();
+    const node = root.querySelector(`[data-node-id="${TEXT_ID}"]`);
+    if (!node) throw new Error('Text missing');
+    pointer(node, 'pointerdown', 50, 50, false);
+    pointer(scroll, 'pointermove', 50 - mmToPx(9.5), 50, false);
+    fixture.detectChanges();
+    expect(root.querySelector('.bg-chart-7')).not.toBeNull();
+    pointer(scroll, 'pointerup', 50 - mmToPx(9.5), 50, false);
+    expect(state.document()?.nodes[TEXT_ID].layout).toMatchObject({ x: 0 });
+    state.undo();
+    expect(state.document()?.nodes[TEXT_ID].layout).toMatchObject({ x: 10 });
+    vi.unstubAllGlobals();
+  });
+
+  it('Hybrid canvas drag/drop converts body flow to a fixed zone and back with undo', async () => {
+    await loadEditableQuotation();
+    state.apply('zoneFixture', (doc) => {
+      setZoneHeight(doc, 'header', 20);
+    });
+    const { fixture, root, scroll } = await canvas();
+    const node = root.querySelector(`[data-node-id="${TEXT_ID}"]`);
+    const paper = root.querySelector('.bg-paper.shadow-card');
+    if (!(node instanceof HTMLElement) || !(paper instanceof HTMLElement))
+      throw new Error('Paper or text missing');
+    vi.spyOn(paper, 'getBoundingClientRect').mockReturnValue(
+      new DOMRect(0, 0, mmToPx(210), mmToPx(297)),
+    );
+    vi.spyOn(node, 'getBoundingClientRect').mockReturnValue(
+      new DOMRect(mmToPx(12), mmToPx(40), mmToPx(60), mmToPx(8)),
+    );
+    pointer(node, 'pointerdown', 100, 180);
+    pointer(scroll, 'pointermove', 100, 60);
+    pointer(scroll, 'pointerup', 100, 60);
+    expect(state.document()?.nodes[TEXT_ID].layout).toMatchObject({
+      kind: 'ABSOLUTE',
+      width: 60,
+      height: 8,
+    });
+    expect(state.document()?.nodes[TEXT_ID].parentId).toBe(
+      hybridZone(state.document() ?? makeDocument(), 'header')?.id,
+    );
+    fixture.detectChanges();
+    const freeNode = root.querySelector(`[data-node-id="${TEXT_ID}"]`);
+    if (!(freeNode instanceof HTMLElement)) throw new Error('Free text missing');
+    vi.spyOn(freeNode, 'getBoundingClientRect').mockReturnValue(new DOMRect(100, 60, mmToPx(60), mmToPx(8)));
+    pointer(freeNode, 'pointerdown', 100, 60);
+    pointer(scroll, 'pointermove', 100, 200);
+    pointer(scroll, 'pointerup', 100, 200);
+    expect(state.document()?.nodes[TEXT_ID].layout).toMatchObject({
+      kind: 'FLOW',
+      width: { value: 60, unit: 'MM' },
+      minHeight: { value: 8, unit: 'MM' },
+    });
+    expect(state.document()?.nodes[TEXT_ID].parentId).toBe(BODY_ID);
+    state.undo();
+    expect(state.document()?.nodes[TEXT_ID].layout.kind).toBe('ABSOLUTE');
+    vi.unstubAllGlobals();
+  });
+
+  it('cancelled canvas pointers leave the document unchanged and hide previews', async () => {
+    await loadEditableQuotation();
+    state.apply('fixedFixture', (doc) => {
+      doc.layoutMode = 'FIXED_CANVAS';
+      doc.nodes[TEXT_ID].layout = {
+        kind: 'ABSOLUTE',
+        unit: 'MM',
+        x: 20,
+        y: 30,
+        width: 60,
+        height: 8,
+        rotationDeg: 0,
+        zIndex: 1,
+      };
+    });
+    const { root, scroll } = await canvas();
+    const node = root.querySelector(`[data-node-id="${TEXT_ID}"]`);
+    if (!node) throw new Error('Text missing');
+    pointer(node, 'pointerdown', 100, 100);
+    pointer(scroll, 'pointermove', 200, 200);
+    pointer(scroll, 'pointercancel', 200, 200);
+    expect(state.document()?.nodes[TEXT_ID].layout).toMatchObject({ x: 20, y: 30 });
+    vi.unstubAllGlobals();
+  });
+
   it('loads definition, draft with header ETag, and company-scoped data-source schema via TemplatesApi', async () => {
     const templatesApi = TestBed.inject(TemplatesApi);
     const getTemplateSpy = vi.spyOn(templatesApi, 'getTemplate');
@@ -467,14 +764,16 @@ describe('DesignerState', () => {
     const getVersionSpy = vi.spyOn(templatesApi, 'getVersion');
 
     const initPromise = state.init(TEMPLATE_ID);
-    http.expectOne(`${TEMPLATES_BASE}/${TEMPLATE_ID}`).flush(
-      { success: true, data: makeDefinition() },
-      { headers: { ETag: '"3"' } },
-    );
+    http
+      .expectOne(`${TEMPLATES_BASE}/${TEMPLATE_ID}`)
+      .flush({ success: true, data: makeDefinition() },
+      { headers: { ETag: '"3"' } });
     await flushMicrotasks();
 
-    http.expectOne(`${TEMPLATES_BASE}/${TEMPLATE_ID}/draft`).flush(
-      { errorCode: 'CORE.TEMPLATE.PERMISSION.DENIED' },
+    http
+      .expectOne(`${TEMPLATES_BASE}/${TEMPLATE_ID}/draft`)
+      .flush(
+        { errorCode: 'CORE.TEMPLATE.PERMISSION.DENIED' },
       { status: 403, statusText: 'Forbidden' },
     );
     await flushMicrotasks();
@@ -532,10 +831,10 @@ describe('DesignerState', () => {
     ] as const) {
       state.resetForTemplate();
       const pending = state.init(TEMPLATE_ID);
-      http.expectOne(`${TEMPLATES_BASE}/${TEMPLATE_ID}`).flush(
-        { errorCode, correlationId: 'corr-load-1' },
-        { status, statusText: 'Error' },
-      );
+      http
+        .expectOne(`${TEMPLATES_BASE}/${TEMPLATE_ID}`)
+        .flush({ errorCode, correlationId: 'corr-load-1' },
+        { status, statusText: 'Error' });
       await pending;
       expect(state.loadError()).toBe(expected);
       expect(state.loadCorrelationId()).toBe('corr-load-1');
@@ -544,19 +843,26 @@ describe('DesignerState', () => {
     // Schema failure keeps canvas loaded and disables schema-bound tools.
     state.resetForTemplate();
     const okLoad = state.init(TEMPLATE_ID);
-    http.expectOne(`${TEMPLATES_BASE}/${TEMPLATE_ID}`).flush({ success: true, data: makeDefinition() });
+    http
+      .expectOne(`${TEMPLATES_BASE}/${TEMPLATE_ID}`)
+      .flush({ success: true, data: makeDefinition() });
     await flushMicrotasks();
-    http.expectOne(`${TEMPLATES_BASE}/${TEMPLATE_ID}/draft`).flush({ success: true, data: makeDraft() });
+    http
+      .expectOne(`${TEMPLATES_BASE}/${TEMPLATE_ID}/draft`)
+      .flush({ success: true, data: makeDraft() });
     await flushMicrotasks();
     http
       .expectOne((r) => r.url === `${TEMPLATES_BASE}/data-sources/TRADE_QUOTATION_PRINT_V1/schema`)
-      .flush({ errorCode: 'CORE.TEMPLATE.DEPENDENCY.UNAVAILABLE' }, { status: 503, statusText: 'Unavailable' });
+      .flush(
+        { errorCode: 'CORE.TEMPLATE.DEPENDENCY.UNAVAILABLE' }, { status: 503, statusText: 'Unavailable' },
+      );
     await okLoad;
 
     expect(state.loadError()).toBeNull();
     expect(state.schema()).toBeNull();
     expect(state.schemaFailed()).toBe(true);
-    expect(state.toolState('DATA_FIELD')).toEqual({ state: 'DISABLED', reasonKey: 'schemaUnavailable' });
+    expect(state.toolState('DATA_FIELD')).toEqual({ state: 'DISABLED', reasonKey: 'schemaUnavailable',
+    });
   });
 
   it('saves draft via patchDraft with draft-schema If-Match, UUIDv7 idempotency, optimistic revisions, and migration toast', async () => {
@@ -652,9 +958,11 @@ describe('DesignerState', () => {
   });
 
   it('retains idempotency key and clientMutationId across retryable save errors, and rotates after terminal failure', async () => {
-    const invoiceDoc = makeDocument({ documentType: 'INVOICE', dataSourceKey: 'TRADE_INVOICE_PRINT_V1' });
+    const invoiceDoc = makeDocument({ documentType: 'INVOICE', dataSourceKey: 'TRADE_INVOICE_PRINT_V1',
+    });
     await loadEditableQuotation({
-      def: makeDefinition({ documentType: 'INVOICE', dataSourceKey: 'TRADE_INVOICE_PRINT_V1', dataSourceSchemaVersion: 1 }),
+      def: makeDefinition({ documentType: 'INVOICE', dataSourceKey: 'TRADE_INVOICE_PRINT_V1', dataSourceSchemaVersion: 1,
+      }),
       draft: makeDraft({ editorDocument: invoiceDoc }),
       schema: makeSchema({
         adapterKey: 'TRADE_INVOICE_PRINT_V1',
@@ -671,8 +979,16 @@ describe('DesignerState', () => {
 
     for (const [status, code, expectedMsg] of [
       [0, 'NETWORK_ERROR', globalEn.apiErrors.network],
-      [503, 'CORE.TEMPLATE.DEPENDENCY.UNAVAILABLE', templatesEn.errors['CORE.TEMPLATE.DEPENDENCY.UNAVAILABLE']],
-      [409, 'CORE.TEMPLATE.IDEMPOTENCY.IN_FLIGHT', templatesEn.errors['CORE.TEMPLATE.IDEMPOTENCY.IN_FLIGHT']],
+      [
+        503,
+        'CORE.TEMPLATE.DEPENDENCY.UNAVAILABLE',
+        templatesEn.errors['CORE.TEMPLATE.DEPENDENCY.UNAVAILABLE'],
+      ],
+      [
+        409,
+        'CORE.TEMPLATE.IDEMPOTENCY.IN_FLIGHT',
+        templatesEn.errors['CORE.TEMPLATE.IDEMPOTENCY.IN_FLIGHT'],
+      ],
       [401, 'COMMON.GENERIC.UNAUTHORIZED', globalEn.apiErrors.notSaved],
     ] as const) {
       notify.error.mockClear();
@@ -701,7 +1017,9 @@ describe('DesignerState', () => {
     const terminalAttempt = state.save();
     const termReq = http.expectOne(`${TEMPLATES_BASE}/${TEMPLATE_ID}/draft`);
     expect(termReq.request.headers.get('x-idempotency-key')).toBe(heldKey);
-    termReq.flush({ errorCode: 'CORE.TEMPLATE.NOT_FOUND' }, { status: 404, statusText: 'Not Found' });
+    termReq.flush(
+      { errorCode: 'CORE.TEMPLATE.NOT_FOUND' }, { status: 404, statusText: 'Not Found' },
+    );
     expect(await terminalAttempt).toBe(false);
     expect(notify.error).toHaveBeenCalledWith(templatesEn.errors['CORE.TEMPLATE.NOT_FOUND']);
 
@@ -713,7 +1031,8 @@ describe('DesignerState', () => {
       {
         success: true,
         data: {
-          draft: makeDraft({ revision: 7, etag: '"7"', editorDocument: rotatedReq.request.body.editorDocument }),
+          draft: makeDraft({ revision: 7, etag: '"7"', editorDocument: rotatedReq.request.body.editorDocument,
+          }),
           thumbnail: { state: 'PENDING', sourceChecksum: CONTENT_CHECKSUM },
           migrationRecovery: null,
         },
@@ -729,8 +1048,10 @@ describe('DesignerState', () => {
 
     // 1. 409 STALE_REVISION opens conflict modal.
     const staleSave = state.save();
-    http.expectOne(`${TEMPLATES_BASE}/${TEMPLATE_ID}/draft`).flush(
-      { errorCode: 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION' },
+    http
+      .expectOne(`${TEMPLATES_BASE}/${TEMPLATE_ID}/draft`)
+      .flush(
+        { errorCode: 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION' },
       { status: 409, statusText: 'Conflict' },
     );
     expect(await staleSave).toBe(false);
@@ -739,8 +1060,10 @@ describe('DesignerState', () => {
 
     // 2. 422 SCHEMA.INVALID includes correlation support reference.
     const invalidSave = state.save();
-    http.expectOne(`${TEMPLATES_BASE}/${TEMPLATE_ID}/draft`).flush(
-      { errorCode: 'CORE.TEMPLATE.SCHEMA.INVALID', correlationId: 'corr-422' },
+    http
+      .expectOne(`${TEMPLATES_BASE}/${TEMPLATE_ID}/draft`)
+      .flush(
+        { errorCode: 'CORE.TEMPLATE.SCHEMA.INVALID', correlationId: 'corr-422' },
       { status: 422, statusText: 'Unprocessable Entity' },
     );
     expect(await invalidSave).toBe(false);
@@ -751,17 +1074,19 @@ describe('DesignerState', () => {
 
     // 3. 413 payload too large.
     const largeSave = state.save();
-    http.expectOne(`${TEMPLATES_BASE}/${TEMPLATE_ID}/draft`).flush(
-      { code: 'GW.BODY.TOO_LARGE' },
-      { status: 413, statusText: 'Payload Too Large' },
-    );
+    http
+      .expectOne(`${TEMPLATES_BASE}/${TEMPLATE_ID}/draft`)
+      .flush({ code: 'GW.BODY.TOO_LARGE' },
+      { status: 413, statusText: 'Payload Too Large' });
     expect(await largeSave).toBe(false);
     expect(notify.error).toHaveBeenCalledWith(designerEn.errors.tooLarge);
 
     // 4. 409 SCHEMA_CHANGED clears schema cache, reloads definition/draft/schema, and updates draft-schema If-Match.
     const schemaChangedSave = state.save();
-    http.expectOne(`${TEMPLATES_BASE}/${TEMPLATE_ID}/draft`).flush(
-      { errorCode: 'CORE.TEMPLATE.CONCURRENCY.SCHEMA_CHANGED' },
+    http
+      .expectOne(`${TEMPLATES_BASE}/${TEMPLATE_ID}/draft`)
+      .flush(
+        { errorCode: 'CORE.TEMPLATE.CONCURRENCY.SCHEMA_CHANGED' },
       { status: 409, statusText: 'Conflict' },
     );
     expect(await schemaChangedSave).toBe(false);
@@ -814,17 +1139,24 @@ describe('DesignerState', () => {
     await flushMicrotasks();
     http
       .expectOne(`${ASSETS_BASE}/${badAssetId}/content`)
-      .flush(new Blob([JSON.stringify({ errorCode: 'CORE.TEMPLATE.NOT_FOUND' })], { type: 'application/json' }), {
+      .flush(
+        new Blob([JSON.stringify({ errorCode: 'CORE.TEMPLATE.NOT_FOUND' })], { type: 'application/json',
+        }), {
         status: 404,
         statusText: 'Not Found',
-      });
+        },
+      );
     await flushMicrotasks();
     expect(state.assetEntry(badAssetId)).toEqual({ status: 'ERROR', url: null });
 
     const reloadPromise = state.reload();
-    http.expectOne(`${TEMPLATES_BASE}/${TEMPLATE_ID}`).flush({ success: true, data: makeDefinition() });
+    http
+      .expectOne(`${TEMPLATES_BASE}/${TEMPLATE_ID}`)
+      .flush({ success: true, data: makeDefinition() });
     await flushMicrotasks();
-    http.expectOne(`${TEMPLATES_BASE}/${TEMPLATE_ID}/draft`).flush({ success: true, data: makeDraft() });
+    http
+      .expectOne(`${TEMPLATES_BASE}/${TEMPLATE_ID}/draft`)
+      .flush({ success: true, data: makeDraft() });
     await flushMicrotasks();
     http
       .expectOne((r) => r.url === `${TEMPLATES_BASE}/data-sources/TRADE_QUOTATION_PRINT_V1/schema`)
@@ -833,7 +1165,9 @@ describe('DesignerState', () => {
 
     state.requestAsset(badAssetId);
     await flushMicrotasks();
-    http.expectOne(`${ASSETS_BASE}/${badAssetId}/content`).flush(new Blob(['png-2'], { type: 'image/png' }));
+    http
+      .expectOne(`${ASSETS_BASE}/${badAssetId}/content`)
+      .flush(new Blob(['png-2'], { type: 'image/png' }));
     await flushMicrotasks();
     expect(state.assetEntry(badAssetId)).toEqual({ status: 'READY', url: 'blob:designer-2' });
 

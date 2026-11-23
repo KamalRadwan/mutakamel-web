@@ -57,6 +57,7 @@ import { Field } from '../../../../../shared/ui/field/field';
 import { Segmented, SegmentedOption } from '../../../../../shared/ui/segmented/segmented';
 import { templateLayoutMeta } from '../../shared/template-family';
 import { DesignerState, DesignerTool } from '../designer-state';
+import { nodeZone } from '../hybrid-geometry';
 
 type RibbonMenuKind = 'table' | 'align' | 'arrange' | 'zoom';
 type OverflowToolId =
@@ -150,6 +151,20 @@ const ZOOM_PRESETS = [25, 50, 60, 75, 100, 125, 150, 200, 300, 400] as const;
   },
 })
 export class Ribbon {
+  protected readonly insertionHint = computed(() => {
+    if (this.state.layoutMode() !== 'HYBRID_DOCUMENT') return null;
+    const doc = this.state.document(),
+      node = this.state.primary();
+    const zone = doc && node ? nodeZone(doc, node.id) : undefined;
+    return this.transloco.translate(
+      zone && (zone.type === 'header' || zone.type === 'footer') && zone.props.zoneMode === 'FIXED'
+        ? `tplDesigner.hybrid.insert.${zone.type}`
+        : 'tplDesigner.hybrid.insert.FLOW',
+    );
+  });
+  protected openConversion(): void {
+    this.state.run({ kind: 'openConvertLayout' });
+  }
   private static nextId = 0;
   protected readonly uid = `tpl-ribbon-${++Ribbon.nextId}`;
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
@@ -291,7 +306,9 @@ export class Ribbon {
   });
 
   protected readonly hasGroup4Tools = computed(() =>
-    this.overflowTools().some((id) => id === 'align' || id === 'arrange' || id === 'layers' || id === 'pages'),
+    this.overflowTools().some(
+      (id) => id === 'align' || id === 'arrange' || id === 'layers' || id === 'pages',
+    ),
   );
 
   protected readonly visibleOverflow = overflowFit(
@@ -385,12 +402,18 @@ export class Ribbon {
     this.language();
     this.i18n();
     return [
-      { id: 'START', label: this.transloco.translate('tplTools.align.start'), icon: 'tablerLayoutAlignLeft', mirrorRtl: true },
-      { id: 'CENTER_H', label: this.transloco.translate('tplTools.align.centerH'), icon: 'tablerLayoutAlignCenter' },
-      { id: 'END', label: this.transloco.translate('tplTools.align.end'), icon: 'tablerLayoutAlignRight', mirrorRtl: true },
-      { id: 'TOP', label: this.transloco.translate('tplTools.align.top'), icon: 'tablerLayoutAlignTop', divider: true },
-      { id: 'CENTER_V', label: this.transloco.translate('tplTools.align.centerV'), icon: 'tablerLayoutAlignMiddle' },
-      { id: 'BOTTOM', label: this.transloco.translate('tplTools.align.bottom'), icon: 'tablerLayoutAlignBottom' },
+      { id: 'START', label: this.transloco.translate('tplTools.align.start'), icon: 'tablerLayoutAlignLeft', mirrorRtl: true,
+      },
+      { id: 'CENTER_H', label: this.transloco.translate('tplTools.align.centerH'), icon: 'tablerLayoutAlignCenter',
+      },
+      { id: 'END', label: this.transloco.translate('tplTools.align.end'), icon: 'tablerLayoutAlignRight', mirrorRtl: true,
+      },
+      { id: 'TOP', label: this.transloco.translate('tplTools.align.top'), icon: 'tablerLayoutAlignTop', divider: true,
+      },
+      { id: 'CENTER_V', label: this.transloco.translate('tplTools.align.centerV'), icon: 'tablerLayoutAlignMiddle',
+      },
+      { id: 'BOTTOM', label: this.transloco.translate('tplTools.align.bottom'), icon: 'tablerLayoutAlignBottom',
+      },
     ];
   });
 
@@ -398,10 +421,14 @@ export class Ribbon {
     this.language();
     this.i18n();
     return [
-      { id: 'FRONT', label: this.transloco.translate('tplTools.arrange.front'), icon: 'tablerStackFront' },
-      { id: 'FORWARD', label: this.transloco.translate('tplTools.arrange.forward'), icon: 'tablerStackForward' },
-      { id: 'BACKWARD', label: this.transloco.translate('tplTools.arrange.backward'), icon: 'tablerStackBackward' },
-      { id: 'BACK', label: this.transloco.translate('tplTools.arrange.back'), icon: 'tablerStackBack' },
+      { id: 'FRONT', label: this.transloco.translate('tplTools.arrange.front'), icon: 'tablerStackFront',
+      },
+      { id: 'FORWARD', label: this.transloco.translate('tplTools.arrange.forward'), icon: 'tablerStackForward',
+      },
+      { id: 'BACKWARD', label: this.transloco.translate('tplTools.arrange.backward'), icon: 'tablerStackBackward',
+      },
+      { id: 'BACK', label: this.transloco.translate('tplTools.arrange.back'), icon: 'tablerStackBack',
+      },
     ];
   });
 
@@ -598,7 +625,8 @@ export class Ribbon {
       this.closeMenu();
     };
     document.addEventListener('scroll', closeOnScroll, { capture: true, passive: true });
-    this.destroyRef.onDestroy(() => document.removeEventListener('scroll', closeOnScroll, { capture: true }));
+    this.destroyRef.onDestroy(() => document.removeEventListener('scroll', closeOnScroll, { capture: true }),
+    );
 
     const onHostKeydownCapture = (event: KeyboardEvent) => {
       if (event.defaultPrevented || this.openMenu()) return;
@@ -607,7 +635,9 @@ export class Ribbon {
       const seg = target.closest<HTMLElement>('[data-ribbon-segmented]');
       if (!seg) return;
 
-      const radios = Array.from(seg.querySelectorAll<HTMLButtonElement>('button[role="radio"]:not(:disabled)'));
+      const radios = Array.from(
+        seg.querySelectorAll<HTMLButtonElement>('button[role="radio"]:not(:disabled)'),
+      );
       const radioIdx = radios.indexOf(target);
       if (radioIdx < 0) return;
 
@@ -633,7 +663,8 @@ export class Ribbon {
     };
     this.host.nativeElement.addEventListener('keydown', onHostKeydownCapture, { capture: true });
     this.destroyRef.onDestroy(() =>
-      this.host.nativeElement.removeEventListener('keydown', onHostKeydownCapture, { capture: true }),
+      this.host.nativeElement.removeEventListener('keydown', onHostKeydownCapture, { capture: true,
+      }),
     );
 
     afterRenderEffect(() => {
@@ -764,7 +795,10 @@ export class Ribbon {
     });
   }
 
-  protected runToolCommand(tool: DesignerTool, kind: 'insertImage' | 'insertDataField' | 'insertFormula' | 'insertButton' | 'insertLink' | 'openLayers' | 'openPages' | 'openPageSetup' | 'openEmailSettings'): void {
+  protected runToolCommand(
+    tool: DesignerTool, kind:
+      | 'insertImage' | 'insertDataField' | 'insertFormula' | 'insertButton' | 'insertLink' | 'openLayers' | 'openPages' | 'openPageSetup' | 'openEmailSettings',
+  ): void {
     if (this.state.toolState(tool).state !== 'ENABLED') return;
     this.state.run({ kind });
   }
@@ -851,7 +885,10 @@ export class Ribbon {
     }
 
     if (kind === 'arrange' && this.arrangeState().state === 'ENABLED') {
-      this.state.arrange(this.state.selectedIds(), item.id as 'FRONT' | 'BACK' | 'FORWARD' | 'BACKWARD');
+      this.state.arrange(
+        this.state.selectedIds(),
+        item.id as 'FRONT' | 'BACK' | 'FORWARD' | 'BACKWARD',
+      );
       return;
     }
 
@@ -940,7 +977,9 @@ export class Ribbon {
 
     const currentToolEl = fromEl.matches('[data-ribbon-tool]')
       ? (fromEl as HTMLButtonElement)
-      : (fromEl.closest('[data-ribbon-segmented]')?.querySelector<HTMLButtonElement>('[data-ribbon-tool]') ?? null);
+      : (fromEl
+          .closest('[data-ribbon-segmented]')
+          ?.querySelector<HTMLButtonElement>('[data-ribbon-tool]') ?? null);
     const idx = currentToolEl ? buttons.indexOf(currentToolEl) : -1;
     if (idx < 0 && (dir === 'next' || dir === 'prev')) return;
 
@@ -996,7 +1035,10 @@ export class Ribbon {
     } else if (event.key === 'End') {
       event.preventDefault();
       enabledButtons[enabledButtons.length - 1]?.focus();
-    } else if ((event.key === 'Enter' || event.key === ' ') && target instanceof HTMLButtonElement && !target.disabled) {
+    } else if (
+      (event.key === 'Enter' || event.key === ' ') && target instanceof HTMLButtonElement &&
+      !target.disabled
+    ) {
       event.preventDefault();
       target.click();
     }
