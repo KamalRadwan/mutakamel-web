@@ -12,7 +12,7 @@
       [value]="selectedUser() ? fullName(selectedUser()!) : emptyLabel()"
       [attr.aria-readonly]="'true'"
       [attr.aria-label]="label()"
-      [attr.aria-describedby]="describedBy() || null"
+      [attr.aria-describedby]="(describedBy() + (accessDenied() ? ' ' + fieldId() + '-access' : '')).trim() || null"
     />
   </div>
 } @else {
@@ -31,9 +31,10 @@
     aria-haspopup="listbox"
     [attr.aria-expanded]="menuOpen()"
     [attr.aria-label]="label()"
-    [attr.aria-describedby]="describedBy() || null"
+    [attr.aria-describedby]="(describedBy() + (accessDenied() ? ' ' + fieldId() + '-access' : '')).trim() || null"
     [attr.aria-invalid]="hasError() ? 'true' : null"
-    [disabled]="disabled()"
+    [disabled]="disabled() || accessDenied()"
+    [title]="accessDenied() ? ('wsPartyModal.fields.ownerReadRequired' | transloco) : ''"
     (click)="toggle()"
   >
     <span class="flex min-w-0 items-center gap-6">
@@ -73,6 +74,7 @@
         type="text"
         dir="auto"
         autocomplete="off"
+        maxlength="200"
         class="h-full min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
         [placeholder]="searchPlaceholder()"
         [attr.aria-label]="searchPlaceholder()"
@@ -128,4 +130,8 @@
       }
     </ul>
   </div>
+}
+
+@if (accessDenied()) {
+  <p [id]="fieldId() + '-access'" class="mt-2 text-11 leading-16 text-text-muted">{{ 'wsPartyModal.fields.ownerReadRequired' | transloco }}</p>
 }

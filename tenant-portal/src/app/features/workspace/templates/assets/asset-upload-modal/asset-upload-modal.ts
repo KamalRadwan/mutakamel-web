@@ -1,7 +1,11 @@
 import { Component, computed, effect, inject, input, output, signal, untracked, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { FormField, disabled, form, required, submit } from '@angular/forms/signals';
-import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
+import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
+import { ApiError, isRetryableWriteError } from '../../../../../core/api/api-errors';
+import { newIdempotencyKey } from '../../../../../core/api/idempotency';
+import { TenantScopeState } from '../../../../../core/scope/tenant-scope';
+import { AssetsApi } from '../assets.api';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerLoader2, tablerPhoto, tablerUpload, tablerX } from '@ng-icons/tabler-icons';
 import { Notify } from '../../../../../core/notify/notify';
@@ -13,15 +17,12 @@ import { Field } from '../../../../../shared/ui/field/field';
 import { FileDrop } from '../../../../../shared/ui/file-drop/file-drop';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import {
-  TemplateAssetDeclaredMimeType,
   TemplateAssetDeliveryClass,
   TemplateAssetDto,
   TemplateAssetType,
   TemplateListRow,
-  newTemplateIdempotencyKey,
-  uploadAsset,
-} from '../../templates.api';
-import { ASSET_ACCEPT, ASSET_MAX_BYTES, computeFileSha256, formatByteSize, translateAssetError } from '../assets.service';
+} from '../../templates.model';
+import { ASSET_ACCEPT, ASSET_MAX_BYTES, canManageAssetScope, computeFileSha256, formatByteSize, prepareAssetFile, translateAssetError } from '../assets.service';
 
 type UploadScopeValue = 'REUSABLE' | 'DEFINITION';
 
@@ -45,6 +46,7 @@ const EMPTY_DRAFT: UploadAssetDraft = {
   selector: 'app-asset-upload-modal',
   imports: [FormField, TranslocoPipe, NgIcon, Button, Checkbox, ConfirmDialog, Dropdown, Field, FileDrop, Modal],
   providers: [provideIcons({ tablerUpload, tablerPhoto, tablerLoader2, tablerX })],
+  viewProviders: [provideTranslocoScope('templates', { scope: 'templates-assets', alias: 'templatesAssets' })],
   templateUrl: './asset-upload-modal.html',
 })
 export class AssetUploadModal {
@@ -52,6 +54,8 @@ export class AssetUploadModal {
   protected readonly uid = `asset-upload-modal-${++AssetUploadModal.nextId}`;
 
   private readonly notify = inject(Notify);
+  private readonly api = inject(AssetsApi);
+  private readonly scope = inject(TenantScopeState);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
 
@@ -89,6 +93,8 @@ export class AssetUploadModal {
   protected readonly hashing = signal(false);
   protected readonly submitted = signal(false);
   protected readonly fileRejectReason = signal<'type' | 'size' | null>(null);
+  protected readonly serverFileError = signal<unknown>(null);
+  protected readonly serverDefinitionError = signal<unknown>(null);
 
   private allowClose = false;
   private confirmingDiscard = false;
@@ -118,8 +124,8 @@ export class AssetUploadModal {
   protected readonly scopeOptions = computed<DropdownOption<UploadScopeValue>[]>(() => {
     this.i18n();
     return [
-      { value: 'REUSABLE', label: this.transloco.translate('templatesAssets.scopes.REUSABLE') },
-      { value: 'DEFINITION', label: this.transloco.translate('templatesAssets.scopes.DEFINITION') },
+      ...(canManageAssetScope(this.scope, null) ? [{ value: 'REUSABLE' as const, label: this.transloco.translate('templatesAssets.scopes.REUSABLE') }] : []),
+      ...(this.templates().length ? [{ value: 'DEFINITION' as const, label: this.transloco.translate('templatesAssets.scopes.DEFINITION') }] : []),
     ];
   });
 
@@ -163,6 +169,7 @@ export class AssetUploadModal {
 
   protected readonly templateError = computed<string | null>(() => {
     this.i18n();
+    if (this.serverDefinitionError()) return translateAssetError(this.serverDefinitionError(), this.transloco);
     const state = this.uploadForm.definitionId();
     if (!state.touched() || !state.errors().length) return null;
     return this.transloco.translate('templatesAssets.validation.required');
@@ -184,6 +191,9 @@ export class AssetUploadModal {
 
   protected readonly fileError = computed<string | null>(() => {
     this.i18n();
+    const error = this.serverFileError();
+    if (error instanceof ApiError && error.status === 413) return this.transloco.translate('templatesAssets.validation.fileSize');
+    if (error) return translateAssetError(error, this.transloco);
     const rejected = this.fileRejectReason();
     if (rejected === 'type') return this.transloco.translate('templatesAssets.validation.fileType');
     if (rejected === 'size') return this.transloco.translate('templatesAssets.validation.fileSize');
@@ -212,7 +222,7 @@ export class AssetUploadModal {
     this.lastFingerprint = null;
     this.lastIdempotencyKey = null;
 
-    const initialScope = defaults?.scope ?? 'REUSABLE';
+    const initialScope = defaults?.scope ?? (canManageAssetScope(this.scope, null) ? 'REUSABLE' : 'DEFINITION');
     const initial: UploadAssetDraft = {
       scope: initialScope,
       definitionId: initialScope === 'DEFINITION' ? (defaults?.definitionId ?? '') : '',
@@ -228,17 +238,22 @@ export class AssetUploadModal {
     this.hashing.set(false);
     this.submitted.set(false);
     this.fileRejectReason.set(null);
+    this.serverFileError.set(null);
+    this.serverDefinitionError.set(null);
     this.modal().open();
   }
 
   protected async onFilePicked(picked: File): Promise<void> {
     const seq = ++this.hashSeq;
     this.fileRejectReason.set(null);
-    this.file.set(picked);
+    this.serverFileError.set(null);
+    this.file.set(null);
     this.fileSha256.set('');
     this.hashing.set(true);
     try {
-      const digest = await computeFileSha256(picked);
+      const prepared = prepareAssetFile(picked);
+      this.file.set(prepared);
+      const digest = await computeFileSha256(prepared);
       if (seq === this.hashSeq) {
         this.fileSha256.set(digest);
       }
@@ -246,7 +261,7 @@ export class AssetUploadModal {
       if (seq === this.hashSeq) {
         this.file.set(null);
         this.fileSha256.set('');
-        this.notify.error(translateAssetError(error, this.transloco));
+        this.serverFileError.set(error);
       }
     } finally {
       if (seq === this.hashSeq) {
@@ -265,6 +280,7 @@ export class AssetUploadModal {
     this.fileSha256.set('');
     this.hashing.set(false);
     this.fileRejectReason.set(null);
+    this.serverFileError.set(null);
   }
 
   protected formatSize(bytes: number): string {
@@ -282,13 +298,18 @@ export class AssetUploadModal {
       const value = this.draft();
       const delivery = value.deliveryClass;
       if (!picked || !delivery || !sha256) return undefined;
+      const definition = value.scope === 'DEFINITION'
+        ? this.templates().find((item) => item.templateId === value.definitionId)?.definitionScope : null;
+      if ((value.scope === 'DEFINITION' && !definition) || !canManageAssetScope(this.scope, definition ?? null)) return undefined;
+      this.serverFileError.set(null);
+      this.serverDefinitionError.set(null);
 
       const metadata = {
         definitionId: value.scope === 'DEFINITION' ? value.definitionId : null,
         assetType: value.assetType,
         deliveryClass: delivery,
         fileName: picked.name,
-        declaredMimeType: resolveDeclaredMime(picked),
+        declaredMimeType: picked.type as 'image/png' | 'image/jpeg',
         expectedRawSha256: sha256,
         ...(delivery === 'EMAIL_PUBLIC' ? { confirmPublicEmailDelivery: true as const } : {}),
       };
@@ -300,11 +321,11 @@ export class AssetUploadModal {
       });
       if (fingerprint !== this.lastFingerprint || !this.lastIdempotencyKey) {
         this.lastFingerprint = fingerprint;
-        this.lastIdempotencyKey = newTemplateIdempotencyKey();
+        this.lastIdempotencyKey = newIdempotencyKey();
       }
 
       try {
-        const res = await uploadAsset({ metadata, file: picked }, this.lastIdempotencyKey);
+        const res = await this.api.uploadAsset({ metadata, file: picked }, this.lastIdempotencyKey);
         this.lastFingerprint = null;
         this.lastIdempotencyKey = null;
         this.allowClose = true;
@@ -312,7 +333,20 @@ export class AssetUploadModal {
         this.uploaded.emit(res.asset);
         this.notify.success(this.transloco.translate('templatesAssets.toasts.uploaded'));
       } catch (error) {
-        this.notify.error(translateAssetError(error, this.transloco));
+        if (!isRetryableWriteError(error) && !(error instanceof ApiError && error.status === 401)) {
+          this.lastIdempotencyKey = null;
+        }
+        if (error instanceof ApiError && (error.status === 413 || [
+          'CORE.TEMPLATE.ASSET.UPLOAD_INVALID', 'CORE.TEMPLATE.ASSET.CHECKSUM_MISMATCH',
+          'CORE.TEMPLATE.ASSET.INVALID', 'CORE.TEMPLATE.ASSET.EMAIL_PUBLIC_NOT_ALLOWED',
+        ].includes(error.code))) {
+          this.serverFileError.set(error);
+        } else if (error instanceof ApiError && error.status === 404) {
+          this.serverDefinitionError.set(error);
+          if (value.scope === 'REUSABLE') this.serverFileError.set(error);
+        } else {
+          this.notify.error(translateAssetError(error, this.transloco, true));
+        }
       }
       return undefined;
     });
@@ -356,12 +390,4 @@ export class AssetUploadModal {
       this.confirmingDiscard = false;
     }
   }
-}
-
-function resolveDeclaredMime(file: File): TemplateAssetDeclaredMimeType {
-  const mime = file.type.toLowerCase();
-  const name = file.name.toLowerCase();
-  if (mime === 'image/jpeg' || name.endsWith('.jpg') || name.endsWith('.jpeg')) return 'image/jpeg';
-  if (mime === 'image/webp' || name.endsWith('.webp')) return 'image/webp';
-  return 'image/png';
 }

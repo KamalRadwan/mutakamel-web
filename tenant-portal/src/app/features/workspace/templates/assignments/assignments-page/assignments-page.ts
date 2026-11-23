@@ -1,6 +1,5 @@
 import { Component, computed, effect, inject, linkedSignal, signal, untracked, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
-import { RouterLink } from '@angular/router';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
@@ -24,9 +23,15 @@ import {
   tablerWorld,
   tablerX,
 } from '@ng-icons/tabler-icons';
+import { ApiError, correlationIdOf, errorCodeOf, isRetryableWriteError, writeErrorMessage } from '../../../../../core/api/api-errors';
+import { newIdempotencyKey } from '../../../../../core/api/idempotency';
+import { TenantScopeState } from '../../../../../core/scope/tenant-scope';
+import { FullState } from '../../../../../shared/ui/full-state/full-state';
+import { ConflictDialog } from '../../../../../shared/ui/conflict-dialog/conflict-dialog';
+import { AssignmentsApi } from '../assignments.api';
 import { LanguageState } from '../../../../../core/i18n/language';
 import { Notify } from '../../../../../core/notify/notify';
-import { ScopeState } from '../../../../../core/scope/scope';
+import type { ScopeCompany } from '../../../../../core/scope/scope';
 import { ActionItem, ActionSelection, ActionsMenu } from '../../../../../shared/ui/actions-menu/actions-menu';
 import { Button } from '../../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
@@ -35,21 +40,18 @@ import { Dropdown, DropdownOption } from '../../../../../shared/ui/dropdown/drop
 import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import {
-  TemplateApiError,
   TemplateAssignmentDto,
   TemplateAssignmentStatus,
   TemplateAssignmentsListQuery,
   TemplateDataSourceKey,
   TemplateListRow,
   TemplatePageInfo,
-  deactivateAssignment,
-  getTemplate,
-  listAssignments,
-  listTemplates,
+  TemplatesApi,
 } from '../../templates.api';
 import { AssignmentModal } from '../assignment-modal/assignment-modal';
 import type { AssignmentScopeOption } from '../assignments.model';
 import {
+  canManageAssignment,
   SUPPORTED_ASSIGNMENT_SELECTORS,
   assignmentSelectorDropdownOptions,
   buildAssignmentScopeOptions,
@@ -58,12 +60,11 @@ import {
   describeAssignmentScope,
   formatEffectiveRange,
   formatShortDate,
-  scopeKeyFromPortalSelection,
+  scopeKeyOf,
   translateAssignmentError,
 } from '../assignments.service';
 import { TestSelectionModal } from '../test-selection-modal/test-selection-modal';
 
-const CAN_MANAGE = true; // later from the session permissions
 
 interface AssignmentFilters {
   documentAdapter: '' | TemplateDataSourceKey;
@@ -92,7 +93,8 @@ interface TemplateLabelInfo {
 @Component({
   selector: 'app-assignments-page',
   imports: [
-    RouterLink,
+    FullState,
+    ConflictDialog,
     NgIcon,
     TranslocoPipe,
     ActionsMenu,
@@ -136,7 +138,6 @@ export class AssignmentsPage {
   private static nextId = 0;
   protected readonly uid = `assignments-page-${++AssignmentsPage.nextId}`;
 
-  private readonly scopeState = inject(ScopeState);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
@@ -147,14 +148,34 @@ export class AssignmentsPage {
   private readonly filtersModal = viewChild.required<Modal>('filtersModal');
   private readonly deactivateConfirm = viewChild.required<ConfirmDialog>('deactivateConfirm');
 
-  protected readonly canManage = CAN_MANAGE;
+  private readonly api = inject(AssignmentsApi);
+  private readonly templatesApi = inject(TemplatesApi);
+  private readonly tenantScope = inject(TenantScopeState);
+  protected readonly canManage = computed(() => {
+    const scope = this.scopeOptions().find((opt) => opt.key === this.selectedScopeKey())?.scope;
+    return !!scope && canManageAssignment(this.tenantScope.me(), scope);
+  });
+  protected readonly deactivateConflict = signal(false);
+  private deactivateAction: { key: string; bodyJson: string } | null = null;
   protected readonly skeletonRows = [1, 2, 3, 4, 5];
+
+  private readonly scopeCompanies = signal<ScopeCompany[]>([]);
 
   protected readonly scopeOptions = computed<AssignmentScopeOption[]>(() => {
     this.i18n();
     this.language();
+    const companies = new Map(this.scopeCompanies().map((company) => [company.id, { ...company, branches: [...company.branches] }]));
+    const me = this.tenantScope.me();
+    const companyIds = new Set([...(me?.accessibleCompanies ?? []), ...(me?.accessibleBranchCompanies ?? []).map((branch) => branch.companyId)]);
+    for (const id of companyIds) {
+      if (!companies.has(id)) companies.set(id, { id, nameEn: id, nameAr: id, branches: [] });
+    }
+    for (const { branchId, companyId } of me?.accessibleBranchCompanies ?? []) {
+      const company = companies.get(companyId);
+      if (company && !company.branches.some((branch) => branch.id === branchId)) company.branches.push({ id: branchId, nameEn: branchId, nameAr: branchId });
+    }
     return buildAssignmentScopeOptions(
-      this.scopeState.companies(),
+      [...companies.values()],
       this.language(),
       (k) => this.transloco.translate(k),
     );
@@ -164,9 +185,12 @@ export class AssignmentsPage {
     this.scopeOptions().map((opt) => ({ value: opt.key, label: opt.label })),
   );
 
-  private readonly portalScopeKey = computed(() =>
-    scopeKeyFromPortalSelection(this.scopeState.company().id, this.scopeState.branch().id),
-  );
+  private readonly portalScopeKey = computed(() => {
+    const selection = this.tenantScope.selection();
+    return !selection ? 'TENANT' : scopeKeyOf(selection.branchId
+      ? { type: 'BRANCH', companyId: selection.companyId, branchId: selection.branchId }
+      : { type: 'COMPANY', companyId: selection.companyId });
+  });
 
   protected readonly selectedScopeKey = linkedSignal<string, string>({
     source: this.portalScopeKey,
@@ -192,12 +216,11 @@ export class AssignmentsPage {
   protected readonly definitions = signal<TemplateListRow[]>([]);
   protected readonly templateLabels = signal<Record<string, TemplateLabelInfo>>({});
   protected readonly loading = signal(true);
-  protected readonly errorState = signal<'none' | 'forbidden' | 'featureDisabled' | 'failed'>('none');
+  protected readonly errorState = signal<'none' | 'forbidden' | 'featureDisabled' | 'scopeEmpty' | 'failed'>('none');
   protected readonly correlationId = signal<string | null>(null);
   protected readonly deactivatingRow = signal<TemplateAssignmentDto | null>(null);
 
   private loadSeq = 0;
-  private definitionsLoaded = false;
 
   protected readonly activeFiltersCount = computed(() => {
     const f = this.filters();
@@ -293,6 +316,7 @@ export class AssignmentsPage {
   });
 
   constructor() {
+    void this.loadScopeCompanies();
     effect(() => {
       const scopeKey = this.selectedScopeKey();
       const filters = this.filters();
@@ -303,6 +327,11 @@ export class AssignmentsPage {
     });
   }
 
+  private async loadScopeCompanies(): Promise<void> {
+    try { this.scopeCompanies.set(await this.api.listScopeCompanies()); }
+    catch (error) { this.notify.error(translateAssignmentError(error, (k, p) => this.transloco.translate(k, p))); }
+  }
+
   protected onScopeChanged(nextKey: string): void {
     if (nextKey === this.selectedScopeKey()) return;
     this.cursorStack.set([]);
@@ -310,7 +339,7 @@ export class AssignmentsPage {
   }
 
   protected openCreate(): void {
-    if (!this.canManage) return;
+    if (!this.canManage()) return;
     this.assignmentModal().openCreate(this.selectedScopeKey());
   }
 
@@ -377,7 +406,7 @@ export class AssignmentsPage {
     const mapped = this.templateLabels()[row.definitionId];
     if (mapped) return mapped;
     return {
-      name: this.transloco.translate('assignments.table.unknownTemplate'),
+      name: row.definitionId,
       code: '',
     };
   }
@@ -406,8 +435,8 @@ export class AssignmentsPage {
     this.i18n();
     const t = (key: string) => this.transloco.translate(key);
     const isActive = row.status === 'ACTIVE';
-    const deactivateDisabled = !this.canManage || !isActive;
-    const reason = !this.canManage
+    const deactivateDisabled = !canManageAssignment(this.tenantScope.me(), row.scope) || !isActive;
+    const reason = !canManageAssignment(this.tenantScope.me(), row.scope)
       ? t('assignments.actions.deactivateNoPermission')
       : !isActive
         ? t('assignments.actions.deactivateAlreadyInactive')
@@ -453,18 +482,37 @@ export class AssignmentsPage {
   }
 
   private async confirmDeactivate(row: TemplateAssignmentDto): Promise<void> {
-    if (!this.canManage || row.status !== 'ACTIVE') return;
+    if (!canManageAssignment(this.tenantScope.me(), row.scope) || row.status !== 'ACTIVE') return;
     this.deactivatingRow.set(row);
     const confirmed = await this.deactivateConfirm().open();
     if (!confirmed) return;
 
     try {
-      await deactivateAssignment(row.assignmentId, row.etag);
+      const bodyJson = JSON.stringify([row.assignmentId, row.etag]);
+      if (this.deactivateAction?.bodyJson !== bodyJson) this.deactivateAction = { key: newIdempotencyKey(), bodyJson };
+      await this.api.deactivateAssignment(row.assignmentId, row.etag, this.deactivateAction!.key);
+      this.deactivateAction = null;
       this.notify.success(this.transloco.translate('assignments.toasts.deactivated'));
       void this.loadAssignments(this.selectedScopeKey(), this.filters(), this.currentCursor());
     } catch (error) {
-      this.notify.error(translateAssignmentError(error, (k, p) => this.transloco.translate(k, p)));
+      if (!isRetryableWriteError(error) && !(error instanceof ApiError && error.status === 401)) this.deactivateAction = null;
+      if (error instanceof ApiError && error.status === 404) { this.reload(); return; }
+      if (error instanceof ApiError && error.status === 409 && error.code.endsWith('STALE_REVISION')) {
+        this.deactivateConflict.set(true);
+        return;
+      }
+      this.notify.error(writeErrorMessage(error, 'assignments', (k, p) => this.transloco.translate(k, p)));
     }
+  }
+
+  protected async refreshDeactivateConflict(keep: boolean): Promise<void> {
+    this.deactivateConflict.set(false);
+    const row = this.deactivatingRow();
+    if (keep && row) {
+      try { this.deactivatingRow.set(await this.api.getAssignment(row.assignmentId)); }
+      catch (error) { this.notify.error(translateAssignmentError(error, (k, p) => this.transloco.translate(k, p))); }
+    }
+    this.reload();
   }
 
   private async loadAssignments(
@@ -510,12 +558,9 @@ export class AssignmentsPage {
 
     try {
       const [page] = await Promise.all([
-        listAssignments(query),
-        this.ensureDefinitionsLoaded(),
+        this.api.listAssignments(query),
+        this.loadDefinitions(scopeOpt.scope, seq),
       ]);
-      if (seq !== this.loadSeq) return;
-
-      await this.hydrateMissingTemplateLabels(page.items, seq);
       if (seq !== this.loadSeq) return;
 
       this.assignments.set(page.items);
@@ -530,53 +575,47 @@ export class AssignmentsPage {
     }
   }
 
-  private async ensureDefinitionsLoaded(): Promise<void> {
-    if (this.definitionsLoaded) return;
+  private async loadDefinitions(scope: TemplateAssignmentDto['scope'], seq: number): Promise<void> {
+    this.templateLabels.set({});
+    this.definitions.set([]);
     try {
-      const res = await listTemplates({ assignmentScopeType: 'TENANT', limit: 100 });
-      this.definitions.set(res.items);
-      const nextMap: Record<string, TemplateLabelInfo> = { ...this.templateLabels() };
-      for (const item of res.items) {
-        nextMap[item.templateId] = { name: item.name, code: item.code };
-      }
-      this.templateLabels.set(nextMap);
-      this.definitionsLoaded = true;
-    } catch {
-      // Keep page usable if catalog lookup fails.
-    }
-  }
-
-  private async hydrateMissingTemplateLabels(items: readonly TemplateAssignmentDto[], seq: number): Promise<void> {
-    const known = this.templateLabels();
-    const missingIds = Array.from(new Set(items.map((row) => row.definitionId))).filter((id) => !known[id]);
-    if (missingIds.length === 0) return;
-
-    const settled = await Promise.allSettled(missingIds.map((id) => getTemplate(id)));
-    if (seq !== this.loadSeq) return;
-
-    const additions: Record<string, TemplateLabelInfo> = {};
-    settled.forEach((result, index) => {
-      if (result.status === 'fulfilled') {
-        additions[missingIds[index]] = { name: result.value.name, code: result.value.code };
-      }
-    });
-    if (Object.keys(additions).length > 0) {
-      this.templateLabels.update((current) => ({ ...current, ...additions }));
+      const items: TemplateListRow[] = [];
+      let cursor: string | null = null;
+      do {
+        const page = await this.templatesApi.listTemplates({
+          assignmentScopeType: scope.type,
+          assignmentCompanyId: scope.type !== 'TENANT' ? scope.companyId : undefined,
+          assignmentBranchId: scope.type === 'BRANCH' ? scope.branchId : undefined,
+          limit: 100, cursor: cursor ?? undefined,
+        });
+        if (seq !== this.loadSeq) return;
+        items.push(...page.items);
+        cursor = page.pageInfo.hasNextPage ? page.pageInfo.nextCursor : null;
+      } while (cursor);
+      this.definitions.set(items);
+      this.templateLabels.set(Object.fromEntries(items.map((item) => [item.templateId, { name: item.name, code: item.code }])));
+    } catch (error) {
+      if (seq === this.loadSeq) this.notify.error(translateAssignmentError(error, (k, p) => this.transloco.translate(k, p)));
     }
   }
 
   private handleLoadError(error: unknown): void {
-    if (error instanceof TemplateApiError) {
-      this.correlationId.set(error.correlationId);
-      if (error.code === 'CORE.TEMPLATE.FEATURE.DISABLED') {
-        this.errorState.set('featureDisabled');
+    this.correlationId.set(correlationIdOf(error));
+    const code = errorCodeOf(error);
+    this.assignments.set([]);
+    this.pageInfo.set({ limit: 25, hasNextPage: false, nextCursor: null });
+    if (error instanceof ApiError) {
+      if (error.status === 400 && code?.endsWith('SCHEMA.INVALID')) {
+        if (this.activeFiltersCount() || this.currentCursor()) this.clearAllFilters();
+        else this.errorState.set('failed');
+        this.notify.error(translateAssignmentError(error, (k, p) => this.transloco.translate(k, p)));
         return;
       }
-      if (error.status === 403 || error.code === 'CORE.TEMPLATE.PERMISSION.DENIED') {
-        this.errorState.set('forbidden');
-        return;
-      }
+      if (error.status === 404) { this.errorState.set('scopeEmpty'); return; }
+      if (code?.endsWith('FEATURE.DISABLED')) { this.errorState.set('featureDisabled'); return; }
+      if (error.status === 403 && !code?.startsWith('TENANT_MAINTENANCE')) { this.errorState.set('forbidden'); return; }
     }
     this.errorState.set('failed');
+    this.notify.error(translateAssignmentError(error, (k, p) => this.transloco.translate(k, p)));
   }
 }

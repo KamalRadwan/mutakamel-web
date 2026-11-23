@@ -1,41 +1,16 @@
 @if (isForbidden()) {
-  <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card" role="alert">
-    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-orange text-on-icon">
-      <ng-icon name="tablerLock" size="18" aria-hidden="true" />
-    </span>
-    <h1 class="text-16 leading-24 font-medium text-text">
-      {{ (isFeatureDisabled() ? 'templates.states.featureDisabled.title' : 'templates.states.forbidden.title') | transloco }}
-    </h1>
-    <p class="max-w-modal-form text-12 leading-18 text-text-muted">
-      {{ (isFeatureDisabled() ? 'templates.states.featureDisabled.description' : 'templates.states.forbidden.description') | transloco }}
-    </p>
-    <a uiButton routerLink="/">
-      {{ 'templatesAssets.states.backToHome' | transloco }}
-    </a>
-  </div>
+  <ui-full-state kind="forbidden"
+    [title]="(isFeatureDisabled() ? 'templatesAssets.states.featureDisabled.title' : 'templates.states.forbidden.title') | transloco"
+    [text]="(isFeatureDisabled() ? 'templates.states.featureDisabled.description' : 'templates.states.forbidden.description') | transloco"
+    [actionLabel]="'templatesAssets.states.backToHome' | transloco" (action)="backHome()" />
 } @else if (loadFailed()) {
-  <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card" role="alert">
-    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
-      <ng-icon name="tablerRefresh" size="18" aria-hidden="true" />
-    </span>
-    <h1 class="text-16 leading-24 font-medium text-text">
-      {{ 'templatesAssets.states.loadFailed.title' | transloco }}
-    </h1>
-    <p class="max-w-modal-form text-12 leading-18 text-text-muted">
-      {{ 'templatesAssets.states.loadFailed.description' | transloco }}
-    </p>
-    @if (loadError()?.correlationId; as corrId) {
-      <p dir="ltr" class="text-11 leading-16 text-text-muted">
-        {{ 'templates.states.loadFailed.reference' | transloco: { correlationId: corrId } }}
-      </p>
-    }
-    <button type="button" uiButton (click)="reload()">
-      {{ 'templates.actions.retry' | transloco }}
-    </button>
-  </div>
+  <ui-full-state kind="load-failure"
+    [title]="'templatesAssets.states.loadFailed.title' | transloco"
+    [text]="loadFailureText()"
+    [actionLabel]="'templates.actions.retry' | transloco" (action)="reload()" />
 } @else {
   <div class="flex shrink-0 flex-wrap items-center gap-8 rounded-10 bg-surface p-8 shadow-card">
-    @if (canManage) {
+    @if (canUpload()) {
       <button type="button" uiButton class="shrink-0" (click)="openUpload()">
         <ng-icon name="tablerUpload" size="15" aria-hidden="true" />
         {{ 'templates.actions.upload' | transloco }}
@@ -99,6 +74,14 @@
         (valueChange)="setScopeFilter($event)"
       />
       @if (scopeFilter() === 'DEFINITION') {
+        @if (definitionsNeedSearch()) {
+          <ui-field for="asset-definition-search" [label]="'templatesAssets.toolbar.filters.templateLabel' | transloco"
+            [hint]="'templatesAssets.toolbar.filters.templateSearchHint' | transloco">
+            <input id="asset-definition-search" aria-describedby="asset-definition-search-hint" type="search" maxlength="100"
+              class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+              [value]="definitionSearch()" (input)="onDefinitionSearch($event)" />
+          </ui-field>
+        }
         <ui-dropdown
           [options]="templateFilterOptions()"
           [value]="definitionIdFilter()"
@@ -221,8 +204,8 @@
           <div
             role="row"
             class="grid h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
-            [class.grid-cols-tpl-asset-row-actions]="canManage"
-            [class.grid-cols-tpl-asset-row]="!canManage"
+            [class.grid-cols-tpl-asset-row-actions]="canManage()"
+            [class.grid-cols-tpl-asset-row]="!canManage()"
           >
             <span role="columnheader" class="flex min-w-0 items-center truncate px-10">{{ 'templatesAssets.table.asset' | transloco }}</span>
             <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">{{ 'templatesAssets.table.scope' | transloco }}</span>
@@ -231,7 +214,7 @@
             <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">{{ 'templatesAssets.table.specs' | transloco }}</span>
             <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">{{ 'templatesAssets.table.status' | transloco }}</span>
             <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">{{ 'templatesAssets.table.updated' | transloco }}</span>
-            @if (canManage) {
+            @if (canManage()) {
               <span role="columnheader" class="border-s border-on-nav-line"><span class="sr-only">{{ 'templatesAssets.table.actions' | transloco }}</span></span>
             }
           </div>
@@ -239,8 +222,8 @@
             <div
               role="row"
               class="mt-6 grid h-table-row rounded-10 border border-border bg-surface shadow-card"
-              [class.grid-cols-tpl-asset-row-actions]="canManage"
-              [class.grid-cols-tpl-asset-row]="!canManage"
+              [class.grid-cols-tpl-asset-row-actions]="canManage()"
+              [class.grid-cols-tpl-asset-row]="!canManage()"
               aria-hidden="true"
             >
               <span role="cell" class="flex min-w-0 items-center gap-8 px-10">
@@ -265,7 +248,7 @@
               <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
                 <span class="h-skeleton-line w-1/2 rounded-6 bg-neutral-soft"></span>
               </span>
-              @if (canManage) {
+              @if (canManage()) {
                 <span role="cell" class="flex items-center justify-center border-s border-border">
                   <span class="size-btn-h-sm rounded-6 bg-neutral-soft"></span>
                 </span>
@@ -302,7 +285,7 @@
         <p class="max-w-modal-form text-12 leading-18 text-text-muted">
           {{ 'templates.states.emptyAssets.description' | transloco }}
         </p>
-        @if (canManage) {
+        @if (canManage()) {
           <button type="button" uiButton variant="secondary" (click)="openUpload()">
             <ng-icon name="tablerUpload" size="15" aria-hidden="true" />
             {{ 'templates.actions.upload' | transloco }}
@@ -389,8 +372,8 @@
         <div
           role="row"
           class="grid h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
-          [class.grid-cols-tpl-asset-row-actions]="canManage"
-          [class.grid-cols-tpl-asset-row]="!canManage"
+          [class.grid-cols-tpl-asset-row-actions]="canManage()"
+          [class.grid-cols-tpl-asset-row]="!canManage()"
         >
           <span role="columnheader" class="flex min-w-0 items-center truncate px-10">{{ 'templatesAssets.table.asset' | transloco }}</span>
           <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">{{ 'templatesAssets.table.scope' | transloco }}</span>
@@ -399,7 +382,7 @@
           <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">{{ 'templatesAssets.table.specs' | transloco }}</span>
           <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">{{ 'templatesAssets.table.status' | transloco }}</span>
           <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">{{ 'templatesAssets.table.updated' | transloco }}</span>
-          @if (canManage) {
+          @if (canManage()) {
             <span role="columnheader" class="border-s border-on-nav-line"><span class="sr-only">{{ 'templatesAssets.table.actions' | transloco }}</span></span>
           }
         </div>
@@ -408,8 +391,8 @@
           <div
             role="row"
             class="mt-6 grid h-table-row cursor-pointer rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card transition-colors duration-fast hover:bg-row-hover"
-            [class.grid-cols-tpl-asset-row-actions]="canManage"
-            [class.grid-cols-tpl-asset-row]="!canManage"
+            [class.grid-cols-tpl-asset-row-actions]="canManage()"
+            [class.grid-cols-tpl-asset-row]="!canManage()"
             (click)="openDetail(asset)"
           >
             <span role="cell" class="flex min-w-0 items-center gap-8 px-10">
@@ -471,7 +454,7 @@
               <span class="truncate text-12 text-text-muted">{{ formatDate(asset.updatedAt) }}</span>
             </span>
 
-            @if (canManage) {
+            @if (canManage()) {
               <span role="cell" class="flex items-center justify-center border-s border-border" (click)="$event.stopPropagation()">
                 <ui-actions-menu
                   [items]="actionsFor(asset)"
@@ -486,39 +469,22 @@
     </div>
   }
 
-  @if (!loading() && !loadFailed() && (hasPrevPage() || hasNextPage())) {
+  @if (!loading() && !loadFailed() && hasNextPage()) {
     <footer class="mt-auto flex items-center justify-end gap-4 pt-4">
-      <button
-        type="button"
-        class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 border border-border-field bg-surface text-text outline-none transition-colors duration-fast hover:bg-surface-muted focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:border-transparent disabled:bg-neutral-soft disabled:text-text-placeholder"
-        [disabled]="!hasPrevPage()"
-        [attr.aria-label]="'templates.actions.previous' | transloco"
-        [title]="'templates.actions.previous' | transloco"
-        (click)="goPrevPage()"
-      >
-        <ng-icon name="tablerChevronLeft" size="14" class="rtl:rotate-180" aria-hidden="true" />
-      </button>
-      <button
-        type="button"
-        class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 border border-border-field bg-surface text-text outline-none transition-colors duration-fast hover:bg-surface-muted focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:border-transparent disabled:bg-neutral-soft disabled:text-text-placeholder"
-        [disabled]="!hasNextPage()"
-        [attr.aria-label]="'templates.actions.next' | transloco"
-        [title]="'templates.actions.next' | transloco"
-        (click)="goNextPage()"
-      >
-        <ng-icon name="tablerChevronRight" size="14" class="rtl:rotate-180" aria-hidden="true" />
+      <button type="button" uiButton variant="secondary" (click)="goNextPage()">
+        {{ 'templatesAssets.actions.loadMore' | transloco }}
       </button>
     </footer>
   }
 }
 
 <app-asset-upload-modal
-  [templates]="templatesList()"
+  [templates]="manageableTemplates()"
   (uploaded)="onUploaded($event)"
 />
 
 <app-asset-detail-modal
-  [canManage]="canManage"
+  [canManage]="detailCanManage()"
   [templateNames]="templateNameMap()"
   (retired)="onRetired()"
 />
@@ -530,3 +496,5 @@
   [confirmLabel]="'templates.actions.retire' | transloco"
   [cancelLabel]="'templates.actions.cancel' | transloco"
 />
+
+<ui-conflict-dialog [(open)]="conflictOpen" (reload)="resolveRetireConflict(false)" (keepEditing)="resolveRetireConflict(true)" />

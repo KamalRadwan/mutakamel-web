@@ -7,8 +7,6 @@ import {
   tablerAdjustments,
   tablerCopy,
   tablerInfoCircle,
-  tablerLock,
-  tablerRefresh,
 } from '@ng-icons/tabler-icons';
 import { Notify } from '../../../../../core/notify/notify';
 import { Button } from '../../../../../shared/ui/button/button';
@@ -16,9 +14,12 @@ import { Dropdown, DropdownOption } from '../../../../../shared/ui/dropdown/drop
 import { Field } from '../../../../../shared/ui/field/field';
 import { Switch } from '../../../../../shared/ui/switch/switch';
 import { UnsavedDialog } from '../../../../../shared/ui/unsaved-dialog/unsaved-dialog';
-import { ApiError, errorCodeOf, errorMessage } from '../../../staff/shared/staff.api';
-import { StaffSession } from '../../../staff/shared/staff-session';
-import { getDirectorySettings, updateDirectorySettings } from '../directory-settings.api';
+import { ApiError, errorCodeOf, errorMessage, fieldErrorsOf, isValidationError, writeErrorMessage } from '../../../../../core/api/api-errors';
+import { TenantScopeState } from '../../../../../core/scope/tenant-scope';
+import { ConflictDialog } from '../../../../../shared/ui/conflict-dialog/conflict-dialog';
+import { FullState } from '../../../../../shared/ui/full-state/full-state';
+import { SettingsNotice } from '../../../../../shared/ui/settings-notice/settings-notice';
+import { DirectorySettingsApi } from '../directory-settings.api';
 import {
   DIRECTORY_SETTINGS_LIMITS,
   DUPLICATE_SCOPES,
@@ -27,12 +28,6 @@ import {
   DuplicateScope,
 } from '../directory-settings.model';
 import { correlationIdOf } from '../../../../../core/api/api-errors';
-
-const FORBIDDEN_ERROR_CODES = new Set([
-  'TENANT_WIDE_PERMISSION_REQUIRED',
-  'BRANCH_PERMISSION_DENIED',
-  'PERMISSION_SCOPE_UNAVAILABLE',
-]);
 
 interface ParsedLimit {
   value: number | null;
@@ -60,7 +55,7 @@ function parseLimit(raw: string): ParsedLimit {
 
 function isForbiddenError(error: unknown): boolean {
   const code = errorCodeOf(error);
-  if (code && FORBIDDEN_ERROR_CODES.has(code)) return true;
+  if (code === 'TENANT_MAINTENANCE_ACTIVE' || code === 'TENANT_MAINTENANCE_RELEASE_REQUIRED') return false;
   return error instanceof ApiError && error.status === 403;
 }
 
@@ -78,15 +73,13 @@ function hasCrmRoute(routes: Routes): boolean {
 
 @Component({
   selector: 'app-directory-settings-page',
-  imports: [NgIcon, RouterLink, TranslocoPipe, Button, Dropdown, Field, Switch, UnsavedDialog],
+  imports: [NgIcon, RouterLink, TranslocoPipe, Button, Dropdown, Field, Switch, UnsavedDialog, ConflictDialog, FullState, SettingsNotice],
   providers: [
     provideTranslocoScope('settings', { scope: 'ws-directory-settings', alias: 'wsDirSettings' }),
     provideIcons({
       tablerCopy,
       tablerAdjustments,
       tablerInfoCircle,
-      tablerLock,
-      tablerRefresh,
     }),
   ],
   templateUrl: './directory-settings-page.html',
@@ -102,7 +95,8 @@ export class DirectorySettingsPage {
   private readonly router = inject(Router);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
-  private readonly session = inject(StaffSession);
+  private readonly scope = inject(TenantScopeState);
+  private readonly api = inject(DirectorySettingsApi);
   private readonly i18n = translationEvents(this.transloco);
 
   private readonly unsavedDialog = viewChild.required(UnsavedDialog);
@@ -116,6 +110,16 @@ export class DirectorySettingsPage {
   protected readonly loadFailed = signal(false);
   protected readonly loadCorrelationId = signal<string | null>(null);
   protected readonly saving = signal(false);
+  protected readonly etag = signal<string | null>(null);
+  protected readonly conflictOpen = signal(false);
+  protected readonly fieldErrors = signal<Record<string, string[]>>({});
+
+  protected readonly loadFailureText = computed(() => {
+    this.i18n();
+    const text = this.transloco.translate('wsDirSettings.states.loadFailedText');
+    const id = this.loadCorrelationId();
+    return id ? `${text} ${this.transloco.translate('wsDirSettings.states.supportRef')}: ${id}` : text;
+  });
 
   protected readonly duplicateScope = signal<DuplicateScope>('TENANT');
   protected readonly preventDuplicateEmail = signal(true);
@@ -147,6 +151,8 @@ export class DirectorySettingsPage {
 
   protected readonly maxContactsError = computed<string | null>(() => {
     this.i18n();
+    const serverError = this.fieldError('maxContactMethodsPerParty');
+    if (serverError) return serverError;
     const key = this.parsedMaxContacts().errorKey;
     if (!key || (!this.maxContactsTouched() && !this.maxContactsDirty())) return null;
     return this.transloco.translate(`wsDirSettings.validation.${key}`, {
@@ -157,6 +163,8 @@ export class DirectorySettingsPage {
 
   protected readonly maxAddressesError = computed<string | null>(() => {
     this.i18n();
+    const serverError = this.fieldError('maxAddressesPerParty');
+    if (serverError) return serverError;
     const key = this.parsedMaxAddresses().errorKey;
     if (!key || (!this.maxAddressesTouched() && !this.maxAddressesDirty())) return null;
     return this.transloco.translate(`wsDirSettings.validation.${key}`, {
@@ -183,8 +191,23 @@ export class DirectorySettingsPage {
   });
 
   protected readonly canSave = computed(
-    () => this.dirty() && this.valid() && !this.saving() && !this.loading(),
+    () => this.dirty() && this.valid() && !this.saving() && !this.loading() && !this.forbidden() && !this.conflictOpen(),
   );
+
+  protected readonly stricterChange = computed(() => {
+    const current = this.saved();
+    if (!current) return false;
+    const maxContacts = this.parsedMaxContacts().value;
+    const maxAddresses = this.parsedMaxAddresses().value;
+    return (
+      (!current.preventDuplicateEmail && this.preventDuplicateEmail()) ||
+      (!current.preventDuplicatePhone && this.preventDuplicatePhone()) ||
+      (!current.preventDuplicateWhatsapp && this.preventDuplicateWhatsapp()) ||
+      (maxContacts !== null && maxContacts < current.maxContactMethodsPerParty) ||
+      (maxAddresses !== null && maxAddresses < current.maxAddressesPerParty) ||
+      (this.duplicateScope() !== current.duplicateScope && current.duplicateScope !== 'TENANT')
+    );
+  });
 
   protected readonly scopeOptions = computed<DropdownOption<DuplicateScope>[]>(() => {
     this.i18n();
@@ -204,15 +227,12 @@ export class DirectorySettingsPage {
   });
 
   constructor() {
-    if (!this.session.me()) {
-      void this.session.load().catch(() => undefined);
-    }
-
     effect(() => {
-      const me = this.session.me();
+      const me = this.scope.me();
       if (!me) return;
 
-      if (!this.session.isTenantWide('directory.settings.manage')) {
+      if (!me.isTenantOwner && !(me.permissions.includes('directory.settings.manage') &&
+          me.permissionScopes['directory.settings.manage']?.tenantWide)) {
         untracked(() => {
           this.loadSeq++;
           this.forbidden.set(true);
@@ -249,14 +269,53 @@ export class DirectorySettingsPage {
   }
 
   protected reload(): void {
+    this.conflictOpen.set(false);
+    this.saved.set(null);
     void this.load();
   }
 
+  protected backHome(): void {
+    void this.router.navigateByUrl('/workspace/home');
+  }
+
+  protected async keepMyChanges(): Promise<void> {
+    if (this.loading() || this.saving()) return;
+    const seq = ++this.loadSeq;
+    this.loading.set(true);
+    try {
+      const result = await this.api.getDirectorySettings();
+      if (seq !== this.loadSeq) return;
+      this.saved.update((current) => current ? { ...current, version: result.settings.version } : null);
+      this.etag.set(result.etag);
+      this.conflictOpen.set(false);
+    } catch (error) {
+      if (seq !== this.loadSeq) return;
+      if (isForbiddenError(error)) this.forbidden.set(true);
+      else this.notify.error(errorMessage(error, 'wsDirSettings', this.transloco));
+    } finally {
+      if (seq === this.loadSeq) this.loading.set(false);
+    }
+  }
+
+  protected fieldError(field: string): string | null {
+    return this.fieldErrors()[field] ? this.transloco.translate('wsDirSettings.validation.invalid') : null;
+  }
+
+  protected clearFieldError(field: string): void {
+    this.fieldErrors.update((errors) => {
+      const next = { ...errors };
+      delete next[field];
+      return next;
+    });
+  }
+
   protected onMaxContactsInput(event: Event): void {
+    this.clearFieldError('maxContactMethodsPerParty');
     this.maxContactsInput.set((event.target as HTMLInputElement).value);
   }
 
   protected onMaxAddressesInput(event: Event): void {
+    this.clearFieldError('maxAddressesPerParty');
     this.maxAddressesInput.set((event.target as HTMLInputElement).value);
   }
 
@@ -276,7 +335,8 @@ export class DirectorySettingsPage {
     this.maxAddressesTouched.set(true);
 
     const current = this.saved();
-    if (!current || !this.valid() || !this.dirty() || this.saving()) {
+    const etag = this.etag();
+    if (!current || !this.canSave() || !etag) {
       return false;
     }
 
@@ -313,14 +373,24 @@ export class DirectorySettingsPage {
     }
 
     this.saving.set(true);
+    this.fieldErrors.set({});
     try {
-      const updated = await updateDirectorySettings(patch);
-      this.saved.set(updated);
-      this.syncDraft(updated);
+      const updated = await this.api.updateDirectorySettings(patch, etag);
+      this.saved.set(updated.settings);
+      this.etag.set(updated.etag);
+      this.syncDraft(updated.settings);
       this.notify.success(this.transloco.translate('wsDirSettings.toast.saved'));
       return true;
     } catch (error) {
-      this.notify.error(errorMessage(error, 'wsDirSettings', this.transloco));
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+      } else if (error instanceof ApiError && error.status === 409) {
+        this.conflictOpen.set(true);
+      } else if (isValidationError(error)) {
+        this.fieldErrors.set(fieldErrorsOf(error));
+      } else {
+        this.notify.error(writeErrorMessage(error, 'wsDirSettings', this.transloco));
+      }
       return false;
     } finally {
       this.saving.set(false);
@@ -342,10 +412,11 @@ export class DirectorySettingsPage {
     this.loadCorrelationId.set(null);
 
     try {
-      const result = await getDirectorySettings();
+      const result = await this.api.getDirectorySettings();
       if (seq !== this.loadSeq) return;
-      this.saved.set(result);
-      this.syncDraft(result);
+      this.saved.set(result.settings);
+      this.etag.set(result.etag);
+      this.syncDraft(result.settings);
     } catch (error) {
       if (seq !== this.loadSeq) return;
       if (isForbiddenError(error)) {
@@ -363,6 +434,7 @@ export class DirectorySettingsPage {
   }
 
   private syncDraft(settings: DirectorySettings): void {
+    this.fieldErrors.set({});
     this.duplicateScope.set(settings.duplicateScope);
     this.preventDuplicateEmail.set(settings.preventDuplicateEmail);
     this.preventDuplicatePhone.set(settings.preventDuplicatePhone);

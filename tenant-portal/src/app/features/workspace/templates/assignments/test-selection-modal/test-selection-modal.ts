@@ -1,6 +1,6 @@
 import { Component, computed, inject, input, signal, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
-import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
+import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   tablerBuilding,
@@ -10,6 +10,8 @@ import {
   tablerWorld,
   tablerX,
 } from '@ng-icons/tabler-icons';
+import { ApiError, errorCodeOf, fieldErrorsOf, isValidationError } from '../../../../../core/api/api-errors';
+import { AssignmentsApi } from '../assignments.api';
 import { Notify } from '../../../../../core/notify/notify';
 import { Button } from '../../../../../shared/ui/button/button';
 import { DateField } from '../../../../../shared/ui/date-time/date-field';
@@ -20,11 +22,8 @@ import { Modal } from '../../../../../shared/ui/modal/modal';
 import {
   ResolveTemplateAssignmentResponseDto,
   TemplateDataSourceKey,
-  TemplateDefinitionDetail,
   TemplateListRow,
   TemplateLocale,
-  getTemplate,
-  resolveAssignment,
 } from '../../templates.api';
 import type { AssignmentScopeOption } from '../assignments.model';
 import {
@@ -39,6 +38,7 @@ import {
 @Component({
   selector: 'app-test-selection-modal',
   imports: [NgIcon, TranslocoPipe, Button, DateField, TimeField, Dropdown, Field, Modal],
+  viewProviders: [provideTranslocoScope('templates', { scope: 'templates-assignments', alias: 'assignments' })],
   providers: [
     provideIcons({
       tablerBuilding,
@@ -55,6 +55,7 @@ export class TestSelectionModal {
   private static nextId = 0;
   protected readonly uid = `test-selection-modal-${++TestSelectionModal.nextId}`;
 
+  private readonly api = inject(AssignmentsApi);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
@@ -70,7 +71,7 @@ export class TestSelectionModal {
   protected readonly businessTime = signal<string | null>(null);
   protected readonly resolving = signal(false);
   protected readonly result = signal<ResolveTemplateAssignmentResponseDto | null>(null);
-  private readonly resolvedDefinitions = signal<Record<string, TemplateDefinitionDetail>>({});
+  protected readonly serverErrors = signal<Record<string, string>>({});
 
   private runSeq = 0;
 
@@ -97,10 +98,9 @@ export class TestSelectionModal {
     if (!chosen) return null;
     const defId = chosen.version.templateDefinitionId;
     const fromList = this.definitions().find((d) => d.templateId === defId);
-    const fromDetail = this.resolvedDefinitions()[defId];
     return {
-      name: fromList?.name ?? fromDetail?.name ?? this.transloco.translate('assignments.table.unknownTemplate'),
-      code: fromList?.code ?? fromDetail?.code ?? '',
+      name: fromList?.name ?? defId,
+      code: fromList?.code ?? '',
       versionNumber: chosen.version.versionNumber,
     };
   });
@@ -113,6 +113,7 @@ export class TestSelectionModal {
   });
 
   open(defaultScopeKey: string): void {
+    this.runSeq++;
     const resolvedScopeKey = this.scopeOptions().some((opt) => opt.key === defaultScopeKey)
       ? defaultScopeKey
       : (this.scopeOptions()[0]?.key ?? 'TENANT');
@@ -122,6 +123,7 @@ export class TestSelectionModal {
     this.scopeKey.set(resolvedScopeKey);
     this.businessDate.set(null);
     this.businessTime.set(null);
+    this.serverErrors.set({});
     this.result.set(null);
     this.resolving.set(false);
     this.modal().open();
@@ -137,6 +139,7 @@ export class TestSelectionModal {
     if (!next) {
       this.businessTime.set(null);
     }
+    this.serverErrors.set({});
     this.result.set(null);
   }
 
@@ -145,16 +148,19 @@ export class TestSelectionModal {
     if (next && !this.businessDate()) {
       this.businessDate.set(todayDateInput());
     }
+    this.serverErrors.set({});
     this.result.set(null);
   }
 
   protected clearBusinessTime(): void {
     this.businessDate.set(null);
     this.businessTime.set(null);
+    this.serverErrors.set({});
     this.result.set(null);
   }
 
   protected onInputChange(): void {
+    this.serverErrors.set({});
     this.result.set(null);
   }
 
@@ -167,12 +173,14 @@ export class TestSelectionModal {
     if (!selector || !scopeOpt) return;
 
     const seq = ++this.runSeq;
+    this.serverErrors.set({});
+    this.result.set(null);
     this.resolving.set(true);
     try {
       const dateVal = this.businessDate();
       const timeVal = this.businessTime();
       const businessTime = dateVal ? dateTimeToIso(dateVal, timeVal) : undefined;
-      const res = await resolveAssignment({
+      const res = await this.api.resolveAssignment({
         documentType: selector.documentType,
         outputChannel: selector.outputChannel,
         adapterKey: selector.adapterKey,
@@ -182,20 +190,18 @@ export class TestSelectionModal {
       });
       if (seq !== this.runSeq) return;
 
-      const defId = res.chosen?.version.templateDefinitionId;
-      if (defId && !this.definitions().some((d) => d.templateId === defId) && !this.resolvedDefinitions()[defId]) {
-        try {
-          const detail = await getTemplate(defId);
-          if (seq !== this.runSeq) return;
-          this.resolvedDefinitions.update((map) => ({ ...map, [defId]: detail }));
-        } catch {
-          // Keep fallback label when definition detail is unavailable
-        }
-      }
-
       this.result.set(res);
     } catch (error) {
       if (seq !== this.runSeq) return;
+      if (error instanceof ApiError && (isValidationError(error) || (error.status === 400 && errorCodeOf(error)?.endsWith('SCHEMA.INVALID')))) {
+        const fields = fieldErrorsOf(isValidationError(error) ? error : new ApiError(400, 'VALIDATION_ERROR', error.details));
+        const errors: Record<string, string> = {};
+        for (const path of Object.keys(fields)) {
+          const field = path.startsWith('scope') ? 'scope' : ['documentType', 'outputChannel', 'adapterKey'].includes(path) ? 'document' : path;
+          if (['scope', 'document', 'locale', 'businessTime'].includes(field)) errors[field] = this.transloco.translate('assignments.modal.fieldInvalid');
+        }
+        if (Object.keys(errors).length) { this.serverErrors.set(errors); return; }
+      }
       this.notify.error(translateAssignmentError(error, (k, p) => this.transloco.translate(k, p)));
     } finally {
       if (seq === this.runSeq) {

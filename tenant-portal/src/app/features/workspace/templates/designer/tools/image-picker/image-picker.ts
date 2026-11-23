@@ -13,9 +13,8 @@ import { Segmented, SegmentedOption } from '../../../../../../shared/ui/segmente
 import {
   TemplateAssetDto,
   TemplateAssetType,
-  getAssetContent,
-  listAssets,
-} from '../../../templates.api';
+} from '../../../templates.model';
+import { AssetsApi } from '../../../assets/assets.api';
 import { DesignerState } from '../../designer-state';
 import { clamp, printableRectMm, roundMm } from '../../geometry';
 
@@ -43,6 +42,7 @@ export class ImagePicker {
   private static nextId = 0;
   protected readonly uid = `tpl-image-picker-${++ImagePicker.nextId}`;
 
+  private readonly api = inject(AssetsApi);
   private readonly state = inject(DesignerState);
   private readonly transloco = inject(TranslocoService);
   private readonly notify = inject(Notify);
@@ -336,7 +336,7 @@ export class ImagePicker {
     }
 
     try {
-      const page = await listAssets({
+      const page = await this.api.listAssets({
         scope: 'ALL_AUTHORIZED',
         status: 'ACTIVE',
         ...(isEmail ? { deliveryClass: 'EMAIL_PUBLIC' as const } : {}),
@@ -383,7 +383,8 @@ export class ImagePicker {
     if (this.blobUrls()[assetId] || this.pendingBlobs.has(assetId)) return;
     this.pendingBlobs.add(assetId);
     try {
-      const blob = await getAssetContent(assetId);
+      const blob = await this.api.getAssetContent(assetId);
+      if (this.destroyRef.destroyed) return;
       const url = URL.createObjectURL(blob);
       this.ownedUrls.push(url);
       this.blobUrls.update((map) => ({ ...map, [assetId]: url }));

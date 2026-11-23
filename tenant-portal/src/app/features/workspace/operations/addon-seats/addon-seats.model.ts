@@ -1,4 +1,4 @@
-import type { CorePage, CorePageMeta } from '../../settings/core-response.model';
+import type { CorePage, CorePageMeta } from '../../../../core/api/core-page';
 
 export type AddonReadinessStatus = 'READY' | 'NOT_READY' | 'BLOCKED';
 
@@ -54,6 +54,8 @@ export interface AddonOption {
   parentAssignment: AddonOptionRef | null;
   assignment: AddonOptionRef | null;
   localState: AddonOptionLocalState;
+  // Present once BE-O3 is merged
+  seats?: { used: number; total: number };
   observation: 'LOCAL_PROJECTION';
   operationalUse: 'NOT_EVALUATED';
 }

@@ -1,6 +1,4 @@
-@if (sessionFailed()) {
-  <app-session-failed-state (retry)="retrySession()" />
-} @else if (isForbidden()) {
+@if (isForbidden()) {
   <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
     <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-orange text-on-icon">
       <ng-icon name="tablerLock" size="18" aria-hidden="true" />
@@ -141,18 +139,15 @@
       <ui-field
         [for]="uid + '-user'"
         [label]="'wsAudit.filters.user' | transloco"
-        [hint]="'wsAudit.filters.userHint' | transloco"
+        [hint]="(actorLookupDenied() ? 'wsAudit.filters.userReadRequired' : 'wsAudit.filters.userHint') | transloco"
         [bare]="true"
       >
-        <ui-dropdown
-          class="w-full"
-          size="field"
-          [id]="uid + '-user'"
+        <ui-query-single-select
+          [field]="actorField()"
           [describedBy]="uid + '-user-hint'"
-          [label]="'wsAudit.filters.user' | transloco"
-          [options]="userOptions()"
+          [disabled]="actorLookupDenied()"
           [value]="draftActorUserId()"
-          (valueChange)="onDropdownChange('actorUserId', $event)"
+          (valueChange)="onDropdownChange('actorUserId', $event ?? '')"
         />
       </ui-field>
 
@@ -234,7 +229,7 @@
       <ui-field
         [for]="uid + '-include-requests'"
         [label]="'wsAudit.filters.includeRequests' | transloco"
-        [hint]="'wsAudit.filters.includeRequestsHint' | transloco"
+        [hint]="(includeRequestsAvailable ? 'wsAudit.filters.includeRequestsHint' : 'wsAudit.filters.comingSoon') | transloco"
         [bare]="true"
       >
         <div class="flex h-field items-center gap-8">
@@ -243,6 +238,7 @@
             [describedBy]="uid + '-include-requests-hint'"
             [label]="'wsAudit.filters.includeRequests' | transloco"
             [checked]="draftIncludeRequests()"
+            [disabled]="!includeRequestsAvailable"
             (checkedChange)="onIncludeRequestsChange($event)"
           />
         </div>
@@ -299,23 +295,13 @@
   </section>
 
   @if (loadFailed() && !loading()) {
-    <div
-      class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card"
-      role="alert"
-    >
-      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
-        <ng-icon name="tablerAlertTriangle" size="18" aria-hidden="true" />
-      </span>
-      <h2 class="text-16 leading-24 font-medium text-text">{{ 'wsAudit.failed.title' | transloco }}</h2>
-      @if (loadCorrelationId(); as supportRef) {
-        <p class="text-12 leading-18 text-text-muted">
-          {{ 'wsAudit.failed.supportRef' | transloco }}: <bdi dir="ltr" class="tabular-nums">{{ supportRef }}</bdi>
-        </p>
-      }
-      <button type="button" uiButton variant="primary" (click)="reload()">
-        {{ 'wsAudit.failed.retry' | transloco }}
-      </button>
-    </div>
+    <ui-full-state
+      kind="load-failure"
+      [title]="'wsAudit.failed.title' | transloco"
+      [text]="loadCorrelationId() ? (('wsAudit.failed.supportRef' | transloco) + ': ' + loadCorrelationId()) : ''"
+      [actionLabel]="'wsAudit.failed.retry' | transloco"
+      (action)="reload()"
+    />
   } @else if (!loading() && rows().length === 0 && !dateRangeError()) {
     <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
       <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-navy text-on-icon">
@@ -454,7 +440,7 @@
 
               <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
                 <span class="inline-flex h-badge max-w-full items-center truncate rounded-8 bg-neutral-soft px-8 text-12 font-medium text-on-neutral-soft whitespace-nowrap">
-                  {{ ('wsAudit.apps.' + ev.sourceApp) | transloco }}
+                  {{ ev.sourceApp ? (('wsAudit.apps.' + ev.sourceApp) | transloco) : '—' }}
                 </span>
               </span>
 
@@ -464,10 +450,10 @@
                   [class]="
                     ev.outcome === 'SUCCESS'
                       ? 'bg-success-soft text-on-success-soft'
-                      : 'bg-danger-soft text-on-danger-soft'
+                      : ev.outcome === 'FAILURE' ? 'bg-danger-soft text-on-danger-soft' : 'bg-neutral-soft text-on-neutral-soft'
                   "
                 >
-                  {{ ('wsAudit.outcomes.' + ev.outcome) | transloco }}
+                  {{ ev.outcome ? (('wsAudit.outcomes.' + ev.outcome) | transloco) : '—' }}
                 </span>
               </span>
 
@@ -476,6 +462,8 @@
                   <span class="inline-flex h-badge items-center rounded-8 bg-warning px-8 text-12 font-medium text-on-warning whitespace-nowrap">
                     {{ 'wsAudit.sensitivities.HIGH_CHIP' | transloco }}
                   </span>
+                } @else if (ev.sensitivity === null) {
+                  <span class="text-text-muted">—</span>
                 }
               </span>
             </div>

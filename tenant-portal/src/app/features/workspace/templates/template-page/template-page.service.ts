@@ -58,7 +58,7 @@ export function errorDetailsOf(error: unknown): {
     return {
       status: error.status,
       code: error.code,
-      correlationId: error.correlationId,
+      correlationId: error.correlationId ?? null,
     };
   }
   if (typeof error === 'object' && error !== null) {

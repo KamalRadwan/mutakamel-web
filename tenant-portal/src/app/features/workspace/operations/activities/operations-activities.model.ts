@@ -33,7 +33,7 @@ export interface ActivitiesFilterState {
   /** null = use view default (PLANNED + IN_PROGRESS in List; all in Calendar). [] = explicitly all statuses in List. */
   statusesExplicit: ActivityStatus[] | null;
   branchId: string | null;
-  /** Encoded as "APP:TYPE", e.g. "CRM:LEAD", or null. Client-side filter on primary target. */
+  /** Encoded as "APP:TYPE", e.g. "CRM:LEAD", or null. Sent as targetApp and targetType. */
   recordType: string | null;
   dueRange: DateRangeValue | null;
   overdue: boolean;
@@ -149,14 +149,7 @@ export function defaultFilterState(): ActivitiesFilterState {
 }
 
 export function primaryTargetOf(activity: Activity): ActivityTarget | null {
-  return activity.targets.find((target) => target.role === 'PRIMARY') ?? activity.targets[0] ?? null;
-}
-
-export function matchesRecordType(activity: Activity, recordType: string | null): boolean {
-  if (!recordType) return true;
-  const primary = primaryTargetOf(activity);
-  if (!primary) return false;
-  return `${primary.targetApp}:${primary.targetType}` === recordType;
+  return activity.targets.find((target) => target.role === 'PRIMARY') ?? null;
 }
 
 export function localDayBounds(now = new Date()): { dayStart: string; dayEnd: string } {

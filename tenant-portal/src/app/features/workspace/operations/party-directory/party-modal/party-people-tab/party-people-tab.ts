@@ -35,13 +35,8 @@ import { Dropdown, DropdownOption } from '../../../../../../shared/ui/dropdown/d
 import { Field } from '../../../../../../shared/ui/field/field';
 import { rectInPage, viewport } from '../../../../../../shared/ui/overlay/zoom';
 import { PhoneActionSource, PhoneActions } from '../../../../../../shared/widgets/phone-actions/phone-actions';
-import { errorCodeOf } from '../../../../staff/shared/staff.api';
-import {
-  addRelationship,
-  deleteRelationship,
-  listOrgContacts,
-  listParties,
-} from '../../party-directory.api';
+import { ApiError, errorCodeOf, isValidationError } from '../../../../../../core/api/api-errors';
+import { PartyDirectoryApi } from '../../party-directory.api';
 import {
   OrgContact,
   PartyDetail,
@@ -105,6 +100,7 @@ export class PartyPeopleTab {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly api = inject(PartyDirectoryApi);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
@@ -118,7 +114,7 @@ export class PartyPeopleTab {
   readonly readonly = input(false);
 
   readonly openPerson = output<string>();
-  readonly changed = output<void>();
+  readonly partyUpdated = output<PartyDetail>();
 
   protected readonly limits = PARTY_LIMITS;
   protected readonly skeletonRows = SKELETON_ROWS;
@@ -357,7 +353,7 @@ export class PartyPeopleTab {
 
     this.savingLink.set(true);
     try {
-      await addRelationship({
+      await this.api.addRelationship({
         fromPartyId: this.party().id,
         toPartyId: person.id,
         relationshipType: this.relationshipType(),
@@ -367,12 +363,12 @@ export class PartyPeopleTab {
       this.notify.success(this.transloco.translate('wsPartyModal.people.linked'));
       this.resetLinkForm();
       await this.loadContacts(true);
-      this.changed.emit();
+      this.partyUpdated.emit(await this.api.getParty(this.party().id));
     } catch (error) {
       const code = errorCodeOf(error);
       if (
         code === 'PARTY_RELATIONSHIP_ALREADY_EXISTS' ||
-        code === 'PARTY_RELATIONSHIP_INVALID'
+        code === 'PARTY_RELATIONSHIP_INVALID' || isValidationError(error)
       ) {
         this.personServerError.set({
           message: resolvePartyError(error, this.transloco),
@@ -394,10 +390,10 @@ export class PartyPeopleTab {
 
     this.unlinkingId.set(row.relationshipId);
     try {
-      await deleteRelationship(row.relationshipId);
+      await this.api.deleteRelationship(row.relationshipId);
       this.notify.success(this.transloco.translate('wsPartyModal.people.unlinked'));
       await this.loadContacts(true);
-      this.changed.emit();
+      this.partyUpdated.emit(await this.api.getParty(this.party().id));
     } catch (error) {
       this.notify.error(resolvePartyError(error, this.transloco));
     } finally {
@@ -417,13 +413,14 @@ export class PartyPeopleTab {
     }
 
     try {
-      const res = await listOrgContacts(partyId, { page: nextPage, limit: PAGE_LIMIT });
+      const res = await this.api.listOrgContacts(partyId, { page: nextPage, limit: PAGE_LIMIT });
       if (seq !== this.loadSeq || this.party().id !== partyId) return;
       this.currentPage = res.meta.page;
       this.hasNext.set(res.meta.hasNext);
       this.contacts.update((prev) => (reset ? res.data : [...prev, ...res.data]));
     } catch (error) {
       if (seq !== this.loadSeq || this.party().id !== partyId) return;
+      if (error instanceof ApiError && error.status === 422) this.notify.error(resolvePartyError(error, this.transloco, 'read'));
       if (reset) {
         this.loadFailed.set(true);
       } else {
@@ -441,7 +438,7 @@ export class PartyPeopleTab {
     const seq = ++this.searchSeq;
     this.pickerSearching.set(true);
     try {
-      const page = await listParties({
+      const page = await this.api.listParties({
         page: 1,
         limit: PAGE_LIMIT,
         partyType: 'PERSON',

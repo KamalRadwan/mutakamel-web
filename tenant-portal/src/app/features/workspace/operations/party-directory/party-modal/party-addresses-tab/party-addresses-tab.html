@@ -1,10 +1,10 @@
 <div class="min-h-0 flex-1 overflow-y-auto p-10">
   <div class="mb-8 flex items-center justify-between gap-8">
     <p class="text-11 leading-16 text-text-muted">
-      <bdi dir="ltr">{{ addresses().length }}</bdi> / <bdi dir="ltr">{{ maxAddresses() }}</bdi>
-      <span class="sr-only">
-        {{ 'wsPartyModal.counter' | transloco: { count: addresses().length, max: maxAddresses() } }}
-      </span>
+      <bdi dir="ltr">{{ addresses().length }}</bdi>
+      @if (maxAddresses() !== null) {
+        / <bdi dir="ltr">{{ maxAddresses() }}</bdi>
+      }
     </p>
 
     @if (!readonly() && editingKey() !== 'new' && addresses().length > 0) {
@@ -194,7 +194,7 @@
         [hint]="'wsPartyModal.addresses.labelHint' | transloco"
         [count]="addressForm.label().value().length"
         [max]="limits.addressLabel"
-        [error]="maxErr(addressForm.label(), limits.addressLabel)"
+        [error]="maxErr('label', addressForm.label(), limits.addressLabel)"
       >
         <input
           [id]="uid + '-' + prefix + '-addr-label'"
@@ -203,7 +203,7 @@
           class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
           [formField]="addressForm.label"
           [readOnly]="saving()"
-          [attr.aria-invalid]="maxErr(addressForm.label(), limits.addressLabel) ? 'true' : null"
+          [attr.aria-invalid]="maxErr('label', addressForm.label(), limits.addressLabel) ? 'true' : null"
         />
       </ui-field>
 
@@ -213,7 +213,7 @@
         [hint]="'wsPartyModal.addresses.countryHint' | transloco"
         [count]="addressForm.country().value().length"
         [max]="limits.country"
-        [error]="maxErr(addressForm.country(), limits.country)"
+        [error]="maxErr('country', addressForm.country(), limits.country)"
       >
         <input
           [id]="uid + '-' + prefix + '-addr-country'"
@@ -222,7 +222,7 @@
           class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
           [formField]="addressForm.country"
           [readOnly]="saving()"
-          [attr.aria-invalid]="maxErr(addressForm.country(), limits.country) ? 'true' : null"
+          [attr.aria-invalid]="maxErr('country', addressForm.country(), limits.country) ? 'true' : null"
         />
       </ui-field>
 
@@ -232,7 +232,7 @@
         [hint]="'wsPartyModal.addresses.cityHint' | transloco"
         [count]="addressForm.city().value().length"
         [max]="limits.city"
-        [error]="maxErr(addressForm.city(), limits.city)"
+        [error]="maxErr('city', addressForm.city(), limits.city)"
       >
         <input
           [id]="uid + '-' + prefix + '-addr-city'"
@@ -241,7 +241,7 @@
           class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
           [formField]="addressForm.city"
           [readOnly]="saving()"
-          [attr.aria-invalid]="maxErr(addressForm.city(), limits.city) ? 'true' : null"
+          [attr.aria-invalid]="maxErr('city', addressForm.city(), limits.city) ? 'true' : null"
         />
       </ui-field>
 
@@ -251,7 +251,7 @@
         [hint]="'wsPartyModal.addresses.areaHint' | transloco"
         [count]="addressForm.area().value().length"
         [max]="limits.area"
-        [error]="maxErr(addressForm.area(), limits.area)"
+        [error]="maxErr('area', addressForm.area(), limits.area)"
       >
         <input
           [id]="uid + '-' + prefix + '-addr-area'"
@@ -260,7 +260,7 @@
           class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
           [formField]="addressForm.area"
           [readOnly]="saving()"
-          [attr.aria-invalid]="maxErr(addressForm.area(), limits.area) ? 'true' : null"
+          [attr.aria-invalid]="maxErr('area', addressForm.area(), limits.area) ? 'true' : null"
         />
       </ui-field>
 
@@ -270,7 +270,7 @@
         [hint]="'wsPartyModal.addresses.postalCodeHint' | transloco"
         [count]="addressForm.postalCode().value().length"
         [max]="limits.postalCode"
-        [error]="maxErr(addressForm.postalCode(), limits.postalCode)"
+        [error]="maxErr('postalCode', addressForm.postalCode(), limits.postalCode)"
       >
         <input
           [id]="uid + '-' + prefix + '-addr-postal'"
@@ -279,7 +279,7 @@
           class="min-w-0 flex-1 bg-transparent text-start text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
           [formField]="addressForm.postalCode"
           [readOnly]="saving()"
-          [attr.aria-invalid]="maxErr(addressForm.postalCode(), limits.postalCode) ? 'true' : null"
+          [attr.aria-invalid]="maxErr('postalCode', addressForm.postalCode(), limits.postalCode) ? 'true' : null"
         />
       </ui-field>
 
@@ -290,7 +290,7 @@
           [hint]="'wsPartyModal.addresses.streetHint' | transloco"
           [count]="addressForm.street().value().length"
           [max]="limits.street"
-          [error]="maxErr(addressForm.street(), limits.street)"
+          [error]="maxErr('street', addressForm.street(), limits.street)"
         >
           <input
             [id]="uid + '-' + prefix + '-addr-street'"
@@ -299,7 +299,7 @@
             class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
             [formField]="addressForm.street"
             [readOnly]="saving()"
-            [attr.aria-invalid]="maxErr(addressForm.street(), limits.street) ? 'true' : null"
+            [attr.aria-invalid]="maxErr('street', addressForm.street(), limits.street) ? 'true' : null"
           />
         </ui-field>
       </div>
@@ -311,7 +311,7 @@
           [hint]="'wsPartyModal.addresses.buildingNoHint' | transloco"
           [count]="addressForm.buildingNo().value().length"
           [max]="limits.buildingNo"
-          [error]="maxErr(addressForm.buildingNo(), limits.buildingNo)"
+          [error]="maxErr('buildingNo', addressForm.buildingNo(), limits.buildingNo)"
         >
           <input
             [id]="uid + '-' + prefix + '-addr-building'"
@@ -320,7 +320,7 @@
             class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
             [formField]="addressForm.buildingNo"
             [readOnly]="saving()"
-            [attr.aria-invalid]="maxErr(addressForm.buildingNo(), limits.buildingNo) ? 'true' : null"
+            [attr.aria-invalid]="maxErr('buildingNo', addressForm.buildingNo(), limits.buildingNo) ? 'true' : null"
           />
         </ui-field>
 
@@ -330,7 +330,7 @@
           [hint]="'wsPartyModal.addresses.floorHint' | transloco"
           [count]="addressForm.floor().value().length"
           [max]="limits.floor"
-          [error]="maxErr(addressForm.floor(), limits.floor)"
+          [error]="maxErr('floor', addressForm.floor(), limits.floor)"
         >
           <input
             [id]="uid + '-' + prefix + '-addr-floor'"
@@ -339,7 +339,7 @@
             class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
             [formField]="addressForm.floor"
             [readOnly]="saving()"
-            [attr.aria-invalid]="maxErr(addressForm.floor(), limits.floor) ? 'true' : null"
+            [attr.aria-invalid]="maxErr('floor', addressForm.floor(), limits.floor) ? 'true' : null"
           />
         </ui-field>
 
@@ -349,7 +349,7 @@
           [hint]="'wsPartyModal.addresses.apartmentHint' | transloco"
           [count]="addressForm.apartment().value().length"
           [max]="limits.apartment"
-          [error]="maxErr(addressForm.apartment(), limits.apartment)"
+          [error]="maxErr('apartment', addressForm.apartment(), limits.apartment)"
         >
           <input
             [id]="uid + '-' + prefix + '-addr-apt'"
@@ -358,7 +358,7 @@
             class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
             [formField]="addressForm.apartment"
             [readOnly]="saving()"
-            [attr.aria-invalid]="maxErr(addressForm.apartment(), limits.apartment) ? 'true' : null"
+            [attr.aria-invalid]="maxErr('apartment', addressForm.apartment(), limits.apartment) ? 'true' : null"
           />
         </ui-field>
       </div>
@@ -370,7 +370,7 @@
           [hint]="'wsPartyModal.addresses.landmarkHint' | transloco"
           [count]="addressForm.landmark().value().length"
           [max]="limits.landmark"
-          [error]="maxErr(addressForm.landmark(), limits.landmark)"
+          [error]="maxErr('landmark', addressForm.landmark(), limits.landmark)"
         >
           <input
             [id]="uid + '-' + prefix + '-addr-landmark'"
@@ -379,7 +379,7 @@
             class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
             [formField]="addressForm.landmark"
             [readOnly]="saving()"
-            [attr.aria-invalid]="maxErr(addressForm.landmark(), limits.landmark) ? 'true' : null"
+            [attr.aria-invalid]="maxErr('landmark', addressForm.landmark(), limits.landmark) ? 'true' : null"
           />
         </ui-field>
       </div>

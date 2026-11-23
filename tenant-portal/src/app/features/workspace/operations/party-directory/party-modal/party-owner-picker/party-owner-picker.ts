@@ -1,3 +1,4 @@
+import { WorkspaceLookups } from '../../../../../../shared/widgets/workspace-lookups/workspace-lookups.api';
 import {
   Component,
   DestroyRef,
@@ -5,6 +6,8 @@ import {
   Injector,
   afterNextRender,
   computed,
+  effect,
+  untracked,
   inject,
   input,
   model,
@@ -13,10 +16,12 @@ import {
 } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerCheck, tablerChevronDown, tablerLoader2, tablerSearch } from '@ng-icons/tabler-icons';
-import { TranslocoPipe } from '@jsverse/transloco';
+import { TranslocoPipe, provideTranslocoScope } from '@jsverse/transloco';
 import { rectInPage, viewport } from '../../../../../../shared/ui/overlay/zoom';
-import { getUser, listUsers } from '../../../../staff/shared/staff.api';
-import { TenantUser } from '../../../../staff/shared/staff.model';
+import { ApiError } from '../../../../../../core/api/api-errors';
+import {
+  WorkspaceUser as TenantUser,
+} from '../../../../../../shared/widgets/workspace-lookups/workspace-lookups.model';
 import { tenantUserName } from '../party-modal.util';
 
 interface MenuPlace {
@@ -31,6 +36,7 @@ const SEARCH_DEBOUNCE_MS = 200;
 @Component({
   selector: 'app-party-owner-picker',
   imports: [NgIcon, TranslocoPipe],
+  viewProviders: [provideTranslocoScope('settings', { scope: 'ws-party-directory', alias: 'wsParty' }, { scope: 'ws-party-modal', alias: 'wsPartyModal' })],
   providers: [provideIcons({ tablerChevronDown, tablerSearch, tablerLoader2, tablerCheck })],
   templateUrl: './party-owner-picker.html',
   host: {
@@ -41,6 +47,7 @@ const SEARCH_DEBOUNCE_MS = 200;
   },
 })
 export class PartyOwnerPicker {
+  private readonly lookups = inject(WorkspaceLookups);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
   private readonly destroyRef = inject(DestroyRef);
@@ -49,6 +56,8 @@ export class PartyOwnerPicker {
   private readonly menuPanel = viewChild<ElementRef<HTMLElement>>('menuPanel');
   private readonly searchInput = viewChild<ElementRef<HTMLInputElement>>('searchInput');
 
+  readonly branchId = input<string | null>(null);
+  protected readonly accessDenied = signal(false);
   readonly value = model<string | null>(null);
   readonly readonly = input(false);
   readonly disabled = input(false);
@@ -86,6 +95,17 @@ export class PartyOwnerPicker {
   });
 
   constructor() {
+    effect(() => {
+      this.branchId();
+      untracked(() => {
+        this.searchSeq++;
+        if (this.searchTimer !== null) clearTimeout(this.searchTimer);
+        this.close();
+        this.options.set([]);
+        this.searching.set(false);
+        this.accessDenied.set(false);
+      });
+    });
     const onScroll = (event: Event) => {
       if (!this.menuOpen()) return;
       const target = event.target;
@@ -104,7 +124,7 @@ export class PartyOwnerPicker {
   }
 
   protected toggle(): void {
-    if (this.readonly() || this.disabled()) return;
+    if (this.readonly() || this.disabled() || this.accessDenied()) return;
     if (this.menuOpen()) {
       this.close();
       return;
@@ -159,7 +179,8 @@ export class PartyOwnerPicker {
   }
 
   protected onSearchInput(event: Event): void {
-    const term = (event.target as HTMLInputElement).value;
+    const term = (event.target as HTMLInputElement).value.slice(0, 200);
+    this.searchSeq++;
     this.search.set(term);
     if (this.searchTimer !== null) {
       clearTimeout(this.searchTimer);
@@ -192,7 +213,7 @@ export class PartyOwnerPicker {
   }
 
   protected select(user: TenantUser | null): void {
-    if (this.readonly() || this.disabled()) return;
+    if (this.readonly() || this.disabled() || this.accessDenied()) return;
     this.value.set(user?.id ?? null);
     this.resolvedSelected.set(user);
     this.lastResolvedId = user?.id ?? null;
@@ -204,11 +225,11 @@ export class PartyOwnerPicker {
     this.lastResolvedId = userId;
     const seq = ++this.resolveSeq;
     try {
-      const user = await getUser(userId);
+      const user = await this.lookups.user(userId);
       if (seq !== this.resolveSeq || this.value() !== userId) return;
       this.resolvedSelected.set(user);
-    } catch {
-      // Leave fallback empty label if user cannot be resolved.
+    } catch (error) {
+      if (seq === this.resolveSeq && error instanceof ApiError && error.status === 403) this.accessDenied.set(true);
     }
   }
 
@@ -216,7 +237,8 @@ export class PartyOwnerPicker {
     const seq = ++this.searchSeq;
     this.searching.set(true);
     try {
-      const page = await listUsers({
+      const page = await this.lookups.users({
+        ...(this.branchId() ? { branchId: this.branchId()! } : {}),
         status: 'ACTIVE',
         ...(search.trim() ? { search: search.trim() } : {}),
         limit: 20,
@@ -226,9 +248,13 @@ export class PartyOwnerPicker {
       if (this.menuOpen()) {
         queueMicrotask(() => this.placeMenu(this.menuSeq));
       }
-    } catch {
+    } catch (error) {
       if (seq !== this.searchSeq) return;
       this.options.set([]);
+      if (error instanceof ApiError && error.status === 403) {
+        this.accessDenied.set(true);
+        this.close();
+      }
     } finally {
       if (seq === this.searchSeq) {
         this.searching.set(false);

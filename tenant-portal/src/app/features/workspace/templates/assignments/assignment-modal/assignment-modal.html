@@ -148,6 +148,7 @@
             [for]="uid + '-locale'"
             [label]="'assignments.modal.languageLabel' | transloco"
             [hint]="'assignments.modal.languageHint' | transloco"
+            [error]="serverErrors()['localeChoice'] ?? null"
             [required]="true"
           >
             <ui-dropdown
@@ -157,7 +158,7 @@
               [options]="languageOptions()"
               [formField]="assignmentForm.localeChoice"
               [label]="'assignments.modal.languageLabel' | transloco"
-              [describedBy]="uid + '-locale-hint'"
+              [describedBy]="uid + '-locale-hint' + (serverErrors()['localeChoice'] ? ' ' + uid + '-locale-error' : '')"
             />
           </ui-field>
         } @else {
@@ -185,6 +186,7 @@
             [for]="uid + '-scope'"
             [label]="'assignments.modal.scopeLabel' | transloco"
             [hint]="'assignments.modal.scopeHint' | transloco"
+            [error]="serverErrors()['scopeKey'] ?? null"
             [required]="true"
           >
             <ui-dropdown
@@ -194,7 +196,7 @@
               [options]="scopeDropdownOptions()"
               [formField]="assignmentForm.scopeKey"
               [label]="'assignments.modal.scopeLabel' | transloco"
-              [describedBy]="uid + '-scope-hint'"
+              [describedBy]="uid + '-scope-hint' + (serverErrors()['scopeKey'] ? ' ' + uid + '-scope-error' : '')"
             />
           </ui-field>
         } @else {
@@ -307,12 +309,13 @@
           [for]="uid + '-default'"
           [label]="'assignments.modal.defaultLabel' | transloco"
           [hint]="'assignments.modal.defaultHint' | transloco"
+          [error]="serverErrors()['isDefault'] ?? null"
         >
           <div class="flex h-field items-center">
             <ui-switch
               [id]="uid + '-default'"
               [label]="'assignments.modal.defaultLabel' | transloco"
-              [describedBy]="uid + '-default-hint'"
+              [describedBy]="uid + '-default-hint' + (serverErrors()['isDefault'] ? ' ' + uid + '-default-error' : '')"
               [formField]="assignmentForm.isDefault"
             />
           </div>
@@ -387,27 +390,8 @@
   [cancelLabel]="'assignments.unsaved.cancel' | transloco"
 />
 
-<ui-modal
-  #conflictModal
-  size="confirm"
-  icon="tablerAlertTriangle"
-  tile="bg-icon-orange"
-  [title]="'assignments.conflict.title' | transloco"
-  [closeLabel]="'assignments.actions.close' | transloco"
-  [dismissable]="false"
-  (closed)="onConflictClosed()"
->
-  <p class="text-12 leading-18 text-text-muted">{{ 'assignments.conflict.text' | transloco }}</p>
-
-  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
-    <button type="button" uiButton variant="primary" (click)="reloadFromConflict()">
-      {{ 'assignments.conflict.reload' | transloco }}
-    </button>
-    <button type="button" uiButton variant="secondary" (click)="keepChangesAfterConflict()">
-      {{ 'assignments.conflict.keep' | transloco }}
-    </button>
-  </div>
-</ui-modal>
+<ui-conflict-dialog [(open)]="conflictOpen"
+  (reload)="reloadFromConflict()" (keepEditing)="keepChangesAfterConflict()" />
 
 <ui-confirm-dialog
   #deactivateConfirm

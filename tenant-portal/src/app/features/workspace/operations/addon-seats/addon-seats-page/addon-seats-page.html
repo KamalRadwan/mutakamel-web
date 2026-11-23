@@ -1,6 +1,4 @@
-@if (sessionFailed()) {
-  <app-session-failed-state (retry)="retrySession()" />
-} @else if (showForbidden()) {
+@if (showForbidden()) {
   <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
     <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-orange text-on-icon">
       <ng-icon name="tablerLock" size="18" aria-hidden="true" />
@@ -18,7 +16,7 @@
       class="w-full max-w-modal-form flex-1"
       [for]="uid + '-user'"
       [label]="'wsAddonSeats.userField.label' | transloco"
-      [hint]="'wsAddonSeats.userField.hint' | transloco"
+      [hint]="(pickerForbidden() ? 'wsAddonSeats.userField.readAccessRequired' : 'wsAddonSeats.userField.hint') | transloco"
     >
       <div class="flex items-center gap-4">
         <button
@@ -67,6 +65,15 @@
     </ui-field>
 
     @if (selectedUserId()) {
+      @if (missingParentSeat()) {
+        <a
+          uiButton variant="ghost" size="small"
+          routerLink="/workspace/staff/users"
+          [queryParams]="{ open: selectedUserId(), tab: 'apps' }"
+        >
+          {{ 'wsAddonSeats.options.openUserApps' | transloco: { user: selectedUserDisplayName() } }}
+        </a>
+      }
       <button
         type="button"
         class="ms-auto inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 border border-border-field bg-surface text-text-muted outline-none transition-colors duration-fast hover:border-border-field-hover hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder"
@@ -139,7 +146,7 @@
         } @empty {
           @if (!usersSearching()) {
             <li class="flex h-menu-item items-center justify-center px-8 text-12 text-text-muted">
-              {{ 'wsAddonSeats.userField.noResults' | transloco }}
+              {{ (pickerForbidden() ? 'wsAddonSeats.userField.readAccessRequired' : 'wsAddonSeats.userField.noResults') | transloco }}
             </li>
           }
         }
@@ -171,7 +178,9 @@
           }
           <bdi dir="ltr" class="truncate text-12 leading-18 text-text-muted">{{ user.email }}</bdi>
         </div>
-        <app-staff-status-badge [status]="user.status" />
+        <span class="inline-flex h-badge max-w-full items-center truncate rounded-8 px-8 text-12 font-medium whitespace-nowrap" [class]="userStatusTone(user.status)">
+          {{ 'staff.status.' + user.status | transloco }}
+        </span>
       </section>
     } @else if (resolvingUser()) {
       <section class="flex shrink-0 items-center gap-8 rounded-10 border border-border bg-surface p-8 shadow-card" aria-busy="true">
@@ -336,22 +345,20 @@
                           <span class="truncate text-12 leading-16 text-text-muted">
                             {{ 'wsAddonSeats.options.noAppSeat' | transloco: { app: appName } }}
                           </span>
-                          @if (staffUserScope(option.userId); as target) {
                             <a
                               class="truncate text-11 leading-16 font-medium text-accent outline-none hover:underline focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
                               [routerLink]="['/workspace/staff/users']"
-                              [queryParams]="{ open: option.userId, tab: 'apps', companyId: target.companyId, branchId: target.branchId }"
+                              [queryParams]="{ open: option.userId, tab: 'apps' }"
                             >
                               {{ 'wsAddonSeats.options.openUserApps' | transloco: { user: selectedUserDisplayName() } }}
                             </a>
-                          }
                         </span>
                       }
                     </span>
 
                     <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
                       @if (ready) {
-                        <span class="inline-flex h-badge max-w-full items-center truncate rounded-8 bg-success-soft px-8 text-12 font-medium text-on-success-soft whitespace-nowrap">
+                        <span class="inline-flex h-badge max-w-full items-center truncate rounded-8 bg-success-soft px-8 text-12 font-medium text-on-success-soft whitespace-nowrap" [title]="readinessReason(option)">
                           {{ 'wsAddonSeats.options.ready' | transloco }}
                         </span>
                       } @else {
@@ -364,7 +371,7 @@
                       }
                     </span>
 
-                    <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                    <span role="cell" class="flex min-w-0 flex-col items-start justify-center border-s border-border px-10">
                       @if (option.assignment) {
                         <span class="inline-flex h-badge max-w-full items-center truncate rounded-8 bg-success px-8 text-12 font-medium text-on-success whitespace-nowrap">
                           {{ 'wsAddonSeats.seat.assigned' | transloco }}
@@ -372,6 +379,12 @@
                       } @else {
                         <span class="inline-flex h-badge max-w-full items-center truncate rounded-8 bg-neutral-soft px-8 text-12 font-medium text-text-muted whitespace-nowrap">
                           {{ 'wsAddonSeats.seat.notAssigned' | transloco }}
+                        </span>
+                      }
+                      @if (option.seats; as seats) {
+                        <span class="truncate text-11 leading-16 text-text-muted">
+                          <bdi dir="ltr" class="tabular-nums">{{ seats.used }} / {{ seats.total }}</bdi>
+                          {{ 'wsAddonSeats.options.seatsUsed' | transloco }}
                         </span>
                       }
                     </span>
@@ -394,7 +407,7 @@
                           </button>
                         } @else {
                           @let assigning = busyActionKey() === 'assign:' + option.addonSelectionId;
-                          <span class="inline-flex" [title]="disabledReason ?? ''">
+                          <span class="inline-flex" [title]="disabledReason ?? readinessReason(option)">
                             <button
                               type="button"
                               uiButton
@@ -402,15 +415,15 @@
                               size="small"
                               [loading]="assigning"
                               [disabled]="!!disabledReason || !!busyActionKey()"
-                              [attr.aria-describedby]="disabledReason ? uid + '-opt-reason-' + option.addonSelectionId : null"
+                              [attr.aria-describedby]="disabledReason || readinessReason(option) ? uid + '-opt-reason-' + option.addonSelectionId : null"
                               (click)="assign(option)"
                             >
                               {{ 'wsAddonSeats.actions.assign' | transloco }}
                             </button>
                           </span>
-                          @if (disabledReason) {
+                          @if (disabledReason || readinessReason(option)) {
                             <span [id]="uid + '-opt-reason-' + option.addonSelectionId" class="sr-only">
-                              {{ disabledReason }}
+                              {{ disabledReason ?? readinessReason(option) }}
                             </span>
                           }
                         }

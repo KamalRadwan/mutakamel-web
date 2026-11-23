@@ -18,7 +18,7 @@ import {
   ActivityTypeDefinition,
   TYPE_LOOK,
 } from '../../../../../shared/widgets/activities/activities.model';
-import { Branch } from '../../../staff/shared/staff.model';
+import { WorkspaceBranch } from '../../../../../shared/widgets/workspace-lookups/workspace-lookups.model';
 import { ActivitiesMultiSelect, MultiSelectOption } from '../activities-multi-select/activities-multi-select';
 import {
   ALL_RECORD_TYPES,
@@ -56,7 +56,7 @@ export class ActivitiesFilters {
   readonly panelId = input('ws-activities-filters');
   readonly view = input.required<ActivitiesView>();
   readonly state = input.required<ActivitiesFilterState>();
-  readonly branches = input<readonly Branch[]>([]);
+  readonly branches = input<readonly WorkspaceBranch[]>([]);
   readonly activityTypes = input<readonly ActivityTypeDefinition[]>([]);
   readonly hasActiveFilters = input(false);
 

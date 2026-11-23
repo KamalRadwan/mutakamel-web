@@ -6,19 +6,24 @@ import {
   fakeCreateAssignment,
   fakeGetDataSourceSchema,
   fakeGetDraft,
+  fakeGetAssignment,
+  fakeGetPreviewJob,
+  fakeGetPreviewJobArtifact,
   fakeGetTemplate,
   fakeListDataSources,
   fakeListTemplates,
   fakeListRecoverySnapshots,
   fakeListVersions,
   fakePatchDraft,
+  fakePatchAssignment,
+  fakePreviewPdf,
   fakeRestoreRecoverySnapshot,
   fakeRetryTemplateThumbnail,
   fakeUploadAsset,
   fakeValidateDraft,
   newTemplateIdempotencyKey,
 } from './templates.fake';
-import type { TemplateDataSourceKey, TemplateDocumentV1 } from './templates.model';
+import type { CreateTemplateAssignmentDto, TemplateDataSourceKey, TemplateDocumentV1, TemplatePdfPreviewAcceptedDto, TemplatePdfPreviewRequestDto } from './templates.model';
 
 const QUOTATION_ID = FAKE_TEMPLATE_IDS.corporateQuotationId;
 /** Fake seeds (templates.fake.ts TPL_IDS). */
@@ -183,31 +188,40 @@ describe('templates.fake PATCH draft If-Match (draft-schema strong tag)', () => 
 describe('templates.fake validation issues', () => {
   it('reports an all-blank email subject as the issue TEMPLATE_EMAIL_SUBJECT_EMPTY with an RFC 6901 pointer', async () => {
     const draft = await fakeGetDraft(LEAD_EMAIL_ID);
-    const doc = structuredClone(draft.editorDocument) as TemplateDocumentV1;
-    if (!doc.email) throw new Error('Lead email fixture has no email block.');
-    doc.email.subject = { ...doc.email.subject, segments: [{ kind: 'TEXT', value: '   ' }] } as typeof doc.email.subject;
-    const saved = await fakePatchDraft(
-      LEAD_EMAIL_ID,
-      { editorDocument: doc, clientMutationId: newTemplateIdempotencyKey() },
-      draft.etag,
-      newTemplateIdempotencyKey(),
-    );
-    const run = await fakeValidateDraft(
-      LEAD_EMAIL_ID,
-      { draftRevision: saved.draft.revision, rendererTargets: ['EMAIL_HTML', 'EMAIL_TEXT'] },
-      saved.draft.etag,
-    );
-    expect(run.status).toBe('FAILED');
-    expect(run.issues).toContainEqual(
-      expect.objectContaining({ code: 'TEMPLATE_EMAIL_SUBJECT_EMPTY', severity: 'ERROR', jsonPointer: '/email/subject' }),
-    );
-    for (const issue of run.issues) {
-      expect(issue.jsonPointer === '' || issue.jsonPointer.startsWith('/')).toBe(true);
-      expect(issue.jsonPointer.length).toBeLessThanOrEqual(500);
+    try {
+      const doc = structuredClone(draft.editorDocument) as TemplateDocumentV1;
+      if (!doc.email) throw new Error('Lead email fixture has no email block.');
+      doc.email.subject = { ...doc.email.subject, segments: [{ kind: 'TEXT', value: '   ' }] } as typeof doc.email.subject;
+      const saved = await fakePatchDraft(
+        LEAD_EMAIL_ID,
+        { editorDocument: doc, clientMutationId: newTemplateIdempotencyKey() },
+        draft.etag,
+        newTemplateIdempotencyKey(),
+      );
+      const run = await fakeValidateDraft(
+        LEAD_EMAIL_ID,
+        { draftRevision: saved.draft.revision, rendererTargets: ['EMAIL_HTML', 'EMAIL_TEXT'] },
+        saved.draft.etag,
+      );
+      expect(run.status).toBe('FAILED');
+      expect(run.issues).toContainEqual(
+        expect.objectContaining({ code: 'TEMPLATE_EMAIL_SUBJECT_EMPTY', severity: 'ERROR', jsonPointer: '/email/subject' }),
+      );
+      for (const issue of run.issues) {
+        expect(issue.jsonPointer === '' || issue.jsonPointer.startsWith('/')).toBe(true);
+        expect(issue.jsonPointer.length).toBeLessThanOrEqual(500);
+      }
+      const after = await fakeGetDraft(LEAD_EMAIL_ID);
+      expect(after.validation.errorCount).toBe(run.issues.filter((i) => i.severity === 'ERROR').length);
+      expect(after.validation.warningCount).toBe(run.issues.filter((i) => i.severity !== 'ERROR').length);
+    } finally {
+      const current = await fakeGetDraft(LEAD_EMAIL_ID);
+      const restored = await fakePatchDraft(LEAD_EMAIL_ID,
+        { editorDocument: draft.editorDocument, clientMutationId: newTemplateIdempotencyKey() },
+        current.etag, newTemplateIdempotencyKey());
+      await fakeValidateDraft(LEAD_EMAIL_ID,
+        { draftRevision: restored.draft.revision, rendererTargets: ['EMAIL_HTML', 'EMAIL_TEXT'] }, restored.draft.etag);
     }
-    const after = await fakeGetDraft(LEAD_EMAIL_ID);
-    expect(after.validation.errorCount).toBe(run.issues.filter((i) => i.severity === 'ERROR').length);
-    expect(after.validation.warningCount).toBe(run.issues.filter((i) => i.severity !== 'ERROR').length);
   });
 });
 
@@ -331,5 +345,102 @@ describe('templates.fake assignments owner runtime', () => {
     expect(res.assignment.documentType).toBe('SALES_ORDER');
     expect(res.assignment.adapterKey).toBe('TRADE_SALES_ORDER_PRINT_V1');
     expect(res.assignment.versionId).toBe(published.templateVersionId);
+  });
+});
+
+describe('templates fake', () => {
+  async function settle<T>(promise: Promise<T>): Promise<T> {
+    const outcome = promise.then((value) => ({ value }), (error: unknown) => ({ error }));
+    await vi.advanceTimersByTimeAsync(200);
+    const result = await outcome;
+    if ('error' in result) throw result.error;
+    return result.value;
+  }
+
+  it('pdf limits', async () => {
+    vi.useFakeTimers();
+    const originalTime = Date.now();
+    const jobs: TemplatePdfPreviewAcceptedDto[] = [];
+    try {
+      const draft = await settle(fakeGetDraft(QUOTATION_ID));
+      const body: TemplatePdfPreviewRequestDto = {
+        source: { kind: 'DRAFT', draftRevision: draft.revision },
+        dataSource: { kind: 'SYNTHETIC', fixtureKey: 'standard' }, locale: 'en-US', timeZone: 'UTC',
+      };
+      const firstKey = newTemplateIdempotencyKey();
+      for (let index = 0; index < 3; index++) {
+        jobs.push(await settle(fakePreviewPdf(QUOTATION_ID, body, index === 0 ? firstKey : newTemplateIdempotencyKey())));
+      }
+      const replay = await settle(fakePreviewPdf(QUOTATION_ID, body, firstKey));
+      expect(replay.renderJobId).toBe(jobs[0].renderJobId);
+      const limited = await settle(rejection(fakePreviewPdf(QUOTATION_ID, body, newTemplateIdempotencyKey())));
+      expect(limited).toMatchObject({ status: 429, code: 'CORE.TEMPLATE.PREVIEW.TOO_MANY_ACTIVE' });
+      expect(limited.correlationId).toBeTruthy();
+      expect(limited.details === undefined || Object.values(limited.details).every((value) =>
+        Array.isArray(value) && value.every((item) => typeof item === 'string'))).toBe(true);
+      const completed = await settle(fakeGetPreviewJob(jobs[0].renderJobId));
+      expect(completed.status).toBe('COMPLETED');
+      await expect(settle(fakeGetPreviewJobArtifact(jobs[0].renderJobId))).resolves.toBeInstanceOf(Blob);
+      const freedSlot = await settle(fakePreviewPdf(QUOTATION_ID, body, newTemplateIdempotencyKey()));
+      jobs.push(freedSlot);
+      expect(freedSlot.renderJobId).not.toBe(jobs[0].renderJobId);
+      vi.setSystemTime(new Date(Date.parse(freedSlot.expiresAt) + 1));
+      for (const read of [fakeGetPreviewJob, fakeGetPreviewJobArtifact]) {
+        const error = await settle(rejection(read(jobs[0].renderJobId)));
+        expect(error).toMatchObject({ status: 410, code: 'CORE.TEMPLATE.PREVIEW.ARTIFACT_EXPIRED' });
+      }
+      const pendingExpired = await settle(rejection(fakeGetPreviewJob(freedSlot.renderJobId)));
+      expect(pendingExpired).toMatchObject({ status: 410, code: 'CORE.TEMPLATE.PREVIEW.ARTIFACT_EXPIRED' });
+      // Expired active rows release the user's slots without polling.
+      const finalRequest = settle(fakePreviewPdf(QUOTATION_ID, body, newTemplateIdempotencyKey())).then((job) => {
+        jobs.push(job);
+        return job;
+      });
+      await expect(finalRequest).resolves.toHaveProperty('renderJobId');
+    } finally {
+      // Finish jobs at the original clock so pending rows do not revive when real timers resume.
+      vi.setSystemTime(originalTime);
+      for (const job of jobs) await settle(fakeGetPreviewJob(job.renderJobId));
+    }
+  });
+
+  it('default assignment overlap is a 409', async () => {
+    vi.useFakeTimers();
+    const definition = await settle(fakeGetTemplate(QUOTATION_ID));
+    const versions = await settle(fakeListVersions(QUOTATION_ID, { limit: 100 }));
+    const version = versions.items.find((item) => item.lifecycleStatus === 'PUBLISHED');
+    if (!version) throw new Error('Missing published quotation version.');
+    const body: CreateTemplateAssignmentDto = {
+      versionId: version.templateVersionId, adapterKey: 'TRADE_QUOTATION_PRINT_V1',
+      documentType: 'QUOTATION', outputChannel: 'PRINT', locale: 'en-US', scope: definition.scope,
+      priority: 98765, isDefault: true, effectiveFrom: '2030-01-01T00:00:00.000Z', effectiveTo: '2030-03-01T00:00:00.000Z',
+    };
+    const create = (patch: Partial<CreateTemplateAssignmentDto> = {}) =>
+      fakeCreateAssignment({ ...body, ...patch }, newTemplateIdempotencyKey());
+    const first = await settle(create());
+    for (const patch of [{}, { effectiveFrom: '2030-02-01T00:00:00.000Z', effectiveTo: null },
+      { effectiveFrom: '2029-12-31T20:00:00-04:00' }]) {
+      const error = await settle(rejection(create(patch)));
+      expect(error).toMatchObject({ status: 409, code: 'CORE.TEMPLATE.ASSIGNMENT.CONFLICT' });
+    }
+    await expect(settle(create({ priority: 98766 }))).resolves.toHaveProperty('assignment');
+    const nonDefault = await settle(create({ isDefault: false }));
+    await expect(settle(create({ locale: 'ar-EG' }))).resolves.toHaveProperty('assignment');
+    await expect(settle(create({ effectiveFrom: body.effectiveTo!, effectiveTo: null }))).resolves.toHaveProperty('assignment');
+    const conflict = await settle(rejection(fakePatchAssignment(nonDefault.assignment.assignmentId,
+      { isDefault: true }, nonDefault.assignment.etag)));
+    expect(conflict).toMatchObject({ status: 409, code: 'CORE.TEMPLATE.ASSIGNMENT.CONFLICT' });
+    await expect(settle(fakeGetAssignment(nonDefault.assignment.assignmentId))).resolves.toEqual(nonDefault.assignment);
+    const badWindow = await settle(rejection(create({ effectiveTo: body.effectiveFrom })));
+    expect(badWindow).toMatchObject({ status: 422, code: 'CORE.TEMPLATE.ASSIGNMENT.CONFLICT' });
+    const badPatch = await settle(rejection(fakePatchAssignment(first.assignment.assignmentId,
+      { effectiveTo: body.effectiveFrom }, first.assignment.etag)));
+    expect(badPatch).toMatchObject({ status: 422 });
+    await expect(settle(fakeGetAssignment(first.assignment.assignmentId))).resolves.toEqual(first.assignment);
+    // The current row never conflicts with itself; inactive defaults can overlap.
+    const self = await settle(fakePatchAssignment(first.assignment.assignmentId, { priority: body.priority }, first.assignment.etag));
+    expect(self.assignment.revision).toBe(first.assignment.revision + 1);
+    await expect(settle(fakePatchAssignment(nonDefault.assignment.assignmentId,
+      { isDefault: true, status: 'INACTIVE' }, nonDefault.assignment.etag))).resolves.toHaveProperty('assignment');
   });
 });

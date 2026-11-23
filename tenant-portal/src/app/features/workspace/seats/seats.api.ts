@@ -1,11 +1,10 @@
+import { InjectionToken } from '@angular/core';
 import { newIdempotencyKey } from '../../../core/api/idempotency';
 import {
-  fakeBulkAssignRole,
   fakeFreeUp,
   fakeFreeUpPreview,
   fakeGetMySeatStates,
   fakeGetSeatUsage,
-  fakeImportUsers,
   fakeListSeatHolders,
   fakePreviewSeats,
   fakeReleaseSeats,
@@ -13,10 +12,8 @@ import {
   fakeSwitchToDerived,
 } from './seats.fake';
 import {
-  BulkRoleResult,
   CorePage,
   FreeUpPreview,
-  ImportResult,
   MySeatState,
   SeatChange,
   SeatHolder,
@@ -42,6 +39,10 @@ export function previewSeats(changes: SeatChange[]): Promise<SeatPreview> {
   return fakePreviewSeats(changes);
 }
 
+export const SEAT_PREVIEW = new InjectionToken<typeof previewSeats>('SEAT_PREVIEW', {
+  providedIn: 'root', factory: () => previewSeats,
+});
+
 // TODO(seats-backend): releaseSeats response has no schema in OpenAPI yet; shape matches Core service code.
 /** POST /api/tenant/core/v1/users/:id/release-seats?confirmAddonCascade= (header x-idempotency-key UUIDv7) */
 export function releaseSeats(
@@ -50,34 +51,6 @@ export function releaseSeats(
   key = newIdempotencyKey(),
 ): Promise<SeatPreview> {
   return fakeReleaseSeats(userId, opts, key);
-}
-
-// TODO(seats-backend): bulkAssignRole response has no schema in OpenAPI yet; shape matches Core service code.
-/** POST /api/tenant/core/v1/users/bulk-role-assignments?confirmAddonCascade= (header x-idempotency-key UUIDv7) */
-export function bulkAssignRole(
-  body: {
-    roleId: string;
-    scope: { target: 'TENANT' | 'COMPANY' | 'BRANCH'; companyId?: string; branchId?: string };
-    userIds: string[];
-    dryRun: boolean;
-  },
-  key = newIdempotencyKey(),
-  opts: { confirmAddonCascade?: boolean } = {},
-): Promise<BulkRoleResult> {
-  return fakeBulkAssignRole(body, key, opts);
-}
-
-/** POST /api/tenant/core/v1/users/import?confirmAddonCascade= (header x-idempotency-key UUIDv7) */
-export function importUsers(
-  body: {
-    rows: unknown[];
-    mode: 'ALL_OR_NOTHING' | 'SKIP_ROLES_THAT_DONT_FIT';
-    dryRun: boolean;
-  },
-  key = newIdempotencyKey(),
-  opts: { confirmAddonCascade?: boolean } = {},
-): Promise<ImportResult> {
-  return fakeImportUsers(body, key, opts);
 }
 
 /** POST /api/tenant/core/v1/seats/free-up/preview (owner only, no idempotency key) */

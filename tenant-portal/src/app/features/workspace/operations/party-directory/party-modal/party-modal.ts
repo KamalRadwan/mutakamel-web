@@ -1,3 +1,6 @@
+import { WorkspaceLookups } from '../../../../../shared/widgets/workspace-lookups/workspace-lookups.api';
+import { FullState } from '../../../../../shared/ui/full-state/full-state';
+import { isPartyTenantWide } from './party-modal.util';
 import { Component, ElementRef, computed, inject, output, signal, viewChild, viewChildren } from '@angular/core';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
@@ -20,21 +23,17 @@ import { Button } from '../../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { UnsavedDialog } from '../../../../../shared/ui/unsaved-dialog/unsaved-dialog';
-import { ApiError, errorCodeOf, listAllPages, listBranches } from '../../../staff/shared/staff.api';
-import { StaffSession } from '../../../staff/shared/staff-session';
-import { Branch } from '../../../staff/shared/staff.model';
+import { ApiError, errorCodeOf, correlationIdOf } from '../../../../../core/api/api-errors';
+import { TenantScopeState } from '../../../../../core/scope/tenant-scope';
 import {
-  deleteParty,
-  getDirectorySettings,
-  getParty,
-  updateParty,
-} from '../party-directory.api';
+  WorkspaceBranch as Branch,
+} from '../../../../../shared/widgets/workspace-lookups/workspace-lookups.model';
+import { PartyDirectoryApi } from '../party-directory.api';
 import { PartyDetail, PartyType } from '../party-directory.model';
 import { PartyAddressesTab } from './party-addresses-tab/party-addresses-tab';
 import { PartyContactsTab } from './party-contacts-tab/party-contacts-tab';
 import { PartyDetailsTab } from './party-details-tab/party-details-tab';
 import {
-  DEFAULT_PARTY_LIMITS,
   EditableModalTab,
   PARTY_STATUS_BADGE,
   PartyDirectoryLimits,
@@ -58,6 +57,7 @@ const SKELETON_ROWS = [0, 1, 2, 3] as const;
 @Component({
   selector: 'app-party-modal',
   imports: [
+    FullState,
     NgIcon,
     TranslocoPipe,
     Button,
@@ -70,7 +70,7 @@ const SKELETON_ROWS = [0, 1, 2, 3] as const;
     PartyRolesTab,
     PartyPeopleTab,
   ],
-  providers: [
+  viewProviders: [
     provideTranslocoScope(
       'settings',
       { scope: 'ws-party-directory', alias: 'wsParty' },
@@ -95,8 +95,10 @@ export class PartyModal {
   private static nextId = 0;
   protected readonly uid = `party-modal-${++PartyModal.nextId}`;
 
-  private readonly session = inject(StaffSession);
+  private readonly lookups = inject(WorkspaceLookups);
+  private readonly session = inject(TenantScopeState);
   private readonly language = inject(LanguageState).current;
+  private readonly api = inject(PartyDirectoryApi);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
@@ -123,11 +125,12 @@ export class PartyModal {
   protected readonly activeTab = signal<PartyTabId>('details');
   protected readonly loading = signal(false);
   protected readonly loadFailed = signal(false);
+  protected readonly loadReference = signal<string | null>(null);
   protected readonly deleting = signal(false);
   protected readonly settingInactive = signal(false);
 
   protected readonly branches = signal<Branch[]>([]);
-  protected readonly limits = signal<PartyDirectoryLimits>(DEFAULT_PARTY_LIMITS);
+  protected readonly limits = signal<PartyDirectoryLimits>({ maxContactMethodsPerParty: null, maxAddressesPerParty: null });
 
   protected readonly activeEditableTab = computed<EditableModalTab | undefined>(() => {
     switch (this.activeTab()) {
@@ -186,9 +189,9 @@ export class PartyModal {
     this.session.me();
     if (this.mode() === 'create') {
       return (
-        this.session.isTenantWide('directory.party.manage') ||
+        isPartyTenantWide(this.session, 'directory.party.manage') ||
         this.branches().some(
-          (b) => b.status === 'ACTIVE' && this.session.can('directory.party.manage', { branchId: b.id }),
+          (b) => b.status === 'ACTIVE' && canOnPartyBranch(this.session, 'directory.party.manage', b.id),
         )
       );
     }
@@ -214,6 +217,11 @@ export class PartyModal {
     const current = this.party();
     if (!current) return true;
     return !canOnPartyBranch(this.session, 'directory.address.manage', current.branchId);
+  });
+
+  protected readonly rolesReadonly = computed(() => {
+    const current = this.party();
+    return !current || !canOnPartyBranch(this.session, 'directory.role.manage', current.branchId);
   });
 
   protected readonly peopleReadonly = computed(() => {
@@ -344,13 +352,6 @@ export class PartyModal {
     this.changed.emit({ id: updated.id });
   }
 
-  protected onPeopleChanged(): void {
-    const id = this.party()?.id;
-    if (id) {
-      this.changed.emit({ id });
-    }
-  }
-
   protected async openLinkedPerson(personId: string): Promise<void> {
     if (this.busy()) return;
     const editor = this.activeEditableTab();
@@ -391,7 +392,7 @@ export class PartyModal {
 
     this.deleting.set(true);
     try {
-      await deleteParty(current.id);
+      await this.api.deleteParty(current.id);
       this.notify.success(this.transloco.translate('wsPartyModal.toast.deleted'));
       this.closeImmediate();
       this.changed.emit({ id: current.id, deleted: true });
@@ -418,7 +419,7 @@ export class PartyModal {
 
     this.settingInactive.set(true);
     try {
-      const updated = await updateParty(current.id, { status: 'INACTIVE' });
+      const updated = await this.api.updateParty(current.id, { status: 'INACTIVE' });
       this.party.set(updated);
       this.inUseModal().close();
       this.notify.success(this.transloco.translate('wsPartyModal.toast.setInactive'));
@@ -470,8 +471,9 @@ export class PartyModal {
     const seq = ++this.loadSeq;
     this.loading.set(true);
     this.loadFailed.set(false);
+    this.loadReference.set(null);
     try {
-      const detail = await getParty(id);
+      const detail = await this.api.getParty(id);
       if (seq !== this.loadSeq) return;
       this.partyType.set(detail.partyType);
       this.party.set(detail);
@@ -479,9 +481,18 @@ export class PartyModal {
       if (seq !== this.loadSeq) return;
       const code = errorCodeOf(error);
       if (code === 'PARTY_NOT_FOUND' || (error instanceof ApiError && error.status === 404)) {
-        this.notify.error(resolvePartyError(error, this.transloco));
+        this.notify.error(resolvePartyError(error, this.transloco, 'read'));
+        this.onDeletedRemotely();
+        return;
+      }
+      if (error instanceof ApiError && error.status === 403 && ['BRANCH_PERMISSION_DENIED', 'TENANT_WIDE_PERMISSION_REQUIRED', 'MISSING_REQUIRED_PERMISSIONS'].includes(error.code)) {
+        this.notify.error(this.transloco.translate('wsPartyModal.noAccess'));
         this.closeImmediate();
         return;
+      }
+      this.loadReference.set(correlationIdOf(error));
+      if (['TENANT_MAINTENANCE_ACTIVE', 'TENANT_MAINTENANCE_RELEASE_REQUIRED', 'ACCESS_POLICY_UNAVAILABLE'].includes(code ?? '')) {
+        this.notify.error(resolvePartyError(error, this.transloco, 'read'));
       }
       this.loadFailed.set(true);
     } finally {
@@ -493,24 +504,18 @@ export class PartyModal {
 
   private async loadLookups(): Promise<void> {
     const seq = ++this.lookupsSeq;
-    const canReadSettings = this.session.isTenantWide('directory.settings.manage');
-    const [branchesRes, settingsRes] = await Promise.allSettled([
-      listAllPages((q) => listBranches(q)),
-      canReadSettings ? getDirectorySettings() : Promise.resolve(DEFAULT_PARTY_LIMITS),
+    this.limits.set({ maxContactMethodsPerParty: null, maxAddressesPerParty: null });
+    const [branchesRes, rulesRes] = await Promise.allSettled([
+      this.lookups.allBranches(),
+      this.api.getPartyRules(),
     ]);
     if (seq !== this.lookupsSeq) return;
-    if (branchesRes.status === 'fulfilled') {
-      this.branches.set(branchesRes.value);
-    }
-    if (settingsRes.status === 'fulfilled' && settingsRes.value) {
+    if (branchesRes.status === 'fulfilled') this.branches.set(branchesRes.value);
+    if (rulesRes.status === 'fulfilled') {
       this.limits.set({
-        maxContactMethodsPerParty:
-          settingsRes.value.maxContactMethodsPerParty ?? DEFAULT_PARTY_LIMITS.maxContactMethodsPerParty,
-        maxAddressesPerParty:
-          settingsRes.value.maxAddressesPerParty ?? DEFAULT_PARTY_LIMITS.maxAddressesPerParty,
+        maxContactMethodsPerParty: rulesRes.value.maxContactMethodsPerParty,
+        maxAddressesPerParty: rulesRes.value.maxAddressesPerParty,
       });
-    } else {
-      this.limits.set(DEFAULT_PARTY_LIMITS);
     }
   }
 

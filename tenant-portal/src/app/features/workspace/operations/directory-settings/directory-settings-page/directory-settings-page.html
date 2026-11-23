@@ -1,20 +1,11 @@
 @if (forbidden()) {
-  <div class="flex flex-1 items-center justify-center p-12">
-    <div class="flex w-full max-w-modal-confirm flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
-      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-orange text-on-icon">
-        <ng-icon name="tablerLock" size="18" aria-hidden="true" />
-      </span>
-      <h1 class="text-16 leading-24 font-medium text-text">
-        {{ 'wsDirSettings.states.forbiddenTitle' | transloco }}
-      </h1>
-      <p class="text-12 leading-18 text-text-muted">
-        {{ 'wsDirSettings.states.forbiddenText' | transloco }}
-      </p>
-      <a uiButton variant="primary" routerLink="/workspace/home">
-        {{ 'wsDirSettings.states.backHome' | transloco }}
-      </a>
-    </div>
-  </div>
+  <ui-full-state
+    kind="forbidden"
+    [title]="'wsDirSettings.states.forbiddenTitle' | transloco"
+    [text]="'wsDirSettings.states.forbiddenText' | transloco"
+    [actionLabel]="'wsDirSettings.states.backHome' | transloco"
+    (action)="backHome()"
+  />
 } @else if (loading() && !saved()) {
   <div class="flex flex-1 flex-col gap-10 p-12" aria-busy="true">
     <section class="flex flex-col gap-10 rounded-10 border border-border bg-surface p-8 shadow-card">
@@ -48,30 +39,13 @@
     </section>
   </div>
 } @else if (loadFailed() && !saved()) {
-  <div class="flex flex-1 items-center justify-center p-12">
-    <div
-      role="alert"
-      class="flex w-full max-w-modal-confirm flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card"
-    >
-      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
-        <ng-icon name="tablerRefresh" size="18" aria-hidden="true" />
-      </span>
-      <h1 class="text-16 leading-24 font-medium text-text">
-        {{ 'wsDirSettings.states.loadFailedTitle' | transloco }}
-      </h1>
-      <p class="text-12 leading-18 text-text-muted">
-        {{ 'wsDirSettings.states.loadFailedText' | transloco }}
-      </p>
-      @if (loadCorrelationId(); as corrId) {
-        <p class="text-11 leading-16 text-text-muted">
-          {{ 'wsDirSettings.states.supportRef' | transloco }}: <bdi dir="ltr">{{ corrId }}</bdi>
-        </p>
-      }
-      <button type="button" uiButton variant="primary" (click)="reload()">
-        {{ 'settings.common.retry' | transloco }}
-      </button>
-    </div>
-  </div>
+  <ui-full-state
+    kind="load-failure"
+    [title]="'wsDirSettings.states.loadFailedTitle' | transloco"
+    [text]="loadFailureText()"
+    [actionLabel]="'settings.common.retry' | transloco"
+    (action)="reload()"
+  />
 } @else if (saved()) {
   <form class="flex min-h-0 flex-1 flex-col" novalidate (submit)="onSubmit($event)">
     <div class="flex min-h-0 flex-1 flex-col gap-10 overflow-y-auto p-12">
@@ -95,6 +69,7 @@
             [for]="uid + '-duplicate-scope'"
             [label]="'wsDirSettings.duplicates.scopeLabel' | transloco"
             [hint]="scopeHint()"
+            [error]="fieldError('duplicateScope')"
             [hintText]="'wsDirSettings.duplicates.scopeDesc.' + duplicateScope() | transloco"
           >
             <ui-dropdown
@@ -105,8 +80,8 @@
               [label]="'wsDirSettings.duplicates.scopeLabel' | transloco"
               [options]="scopeOptions()"
               [value]="duplicateScope()"
-              [disabled]="saving()"
-              (valueChange)="duplicateScope.set($event)"
+              [disabled]="saving() || loading()"
+              (valueChange)="duplicateScope.set($event); clearFieldError('duplicateScope')"
             />
           </ui-field>
         </div>
@@ -117,6 +92,7 @@
             [for]="uid + '-prevent-email'"
             [label]="'wsDirSettings.duplicates.emailLabel' | transloco"
             [hint]="'wsDirSettings.duplicates.emailHint' | transloco"
+            [error]="fieldError('preventDuplicateEmail')"
           >
             <div class="flex items-center gap-8">
               <ui-switch
@@ -124,7 +100,8 @@
                 [describedBy]="uid + '-prevent-email-hint'"
                 [label]="'wsDirSettings.duplicates.emailLabel' | transloco"
                 [(checked)]="preventDuplicateEmail"
-                [disabled]="saving()"
+                (checkedChange)="clearFieldError('preventDuplicateEmail')"
+                [disabled]="saving() || loading()"
               />
               <span class="text-12 leading-18 text-text-muted">
                 {{ (preventDuplicateEmail() ? 'wsDirSettings.common.on' : 'wsDirSettings.common.off') | transloco }}
@@ -137,6 +114,7 @@
             [for]="uid + '-prevent-phone'"
             [label]="'wsDirSettings.duplicates.phoneLabel' | transloco"
             [hint]="'wsDirSettings.duplicates.phoneHint' | transloco"
+            [error]="fieldError('preventDuplicatePhone')"
           >
             <div class="flex items-center gap-8">
               <ui-switch
@@ -144,7 +122,8 @@
                 [describedBy]="uid + '-prevent-phone-hint'"
                 [label]="'wsDirSettings.duplicates.phoneLabel' | transloco"
                 [(checked)]="preventDuplicatePhone"
-                [disabled]="saving()"
+                (checkedChange)="clearFieldError('preventDuplicatePhone')"
+                [disabled]="saving() || loading()"
               />
               <span class="text-12 leading-18 text-text-muted">
                 {{ (preventDuplicatePhone() ? 'wsDirSettings.common.on' : 'wsDirSettings.common.off') | transloco }}
@@ -157,6 +136,7 @@
             [for]="uid + '-prevent-whatsapp'"
             [label]="'wsDirSettings.duplicates.whatsappLabel' | transloco"
             [hint]="'wsDirSettings.duplicates.whatsappHint' | transloco"
+            [error]="fieldError('preventDuplicateWhatsapp')"
           >
             <div class="flex items-center gap-8">
               <ui-switch
@@ -164,7 +144,8 @@
                 [describedBy]="uid + '-prevent-whatsapp-hint'"
                 [label]="'wsDirSettings.duplicates.whatsappLabel' | transloco"
                 [(checked)]="preventDuplicateWhatsapp"
-                [disabled]="saving()"
+                (checkedChange)="clearFieldError('preventDuplicateWhatsapp')"
+                [disabled]="saving() || loading()"
               />
               <span class="text-12 leading-18 text-text-muted">
                 {{ (preventDuplicateWhatsapp() ? 'wsDirSettings.common.on' : 'wsDirSettings.common.off') | transloco }}
@@ -213,7 +194,7 @@
               dir="ltr"
               class="min-w-0 flex-1 bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
               [value]="maxContactsInput()"
-              [disabled]="saving()"
+              [disabled]="saving() || loading()"
               [attr.aria-invalid]="maxContactsError() ? 'true' : null"
               (input)="onMaxContactsInput($event)"
               (blur)="maxContactsTouched.set(true)"
@@ -234,7 +215,7 @@
               dir="ltr"
               class="min-w-0 flex-1 bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
               [value]="maxAddressesInput()"
-              [disabled]="saving()"
+              [disabled]="saving() || loading()"
               [attr.aria-invalid]="maxAddressesError() ? 'true' : null"
               (input)="onMaxAddressesInput($event)"
               (blur)="maxAddressesTouched.set(true)"
@@ -243,6 +224,12 @@
         </div>
       </section>
     </div>
+
+    @if (stricterChange()) {
+      <app-settings-notice tone="info" class="mx-12 mb-8">
+        {{ 'wsDirSettings.notice.stricterChanges' | transloco }}
+      </app-settings-notice>
+    }
 
     <footer class="sticky bottom-0 z-sticky flex shrink-0 flex-wrap items-center gap-8 border-t border-border bg-surface-muted px-12 py-8">
       <button
@@ -260,7 +247,7 @@
           type="button"
           uiButton
           variant="secondary"
-          [disabled]="saving()"
+          [disabled]="saving() || loading()"
           (click)="undo()"
         >
           {{ 'settings.common.undo' | transloco }}
@@ -279,4 +266,10 @@
   [saveLabel]="'wsDirSettings.unsaved.save' | transloco"
   [discardLabel]="'wsDirSettings.unsaved.discard' | transloco"
   [cancelLabel]="'wsDirSettings.unsaved.cancel' | transloco"
+/>
+
+<ui-conflict-dialog
+  [(open)]="conflictOpen"
+  (reload)="reload()"
+  (keepEditing)="keepMyChanges()"
 />

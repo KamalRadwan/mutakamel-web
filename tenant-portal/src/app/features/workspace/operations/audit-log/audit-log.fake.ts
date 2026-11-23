@@ -2,7 +2,7 @@ import { ACME_CUSTOMER_ID, CUSTOMERS_FAKE_DB } from '../../../crm/customers/cust
 import { fakeGetLead, fakeLeadPartyId } from '../../../crm/leads/leads.fake';
 import { ACME_OPPORTUNITY_ID, fakeAllOpportunityRows } from '../../../crm/opportunities/opportunities.fake';
 import { opportunityRef } from '../../../crm/opportunities/opportunities.model';
-import { ApiError } from '../../staff/shared/staff.api';
+import { ApiError } from '../../../../core/api/api-errors';
 import { buildActorMeSync } from '../../staff/shared/staff.fake';
 import { Me } from '../../staff/shared/staff.model';
 import {
@@ -1289,44 +1289,46 @@ function validateCommonQuery(q: AuditQuery): {
   fromMs: number | null;
   toMs: number | null;
 } {
+  if (q.cursor !== undefined && q.cursor.length > AUDIT_LIMITS.cursor) throw new ApiError(400, 'CORE_VALIDATION_FAILED');
+  if (q.includeRequests !== undefined && typeof q.includeRequests !== 'boolean') throw new ApiError(400, 'CORE_VALIDATION_FAILED');
   const limit = q.limit ?? AUDIT_LIMITS.defaultLimit;
   if (!Number.isInteger(limit) || limit < AUDIT_LIMITS.minLimit || limit > AUDIT_LIMITS.maxLimit) {
-    throw new ApiError(400, 'AUDIT_QUERY_INVALID');
+    throw new ApiError(400, 'CORE_VALIDATION_FAILED');
   }
   if (q.entityType !== undefined && q.entityType.length > AUDIT_LIMITS.entityType) {
-    throw new ApiError(400, 'AUDIT_QUERY_INVALID');
+    throw new ApiError(400, 'CORE_VALIDATION_FAILED');
   }
   if (q.entityId !== undefined && q.entityId.length > AUDIT_LIMITS.entityId) {
-    throw new ApiError(400, 'AUDIT_QUERY_INVALID');
+    throw new ApiError(400, 'CORE_VALIDATION_FAILED');
   }
   if (q.action !== undefined && q.action.length > AUDIT_LIMITS.action) {
-    throw new ApiError(400, 'AUDIT_QUERY_INVALID');
+    throw new ApiError(400, 'CORE_VALIDATION_FAILED');
   }
   if (q.sourceApp !== undefined && !APP_SET.has(q.sourceApp)) {
-    throw new ApiError(400, 'AUDIT_QUERY_INVALID');
+    throw new ApiError(400, 'CORE_VALIDATION_FAILED');
   }
   if (q.sourceKind !== undefined && !KIND_SET.has(q.sourceKind)) {
-    throw new ApiError(400, 'AUDIT_QUERY_INVALID');
+    throw new ApiError(400, 'CORE_VALIDATION_FAILED');
   }
   if (q.outcome !== undefined && !OUTCOME_SET.has(q.outcome)) {
-    throw new ApiError(400, 'AUDIT_QUERY_INVALID');
+    throw new ApiError(400, 'CORE_VALIDATION_FAILED');
   }
   if (q.sensitivity !== undefined && !SENSITIVITY_SET.has(q.sensitivity)) {
-    throw new ApiError(400, 'AUDIT_QUERY_INVALID');
+    throw new ApiError(400, 'CORE_VALIDATION_FAILED');
   }
 
   let fromMs: number | null = null;
   if (q.from !== undefined) {
     fromMs = Date.parse(q.from);
-    if (Number.isNaN(fromMs)) {
-      throw new ApiError(400, 'AUDIT_QUERY_INVALID');
+    if (Number.isNaN(fromMs) || !/^\d{4}-\d{2}-\d{2}T/.test(q.from)) {
+      throw new ApiError(400, 'CORE_VALIDATION_FAILED');
     }
   }
   let toMs: number | null = null;
   if (q.to !== undefined) {
     toMs = Date.parse(q.to);
-    if (Number.isNaN(toMs)) {
-      throw new ApiError(400, 'AUDIT_QUERY_INVALID');
+    if (Number.isNaN(toMs) || !/^\d{4}-\d{2}-\d{2}T/.test(q.to)) {
+      throw new ApiError(400, 'CORE_VALIDATION_FAILED');
     }
   }
 
@@ -1360,7 +1362,7 @@ function filterEvents(q: AuditQuery, routeDeletedOnly: boolean, fixedEntity?: Fi
     throw new ApiError(400, 'AUDIT_QUERY_INVALID');
   }
   if (labelQuery !== undefined && labelQuery.length > AUDIT_LIMITS.deletedQueryPrefix) {
-    throw new ApiError(400, 'AUDIT_QUERY_INVALID');
+    throw new ApiError(400, 'CORE_VALIDATION_FAILED');
   }
 
   const { limit, cursor, fromMs, toMs } = validateCommonQuery(q);
@@ -1382,7 +1384,7 @@ function filterEvents(q: AuditQuery, routeDeletedOnly: boolean, fixedEntity?: Fi
 
     if (q.sourceKind) {
       if (event.sourceKind !== q.sourceKind) return false;
-    } else if (event.sourceKind === 'HTTP_COMMAND') {
+    } else if (!q.includeRequests && event.sourceKind === 'HTTP_COMMAND') {
       return false;
     }
 
@@ -1521,7 +1523,7 @@ function groupHistory(events: readonly AuditEvent[]): AuditHistoryGroup[] {
 
 function validateHistoryCategory(category: string | undefined): void {
   if (category !== undefined && !HISTORY_CATEGORY_SET.has(category)) {
-    throw new ApiError(400, 'AUDIT_QUERY_INVALID');
+    throw new ApiError(400, 'CORE_VALIDATION_FAILED');
   }
 }
 
@@ -1547,7 +1549,7 @@ function validateEntityParams(entityType: string, entityId: string): void {
   const type = entityType.trim();
   const id = entityId.trim();
   if (!type || type.length > AUDIT_LIMITS.entityType || !id || id.length > AUDIT_LIMITS.entityId) {
-    throw new ApiError(400, 'AUDIT_QUERY_INVALID');
+    throw new ApiError(400, 'CORE_VALIDATION_FAILED');
   }
 }
 
@@ -1584,7 +1586,7 @@ export async function fakeListRelatedEntityHistory(
     new Set(ids).size !== ids.length ||
     ids.some((id) => !isRelatedPartyId(id))
   ) {
-    throw new ApiError(400, 'AUDIT_QUERY_INVALID');
+    throw new ApiError(400, 'CORE_VALIDATION_FAILED');
   }
   validateHistoryCategory(q.historyCategory);
   const { cursor, relatedPartyIds: _relatedPartyIds, historyCategory, ...filters } = q;
@@ -1613,11 +1615,11 @@ export async function fakeListRecordHistory(
     throw new ApiError(403, 'MISSING_REQUIRED_PERMISSIONS');
   }
   if (target.targetApp !== 'CRM' || target.targetType !== 'LEAD' || !isLeadTargetId(target.targetId)) {
-    throw new ApiError(400, 'AUDIT_QUERY_INVALID');
+    throw new ApiError(400, 'CORE_VALIDATION_FAILED');
   }
   const limit = q.limit ?? AUDIT_LIMITS.defaultLimit;
   if (!Number.isInteger(limit) || limit < AUDIT_LIMITS.minLimit || limit > AUDIT_LIMITS.maxLimit) {
-    throw new ApiError(400, 'AUDIT_QUERY_INVALID');
+    throw new ApiError(400, 'CORE_VALIDATION_FAILED');
   }
   validateHistoryCategory(q.historyCategory);
   // Related parties come from CRM projections (here: the leads fake), never from the client.

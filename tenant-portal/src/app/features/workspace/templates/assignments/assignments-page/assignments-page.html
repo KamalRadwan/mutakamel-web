@@ -1,56 +1,16 @@
-@if (errorState() === 'forbidden') {
-  <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card" role="alert">
-    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-orange text-on-icon">
-      <ng-icon name="tablerLock" size="18" aria-hidden="true" />
-    </span>
-    <h1 class="text-16 leading-24 font-medium text-text">
-      {{ 'assignments.states.forbiddenTitle' | transloco }}
-    </h1>
-    <p class="max-w-modal-form text-12 leading-18 text-text-muted">
-      {{ 'assignments.states.forbiddenDescription' | transloco }}
-    </p>
-    <a uiButton routerLink="/">
-      {{ 'assignments.actions.backToHome' | transloco }}
-    </a>
-  </div>
-} @else if (errorState() === 'featureDisabled') {
-  <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card" role="alert">
-    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
-      <ng-icon name="tablerLock" size="18" aria-hidden="true" />
-    </span>
-    <h1 class="text-16 leading-24 font-medium text-text">
-      {{ 'assignments.states.featureDisabledTitle' | transloco }}
-    </h1>
-    <p class="max-w-modal-form text-12 leading-18 text-text-muted">
-      {{ 'assignments.states.featureDisabledDescription' | transloco }}
-    </p>
-    <a uiButton routerLink="/">
-      {{ 'assignments.actions.backToHome' | transloco }}
-    </a>
-  </div>
-} @else if (errorState() === 'failed') {
-  <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card" role="alert">
-    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
-      <ng-icon name="tablerRefresh" size="18" aria-hidden="true" />
-    </span>
-    <h1 class="text-16 leading-24 font-medium text-text">
-      {{ 'assignments.states.loadFailedTitle' | transloco }}
-    </h1>
-    <p class="max-w-modal-form text-12 leading-18 text-text-muted">
-      {{ 'assignments.states.loadFailedDescription' | transloco }}
-    </p>
-    @if (correlationId(); as corrId) {
-      <p class="text-11 leading-16 text-text-muted" dir="ltr">
-        {{ 'assignments.states.supportReference' | transloco: { correlationId: corrId } }}
-      </p>
-    }
-    <button type="button" uiButton (click)="reload()">
-      {{ 'assignments.actions.retry' | transloco }}
-    </button>
-  </div>
+@if (errorState() === 'failed') {
+  <ui-full-state kind="load-failure"
+    [title]="'assignments.states.loadFailedTitle' | transloco"
+    [text]="('assignments.states.loadFailedDescription' | transloco) + (correlationId() ? ' ' + ('assignments.states.supportReference' | transloco: { correlationId: correlationId() }) : '')"
+    [actionLabel]="'assignments.actions.retry' | transloco" (action)="reload()" />
+} @else if (errorState() === 'forbidden' || errorState() === 'featureDisabled') {
+  <ui-full-state kind="forbidden"
+    [title]="(errorState() === 'featureDisabled' ? 'assignments.states.featureDisabledTitle' : 'assignments.states.forbiddenTitle') | transloco"
+    [text]="(errorState() === 'featureDisabled' ? 'assignments.states.featureDisabledDescription' : 'assignments.states.forbiddenDescription') | transloco"
+    [actionLabel]="'assignments.actions.retry' | transloco" (action)="reload()" />
 } @else {
   <div class="flex shrink-0 flex-wrap items-center gap-8 rounded-10 bg-surface p-8 shadow-card">
-    @if (canManage) {
+    @if (canManage()) {
       <button type="button" uiButton class="shrink-0" (click)="openCreate()">
         <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
         {{ 'assignments.toolbar.newAssignment' | transloco }}
@@ -123,7 +83,7 @@
 
   @if (!loading() && assignments().length === 0) {
     <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
-      @if (activeFiltersCount() > 0) {
+      @if (activeFiltersCount() > 0 && errorState() !== 'scopeEmpty') {
         <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
           <ng-icon name="tablerFilter" size="18" aria-hidden="true" />
         </span>
@@ -141,12 +101,12 @@
           <ng-icon name="tablerRoute" size="18" aria-hidden="true" />
         </span>
         <h2 class="text-15 leading-22 font-medium text-text">
-          {{ 'assignments.states.emptyTitle' | transloco }}
+          {{ (errorState() === 'scopeEmpty' ? 'assignments.states.scopeEmptyTitle' : 'assignments.states.emptyTitle') | transloco }}
         </h2>
         <p class="text-12 leading-18 text-text-muted">
-          {{ 'assignments.states.emptyDescription' | transloco }}
+          {{ (errorState() === 'scopeEmpty' ? 'assignments.states.scopeEmptyDescription' : 'assignments.states.emptyDescription') | transloco }}
         </p>
-        @if (canManage) {
+        @if (canManage()) {
           <button type="button" uiButton variant="secondary" (click)="openCreate()">
             <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
             {{ 'assignments.toolbar.newAssignment' | transloco }}
@@ -500,8 +460,6 @@
 <app-assignment-modal
   [definitions]="definitions()"
   [scopeOptions]="scopeOptions()"
-  [existingAssignments]="assignments()"
-  [canManage]="canManage"
   (saved)="onModalSaved($event)"
   (deactivated)="onModalDeactivated()"
 />
@@ -522,3 +480,6 @@
   [confirmLabel]="'assignments.confirmDeactivate.confirm' | transloco"
   [cancelLabel]="'assignments.actions.cancel' | transloco"
 />
+
+<ui-conflict-dialog [(open)]="deactivateConflict"
+  (reload)="refreshDeactivateConflict(false)" (keepEditing)="refreshDeactivateConflict(true)" />

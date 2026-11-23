@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
+import { Component, DestroyRef, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { ActivatedRoute, ParamMap, Router } from '@angular/router';
@@ -29,10 +29,13 @@ import { Dropdown, DropdownOption } from '../../../../../shared/ui/dropdown/drop
 import { Field } from '../../../../../shared/ui/field/field';
 import { Segmented, SegmentedOption } from '../../../../../shared/ui/segmented/segmented';
 import { Switch } from '../../../../../shared/ui/switch/switch';
-import { listAllPages, listBranches, listUsers } from '../../../staff/shared/staff.api';
-import { Branch, TenantUser } from '../../../staff/shared/staff.model';
-import { StaffSession } from '../../../staff/shared/staff-session';
-import { SessionFailedState } from '../../shared/session-failed-state/session-failed-state';
+import { TenantScopeState } from '../../../../../core/scope/tenant-scope';
+import { correlationIdOf, errorMessage } from '../../../../../core/api/api-errors';
+import { WorkspaceLookups } from '../../../../../shared/widgets/workspace-lookups/workspace-lookups.api';
+import { WorkspaceBranch, WorkspaceUser } from '../../../../../shared/widgets/workspace-lookups/workspace-lookups.model';
+import { QuerySingleSelect } from '../../../../../shared/ui/query-builder/query-value/single-select/single-select';
+import { QueryField } from '../../../../../shared/query-builder/query.model';
+import { FullState } from '../../../../../shared/ui/full-state/full-state';
 import { AuditEventModal } from '../audit-event-modal/audit-event-modal';
 import {
   AUDIT_LIMITS,
@@ -48,13 +51,11 @@ import {
   AuditViewMode,
   ApiError,
   avatarToneForName,
-  correlationIdOf,
   errorCodeOf,
   formatAuditDateTime,
   humanizeActionCode,
   initialsForName,
-  listAuditEvents,
-  listDeletedRecords,
+  AuditLogApi,
 } from '../audit-log.api';
 
 type DateRangeErrorKind = 'required' | 'order' | 'max' | null;
@@ -73,6 +74,9 @@ interface AuditFilterState {
   includeRequests: boolean;
   correlationId: string | null;
 }
+
+// BE-O5 is absent from committed backend main; do not send its query flag yet.
+const INCLUDE_REQUESTS_AVAILABLE: boolean = false;
 
 const SKELETON_ROWS = [1, 2, 3, 4, 5] as const;
 const SOURCE_APP_SET = new Set<string>(AUDIT_SOURCE_APPS);
@@ -175,7 +179,7 @@ function parseFiltersFromParams(params: ParamMap): AuditFilterState {
     branchId: params.get('branchId') ?? '',
     entityType: (params.get('entityType') ?? '').slice(0, AUDIT_LIMITS.entityType),
     action: (params.get('action') ?? '').slice(0, AUDIT_LIMITS.action),
-    includeRequests: params.get('sourceKind') === 'HTTP_COMMAND',
+    includeRequests: INCLUDE_REQUESTS_AVAILABLE && params.get('includeRequests') === 'true',
     correlationId: params.get('correlationId') || null,
   };
 }
@@ -201,7 +205,8 @@ function serializeFilterKey(state: AuditFilterState): string {
 @Component({
   selector: 'app-audit-log-page',
   imports: [
-    SessionFailedState,
+    FullState,
+    QuerySingleSelect,
     NgIcon,
     TranslocoPipe,
     AuditEventModal,
@@ -213,7 +218,7 @@ function serializeFilterKey(state: AuditFilterState): string {
     Switch,
   ],
   providers: [
-    provideTranslocoScope('settings', { scope: 'ws-audit-log', alias: 'wsAudit' }),
+    provideTranslocoScope('settings', { scope: 'ws-audit-log', alias: 'wsAudit' }, { scope: 'ui-query-value', alias: 'qv' }),
     provideIcons({
       tablerLock,
       tablerAlertTriangle,
@@ -233,9 +238,12 @@ export class AuditLogPage {
 
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
-  private readonly session = inject(StaffSession);
-
-  protected readonly sessionFailed = computed(() => !this.session.me() && this.session.state() === 'failed');
+  private readonly scope = inject(TenantScopeState);
+  private readonly api = inject(AuditLogApi);
+  private readonly lookups = inject(WorkspaceLookups);
+  private readonly destroyRef = inject(DestroyRef);
+  protected readonly includeRequestsAvailable = INCLUDE_REQUESTS_AVAILABLE;
+  private filterTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
@@ -271,20 +279,20 @@ export class AuditLogPage {
   protected readonly loadCorrelationId = signal<string | null>(null);
   protected readonly forbidden = signal(false);
 
-  protected readonly users = signal<TenantUser[]>([]);
-  protected readonly branches = signal<Branch[]>([]);
+  protected readonly users = signal<WorkspaceUser[]>([]);
+  protected readonly branches = signal<WorkspaceBranch[]>([]);
 
   protected readonly canReadAudit = computed(() => {
-    const me = this.session.me();
+    const me = this.scope.me();
     // Until the session has loaded (or if loading failed) do not show the 403 state; the API decides.
     if (!me) return true;
     if (me.isTenantOwner) return true;
-    if (this.session.isTenantWide('audit.read')) return true;
+    if (me.permissions.includes('audit.read') && me.permissionScopes['audit.read']?.tenantWide) return true;
     const branchScope = me.permissionScopes['audit.read.branch'];
-    if (branchScope && (branchScope.tenantWide || branchScope.branchIds.length > 0)) {
+    if (me.permissions.includes('audit.read.branch') && branchScope && (branchScope.tenantWide || branchScope.branchIds.length > 0)) {
       return true;
     }
-    return this.session.can('audit.read.own');
+    return me.permissions.includes('audit.read.own');
   });
 
   protected readonly isForbidden = computed(() => !this.canReadAudit() || this.forbidden());
@@ -345,18 +353,33 @@ export class AuditLogPage {
     ];
   });
 
-  protected readonly userOptions = computed<DropdownOption<string>[]>(() => {
+  protected readonly actorLookupDenied = signal(false);
+  protected readonly actorField = computed<QueryField>(() => {
     this.i18n();
-    const list = this.users().map((user) => ({
-      value: user.id,
-      label: `${user.firstName} ${user.lastName}`.trim() || user.email,
-    }));
-    const currentId = this.draftActorUserId();
-    if (currentId && !list.some((opt) => opt.value === currentId)) {
-      list.push({ value: currentId, label: currentId });
-    }
-    return [{ value: '', label: this.transloco.translate('wsAudit.filters.allUsers') }, ...list];
+    return {
+      id: 'auditActor', kind: 'enum', placement: 'root',
+      label: this.transloco.translate('wsAudit.filters.user'),
+      hint: this.transloco.translate('wsAudit.filters.userHint'),
+      options: this.users().map((user) => ({ value: user.id, label: `${user.firstName} ${user.lastName}`.trim() || user.email })),
+      specialOptions: [{ value: '', label: this.transloco.translate('wsAudit.filters.allUsers') }],
+      searchOptions: this.searchActors,
+    };
   });
+
+  protected readonly searchActors = async (search: string) => {
+    try {
+      const page = await this.lookups.users({ search, limit: 20 });
+      if (this.destroyRef.destroyed) return [];
+      this.actorLookupDenied.set(false);
+      this.users.update((current) => [...new Map([...current, ...page.data].map((user) => [user.id, user])).values()]);
+      return page.data.map((user) => ({ value: user.id, label: `${user.firstName} ${user.lastName}`.trim() || user.email }));
+    } catch (error) {
+      if (this.destroyRef.destroyed) return [];
+      if (error instanceof ApiError && error.status === 403) this.actorLookupDenied.set(true);
+      else this.notify.error(this.resolveError(error));
+      return [];
+    }
+  };
 
   protected readonly branchOptions = computed<DropdownOption<string>[]>(() => {
     this.i18n();
@@ -392,14 +415,11 @@ export class AuditLogPage {
   private lookupsLoaded = false;
   private lastSyncedUrlKey = serializeFilterKey(this.initialState);
 
-  protected retrySession(): void {
-    void this.session.load().catch(() => undefined);
-  }
-
   constructor() {
-    if (!this.session.me()) {
-      void this.session.load().catch(() => undefined);
-    }
+    this.destroyRef.onDestroy(() => {
+      this.loadSeq++;
+      if (this.filterTimer !== null) clearTimeout(this.filterTimer);
+    });
 
     if (
       !this.route.snapshot.queryParamMap.has('from') ||
@@ -497,6 +517,7 @@ export class AuditLogPage {
   }
 
   protected onIncludeRequestsChange(checked: boolean): void {
+    if (!this.includeRequestsAvailable) return;
     this.draftIncludeRequests.set(checked);
     this.commitDiscreteFilters();
   }
@@ -506,6 +527,7 @@ export class AuditLogPage {
     if (which === 'q') this.draftQ.set(value);
     else if (which === 'entityType') this.draftEntityType.set(value);
     else this.draftAction.set(value);
+    this.scheduleFilters();
   }
 
   protected clearTextField(which: 'q' | 'entityType' | 'action'): void {
@@ -516,6 +538,8 @@ export class AuditLogPage {
   }
 
   protected applyFilters(): void {
+    if (this.filterTimer !== null) clearTimeout(this.filterTimer);
+    this.filterTimer = null;
     if (this.dateRangeErrorKind() !== null) return;
     const next: AuditFilterState = {
       range: this.draftRange(),
@@ -530,7 +554,7 @@ export class AuditLogPage {
       branchId: this.draftBranchId(),
       entityType: this.draftEntityType().trim(),
       action: this.draftAction().trim(),
-      includeRequests: this.draftIncludeRequests(),
+      includeRequests: this.includeRequestsAvailable && this.draftIncludeRequests(),
       correlationId: this.draftCorrelationId(),
     };
     this.commitAndSync(next);
@@ -578,7 +602,7 @@ export class AuditLogPage {
       branchId: '',
       entityType: '',
       action: '',
-      includeRequests: event.sourceKind === 'HTTP_COMMAND',
+      includeRequests: this.includeRequestsAvailable,
       correlationId: event.correlationId,
     };
     this.applyStateToDraft(next);
@@ -613,7 +637,13 @@ export class AuditLogPage {
       this.nextCursor.set(page.nextCursor);
     } catch (error) {
       if (seq !== this.loadSeq) return;
-      this.notify.error(this.resolveError(error));
+      if (error instanceof ApiError && error.status === 400 &&
+          ['CORE_VALIDATION_FAILED', 'AUDIT_QUERY_INVALID'].includes(error.code)) {
+        this.nextCursor.set(null);
+        await this.fetchInitial(this.applied());
+      } else {
+        this.handleLoadError(error);
+      }
     } finally {
       if (seq === this.loadSeq) {
         this.loadingMore.set(false);
@@ -626,14 +656,7 @@ export class AuditLogPage {
   }
 
   protected actorDisplay(event: AuditEvent): string {
-    if (event.actorType !== 'USER') {
-      return this.transloco.translate('wsAudit.actor.system');
-    }
-    if (event.actorLabel) return event.actorLabel;
-    if (event.actorUserId) {
-      return this.userNames().get(event.actorUserId) ?? event.actorUserId;
-    }
-    return this.transloco.translate('wsAudit.actor.system');
+    return event.actorLabel ?? this.transloco.translate('wsAudit.actor.system');
   }
 
   protected actorInitials(event: AuditEvent): string {
@@ -660,26 +683,13 @@ export class AuditLogPage {
     return event.entityLabel || event.entityId || '—';
   }
 
+  private scheduleFilters(): void {
+    if (this.filterTimer !== null) clearTimeout(this.filterTimer);
+    this.filterTimer = setTimeout(() => this.applyFilters(), 300);
+  }
+
   private commitDiscreteFilters(): void {
-    if (this.dateRangeErrorKind() !== null) return;
-    const prev = this.applied();
-    const next: AuditFilterState = {
-      range: this.draftRange(),
-      mode: this.draftMode(),
-      q: this.draftMode() === 'deleted' ? prev.q : '',
-      sourceApp: SOURCE_APP_SET.has(this.draftSourceApp()) ? (this.draftSourceApp() as AuditSourceApp) : '',
-      outcome: OUTCOME_SET.has(this.draftOutcome()) ? (this.draftOutcome() as AuditOutcome) : '',
-      sensitivity: SENSITIVITY_SET.has(this.draftSensitivity())
-        ? (this.draftSensitivity() as AuditSensitivity)
-        : '',
-      actorUserId: this.draftActorUserId(),
-      branchId: this.draftBranchId(),
-      entityType: prev.entityType,
-      action: prev.action,
-      includeRequests: this.draftIncludeRequests(),
-      correlationId: this.draftCorrelationId(),
-    };
-    this.commitAndSync(next);
+    this.scheduleFilters();
   }
 
   private commitAndSync(next: AuditFilterState): void {
@@ -723,7 +733,8 @@ export class AuditLogPage {
       branchId: state.branchId || null,
       entityType: state.entityType || null,
       action: state.action || null,
-      sourceKind: state.includeRequests ? 'HTTP_COMMAND' : null,
+      sourceKind: null,
+      includeRequests: this.includeRequestsAvailable && state.includeRequests ? 'true' : null,
       correlationId: state.correlationId || null,
     };
 
@@ -794,7 +805,7 @@ export class AuditLogPage {
     if (state.branchId) q.branchId = state.branchId;
     if (state.entityType) q.entityType = state.entityType;
     if (state.action) q.action = state.action;
-    if (state.includeRequests) q.sourceKind = 'HTTP_COMMAND';
+    if (this.includeRequestsAvailable && state.includeRequests) q.includeRequests = true;
     if (state.correlationId) q.correlationId = state.correlationId;
     return q;
   }
@@ -806,9 +817,9 @@ export class AuditLogPage {
     }
     if (state.mode === 'deleted') {
       const deletedQuery: AuditDeletedQuery = state.q ? { ...query, q: state.q } : query;
-      return listDeletedRecords(deletedQuery);
+      return this.api.listDeletedRecords(deletedQuery);
     }
-    return listAuditEvents(query);
+    return this.api.listAuditEvents(query);
   }
 
   private async fetchInitial(state: AuditFilterState): Promise<void> {
@@ -833,17 +844,7 @@ export class AuditLogPage {
       this.nextCursor.set(page.nextCursor);
     } catch (error) {
       if (seq !== this.loadSeq) return;
-      const code = errorCodeOf(error);
-      if ((error instanceof ApiError && error.status === 403) || code === 'MISSING_REQUIRED_PERMISSIONS') {
-        this.forbidden.set(true);
-        this.rows.set([]);
-        this.nextCursor.set(null);
-        return;
-      }
-      this.loadFailed.set(true);
-      this.loadCorrelationId.set(correlationIdOf(error));
-      this.rows.set([]);
-      this.nextCursor.set(null);
+      this.handleLoadError(error);
     } finally {
       if (seq === this.loadSeq) {
         this.loading.set(false);
@@ -851,28 +852,32 @@ export class AuditLogPage {
     }
   }
 
+  private handleLoadError(error: unknown): void {
+    const code = errorCodeOf(error);
+    const forbidden = error instanceof ApiError && error.status === 403 &&
+      !['TENANT_MAINTENANCE_ACTIVE', 'TENANT_MAINTENANCE_RELEASE_REQUIRED'].includes(code ?? '');
+    this.forbidden.set(forbidden);
+    this.loadFailed.set(!forbidden);
+    this.loadCorrelationId.set(correlationIdOf(error));
+    this.rows.set([]);
+    this.nextCursor.set(null);
+    if (error instanceof ApiError && (error.status === 429 ||
+        ['TENANT_MAINTENANCE_ACTIVE', 'TENANT_MAINTENANCE_RELEASE_REQUIRED', 'ACCESS_POLICY_UNAVAILABLE'].includes(code ?? ''))) {
+      this.notify.error(this.resolveError(error));
+    }
+  }
+
   private async loadLookups(): Promise<void> {
-    const [usersRes, branchesRes] = await Promise.allSettled([
-      listAllPages(listUsers, { limit: 100 }),
-      listAllPages(listBranches, { limit: 100 }),
-    ]);
-    if (usersRes.status === 'fulfilled') {
-      this.users.set(usersRes.value);
+    this.lookupsLoaded = true;
+    try {
+      const branches = await this.lookups.allBranches();
+      if (!this.destroyRef.destroyed) this.branches.set(branches);
+    } catch {
+      this.lookupsLoaded = false;
     }
-    if (branchesRes.status === 'fulfilled') {
-      this.branches.set(branchesRes.value);
-    }
-    this.lookupsLoaded =
-      usersRes.status === 'fulfilled' && branchesRes.status === 'fulfilled';
   }
 
   private resolveError(error: unknown): string {
-    const code = errorCodeOf(error);
-    if (code) {
-      const key = `wsAudit.errors.${code}`;
-      const translated = this.transloco.translate(key);
-      if (translated && translated !== key) return translated;
-    }
-    return this.transloco.translate('wsAudit.errors.generic');
+    return errorMessage(error, 'wsAudit', this.transloco);
   }
 }

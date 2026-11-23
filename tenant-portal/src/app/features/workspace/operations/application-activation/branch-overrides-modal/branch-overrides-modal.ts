@@ -1,19 +1,19 @@
 import { Component, computed, inject, input, signal, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
-import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
+import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerBuildingStore, tablerExclamationCircle, tablerLock, tablerRefresh } from '@ng-icons/tabler-icons';
 import { Notify } from '../../../../../core/notify/notify';
 import { Button } from '../../../../../shared/ui/button/button';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { Segmented, SegmentedOption } from '../../../../../shared/ui/segmented/segmented';
-import { listAllPages, listBranches } from '../../../staff/shared/staff.api';
-import { Branch } from '../../../staff/shared/staff.model';
-import { getBranchAddon, setBranchOverride } from '../activation.api';
+import { WorkspaceLookups } from '../../../../../shared/widgets/workspace-lookups/workspace-lookups.api';
+import type { WorkspaceBranch } from '../../../../../shared/widgets/workspace-lookups/workspace-lookups.model';
+import { ActivationApi } from '../activation.api';
 import { BranchOverrideMode, BranchOverrideResource } from '../activation.model';
 import { ReasonModal } from '../reason-modal/reason-modal';
 import { rectInPage, viewport } from '../../../../../shared/ui/overlay/zoom';
-import { ApiError, correlationIdOf, errorCodeOf, errorMessage } from '../../../../../core/api/api-errors';
+import { ApiError, correlationIdOf, errorCodeOf, errorMessage, writeErrorMessage } from '../../../../../core/api/api-errors';
 
 export interface BranchOverridesContext {
   companyId: string;
@@ -21,12 +21,15 @@ export interface BranchOverridesContext {
   appKey: string;
   addonKey: string;
   addonName: string;
+  companyAddonExists: boolean;
+  companyApplicationExists: boolean;
 }
 
 interface BranchOverrideRow {
-  branch: Branch;
+  branch: WorkspaceBranch;
   resource: BranchOverrideResource | null;
   failed: boolean;
+  forbidden: boolean;
 }
 
 const SKELETON_ROWS = [1, 2, 3, 4] as const;
@@ -57,15 +60,16 @@ async function mapWithConcurrency<T, R>(
   return results;
 }
 
-/** 403: MISSING_REQUIRED_PERMISSIONS or ACCESS_POLICY_BLOCKED. Duck-typed: staff lookups throw their own error class. */
+/** Per-branch authority refusals remain visible on their own row. */
 function isForbiddenError(error: unknown): boolean {
-  return typeof error === 'object' && error !== null && (error as { status?: unknown }).status === 403;
+  return error instanceof ApiError && error.status === 403 && !error.code.startsWith('TENANT_MAINTENANCE_');
 }
 
 @Component({
   selector: 'app-branch-overrides-modal',
   imports: [TranslocoPipe, NgIcon, Button, Modal, Segmented, ReasonModal],
   providers: [provideIcons({ tablerBuildingStore, tablerExclamationCircle, tablerLock, tablerRefresh })],
+  viewProviders: [provideTranslocoScope('settings', { scope: 'ws-app-activation', alias: 'wsActivation' })],
   templateUrl: './branch-overrides-modal.html',
 })
 export class BranchOverridesModal {
@@ -101,13 +105,15 @@ export class BranchOverridesModal {
     this.colTip.set(null);
   }
   private readonly notify = inject(Notify);
+  private readonly api = inject(ActivationApi);
+  private readonly lookups = inject(WorkspaceLookups);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
 
   private readonly modal = viewChild.required<Modal>('modal');
   private readonly reasonModal = viewChild.required(ReasonModal);
 
-  readonly canManage = input(false);
+  readonly canManageBranch = input<(branchId: string) => boolean>(() => false);
 
   protected readonly skeletonRows = SKELETON_ROWS;
   protected readonly context = signal<BranchOverridesContext | null>(null);
@@ -153,14 +159,14 @@ export class BranchOverridesModal {
   }
 
   /**
-   * DISABLED needs the Company Addon binding (shown here only when it is on); INHERIT also needs the Company
+   * DISABLED needs the Company Application and Addon bindings to exist; INHERIT also needs the Company
    * Application and Addon both on (branch-addon-restriction / branch-addon-inheritance services, else 409).
    */
   protected canSelect(row: BranchOverrideRow, mode: BranchOverrideMode): boolean {
     const resource = row.resource;
-    if (!this.canManage() || !resource || this.busyBranchIds().has(row.branch.id)) return false;
-    if (!resource.companyAddonEnabled) return false;
-    return mode === 'DISABLED' || resource.companyApplicationEnabled;
+    if (!this.canManageBranch()(row.branch.id) || !resource || this.busyBranchIds().has(row.branch.id)) return false;
+    if (!this.context()?.companyAddonExists || !this.context()?.companyApplicationExists) return false;
+    return mode === 'DISABLED' || (resource.companyApplicationEnabled && resource.companyAddonEnabled);
   }
 
   /** Why the setting cannot change, for the row tooltip; null when it can. */
@@ -219,6 +225,7 @@ export class BranchOverridesModal {
         : 'wsActivation.branchModal.turnInheritConfirm',
     );
 
+    let revision = resource.revision;
     this.reasonModal().open(
       {
         title,
@@ -230,22 +237,34 @@ export class BranchOverridesModal {
       async (reason, idempotencyKey) => {
         this.setBranchBusy(row.branch.id, true);
         try {
-          await setBranchOverride(
+          const result = await this.api.setBranchOverride(
             row.branch.id,
             ctx.appKey,
             ctx.addonKey,
             {
-              expectedOverrideRevision: resource.revision,
+              expectedOverrideRevision: revision,
               mode: nextMode,
               reason,
             },
             idempotencyKey,
           );
-          this.notify.success(this.transloco.translate('wsActivation.branchModal.toastSaved'));
+          if (!result.changed) this.notify.info(this.transloco.translate('wsActivation.toast.alreadyInState'));
+          else this.notify.success(this.transloco.translate('wsActivation.branchModal.toastSaved'));
           await this.refreshBranchRow(row.branch.id, ctx.appKey, ctx.addonKey);
           return true;
         } catch (error) {
-          return this.handleWriteError(error);
+          this.reasonModal().retainKeyFor(error);
+          const code = errorCodeOf(error);
+          if (code === 'ADDON_REVISION_STALE' || code === 'APPLICATION_ACTIVATION_REVISION_STALE') {
+            this.reasonModal().showConflict(async (keep) => {
+              if (!keep) { await this.load(); return; }
+              const fresh = await this.api.getBranchAddon(row.branch.id, ctx.appKey, ctx.addonKey);
+              revision = fresh.resource.revision;
+            });
+          } else {
+            this.notify.error(writeErrorMessage(error, 'wsActivation', this.transloco));
+          }
+          return false;
         } finally {
           this.setBranchBusy(row.branch.id, false);
         }
@@ -253,55 +272,20 @@ export class BranchOverridesModal {
     );
   }
 
-  private async refreshBranchRow(branchId: string, appKey: string, addonKey: string): Promise<void> {
+  protected async refreshBranchRow(branchId: string, appKey: string, addonKey: string): Promise<void> {
     try {
-      const singleton = await getBranchAddon(branchId, appKey, addonKey);
+      const singleton = await this.api.getBranchAddon(branchId, appKey, addonKey);
       this.rows.update((current) =>
         current.map((item) =>
           item.branch.id === branchId
-            ? { branch: item.branch, resource: singleton.resource, failed: false }
+            ? { branch: item.branch, resource: singleton.resource, failed: false, forbidden: false }
             : item,
         ),
       );
-    } catch {
-      void this.load();
+    } catch (error) {
+      this.rows.update((rows) => rows.map((row) => row.branch.id === branchId
+        ? { ...row, resource: null, failed: !isForbiddenError(error), forbidden: isForbiddenError(error) } : row));
     }
-  }
-
-  private handleWriteError(error: unknown): boolean {
-    const code = errorCodeOf(error);
-    if (
-      code === 'ADDON_REVISION_STALE' ||
-      code === 'APPLICATION_ACTIVATION_REVISION_STALE'
-    ) {
-      this.notify.error(this.transloco.translate('wsActivation.errors.ADDON_REVISION_STALE'));
-      void this.load();
-      return true;
-    }
-    if (code === 'CORE_VALIDATION_FAILED') {
-      this.notify.error(this.transloco.translate('wsActivation.errors.CORE_VALIDATION_FAILED'));
-      return false;
-    }
-    // The first request with this key is still running: keep the reason open so a retry reuses the same key.
-    if (code === 'GW.IDEM.IN_FLIGHT') {
-      this.notify.error(errorMessage(error, 'wsActivation', this.transloco));
-      return false;
-    }
-    if (code === 'ACCESS_POLICY_UNAVAILABLE' || (error instanceof ApiError && error.status === 503)) {
-      this.notify.error(this.transloco.translate('wsActivation.errors.ACCESS_POLICY_UNAVAILABLE'));
-      return false;
-    }
-    if (error instanceof ApiError && error.status === 0) {
-      this.notify.error(this.transloco.translate('settings.errors.network'));
-      return false;
-    }
-    if (code === 'ACCESS_POLICY_BLOCKED' || (error instanceof ApiError && error.status === 403)) {
-      this.notify.error(this.transloco.translate('settings.errors.permission'));
-      return true;
-    }
-
-    this.notify.error(errorMessage(error, 'wsActivation', this.transloco));
-    return true;
   }
 
   private async load(): Promise<void> {
@@ -315,11 +299,7 @@ export class BranchOverridesModal {
     this.correlationId.set(null);
 
     try {
-      const branches = await listAllPages((q) => listBranches(q), {
-        companyId: ctx.companyId,
-        sortBy: 'name',
-        sortDir: 'ASC',
-      });
+      const branches = await this.lookups.allBranches({ companyId: ctx.companyId });
       if (seq !== this.loadSeq) return;
 
       if (branches.length === 0) {
@@ -328,31 +308,24 @@ export class BranchOverridesModal {
       }
 
       const settled = await mapWithConcurrency(branches, MAX_CONCURRENT_READS, (branch) =>
-        getBranchAddon(branch.id, ctx.appKey, ctx.addonKey),
+        this.api.getBranchAddon(branch.id, ctx.appKey, ctx.addonKey),
       );
       if (seq !== this.loadSeq) return;
-
-      const allForbidden = settled.every(
-        (res) => res.status === 'rejected' && isForbiddenError(res.reason),
-      );
-      if (allForbidden) {
-        this.forbidden.set(true);
-        this.rows.set([]);
-        return;
-      }
 
       const nextRows: BranchOverrideRow[] = branches.map((branch, idx) => {
         const res = settled[idx];
         if (res.status === 'fulfilled') {
-          return { branch, resource: res.value.resource, failed: false };
+          return { branch, resource: res.value.resource, failed: false, forbidden: false };
         }
-        return { branch, resource: null, failed: true };
+        return { branch, resource: null, failed: !isForbiddenError(res.reason), forbidden: isForbiddenError(res.reason) };
       });
       this.rows.set(nextRows);
     } catch (error) {
       if (seq !== this.loadSeq) return;
       if (isForbiddenError(error)) {
         this.forbidden.set(true);
+      } else if (error instanceof ApiError && error.status !== 0 && error.status < 500) {
+        this.notify.error(errorMessage(error, 'wsActivation', this.transloco));
       } else {
         this.loadFailed.set(true);
         this.correlationId.set(correlationIdOf(error));

@@ -1,7 +1,6 @@
 import type {
   TemplateDataSourceKey,
   TemplateDocumentType,
-  TemplateLocale,
   TemplateOutputChannel,
   TemplateProductionDisabledReason,
   TemplateScopeRef,
@@ -30,17 +29,4 @@ export interface AssignmentSelectorOption {
   productionAssignmentEnabled: boolean;
   /** Backend productionDisabledReason: null when enabled. */
   productionDisabledReason: TemplateProductionDisabledReason | null;
-}
-
-export interface OverlapCandidate {
-  scope: TemplateScopeRef;
-  documentType: TemplateDocumentType;
-  outputChannel: TemplateOutputChannel;
-  adapterKey: TemplateDataSourceKey;
-  locale: TemplateLocale | null;
-  priority: number;
-  isDefault: boolean;
-  status: 'ACTIVE' | 'INACTIVE';
-  effectiveFrom: string;
-  effectiveTo: string | null;
 }

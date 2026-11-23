@@ -1,7 +1,7 @@
 import { ApiError } from '../../../../core/api/api-errors';
-import { listAllPages, listBranches, listUsers, newIdempotencyKey } from '../../staff/shared/staff.api';
+import { newIdempotencyKey } from '../../../../core/api/idempotency';
 import { DIRECTORY_SETTINGS_LIMITS } from '../directory-settings/directory-settings.model';
-import { fakeGetDirectorySettings as fakeGetSharedDirectorySettings, peekDirectorySettings } from '../directory-settings/directory-settings.fake';
+import { peekDirectorySettings } from '../directory-settings/directory-settings.fake';
 import { fakeActorMe } from '../shared/fake-actor';
 import {
   ADDRESS_TYPES,
@@ -13,7 +13,7 @@ import {
   CreatePartyBody,
   CreateRelationshipBody,
   CreateRoleBody,
-  DirectorySettings,
+  PartyRules,
   OrgContact,
   OrgContactPhone,
   PARTY_LIMITS,
@@ -1745,30 +1745,15 @@ function assertTypeFieldCompatibility(
   }
 }
 
+const FIXTURE_BRANCH_IDS = new Set(["br-alx", "br-cai", "br-jed", "br-ruh"]);
+const FIXTURE_OWNER_IDS = new Set(["u-faisal", "u-hany", "u-mona", "u-nada", "u-omar", "u-owner"]);
+
 async function assertValidBranch(branchId: string | null): Promise<void> {
-  if (branchId === null) return;
-  try {
-    const branches = await listAllPages(listBranches, { limit: 100 });
-    const match = branches.find((b) => b.id === branchId && b.status === 'ACTIVE');
-    if (!match) {
-      throw new ApiError(422, 'PARTY_BRANCH_INVALID');
-    }
-  } catch (err) {
-    if (err instanceof ApiError && err.code === 'PARTY_BRANCH_INVALID') throw err;
-  }
+  if (branchId !== null && !FIXTURE_BRANCH_IDS.has(branchId)) throw new ApiError(422, 'PARTY_BRANCH_INVALID');
 }
 
 async function assertValidOwner(ownerUserId: string | null): Promise<void> {
-  if (ownerUserId === null) return;
-  try {
-    const users = await listAllPages(listUsers, { limit: 100 });
-    const match = users.find((u) => u.id === ownerUserId && u.status === 'ACTIVE');
-    if (!match) {
-      throw new ApiError(422, 'PARTY_OWNER_INVALID');
-    }
-  } catch (err) {
-    if (err instanceof ApiError && err.code === 'PARTY_OWNER_INVALID') throw err;
-  }
+  if (ownerUserId !== null && !FIXTURE_OWNER_IDS.has(ownerUserId)) throw new ApiError(422, 'PARTY_OWNER_INVALID');
 }
 
 function duplicateFamily(methodType: ContactMethodType): string | null {
@@ -2869,7 +2854,16 @@ export async function fakeDeleteRelationship(relationshipId: string): Promise<vo
   fromParty.updatedAt = now;
 }
 
-/** GET /directory/settings: the same singleton the directory-settings screen edits. */
-export function fakeGetDirectorySettings(): Promise<DirectorySettings> {
-  return fakeGetSharedDirectorySettings();
+/** Public party rules projection; does not require directory.settings.manage. */
+export async function fakeGetPartyRules(): Promise<PartyRules> {
+  const settings = peekDirectorySettings();
+  return {
+    duplicateScope: settings.duplicateScope,
+    preventDuplicateEmail: settings.preventDuplicateEmail,
+    preventDuplicatePhone: settings.preventDuplicatePhone,
+    preventDuplicateWhatsapp: settings.preventDuplicateWhatsapp,
+    maxContactMethodsPerParty: settings.maxContactMethodsPerParty,
+    maxAddressesPerParty: settings.maxAddressesPerParty,
+    version: 1,
+  };
 }

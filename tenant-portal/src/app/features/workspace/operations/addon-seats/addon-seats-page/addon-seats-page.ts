@@ -38,27 +38,19 @@ import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-d
 import { Field } from '../../../../../shared/ui/field/field';
 import { rectInPage, viewport } from '../../../../../shared/ui/overlay/zoom';
 import { Pagination } from '../../../../../shared/ui/pagination/pagination';
-import { getSeatUsage } from '../../../seats/seats.api';
-import { ModuleUsage, moduleNameIn, moduleTileOf, seatInitials } from '../../../seats/seats.model';
-import { StaffSession } from '../../../staff/shared/staff-session';
-import { StaffReadAccess } from '../../../staff/staff-read-access';
-import { SessionFailedState } from '../../shared/session-failed-state/session-failed-state';
-import { getUser, listUsers } from '../../../staff/shared/staff.api';
-import { TenantUser } from '../../../staff/shared/staff.model';
-import { StatusBadge } from '../../../staff/shared/status-badge/status-badge';
+import { moduleTileOf, seatInitials } from '../../../seats/seats.model';
+import { TenantScopeState } from '../../../../../core/scope/tenant-scope';
+import { ApiError, correlationIdOf, errorCodeOf, errorMessage, isRetryableWriteError,
+  writeErrorMessage } from '../../../../../core/api/api-errors';
+import { newIdempotencyKey } from '../../../../../core/api/idempotency';
+import { WorkspaceLookups } from '../../../../../shared/widgets/workspace-lookups/workspace-lookups.api';
+import { WorkspaceApp, WorkspaceUser } from '../../../../../shared/widgets/workspace-lookups/workspace-lookups.model';
+import { AddonSeatsApi } from '../addon-seats.api';
 import {
   AddonAssignment,
   AddonOption,
   AddonPageMeta,
-  ApiError,
-  assignAddon,
-  correlationIdOf,
-  errorCodeOf,
-  listAddonAssignments,
-  listAddonOptions,
-  newIdempotencyKey,
-  removeAddon,
-} from '../addon-seats.api';
+} from '../addon-seats.model';
 
 interface PickerPlace {
   top: number;
@@ -103,7 +95,6 @@ const EMPTY_META: AddonPageMeta = {
 @Component({
   selector: 'app-addon-seats-page',
   imports: [
-    SessionFailedState,
     RouterLink,
     TranslocoPipe,
     NgIcon,
@@ -111,7 +102,6 @@ const EMPTY_META: AddonPageMeta = {
     ConfirmDialog,
     Field,
     Pagination,
-    StatusBadge,
   ],
   providers: [
     provideTranslocoScope(
@@ -156,10 +146,9 @@ export class AddonSeatsPage {
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly language = inject(LanguageState).current;
-  private readonly session = inject(StaffSession);
-  private readonly staffRead = inject(StaffReadAccess);
-
-  protected readonly sessionFailed = computed(() => !this.session.me() && this.session.state() === 'failed');
+  private readonly scope = inject(TenantScopeState);
+  private readonly api = inject(AddonSeatsApi);
+  private readonly lookups = inject(WorkspaceLookups);
   private readonly queryParams = toSignal(this.route.queryParamMap);
 
   private readonly userTrigger = viewChild<ElementRef<HTMLButtonElement>>('userTrigger');
@@ -174,19 +163,18 @@ export class AddonSeatsPage {
   protected readonly canRead = computed(
     () =>
       // Until the session has loaded (or if loading failed) do not show the 403 state; the API decides.
-      !this.session.me() ||
-      this.session.isOwner() ||
-      this.session.isTenantWide('applications.addon_seats.read') ||
-      this.session.isTenantWide('applications.addon_seats.manage'),
+      !this.scope.me() ||
+      this.hasTenantPermission('applications.addon_seats.read') ||
+      this.hasTenantPermission('applications.addon_seats.manage'),
   );
   protected readonly canManage = computed(
-    () => this.session.isOwner() || this.session.isTenantWide('applications.addon_seats.manage'),
+    () => this.hasTenantPermission('applications.addon_seats.manage'),
   );
   protected readonly forbiddenFromApi = signal(false);
   protected readonly showForbidden = computed(() => !this.canRead() || this.forbiddenFromApi());
 
   protected readonly selectedUserId = signal<string | null>(null);
-  protected readonly selectedUser = signal<TenantUser | null>(null);
+  protected readonly selectedUser = signal<WorkspaceUser | null>(null);
   protected readonly resolvingUser = signal(false);
 
   protected readonly pickerOpen = signal(false);
@@ -194,7 +182,9 @@ export class AddonSeatsPage {
   protected readonly pickerPlace = signal<PickerPlace>({ top: 0, start: 0, width: 0, maxHeight: null });
   protected readonly userSearch = signal('');
   protected readonly usersSearching = signal(false);
-  protected readonly userOptions = signal<TenantUser[]>([]);
+  protected readonly userOptions = signal<WorkspaceUser[]>([]);
+  protected readonly pickerForbidden = signal(false);
+  protected readonly missingParentSeat = signal(false);
 
   protected readonly options = signal<AddonOption[]>([]);
   protected readonly optionsMeta = signal<AddonPageMeta>(EMPTY_META);
@@ -217,7 +207,7 @@ export class AddonSeatsPage {
   protected readonly busyActionKey = signal<string | null>(null);
   protected readonly pendingRemove = signal<RemoveTarget | null>(null);
 
-  private readonly moduleUsageMap = signal<ReadonlyMap<string, ModuleUsage>>(new Map());
+  private readonly apps = signal<ReadonlyMap<string, WorkspaceApp>>(new Map());
 
   protected readonly optionsColumns = computed(() =>
     this.canManage()
@@ -277,14 +267,7 @@ export class AddonSeatsPage {
   private handledQueryUserId: string | null | undefined = undefined;
   private writeKeyCache: { fingerprint: string; key: string } | null = null;
 
-  protected retrySession(): void {
-    void this.session.load().catch(() => undefined);
-  }
-
   constructor() {
-    if (!this.session.me()) {
-      void this.session.load().catch(() => undefined);
-    }
     void this.loadModuleMetadata();
 
     const onScroll = (event: Event) => {
@@ -399,13 +382,6 @@ export class AddonSeatsPage {
     this.closePicker();
   }
 
-  protected staffUserScope(userId: string): { companyId: string; branchId: string } | null {
-    const selected = this.selectedUser();
-    if (selected?.id !== userId) return null;
-    const target = { companyId: selected.companyId, branchId: selected.branchId };
-    return this.staffRead.allows('users', undefined, target) ? target : null;
-  }
-
   protected onHostEscape(event: Event): void {
     if (!this.pickerOpen()) return;
     event.preventDefault();
@@ -447,13 +423,15 @@ export class AddonSeatsPage {
     }
   }
 
-  protected chooseUser(user: TenantUser): void {
+  protected chooseUser(user: WorkspaceUser): void {
     this.closePicker();
     this.userTrigger()?.nativeElement.focus();
     if (this.selectedUserId() === user.id) return;
 
     this.handledQueryUserId = user.id;
+    this.writeKeyCache = null;
     this.forbiddenFromApi.set(false);
+    this.missingParentSeat.set(false);
     this.optionsPage.set(1);
     this.assignmentsPage.set(1);
     this.selectedUser.set(user);
@@ -502,16 +480,16 @@ export class AddonSeatsPage {
     this.assignmentsPage.set(1);
   }
 
-  protected fullName(user: Pick<TenantUser, 'firstName' | 'lastName' | 'email'>): string {
+  protected fullName(user: Pick<WorkspaceUser, 'firstName' | 'lastName' | 'email'>): string {
     const full = `${user.firstName} ${user.lastName}`.trim();
     return full || user.email;
   }
 
-  protected initials(user: Pick<TenantUser, 'firstName' | 'lastName' | 'email'>): string {
+  protected initials(user: Pick<WorkspaceUser, 'firstName' | 'lastName' | 'email'>): string {
     return seatInitials(this.fullName(user)) || '?';
   }
 
-  protected avatarTone(user: Pick<TenantUser, 'firstName' | 'lastName' | 'email'>): string {
+  protected avatarTone(user: Pick<WorkspaceUser, 'firstName' | 'lastName' | 'email'>): string {
     const name = this.fullName(user);
     let hash = 0;
     for (let i = 0; i < name.length; i++) {
@@ -526,17 +504,7 @@ export class AddonSeatsPage {
 
   protected appLabel(applicationKey: string): string {
     this.i18n();
-    const lang = this.language();
-    const key = `wsAddonSeats.apps.${applicationKey}`;
-    const translated = this.transloco.translate(key);
-    if (typeof translated === 'string' && translated && translated !== key) {
-      return translated;
-    }
-    const usage = this.moduleUsageMap().get(applicationKey);
-    if (usage) {
-      return moduleNameIn(usage.nameI18n, lang);
-    }
-    return applicationKey;
+    return this.apps().get(applicationKey)?.nameI18n[this.language()] || applicationKey;
   }
 
   protected addonLabel(addonKey: string): string {
@@ -558,8 +526,7 @@ export class AddonSeatsPage {
       s.addonReadiness === 'READY' &&
       !s.parentDenied &&
       !s.addonDenied &&
-      !s.adoptionPending &&
-      !s.capacityChangePending
+      !s.adoptionPending
     );
   }
 
@@ -608,6 +575,9 @@ export class AddonSeatsPage {
     if (!option.targetActive) {
       return this.transloco.translate('wsAddonSeats.options.reasons.userNotActive');
     }
+    if (option.seats && option.seats.used >= option.seats.total) {
+      return this.transloco.translate('wsAddonSeats.options.reasons.noFreeSeats');
+    }
     if (!this.isOptionReady(option)) {
       return this.readinessReason(option);
     }
@@ -643,8 +613,9 @@ export class AddonSeatsPage {
 
     this.busyActionKey.set(`assign:${option.addonSelectionId}`);
     try {
-      const receipt = await assignAddon(userId, body, key);
+      const receipt = await this.api.assignAddon(userId, body, key);
       this.writeKeyCache = null;
+      this.missingParentSeat.set(false);
       if (receipt.changed) {
         this.notify.success(
           this.transloco.translate('wsAddonSeats.toast.assigned', {
@@ -667,6 +638,7 @@ export class AddonSeatsPage {
         userId,
         addonName,
         appName,
+        applicationKey: option.applicationKey,
         userName,
       });
     } finally {
@@ -719,7 +691,7 @@ export class AddonSeatsPage {
 
     this.busyActionKey.set(`remove:${target.assignmentId}`);
     try {
-      const receipt = await removeAddon(userId, target.assignmentId, query, key);
+      const receipt = await this.api.removeAddon(userId, target.assignmentId, query, key);
       this.writeKeyCache = null;
       if (receipt.changed) {
         this.notify.success(
@@ -743,6 +715,7 @@ export class AddonSeatsPage {
         userId,
         addonName,
         appName,
+        applicationKey: target.applicationKey,
         userName,
       });
     } finally {
@@ -753,25 +726,37 @@ export class AddonSeatsPage {
 
   private handleWriteError(
     error: unknown,
-    ctx: { kind: 'assign' | 'remove'; userId: string; addonName: string; appName: string; userName: string },
+    ctx: { kind: 'assign' | 'remove'; userId: string; addonName: string; appName: string; applicationKey: string; userName: string },
   ): void {
     const code = errorCodeOf(error);
     const status = error instanceof ApiError ? error.status : null;
-    if (status !== null && status >= 400 && status < 500) {
+    const inFlight = code === 'GW.IDEM.IN_FLIGHT' || !!code?.match(/IDEMPOTENCY.*IN_FLIGHT$/);
+    if (status !== 401 && !inFlight && !isRetryableWriteError(error)) {
       this.writeKeyCache = null;
     }
 
+    if (inFlight) {
+      this.notify.error(this.transloco.translate('wsAddonSeats.errors.GW.IDEM.IN_FLIGHT'));
+      return;
+    }
+
     if (code === 'SEAT_LIMIT_REACHED') {
+      const parentOverCapacity = this.selectedUser()?.seats?.some(
+        (seat) => seat.moduleKey === ctx.applicationKey && seat.accessState === 'OVER_CAPACITY',
+      );
       this.notify.error(
-        this.transloco.translate('wsAddonSeats.errors.SEAT_LIMIT_REACHED', {
+        this.transloco.translate(parentOverCapacity
+          ? 'wsAddonSeats.errors.APP_SEAT_LIMIT_REACHED' : 'wsAddonSeats.errors.SEAT_LIMIT_REACHED', {
           addon: ctx.addonName,
         }),
       );
+      void this.reloadUserTables(ctx.userId);
       return;
     }
 
     if (code === 'ASSIGNMENT_NOT_FOUND') {
       if (ctx.kind === 'assign') {
+        this.missingParentSeat.set(true);
         this.notify.error(
           this.transloco.translate('wsAddonSeats.errors.ASSIGNMENT_NOT_FOUND', {
             user: ctx.userName,
@@ -799,30 +784,13 @@ export class AddonSeatsPage {
       return;
     }
 
-    if (status === 403 || code === 'ACCESS_POLICY_BLOCKED') {
-      this.notify.error(this.transloco.translate('wsAddonSeats.errors.ACCESS_POLICY_BLOCKED'));
-      return;
-    }
-
-    if (status === 503 || code === 'ACCESS_POLICY_UNAVAILABLE') {
-      this.notify.error(this.transloco.translate('wsAddonSeats.errors.ACCESS_POLICY_UNAVAILABLE'));
-      return;
-    }
-
-    if (code) {
-      const key = `wsAddonSeats.errors.${code}`;
-      const translated = this.transloco.translate(key);
-      if (translated && translated !== key) {
-        this.notify.error(translated);
-        return;
-      }
-    }
-
-    this.notify.error(this.transloco.translate('wsAddonSeats.errors.generic'));
+    this.notify.error(writeErrorMessage(error, 'wsAddonSeats', this.transloco));
   }
 
   private async selectUserById(userId: string): Promise<void> {
+    if (this.selectedUserId() !== userId) this.writeKeyCache = null;
     this.forbiddenFromApi.set(false);
+    this.missingParentSeat.set(false);
     this.optionsPage.set(1);
     this.assignmentsPage.set(1);
     this.selectedUserId.set(userId);
@@ -834,7 +802,7 @@ export class AddonSeatsPage {
       this.selectedUser.set(cached);
       return;
     }
-
+    this.selectedUser.set(null);
     await this.resolveUser(userId);
   }
 
@@ -842,7 +810,7 @@ export class AddonSeatsPage {
     const seq = ++this.resolveUserSeq;
     this.resolvingUser.set(true);
     try {
-      const user = await getUser(userId);
+      const user = await this.lookups.user(userId);
       if (seq !== this.resolveUserSeq || this.selectedUserId() !== userId) return;
       this.selectedUser.set(user);
     } catch (error) {
@@ -854,7 +822,7 @@ export class AddonSeatsPage {
         this.resetSelectedUserState();
         this.syncQueryUserId(null);
       } else if (error instanceof ApiError && error.status === 403) {
-        this.forbiddenFromApi.set(true);
+        this.selectedUser.set(null);
       }
     } finally {
       if (seq === this.resolveUserSeq) {
@@ -865,18 +833,19 @@ export class AddonSeatsPage {
 
   private async loadModuleMetadata(): Promise<void> {
     try {
-      const usage = await getSeatUsage();
-      this.moduleUsageMap.set(new Map(usage.modules.map((mod) => [mod.moduleKey, mod])));
+      const apps = await this.lookups.appsOverview();
+      this.apps.set(new Map(apps.map((app) => [app.moduleKey, app])));
     } catch {
-      // Optional metadata fallback when module display names come from seat usage.
+      // Display names are optional; the module key remains usable if the lookup fails.
     }
   }
 
   private async searchUsers(search: string): Promise<void> {
     const seq = ++this.userSearchSeq;
     this.usersSearching.set(true);
+    this.pickerForbidden.set(false);
     try {
-      const page = await listUsers({
+      const page = await this.lookups.users({
         ...(search.trim() ? { search: search.trim() } : {}),
         limit: 50,
       });
@@ -885,9 +854,10 @@ export class AddonSeatsPage {
       if (this.pickerOpen()) {
         queueMicrotask(() => this.placePicker(this.pickerSeq));
       }
-    } catch {
+    } catch (error) {
       if (seq !== this.userSearchSeq) return;
       this.userOptions.set([]);
+      this.pickerForbidden.set(error instanceof ApiError && error.status === 403);
     } finally {
       if (seq === this.userSearchSeq) {
         this.usersSearching.set(false);
@@ -910,7 +880,7 @@ export class AddonSeatsPage {
     this.optionsCorrelationId.set(null);
 
     try {
-      const res = await listAddonOptions(userId, page, limit);
+      const res = await this.api.listAddonOptions(userId, page, limit);
       if (seq !== this.optionsSeq || this.selectedUserId() !== userId) return;
       if (page > res.meta.totalPages && res.meta.totalPages >= 1) {
         this.optionsPage.set(res.meta.totalPages);
@@ -920,8 +890,12 @@ export class AddonSeatsPage {
       this.optionsMeta.set(res.meta);
     } catch (error) {
       if (seq !== this.optionsSeq || this.selectedUserId() !== userId) return;
-      if (error instanceof ApiError && error.status === 403) {
+      if (error instanceof ApiError && error.status === 403 && !error.code.startsWith('TENANT_MAINTENANCE_')) {
         this.forbiddenFromApi.set(true);
+        return;
+      }
+      if (error instanceof ApiError && error.status > 0 && error.status < 500) {
+        this.notify.error(errorMessage(error, 'wsAddonSeats', this.transloco));
         return;
       }
       this.optionsFailed.set(true);
@@ -942,7 +916,7 @@ export class AddonSeatsPage {
     this.assignmentsCorrelationId.set(null);
 
     try {
-      const res = await listAddonAssignments(userId, page, limit);
+      const res = await this.api.listAddonAssignments(userId, page, limit);
       if (seq !== this.assignmentsSeq || this.selectedUserId() !== userId) return;
       if (page > res.meta.totalPages && res.meta.totalPages >= 1) {
         this.assignmentsPage.set(res.meta.totalPages);
@@ -952,8 +926,12 @@ export class AddonSeatsPage {
       this.assignmentsMeta.set(res.meta);
     } catch (error) {
       if (seq !== this.assignmentsSeq || this.selectedUserId() !== userId) return;
-      if (error instanceof ApiError && error.status === 403) {
+      if (error instanceof ApiError && error.status === 403 && !error.code.startsWith('TENANT_MAINTENANCE_')) {
         this.forbiddenFromApi.set(true);
+        return;
+      }
+      if (error instanceof ApiError && error.status > 0 && error.status < 500) {
+        this.notify.error(errorMessage(error, 'wsAddonSeats', this.transloco));
         return;
       }
       this.assignmentsFailed.set(true);
@@ -967,6 +945,8 @@ export class AddonSeatsPage {
   }
 
   private resetSelectedUserState(): void {
+    this.writeKeyCache = null;
+    this.missingParentSeat.set(false);
     this.selectedUserId.set(null);
     this.selectedUser.set(null);
     this.options.set([]);
@@ -997,6 +977,21 @@ export class AddonSeatsPage {
     const key = newIdempotencyKey();
     this.writeKeyCache = { fingerprint, key };
     return key;
+  }
+
+  private hasTenantPermission(key: string): boolean {
+    const me = this.scope.me();
+    return me?.isTenantOwner === true ||
+      (me?.permissions.includes(key) === true && me.permissionScopes[key]?.tenantWide === true);
+  }
+
+  protected userStatusTone(status: WorkspaceUser['status']): string {
+    switch (status) {
+      case 'ACTIVE': return 'bg-success text-on-success';
+      case 'INVITED': return 'bg-brand-soft text-on-brand-soft';
+      case 'SUSPENDED': return 'bg-neutral-soft text-warning-text';
+      default: return 'bg-neutral-soft text-text-muted';
+    }
   }
 
   private initialPickerPlace(triggerEl: HTMLElement): PickerPlace {

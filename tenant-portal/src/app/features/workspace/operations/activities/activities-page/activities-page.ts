@@ -1,7 +1,7 @@
 import { Component, DestroyRef, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
@@ -19,12 +19,7 @@ import {
 import { Notify } from '../../../../../core/notify/notify';
 import { Button } from '../../../../../shared/ui/button/button';
 import { ViewOption, ViewSwitcher } from '../../../../../shared/ui/view-switcher/view-switcher';
-import {
-  activitySummary,
-  listActivities,
-  listActivityCalendar,
-  listActivityTypes,
-} from '../../../../../shared/widgets/activities/activities.api';
+import { ActivitiesApi } from '../../../../../shared/widgets/activities/activities.api';
 import {
   ACTIVITY_STATUSES,
   Activity,
@@ -38,10 +33,12 @@ import {
   RecordActivities,
   RecordTarget,
 } from '../../../../../shared/widgets/activities/record-activities/record-activities';
-import { StaffSession } from '../../../staff/shared/staff-session';
+import { TenantScopeState } from '../../../../../core/scope/tenant-scope';
+import { AuthSession } from '../../../../../core/auth/auth-session';
+import { WorkspaceLookups } from '../../../../../shared/widgets/workspace-lookups/workspace-lookups.api';
+import { WorkspaceApp, WorkspaceBranch } from '../../../../../shared/widgets/workspace-lookups/workspace-lookups.model';
+import { FullState } from '../../../../../shared/ui/full-state/full-state';
 import { SessionFailedState } from '../../shared/session-failed-state/session-failed-state';
-import { listAllPages, listBranches } from '../../../staff/shared/staff.api';
-import { Branch } from '../../../staff/shared/staff.model';
 import { ActivitiesBoard } from '../activities-board/activities-board';
 import { ActivitiesCalendar, calendarMonthRange } from '../activities-calendar/activities-calendar';
 import { ActivitiesFilters } from '../activities-filters/activities-filters';
@@ -64,13 +61,13 @@ import {
   isForbiddenError,
   isTodayRange,
   localDayBounds,
-  matchesRecordType,
+  ALL_RECORD_TYPES,
   parseUrlState,
   primaryTargetOf,
   todayDateRange,
 } from '../operations-activities.model';
 import { RecordPickerModal } from '../record-picker-modal/record-picker-modal';
-import { correlationIdOf } from '../../../../../core/api/api-errors';
+import { ApiError, correlationIdOf, errorMessage } from '../../../../../core/api/api-errors';
 
 const SEARCH_DEBOUNCE_MS = 300;
 const BOARD_PAGE_LIMIT = 20;
@@ -115,8 +112,8 @@ function emptyBoardLanes(): BoardLaneState[] {
   selector: 'app-activities-page',
   imports: [
     SessionFailedState,
+    FullState,
     NgIcon,
-    RouterLink,
     TranslocoPipe,
     Button,
     ViewSwitcher,
@@ -151,9 +148,13 @@ export class ActivitiesPage {
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
-  private readonly session = inject(StaffSession);
+  private readonly scope = inject(TenantScopeState);
+  private readonly auth = inject(AuthSession);
+  private readonly api = inject(ActivitiesApi);
+  private readonly lookups = inject(WorkspaceLookups);
+  private readonly apps = signal<WorkspaceApp[]>([]);
 
-  protected readonly sessionFailed = computed(() => !this.session.me() && this.session.state() === 'failed');
+  protected readonly sessionFailed = computed(() => !this.scope.me() && this.auth.status() === 'failed');
   private readonly queryParams = toSignal(this.route.queryParamMap);
 
   private readonly recordPicker = viewChild(RecordPickerModal);
@@ -169,7 +170,7 @@ export class ActivitiesPage {
   protected readonly searchDraft = signal<string>(this.initialUrl.filters.search);
   protected readonly filtersOpen = signal(false);
 
-  protected readonly branches = signal<Branch[]>([]);
+  protected readonly branches = signal<WorkspaceBranch[]>([]);
   protected readonly activityTypes = signal<ActivityTypeDefinition[]>([]);
   protected readonly summary = signal<ActivitySummary>(emptySummary());
 
@@ -188,36 +189,32 @@ export class ActivitiesPage {
   private loadSeq = 0;
   private lastWrittenQueryKey = JSON.stringify(buildUrlParams(this.initialUrl));
   private lastTruncatedNoticeKey = '';
+  private linkedActivityId: string | null = null;
 
   protected readonly canRead = computed(() => {
     // Until the session has loaded (or if loading failed) do not show the 403 state; the API decides.
-    if (!this.session.me()) return true;
-    return this.session.can('activities.read');
+    if (!this.scope.me()) return true;
+    return this.hasPermission('activities.read');
   });
 
   protected readonly canCreate = computed(() => {
-    const me = this.session.me();
+    const me = this.scope.me();
     if (!me) return false;
-    return this.session.can('activities.create');
+    return this.hasPermission('activities.create');
   });
 
   protected readonly availableApps = computed<TargetApp[]>(() => {
-    const me = this.session.me();
-    if (!me || me.isTenantOwner) return ['CRM', 'CORE', 'TRADE'];
-    const perms = me.permissions;
-    // TODO(Phase 5): use module-access source
-    const apps: TargetApp[] = [];
-    if (perms.some((key) => key.startsWith('crm.'))) apps.push('CRM');
-    apps.push('CORE');
-    if (perms.some((key) => key.startsWith('trade.') || key.startsWith('sales.'))) apps.push('TRADE');
-    return apps;
+    const owner = this.scope.me()?.isTenantOwner === true;
+    return (['CRM', 'CORE', 'TRADE'] as const).filter((app) => app === 'CORE' ||
+      this.apps().some((item) => item.moduleKey === app.toLowerCase() && item.group === 'SUBSCRIBED' &&
+        (owner || item.myAccessState === 'ACTIVE' || item.myAccessState === 'OVER_CAPACITY')));
   });
 
   private canActOn(action: ActivityAction): (activity: Activity) => boolean {
-    const me = this.session.me();
+    const me = this.scope.me();
     return (activity: Activity) =>
       canActOnActivity(
-        { meId: me?.id ?? null, isOwner: this.session.isOwner(), can: (permission, scope) => this.session.can(permission, scope) },
+        { meId: me?.id ?? null, isOwner: me?.isTenantOwner === true, can: (permission, scope) => this.hasPermission(permission, scope) },
         action,
         activity,
       );
@@ -267,19 +264,15 @@ export class ActivitiesPage {
     return !f.overdue && isTodayRange(f.dueRange);
   });
 
-  protected readonly listItems = computed<Activity[]>(() => {
-    const recordType = this.filters().recordType;
-    return this.rawListItems().filter((item) => matchesRecordType(item, recordType));
-  });
+  protected readonly listItems = this.rawListItems.asReadonly();
 
   protected readonly boardLanes = computed<BoardLaneState[]>(() => {
-    const recordType = this.filters().recordType;
     const summaryByStatus = new Map(this.summary().byStatus.map((item) => [item.status, item]));
     return this.rawBoardLanes().map((lane) => {
       const counts = summaryByStatus.get(lane.status);
       return {
         ...lane,
-        items: lane.items.filter((item) => matchesRecordType(item, recordType)),
+        items: lane.items,
         total: counts?.total ?? lane.total,
         overdue: counts?.overdue ?? lane.overdue,
         today: counts?.today ?? lane.today,
@@ -288,10 +281,7 @@ export class ActivitiesPage {
     });
   });
 
-  protected readonly calendarItems = computed<Activity[]>(() => {
-    const recordType = this.filters().recordType;
-    return this.rawCalendarItems().filter((item) => matchesRecordType(item, recordType));
-  });
+  protected readonly calendarItems = this.rawCalendarItems.asReadonly();
 
   private readonly summaryTotal = computed(() =>
     this.summary().byStatus.reduce((acc, item) => acc + item.total, 0),
@@ -325,19 +315,33 @@ export class ActivitiesPage {
       !this.isFirstUseEmpty(),
   );
 
+  protected goHome(): void {
+    void this.router.navigate(['/']);
+  }
+
+  protected readonly loadFailureText = computed(() => {
+    this.i18n();
+    const reference = this.errorCorrelationId();
+    const text = this.transloco.translate('wsActivities.states.loadFailedText');
+    return reference ? `${text} ${this.transloco.translate('wsActivities.states.reference', { correlationId: reference })}` : text;
+  });
+
   protected retrySession(): void {
-    void this.session.load().catch(() => undefined);
+    void this.auth.ensureLoaded().catch(() => undefined);
   }
 
   constructor() {
-    if (!this.session.me()) {
-      void this.session.load().catch(() => undefined);
+    if (!this.scope.me()) {
+      void this.auth.ensureLoaded().catch(() => undefined);
     }
     void this.loadLookups();
 
     effect(() => {
       const pm = this.queryParams();
       if (!pm) return;
+      const activityId = pm.get('activityId');
+      const window = this.recordActivities();
+      if (activityId && window) untracked(() => void this.openLinkedActivity(activityId));
       const parsed = parseUrlState(pm);
       const key = JSON.stringify(buildUrlParams(parsed));
       if (key === this.lastWrittenQueryKey) return;
@@ -354,7 +358,7 @@ export class ActivitiesPage {
 
     effect(() => {
       const readable = this.canRead();
-      const meId = this.session.me()?.id ?? null;
+      const meId = this.scope.me()?.id ?? null;
       const currentView = this.view();
       const f = this.filters();
       const currentPage = this.page();
@@ -523,19 +527,14 @@ export class ActivitiesPage {
 
   protected openActivityWindow(activity: Activity): void {
     const primary = primaryTargetOf(activity);
-    const target: RecordTarget = primary
-      ? {
-          app: primary.targetApp,
-          type: primary.targetType,
-          id: primary.targetId,
-          label: primary.unavailableAt ? this.transloco.translate('wsActivities.unavailable') : primary.label,
-        }
-      : {
-          app: 'CORE',
-          type: 'PARTY',
-          id: activity.id,
-          label: this.transloco.translate('wsActivities.unavailable'),
-        };
+    if (!primary) {
+      this.notify.error(this.transloco.translate('activities.errors.generic'));
+      return;
+    }
+    const target: RecordTarget = {
+      app: primary.targetApp, type: primary.targetType, id: primary.targetId,
+      label: primary.unavailableAt ? this.transloco.translate('wsActivities.unavailable') : primary.label,
+    };
     this.recordActivities()?.open(target, { screen: 'edit', activityId: activity.id });
   }
 
@@ -545,7 +544,7 @@ export class ActivitiesPage {
 
     const seqAtStart = this.loadSeq;
     const f = this.filters();
-    const meId = this.session.me()?.id ?? null;
+    const meId = this.scope.me()?.id ?? null;
     const scope = this.buildScopeFilter(f, meId);
 
     this.rawBoardLanes.update((lanes) =>
@@ -553,7 +552,7 @@ export class ActivitiesPage {
     );
 
     try {
-      const next = await listActivities({
+      const next = await this.api.listActivities({
         ...scope,
         statuses: [status],
         overdue: f.overdue ? true : undefined,
@@ -589,7 +588,9 @@ export class ActivitiesPage {
 
   private buildScopeFilter(f: ActivitiesFilterState, meId: string | null): ActivityScopeFilter {
     const bounds = dateRangeToApiBounds(f.dueRange);
+    const recordType = ALL_RECORD_TYPES.find((item) => item.key === f.recordType);
     return {
+      ...(recordType ? { targetApp: recordType.app, targetType: recordType.type } : {}),
       ...(f.show === 'mine' && meId ? { assigneeUserId: meId } : {}),
       ...(f.branchId ? { branchId: f.branchId } : {}),
       ...(f.types.length > 0 ? { types: f.types } : {}),
@@ -628,10 +629,10 @@ export class ActivitiesPage {
     const { dayStart, dayEnd } = localDayBounds();
 
     try {
-      const summaryPromise = activitySummary(scope, dayStart, dayEnd);
+      const summaryPromise = this.api.activitySummary(scope, dayStart, dayEnd);
 
       if (params.view === 'list') {
-        const listPromise = listActivities({
+        const listPromise = this.api.listActivities({
           ...scope,
           statuses: this.effectiveListStatuses(params.filters),
           overdue: params.filters.overdue ? true : undefined,
@@ -647,7 +648,7 @@ export class ActivitiesPage {
         this.listTotal.set(pageRes.meta.total);
       } else if (params.view === 'board') {
         const lanePromises = ACTIVITY_STATUSES.map((status) =>
-          listActivities({
+          this.api.listActivities({
             ...scope,
             statuses: [status],
             overdue: params.filters.overdue ? true : undefined,
@@ -683,8 +684,9 @@ export class ActivitiesPage {
         const from = gridStart.toISOString();
         const to = gridEndExclusive.toISOString();
         const calStatuses = this.effectiveCalendarStatuses(params.filters);
-        const calendarPromise = listActivityCalendar({
-          ...scope,
+        const { dueFrom: _dueFrom, dueTo: _dueTo, ...calendarScope } = scope;
+        const calendarPromise = this.api.listActivityCalendar({
+          ...calendarScope,
           statuses: calStatuses,
           overdue: params.filters.overdue ? true : undefined,
           from,
@@ -711,7 +713,9 @@ export class ActivitiesPage {
       }
     } catch (error) {
       if (seq !== this.loadSeq) return;
-      if (isForbiddenError(error)) {
+      if (error instanceof ApiError && (error.code.startsWith('TENANT_MAINTENANCE_') || error.status === 429 || error.status === 422 || error.status === 400 || error.status === 413)) {
+        this.notify.error(errorMessage(error, 'wsActivities', this.transloco));
+      } else if (isForbiddenError(error)) {
         this.forbiddenError.set(true);
       } else {
         this.loadError.set(true);
@@ -725,15 +729,42 @@ export class ActivitiesPage {
   }
 
   private async loadLookups(): Promise<void> {
-    const [branchesRes, typesRes] = await Promise.allSettled([
-      listAllPages(listBranches, { limit: 100 }),
-      listActivityTypes(),
+    const [branchesRes, typesRes, appsRes] = await Promise.allSettled([
+      this.lookups.allBranches(),
+      this.api.listActivityTypes(),
+      this.lookups.appsOverview(),
     ]);
+    this.apps.set(appsRes.status === 'fulfilled' ? appsRes.value : []);
     if (branchesRes.status === 'fulfilled') {
       this.branches.set(branchesRes.value);
     }
     if (typesRes.status === 'fulfilled') {
       this.activityTypes.set(typesRes.value);
+    }
+  }
+
+  private hasPermission(key: string, resource?: { branchId?: string | null }): boolean {
+    const me = this.scope.me();
+    if (!me) return false;
+    if (me.isTenantOwner) return true;
+    if (!me.permissions.includes(key)) return false;
+    if (!resource?.branchId) return true;
+    const permission = me.permissionScopes[key];
+    return permission?.tenantWide === true || permission?.branchIds.includes(resource.branchId) === true;
+  }
+
+  private async openLinkedActivity(id: string): Promise<void> {
+    if (this.linkedActivityId === id) return;
+    this.linkedActivityId = id;
+    try {
+      this.openActivityWindow(await this.api.getActivity(id));
+    } catch (error) {
+      this.notify.error(errorMessage(error, 'activities', this.transloco));
+    } finally {
+      await this.router.navigate([], {
+        relativeTo: this.route, queryParams: { activityId: null }, queryParamsHandling: 'merge', replaceUrl: true,
+      });
+      this.linkedActivityId = null;
     }
   }
 

@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../../../core/api/api-errors';
-import type { Me } from '../../staff/shared/staff.model';
-import { setFakeActorOverride } from '../shared/fake-actor';
+import { fakeActorMe, setFakeActorOverride } from '../shared/fake-actor';
 
 
 import { resetDirectorySettingsFake } from '../directory-settings/directory-settings.fake';
@@ -9,13 +8,15 @@ import {
   fakeAddContactMethod,
   fakeAddRole,
   fakeCreateParty,
-  fakeGetDirectorySettings,
+  fakeGetPartyRules,
   fakeGetParty,
   fakeListOrgContacts,
   fakeListParties,
   fakeUpdateParty,
 } from './party-directory.fake';
 import type { CreatePartyBody, ListPartiesQuery } from './party-directory.model';
+
+type Me = ReturnType<typeof fakeActorMe>;
 
 async function settle<T>(promise: Promise<T>): Promise<T> {
   const guarded = promise.then(
@@ -81,12 +82,12 @@ describe('party directory fake (Core directory contract)', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('rejects query fields the DTO does not declare, such as sharedOnly', async () => {
-    const error = await failure(fakeListParties({ sharedOnly: true } as unknown as ListPartiesQuery));
+  it('rejects query fields the DTO does not declare, such as unknownFilter', async () => {
+    const error = await failure(fakeListParties({ unknownFilter: true } as unknown as ListPartiesQuery));
     expect([error.status, error.code, error.details]).toEqual([
       400,
       'CORE_VALIDATION_FAILED',
-      { sharedOnly: ['whitelist_validation'] },
+      { unknownFilter: ['whitelist_validation'] },
     ]);
   });
 
@@ -157,8 +158,10 @@ describe('party directory fake (Core directory contract)', () => {
     expect(created.roles[0]?.appSource).toBe('core-app');
   });
 
-  it('reads the same settings singleton as the directory settings screen', async () => {
-    const settings = await settle(fakeGetDirectorySettings());
-    expect(settings.id).toBe('018f0000-0000-7000-8300-000000000001');
+  it('reads the public party rules projection', async () => {
+    const settings = await settle(fakeGetPartyRules());
+    expect(settings.version).toBe(1);
+    expect(settings.maxContactMethodsPerParty).toBeGreaterThan(0);
+    expect(settings).not.toHaveProperty('id');
   });
 });

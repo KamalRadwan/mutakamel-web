@@ -13,6 +13,7 @@
         [for]="uid + '-document'"
         [label]="'assignments.testModal.documentLabel' | transloco"
         [hint]="'assignments.testModal.documentHint' | transloco"
+        [error]="serverErrors()['document'] ?? null"
         [required]="true"
       >
         <ui-dropdown
@@ -22,7 +23,7 @@
           [options]="documentOptions()"
           [value]="adapterKey()"
           [label]="'assignments.testModal.documentLabel' | transloco"
-          [describedBy]="uid + '-document-hint'"
+          [describedBy]="uid + '-document-hint' + (serverErrors()['document'] ? ' ' + uid + '-document-error' : '')"
           [disabled]="resolving()"
           (valueChange)="adapterKey.set($event); onInputChange()"
         />
@@ -35,6 +36,7 @@
         [for]="uid + '-locale'"
         [label]="'assignments.testModal.languageLabel' | transloco"
         [hint]="'assignments.testModal.languageHint' | transloco"
+        [error]="serverErrors()['locale'] ?? null"
         [required]="true"
       >
         <ui-dropdown
@@ -44,7 +46,7 @@
           [options]="languageOptions()"
           [value]="locale()"
           [label]="'assignments.testModal.languageLabel' | transloco"
-          [describedBy]="uid + '-locale-hint'"
+          [describedBy]="uid + '-locale-hint' + (serverErrors()['locale'] ? ' ' + uid + '-locale-error' : '')"
           [disabled]="resolving()"
           (valueChange)="locale.set($event); onInputChange()"
         />
@@ -57,6 +59,7 @@
         [for]="uid + '-scope'"
         [label]="'assignments.testModal.scopeLabel' | transloco"
         [hint]="'assignments.testModal.scopeHint' | transloco"
+        [error]="serverErrors()['scope'] ?? null"
         [required]="true"
       >
         <ui-dropdown
@@ -66,7 +69,7 @@
           [options]="scopeDropdownOptions()"
           [value]="scopeKey()"
           [label]="'assignments.testModal.scopeLabel' | transloco"
-          [describedBy]="uid + '-scope-hint'"
+          [describedBy]="uid + '-scope-hint' + (serverErrors()['scope'] ? ' ' + uid + '-scope-error' : '')"
           [disabled]="resolving()"
           (valueChange)="scopeKey.set($event); onInputChange()"
         />
@@ -79,13 +82,14 @@
         [for]="uid + '-business-time'"
         [label]="'assignments.testModal.businessTimeLabel' | transloco"
         [hint]="'assignments.testModal.businessTimeHint' | transloco"
+        [error]="serverErrors()['businessTime'] ?? null"
       >
         <div class="flex items-center gap-6">
           <ui-date-field
             class="min-w-0 flex-1"
             [id]="uid + '-business-time'"
             [ariaLabel]="'assignments.testModal.businessTimeLabel' | transloco"
-            [describedBy]="uid + '-business-time-hint'"
+            [describedBy]="uid + '-business-time-hint' + (serverErrors()['businessTime'] ? ' ' + uid + '-business-time-error' : '')"
             [placeholder]="'assignments.testModal.businessTimePlaceholder' | transloco"
             [todayLabel]="'assignments.datePicker.today' | transloco"
             [prevMonthLabel]="'assignments.datePicker.prevMonth' | transloco"
@@ -98,7 +102,7 @@
             class="shrink-0"
             [id]="uid + '-business-clock'"
             [ariaLabel]="'assignments.testModal.businessTimeLabel' | transloco"
-            [describedBy]="uid + '-business-time-hint'"
+            [describedBy]="uid + '-business-time-hint' + (serverErrors()['businessTime'] ? ' ' + uid + '-business-time-error' : '')"
             [hourLabel]="'assignments.timePicker.hour' | transloco"
             [minuteLabel]="'assignments.timePicker.minute' | transloco"
             [disabled]="resolving()"

@@ -4,6 +4,7 @@ export const DUPLICATE_SCOPES: readonly DuplicateScope[] = ['TENANT', 'BRANCH', 
 
 export interface DirectorySettings {
   id: string;
+  version: number;
   duplicateScope: DuplicateScope;
   preventDuplicateEmail: boolean;
   preventDuplicatePhone: boolean;
@@ -21,6 +22,11 @@ export interface DirectorySettingsPatch {
   preventDuplicateWhatsapp?: boolean;
   maxContactMethodsPerParty?: number;
   maxAddressesPerParty?: number;
+}
+
+export interface DirectorySettingsResult {
+  settings: DirectorySettings;
+  etag: string;
 }
 
 export const DIRECTORY_SETTINGS_LIMITS = {

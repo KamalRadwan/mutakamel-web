@@ -1,5 +1,6 @@
 import { CanDeactivateFn, GuardResult, MaybeAsync, Routes, UrlSegment } from '@angular/router';
 import { provideTranslocoScope } from '@jsverse/transloco';
+import { requirePermission } from '../../../core/auth/permission.guard';
 import { TEMPLATE_FUNCTIONS_ENABLED } from './functions/functions.flags';
 import { TEMPLATE_PAGE_TABS } from './templates.model';
 
@@ -24,25 +25,30 @@ export const templatesRoutes: Routes = [
     children: [
       {
         path: 'template-platform',
+        canActivate: [requirePermission('templates.read')],
         loadComponent: () => import('./library/library-page/library-page').then((m) => m.LibraryPage),
       },
       {
         path: 'template-platform/:id/:tab',
+        canActivate: [requirePermission('templates.read')],
         canMatch: [isValidTemplateTab],
         canDeactivate: [canDeactivateTemplatePage],
         loadComponent: () => import('./template-page/template-page/template-page').then((m) => m.TemplatePage),
       },
       {
         path: 'template-platform/:id',
+        canActivate: [requirePermission('templates.read')],
         canDeactivate: [canDeactivateTemplatePage],
         loadComponent: () => import('./template-page/template-page/template-page').then((m) => m.TemplatePage),
       },
       {
         path: 'template-assets',
+        canActivate: [requirePermission('templates.read')],
         loadComponent: () => import('./assets/assets-page/assets-page').then((m) => m.AssetsPage),
       },
       {
         path: 'template-assignments',
+        canActivate: [requirePermission('templates.read')],
         loadComponent: () => import('./assignments/assignments-page/assignments-page').then((m) => m.AssignmentsPage),
       },
       ...(TEMPLATE_FUNCTIONS_ENABLED

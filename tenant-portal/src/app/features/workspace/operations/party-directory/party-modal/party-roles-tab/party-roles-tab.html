@@ -78,7 +78,7 @@
         </div>
       }
 
-      @if (adding()) {
+      @if (adding() && canAddAnyRole()) {
         <article class="flex flex-col gap-8 rounded-10 border border-brand bg-surface p-8 shadow-card">
           <div class="flex items-center justify-between gap-8">
             <span class="text-12 leading-18 font-medium text-text">

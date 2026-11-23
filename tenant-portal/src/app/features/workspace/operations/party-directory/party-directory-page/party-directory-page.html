@@ -1,14 +1,9 @@
-@if (sessionFailed()) {
-  <app-session-failed-state (retry)="retrySession()" />
-} @else if (!canRead() || forbidden()) {
-  <section class="flex flex-1 flex-col items-center justify-center gap-8 p-16 text-center">
-    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-orange text-on-icon">
-      <ng-icon name="tablerLock" size="18" aria-hidden="true" />
-    </span>
-    <h1 class="text-16 leading-24 font-medium text-text">{{ 'wsParty.states.forbiddenTitle' | transloco }}</h1>
-    <p class="text-12 leading-18 text-text-muted">{{ 'wsParty.states.forbiddenText' | transloco }}</p>
-    <a uiButton routerLink="/">{{ 'wsParty.states.backToHome' | transloco }}</a>
-  </section>
+@if (!canRead() || forbidden()) {
+  <ui-full-state kind="forbidden"
+    [title]="'wsParty.states.forbiddenTitle' | transloco"
+    [text]="'wsParty.states.forbiddenText' | transloco"
+    [actionLabel]="'wsParty.states.backToHome' | transloco"
+    (action)="goHome()" />
 } @else {
   <div class="flex shrink-0 flex-wrap items-center gap-8 rounded-10 bg-surface p-8 shadow-card">
     @if (canManageAny()) {
@@ -35,6 +30,7 @@
       </span>
       <input
         #searchInput
+        maxlength="200"
         type="text"
         autocomplete="off"
         class="h-full min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
@@ -163,15 +159,14 @@
         [label]="'wsParty.filters.owner' | transloco"
         [hint]="'wsParty.filters.ownerHint' | transloco"
       >
-        <ui-dropdown
-          id="pd-filter-owner"
-          class="w-full"
-          size="field"
-          [options]="ownerOptions()"
+        <app-party-owner-picker
+          fieldId="pd-filter-owner"
+          describedBy="pd-filter-owner-hint"
           [label]="'wsParty.filters.owner' | transloco"
-          [value]="ownerFilter()"
-          (valueChange)="setOwnerFilter($event)"
-        />
+          [emptyLabel]="'wsParty.filters.all' | transloco"
+          [searchPlaceholder]="'wsPartyModal.fields.ownerSearch' | transloco"
+          [value]="ownerFilter() === 'ALL' ? null : ownerFilter()"
+          (valueChange)="setOwnerFilter($event)" />
       </ui-field>
     </section>
   }
@@ -199,23 +194,11 @@
   }
 
   @if (loadFailed() && !loading()) {
-    <section
-      class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card"
-      role="alert"
-    >
-      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
-        <ng-icon name="tablerCloudOff" size="18" aria-hidden="true" />
-      </span>
-      <p class="text-13 leading-18 font-medium text-text">{{ 'wsParty.states.loadFailed' | transloco }}</p>
-      @if (errorCorrelationId(); as corrId) {
-        <p class="text-11 leading-16 text-text-muted">
-          {{ 'wsParty.states.referenceLabel' | transloco }} <bdi dir="ltr">{{ corrId }}</bdi>
-        </p>
-      }
-      <button type="button" uiButton variant="secondary" size="small" (click)="reload()">
-        {{ 'wsParty.states.retry' | transloco }}
-      </button>
-    </section>
+    <ui-full-state kind="load-failure"
+      [title]="'wsParty.states.loadFailed' | transloco"
+      [text]="errorCorrelationId() ? ('wsParty.states.referenceLabel' | transloco) + ' ' + errorCorrelationId() : ''"
+      [actionLabel]="'wsParty.states.retry' | transloco"
+      (action)="reload()" />
   } @else if (isFirstUseEmpty()) {
     <section class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
       <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-blue text-on-icon">

@@ -1,13 +1,8 @@
-import {
-  fakeGetAddonCommand,
-  fakeGetBranchAddon,
-  fakeGetCompanyAddon,
-  fakeGetCompanyApplication,
-  fakeListCompanyActivations,
-  fakeSetBranchOverride,
-  fakeSetCompanyAddon,
-  fakeSetCompanyApplication,
-} from './activation.fake';
+import { Service, inject } from '@angular/core';
+import { QueryClient } from '@tanstack/angular-query';
+import { ApiError } from '../../../../core/api/api-errors';
+import { CoreHttp, type CoreQuery } from '../../../../core/api/core-http';
+import { TenantScopeState } from '../../../../core/scope/tenant-scope';
 import {
   ActivationListItem,
   ActivationListResponse,
@@ -23,132 +18,108 @@ import {
   SetCompanyApplicationBody,
 } from './activation.model';
 
-/*
- * Errors (core-app tenant/application-access): writes need `applications.activation.manage` (403
- * MISSING_REQUIRED_PERMISSIONS {permissions}), reads ANY read/manage ({anyPermissions}); no exact-scope authority
- * is 403 ACCESS_POLICY_BLOCKED; a bad path/body is 400 CORE_VALIDATION_FAILED without details; the gateway sends
- * GW.IDEM.MISSING / GW.IDEM.BAD_VALUE / GW.IDEM.IN_FLIGHT; a reused key with another request is 422
- * IDEMPOTENCY_BODY_MISMATCH; domain refusals are 409 (APPLICATION_ALLOWANCE_NOT_READY, *_REVISION_STALE).
- */
+const CORE_PATH = '/api/tenant/core/v1';
+const ACTIVATION_QUERY_KEY = 'application-activation';
 
-/**
- * GET /api/tenant/core/v1/companies/:companyId/application-activations?page&limit
- * Query: page (1..1000000), limit (1..100). No body; no org headers.
- */
-export function listCompanyActivations(
-  companyId: string,
-  page = 1,
-  limit = 100,
-): Promise<ActivationListResponse> {
-  return fakeListCompanyActivations(companyId, page, limit);
-}
+@Service()
+export class ActivationApi {
+  private readonly http = inject(CoreHttp);
+  private readonly scope = inject(TenantScopeState);
+  private readonly queries = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0, networkMode: 'always' } },
+  });
 
-/**
- * Fetches all pages (limit 100) of
- * GET /api/tenant/core/v1/companies/:companyId/application-activations?page&limit
- */
-export async function listAllCompanyActivations(companyId: string): Promise<ActivationListItem[]> {
-  const all: ActivationListItem[] = [];
-  let page = 1;
-  while (true) {
-    const res = await listCompanyActivations(companyId, page, 100);
-    all.push(...res.data);
-    if (!res.meta.hasNext || res.data.length === 0 || page >= res.meta.totalPages) {
-      break;
-    }
-    page += 1;
+  listCompanyActivations(companyId: string, page = 1, limit = 100): Promise<ActivationListResponse> {
+    const path = this.companyPath(companyId);
+    return this.read(path, { page, limit }, async () => {
+      const result = await this.http.readPage<ActivationListItem>(path, { page, limit });
+      if (!result.data.every((item) => item?.target && item.scope && item.resource)) this.malformed();
+      return result;
+    });
   }
-  return all;
-}
 
-/**
- * GET /api/tenant/core/v1/companies/:companyId/application-activations/:applicationKey
- * No body; no org headers.
- */
-export function getCompanyApplication(
-  companyId: string,
-  appKey: string,
-): Promise<ActivationSingleton<ApplicationActivationResource>> {
-  return fakeGetCompanyApplication(companyId, appKey);
-}
+  async listAllCompanyActivations(companyId: string): Promise<ActivationListItem[]> {
+    const items: ActivationListItem[] = [];
+    for (let page = 1; page <= 1_000_000; page++) {
+      const result = await this.listCompanyActivations(companyId, page, 100);
+      items.push(...result.data);
+      if (!result.meta.hasNext) return items;
+      if (!result.data.length || page >= result.meta.totalPages) this.malformed();
+    }
+    return this.malformed();
+  }
 
-/**
- * GET /api/tenant/core/v1/companies/:companyId/application-activations/:applicationKey/addons/:addonKey
- * No body; no org headers.
- */
-export function getCompanyAddon(
-  companyId: string,
-  appKey: string,
-  addonKey: string,
-): Promise<ActivationSingleton<AddonActivationResource>> {
-  return fakeGetCompanyAddon(companyId, appKey, addonKey);
-}
+  getCompanyApplication(companyId: string, appKey: string): Promise<ActivationSingleton<ApplicationActivationResource>> {
+    return this.singleton(`${this.companyPath(companyId)}/${encodeURIComponent(appKey)}`);
+  }
 
-/**
- * GET /api/tenant/core/v1/branches/:branchId/application-activations/:applicationKey/addons/:addonKey
- * No body; no org headers.
- */
-export function getBranchAddon(
-  branchId: string,
-  appKey: string,
-  addonKey: string,
-): Promise<ActivationSingleton<BranchOverrideResource>> {
-  return fakeGetBranchAddon(branchId, appKey, addonKey);
-}
+  getCompanyAddon(companyId: string, appKey: string, addonKey: string): Promise<ActivationSingleton<AddonActivationResource>> {
+    return this.singleton(this.addonPath('companies', companyId, appKey, addonKey));
+  }
 
-/**
- * PATCH /api/tenant/core/v1/companies/:companyId/application-activations/:applicationKey
- * Headers: x-idempotency-key (UUIDv7). No If-Match; uses expectedActivationRevision in body.
- */
-export function setCompanyApplication(
-  companyId: string,
-  appKey: string,
-  body: SetCompanyApplicationBody,
-  key: string,
-): Promise<ActivationWriteReceipt> {
-  return fakeSetCompanyApplication(companyId, appKey, body, key);
-}
+  getBranchAddon(branchId: string, appKey: string, addonKey: string): Promise<ActivationSingleton<BranchOverrideResource>> {
+    return this.singleton(this.addonPath('branches', branchId, appKey, addonKey));
+  }
 
-/**
- * PATCH /api/tenant/core/v1/companies/:companyId/application-activations/:applicationKey/addons/:addonKey
- * Headers: x-idempotency-key (UUIDv7). No If-Match; uses expectedActivationRevision in body.
- * Returns 200 ActivationWriteReceipt or 202 AddonActivationPendingCommand (commandId = the idempotency key).
- * Retrying the same key while pending returns the current status; after REJECTED it is 409 ADDON_REVISION_STALE.
- */
-export function setCompanyAddon(
-  companyId: string,
-  appKey: string,
-  addonKey: string,
-  body: SetCompanyAddonBody,
-  key: string,
-): Promise<SetCompanyAddonResponse> {
-  return fakeSetCompanyAddon(companyId, appKey, addonKey, body, key);
-}
+  setCompanyApplication(companyId: string, appKey: string, body: SetCompanyApplicationBody, key: string): Promise<ActivationWriteReceipt> {
+    const { expectedActivationRevision, enabled, reason } = body;
+    return this.write(`${this.companyPath(companyId)}/${encodeURIComponent(appKey)}`,
+      { expectedActivationRevision, enabled, reason }, key);
+  }
 
-/**
- * GET /api/tenant/core/v1/companies/:companyId/application-activations/:applicationKey/addons/:addonKey/activation-commands/:commandId
- * Headers: Cache-Control: private, no-store (response). Only the original command actor may poll: an unknown
- * command, another actor or another target is 403 ACCESS_POLICY_BLOCKED, never 404.
- */
-export function getAddonCommand(
-  companyId: string,
-  appKey: string,
-  addonKey: string,
-  commandId: string,
-): Promise<AddonCommandStatusResponse> {
-  return fakeGetAddonCommand(companyId, appKey, addonKey, commandId);
-}
+  setCompanyAddon(companyId: string, appKey: string, addonKey: string, body: SetCompanyAddonBody, key: string): Promise<SetCompanyAddonResponse> {
+    const { expectedActivationRevision, enabled, reason, definitionVersionId } = body;
+    return this.write(this.addonPath('companies', companyId, appKey, addonKey),
+      { expectedActivationRevision, enabled, reason, definitionVersionId }, key);
+  }
 
-/**
- * PATCH /api/tenant/core/v1/branches/:branchId/application-activations/:applicationKey/addons/:addonKey
- * Headers: x-idempotency-key (UUIDv7). No If-Match; uses expectedOverrideRevision in body.
- */
-export function setBranchOverride(
-  branchId: string,
-  appKey: string,
-  addonKey: string,
-  body: SetBranchOverrideBody,
-  key: string,
-): Promise<ActivationWriteReceipt> {
-  return fakeSetBranchOverride(branchId, appKey, addonKey, body, key);
+  getAddonCommand(companyId: string, appKey: string, addonKey: string, commandId: string): Promise<AddonCommandStatusResponse> {
+    const path = `${this.addonPath('companies', companyId, appKey, addonKey)}/activation-commands/${encodeURIComponent(commandId)}`;
+    return this.read(path, {}, async () => {
+      const result = await this.http.read<AddonCommandStatusResponse>(path);
+      if (!result || !['PENDING', 'COMMITTED', 'REJECTED'].includes(result.state)) this.malformed();
+      return result;
+    });
+  }
+
+  setBranchOverride(branchId: string, appKey: string, addonKey: string, body: SetBranchOverrideBody, key: string): Promise<ActivationWriteReceipt> {
+    const { expectedOverrideRevision, mode, reason } = body;
+    return this.write(this.addonPath('branches', branchId, appKey, addonKey),
+      { expectedOverrideRevision, mode, reason }, key);
+  }
+
+  private singleton<R extends ApplicationActivationResource | AddonActivationResource | BranchOverrideResource>(path: string): Promise<ActivationSingleton<R>> {
+    return this.read(path, {}, async () => {
+      const result = await this.http.read<ActivationSingleton<R>>(path);
+      if (!result?.resource || !result.scope || !result.target || !result.source) this.malformed();
+      return result;
+    });
+  }
+
+  private read<T>(path: string, query: CoreQuery, queryFn: () => Promise<T>): Promise<T> {
+    const me = this.scope.me();
+    // TenantScopeState has no revision counter; use its live authorization and selection projection.
+    const revision = [me?.id, me?.isTenantOwner, me?.permissions, me?.permissionScopes, this.scope.selection()];
+    return this.queries.fetchQuery({ queryKey: [ACTIVATION_QUERY_KEY, revision, path, query], queryFn });
+  }
+
+  private async write<T extends SetCompanyAddonResponse>(path: string, body: unknown, key: string): Promise<T> {
+    const { data } = await this.http.write<T>('PATCH', path, body, { key });
+    if (!data || !['COMMITTED', 'PENDING'].includes(data.state)) this.malformed();
+    await this.queries.cancelQueries({ queryKey: [ACTIVATION_QUERY_KEY] });
+    await this.queries.invalidateQueries({ queryKey: [ACTIVATION_QUERY_KEY] });
+    return data;
+  }
+
+  private companyPath(companyId: string): string {
+    return `${CORE_PATH}/companies/${encodeURIComponent(companyId)}/application-activations`;
+  }
+
+  private addonPath(scope: 'companies' | 'branches', id: string, app: string, addon: string): string {
+    return `${CORE_PATH}/${scope}/${encodeURIComponent(id)}/application-activations/${encodeURIComponent(app)}/addons/${encodeURIComponent(addon)}`;
+  }
+
+  private malformed(): never {
+    throw new ApiError(502, 'COMMON.GENERIC.INTERNAL_ERROR');
+  }
 }

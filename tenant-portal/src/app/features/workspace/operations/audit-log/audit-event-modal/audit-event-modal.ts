@@ -1,6 +1,6 @@
 import { Component, DestroyRef, computed, inject, input, output, signal, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
-import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
+import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   tablerCheck,
@@ -12,21 +12,23 @@ import {
 } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../../core/i18n/language';
 import { Notify } from '../../../../../core/notify/notify';
+import { correlationIdOf, errorMessage, ApiError } from '../../../../../core/api/api-errors';
+import { FullState } from '../../../../../shared/ui/full-state/full-state';
 import { Button } from '../../../../../shared/ui/button/button';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import {
   AuditDiffItem,
   AuditEvent,
   computeEventDiff,
-  errorCodeOf,
   formatAuditDateTime,
-  getAuditEvent,
+  AuditLogApi,
   humanizeActionCode,
 } from '../audit-log.api';
 
 @Component({
   selector: 'app-audit-event-modal',
-  imports: [NgIcon, TranslocoPipe, Button, Modal],
+  imports: [NgIcon, TranslocoPipe, Button, Modal, FullState],
+  viewProviders: [provideTranslocoScope('settings', { scope: 'ws-audit-log', alias: 'wsAudit' })],
   providers: [
     provideIcons({
       tablerCircleCheck,
@@ -47,6 +49,7 @@ export class AuditEventModal {
   private readonly i18n = translationEvents(this.transloco);
   private readonly language = inject(LanguageState).current;
   private readonly notify = inject(Notify);
+  private readonly api = inject(AuditLogApi);
   private readonly destroyRef = inject(DestroyRef);
 
   private readonly modal = viewChild.required(Modal);
@@ -60,11 +63,14 @@ export class AuditEventModal {
   protected readonly loading = signal(false);
   protected readonly technicalOpen = signal(false);
   protected readonly copiedField = signal<'entityId' | 'correlationId' | null>(null);
+  protected readonly loadFailed = signal(false);
+  protected readonly loadCorrelationId = signal<string | null>(null);
   private loadSeq = 0;
   private copyTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     this.destroyRef.onDestroy(() => {
+      this.loadSeq++;
       if (this.copyTimer !== null) {
         clearTimeout(this.copyTimer);
         this.copyTimer = null;
@@ -106,6 +112,8 @@ export class AuditEventModal {
     const seq = ++this.loadSeq;
     this.event.set(preview);
     this.loading.set(true);
+    this.loadFailed.set(false);
+    this.loadCorrelationId.set(null);
     this.technicalOpen.set(false);
     this.copiedField.set(null);
     this.modal().open();
@@ -173,6 +181,8 @@ export class AuditEventModal {
 
   protected formatScalar(value: unknown): string {
     if (value === null || value === undefined) return '—';
+    if (value === '[REDACTED]') return this.transloco.translate('wsAudit.modal.changes.redacted');
+    if (value === '[TRUNCATED]') return this.transloco.translate('wsAudit.modal.changes.truncated');
     if (typeof value === 'string') return value;
     if (typeof value === 'boolean') {
       return this.transloco.translate(value ? 'settings.common.yes' : 'settings.common.no');
@@ -207,32 +217,36 @@ export class AuditEventModal {
   }
 
   private resolveActorLabel(ev: AuditEvent): string {
-    if (ev.actorType !== 'USER') {
-      return this.transloco.translate('wsAudit.actor.system');
-    }
-    if (ev.actorLabel) return ev.actorLabel;
-    if (ev.actorUserId) {
-      return this.userNames().get(ev.actorUserId) ?? ev.actorUserId;
-    }
-    return this.transloco.translate('wsAudit.actor.system');
+    return ev.actorLabel ?? this.transloco.translate('wsAudit.actor.system');
+  }
+
+  protected retry(): void {
+    const id = this.event()?.id;
+    if (!id) return;
+    this.loading.set(true);
+    this.loadFailed.set(false);
+    this.loadCorrelationId.set(null);
+    void this.fetchEvent(id, ++this.loadSeq);
   }
 
   private async fetchEvent(id: string, seq: number): Promise<void> {
     try {
-      const full = await getAuditEvent(id);
+      const full = await this.api.getAuditEvent(id);
       if (seq !== this.loadSeq) return;
       this.event.set(full);
     } catch (error) {
       if (seq !== this.loadSeq) return;
-      const code = errorCodeOf(error);
-      const key = code ? `wsAudit.errors.${code}` : 'wsAudit.errors.generic';
-      const translated = this.transloco.translate(key);
-      const message =
-        translated && translated !== key
-          ? translated
-          : this.transloco.translate('wsAudit.errors.generic');
-      this.notify.error(message);
-      this.close();
+      if (error instanceof ApiError && (error.status === 404 || error.status === 403 &&
+          !['TENANT_MAINTENANCE_ACTIVE', 'TENANT_MAINTENANCE_RELEASE_REQUIRED'].includes(error.code))) {
+        this.notify.error(errorMessage(error, 'wsAudit', this.transloco));
+        this.close();
+      } else {
+        this.loadFailed.set(true);
+        this.loadCorrelationId.set(correlationIdOf(error));
+        if (error instanceof ApiError && [403, 429, 503].includes(error.status)) {
+          this.notify.error(errorMessage(error, 'wsAudit', this.transloco));
+        }
+      }
     } finally {
       if (seq === this.loadSeq) {
         this.loading.set(false);

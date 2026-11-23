@@ -19,24 +19,16 @@ import {
 } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../../core/i18n/language';
 import { Notify } from '../../../../../core/notify/notify';
-import { ScopeState } from '../../../../../core/scope/scope';
+import { TenantScopeState } from '../../../../../core/scope/tenant-scope';
+import { WorkspaceLookups } from '../../../../../shared/widgets/workspace-lookups/workspace-lookups.api';
+import type { WorkspaceApp, WorkspaceCompany } from '../../../../../shared/widgets/workspace-lookups/workspace-lookups.model';
+import { FullState } from '../../../../../shared/ui/full-state/full-state';
 import { Button } from '../../../../../shared/ui/button/button';
 import { Dropdown, DropdownOption } from '../../../../../shared/ui/dropdown/dropdown';
 import { Field } from '../../../../../shared/ui/field/field';
 import { Switch } from '../../../../../shared/ui/switch/switch';
-import { getSeatUsage } from '../../../seats/seats.api';
-import { ModuleTileLook, ModuleUsage, moduleNameIn, moduleTileOf } from '../../../seats/seats.model';
-import { StaffSession } from '../../../staff/shared/staff-session';
-import { SessionFailedState } from '../../shared/session-failed-state/session-failed-state';
-import { listAllPages, listCompanies } from '../../../staff/shared/staff.api';
-import { Company } from '../../../staff/shared/staff.model';
-import {
-  getAddonCommand,
-  getCompanyAddon,
-  listAllCompanyActivations,
-  setCompanyAddon,
-  setCompanyApplication,
-} from '../activation.api';
+import { ModuleTileLook, moduleTileOf } from '../../../seats/seats.model';
+import { ActivationApi } from '../activation.api';
 import {
   ActivationListItem,
   AddonActivationPendingCommand,
@@ -44,7 +36,7 @@ import {
 import { BranchOverridesModal } from '../branch-overrides-modal/branch-overrides-modal';
 import { ReasonModal } from '../reason-modal/reason-modal';
 import { rectInPage, viewport } from '../../../../../shared/ui/overlay/zoom';
-import { ApiError, correlationIdOf, errorCodeOf, errorMessage } from '../../../../../core/api/api-errors';
+import { ApiError, correlationIdOf, errorCodeOf, errorMessage, writeErrorMessage } from '../../../../../core/api/api-errors';
 
 interface PendingCommandState {
   commandId: string;
@@ -91,9 +83,9 @@ function clearStoredCommandId(companyId: string, appKey: string, addonKey: strin
   }
 }
 
-/** 403: MISSING_REQUIRED_PERMISSIONS or ACCESS_POLICY_BLOCKED. Duck-typed: staff lookups throw their own error class. */
+/** Maintenance refusals have their own message, even though they also use 403. */
 function isForbiddenError(error: unknown): boolean {
-  return typeof error === 'object' && error !== null && (error as { status?: unknown }).status === 403;
+  return error instanceof ApiError && error.status === 403 && !error.code.startsWith('TENANT_MAINTENANCE_');
 }
 
 /** The backend sends the progress counters as decimal strings. */
@@ -104,7 +96,7 @@ function validatedBranches(command: AddonActivationPendingCommand): number {
 @Component({
   selector: 'app-activation-page',
   imports: [
-    SessionFailedState,
+    FullState,
     TranslocoPipe, PluralKeyPipe,
     NgIcon,
     Button,
@@ -171,10 +163,10 @@ export class ActivationPage {
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly language = inject(LanguageState).current;
-  private readonly scope = inject(ScopeState);
-  private readonly session = inject(StaffSession);
+  private readonly scope = inject(TenantScopeState);
+  private readonly api = inject(ActivationApi);
+  private readonly lookups = inject(WorkspaceLookups);
 
-  protected readonly sessionFailed = computed(() => !this.session.me() && this.session.state() === 'failed');
   private readonly destroyRef = inject(DestroyRef);
   private readonly queryParams = toSignal(this.route.queryParamMap);
 
@@ -183,9 +175,9 @@ export class ActivationPage {
 
   protected readonly skeletonRows = SKELETON_ROWS;
   protected readonly companiesLoading = signal(true);
-  protected readonly companies = signal<Company[]>([]);
+  protected readonly companies = signal<WorkspaceCompany[]>([]);
   protected readonly selectedCompanyId = signal('');
-  protected readonly seatUsageModules = signal<ReadonlyMap<string, ModuleUsage>>(new Map());
+  protected readonly appNames = signal<ReadonlyMap<string, WorkspaceApp>>(new Map());
 
   protected readonly loading = signal(false);
   protected readonly rows = signal<ActivationListItem[]>([]);
@@ -216,23 +208,24 @@ export class ActivationPage {
     () => this.companies().find((c) => c.id === this.selectedCompanyId()) ?? null,
   );
 
-  protected readonly canRead = computed(() => {
-    const companyId = this.selectedCompanyId();
-    const me = this.session.me();
-    if (!me || !companyId) return true;
-    return (
-      this.session.can('applications.activation.read', { companyId }) ||
-      this.session.can('applications.activation.manage', { companyId })
-    );
-  });
+  private companyPermission(key: string): boolean {
+    const me = this.scope.me();
+    if (!me) return false;
+    if (me.isTenantOwner) return true;
+    // V-A1: companyIds still includes parents of GLOBAL branch grants. Exact COMPANY projection is pending.
+    return me.permissions.includes(key) && me.permissionScopes?.[key]?.tenantWide === true;
+  }
 
-  protected readonly isForbidden = computed(() => !this.canRead() || this.apiForbidden());
-
-  protected readonly canManage = computed(() => {
-    const companyId = this.selectedCompanyId();
-    if (!companyId || !this.session.me()) return false;
-    return this.session.can('applications.activation.manage', { companyId });
-  });
+  protected readonly isForbidden = computed(() => this.apiForbidden());
+  protected readonly canManage = computed(() => Boolean(this.selectedCompanyId()) && this.companyPermission('applications.activation.manage'));
+  protected readonly canManageBranch = (branchId: string): boolean => {
+    const me = this.scope.me();
+    if (!me) return false;
+    const key = 'applications.activation.manage';
+    const grant = me.permissionScopes?.[key];
+    return me.isTenantOwner || (me.permissions.includes(key) &&
+      (grant?.tenantWide === true || grant?.branchIds.includes(branchId) === true));
+  };
 
   private readonly appEnabledByKey = computed(() => {
     const map = new Map<string, boolean>();
@@ -243,10 +236,6 @@ export class ActivationPage {
     }
     return map;
   });
-
-  protected retrySession(): void {
-    void this.session.load().catch(() => undefined);
-  }
 
   constructor() {
     this.destroyRef.onDestroy(() => {
@@ -346,13 +335,13 @@ export class ActivationPage {
     if (!this.canManage()) return true;
     if (this.isRowPending(row)) return true;
     if (this.busyRows().has(this.trackRow(row))) return true;
-    if (this.isAddonRow(row) && !this.isParentAppOn(row)) return true;
+    if (this.isAddonRow(row) && !this.isRowOn(row) && !this.isParentAppOn(row)) return true;
     return false;
   }
 
   protected switchDisabledReason(row: ActivationListItem): string | null {
     this.i18n();
-    if (this.isAddonRow(row) && !this.isParentAppOn(row)) {
+    if (this.isAddonRow(row) && !this.isRowOn(row) && !this.isParentAppOn(row)) {
       return this.transloco.translate('wsActivation.reasons.turnOnParentFirst', {
         app: this.parentAppName(row),
       });
@@ -402,6 +391,8 @@ export class ActivationPage {
         ? 'tablerPuzzle'
         : this.appTile(row.target.applicationKey).icon;
 
+    let revision = row.resource.revision;
+    let definitionVersionId = row.resource.kind === 'ADDON_ACTIVATION' ? row.resource.definitionVersionId : null;
     this.reasonModal().open(
       {
         title,
@@ -415,17 +406,18 @@ export class ActivationPage {
         this.setRowBusy(rowId, true);
         try {
           if (row.resource.kind === 'APPLICATION_ACTIVATION') {
-            await setCompanyApplication(
+            const result = await this.api.setCompanyApplication(
               companyId,
               row.target.applicationKey,
               {
-                expectedActivationRevision: row.resource.revision,
+                expectedActivationRevision: revision,
                 enabled: nextEnabled,
                 reason,
               },
               idempotencyKey,
             );
-            this.notify.success(
+            if (!result.changed) this.notify.info(this.transloco.translate('wsActivation.toast.alreadyInState'));
+            else this.notify.success(
               this.transloco.translate(
                 nextEnabled ? 'wsActivation.toast.turnedOn' : 'wsActivation.toast.turnedOff',
                 { name },
@@ -437,9 +429,8 @@ export class ActivationPage {
 
           if (row.resource.kind === 'ADDON_ACTIVATION' && row.target.addonKey) {
             const addonKey = row.target.addonKey;
-            let definitionVersionId = row.resource.definitionVersionId;
             if (!definitionVersionId) {
-              const singleton = await getCompanyAddon(companyId, row.target.applicationKey, addonKey);
+              const singleton = await this.api.getCompanyAddon(companyId, row.target.applicationKey, addonKey);
               definitionVersionId = singleton.source.selectedDefinitionVersionId;
             }
             if (!definitionVersionId) {
@@ -447,12 +438,12 @@ export class ActivationPage {
               return true;
             }
 
-            const result = await setCompanyAddon(
+            const result = await this.api.setCompanyAddon(
               companyId,
               row.target.applicationKey,
               addonKey,
               {
-                expectedActivationRevision: row.resource.revision,
+                expectedActivationRevision: revision,
                 enabled: nextEnabled,
                 reason,
                 definitionVersionId,
@@ -465,7 +456,8 @@ export class ActivationPage {
               return true;
             }
 
-            this.notify.success(
+            if (!result.changed) this.notify.info(this.transloco.translate('wsActivation.toast.alreadyInState'));
+            else this.notify.success(
               this.transloco.translate(
                 nextEnabled ? 'wsActivation.toast.turnedOn' : 'wsActivation.toast.turnedOff',
                 { name },
@@ -477,7 +469,13 @@ export class ActivationPage {
 
           return true;
         } catch (error) {
-          return this.handleWriteError(error, name, companyId);
+          return this.handleWriteError(error, name, companyId, async (keep) => {
+            if (!keep) { await this.loadActivations(companyId); return; }
+            const fresh = row.resource.kind === 'ADDON_ACTIVATION' && row.target.addonKey
+              ? await this.api.getCompanyAddon(companyId, row.target.applicationKey, row.target.addonKey)
+              : await this.api.getCompanyApplication(companyId, row.target.applicationKey);
+            revision = fresh.resource.revision;
+          });
         } finally {
           this.setRowBusy(rowId, false);
         }
@@ -496,6 +494,9 @@ export class ActivationPage {
       appKey: row.target.applicationKey,
       addonKey: row.target.addonKey,
       addonName: this.rowName(row),
+      companyAddonExists: row.resource.state === 'STORED',
+      companyApplicationExists: this.rows().some((item) => item.target.applicationKey === row.target.applicationKey &&
+        item.resource.kind === 'APPLICATION_ACTIVATION' && item.resource.state === 'STORED'),
     });
   }
 
@@ -506,16 +507,12 @@ export class ActivationPage {
     this.correlationId.set(null);
 
     try {
-      const [, companiesList, seatUsage] = await Promise.all([
-        this.session.me() ? Promise.resolve(this.session.me()) : this.session.load().catch(() => null),
-        listAllPages((q) => listCompanies(q), { sortBy: 'name', sortDir: 'ASC' }),
-        getSeatUsage().catch(() => null),
+      const [companiesList, apps] = await Promise.all([
+        this.lookups.allCompanies({ status: 'ACTIVE' }),
+        this.lookups.appsOverview().catch(() => []),
       ]);
       if (this.destroyed) return;
-
-      if (seatUsage) {
-        this.seatUsageModules.set(new Map(seatUsage.modules.map((m) => [m.moduleKey, m])));
-      }
+      this.appNames.set(new Map(apps.map((app) => [app.moduleKey, app])));
       this.companies.set(companiesList);
 
       const initialCompanyId = this.resolveInitialCompanyId(companiesList);
@@ -538,6 +535,8 @@ export class ActivationPage {
         await this.loadActivations(fromQuery);
       } else if (isForbiddenError(error)) {
         this.apiForbidden.set(true);
+      } else if (error instanceof ApiError && error.status < 500 && error.status !== 0) {
+        this.notify.error(errorMessage(error, 'wsActivation', this.transloco));
       } else {
         this.loadFailed.set(true);
         this.correlationId.set(correlationIdOf(error));
@@ -549,13 +548,13 @@ export class ActivationPage {
     }
   }
 
-  private resolveInitialCompanyId(companies: readonly Company[]): string {
+  private resolveInitialCompanyId(companies: readonly WorkspaceCompany[]): string {
     const fromQuery = this.route.snapshot.queryParamMap.get('companyId')?.trim() ?? '';
     if (fromQuery && (companies.length === 0 || companies.some((c) => c.id === fromQuery))) {
       return fromQuery;
     }
 
-    const fromScope = this.scope.company()?.id ?? '';
+    const fromScope = this.scope.selection()?.companyId ?? '';
     if (fromScope && companies.some((c) => c.id === fromScope)) {
       return fromScope;
     }
@@ -567,18 +566,6 @@ export class ActivationPage {
   private async loadActivations(companyId: string): Promise<void> {
     if (!companyId) return;
 
-    if (
-      this.session.me() &&
-      !this.session.can('applications.activation.read', { companyId }) &&
-      !this.session.can('applications.activation.manage', { companyId })
-    ) {
-      this.rows.set([]);
-      this.apiForbidden.set(true);
-      this.loadFailed.set(false);
-      this.loading.set(false);
-      return;
-    }
-
     const seq = ++this.loadSeq;
     this.loading.set(true);
     this.loadFailed.set(false);
@@ -586,7 +573,7 @@ export class ActivationPage {
     this.correlationId.set(null);
 
     try {
-      const items = await listAllCompanyActivations(companyId);
+      const items = await this.api.listAllCompanyActivations(companyId);
       if (this.destroyed || seq !== this.loadSeq || companyId !== this.selectedCompanyId()) return;
       this.rows.set(items);
       this.resumePendingCommands(companyId, items);
@@ -595,6 +582,8 @@ export class ActivationPage {
       this.rows.set([]);
       if (isForbiddenError(error)) {
         this.apiForbidden.set(true);
+      } else if (error instanceof ApiError && error.status < 500 && error.status !== 0) {
+        this.notify.error(errorMessage(error, 'wsActivation', this.transloco));
       } else {
         this.loadFailed.set(true);
         this.correlationId.set(correlationIdOf(error));
@@ -672,7 +661,7 @@ export class ActivationPage {
     if (!entry || entry.foreignActor || entry.companyId !== this.selectedCompanyId()) return;
 
     try {
-      const result = await getAddonCommand(
+      const result = await this.api.getAddonCommand(
         entry.companyId,
         entry.appKey,
         entry.addonKey,
@@ -721,73 +710,26 @@ export class ActivationPage {
     return Date.now() - startedAt < FAST_POLL_WINDOW_MS ? FAST_POLL_INTERVAL_MS : SLOW_POLL_INTERVAL_MS;
   }
 
-  private handleWriteError(error: unknown, name: string, companyId: string): boolean {
+  private handleWriteError(error: unknown, name: string, companyId: string, refresh: (keep: boolean) => Promise<void>): boolean {
+    this.reasonModal().retainKeyFor(error);
     const code = errorCodeOf(error);
-    if (code === 'APPLICATION_ALLOWANCE_NOT_READY') {
-      this.notify.error(
-        this.transloco.translate('wsActivation.errors.APPLICATION_ALLOWANCE_NOT_READY', { name }),
-      );
-      return true;
-    }
     if (code === 'APPLICATION_ACTIVATION_REVISION_STALE' || code === 'ADDON_REVISION_STALE') {
-      this.notify.error(this.transloco.translate(`wsActivation.errors.${code}`));
-      void this.loadActivations(companyId);
-      return true;
-    }
-    if (code === 'ADDON_CONFIGURATION_INVALID') {
-      this.notify.error(this.transloco.translate('wsActivation.errors.ADDON_CONFIGURATION_INVALID'));
-      return true;
-    }
-    if (code === 'ADDON_OPERATION_UNCERTAIN') {
-      this.notify.error(this.transloco.translate('wsActivation.errors.ADDON_OPERATION_UNCERTAIN'));
-      return true;
-    }
-    if (code === 'CORE_VALIDATION_FAILED') {
-      this.notify.error(this.transloco.translate('wsActivation.errors.CORE_VALIDATION_FAILED'));
+      this.reasonModal().showConflict(refresh);
       return false;
     }
-    // The first request with this key is still running: keep the reason open so a retry reuses the same key.
-    if (code === 'GW.IDEM.IN_FLIGHT') {
-      this.notify.error(errorMessage(error, 'wsActivation', this.transloco));
-      return false;
-    }
-    if (code === 'IDEMPOTENCY_BODY_MISMATCH') {
-      this.notify.error(this.transloco.translate('wsActivation.errors.IDEMPOTENCY_BODY_MISMATCH'));
-      return true;
-    }
-    if (code === 'ACCESS_POLICY_UNAVAILABLE' || (error instanceof ApiError && error.status === 503)) {
-      this.notify.error(this.transloco.translate('wsActivation.errors.ACCESS_POLICY_UNAVAILABLE'));
-      return false;
-    }
-    if (error instanceof ApiError && error.status === 0) {
-      this.notify.error(this.transloco.translate('settings.errors.network'));
-      return false;
-    }
-    if (isForbiddenError(error)) {
-      this.notify.error(this.transloco.translate('settings.errors.permission'));
-      return true;
-    }
-
-    this.notify.error(errorMessage(error, 'wsActivation', this.transloco));
-    return true;
+    this.notify.error(code === 'APPLICATION_ALLOWANCE_NOT_READY'
+      ? this.transloco.translate('wsActivation.errors.APPLICATION_ALLOWANCE_NOT_READY', { name })
+      : writeErrorMessage(error, 'wsActivation', this.transloco));
+    if (code === 'ADDON_OPERATION_UNCERTAIN') void this.loadActivations(companyId);
+    return false;
   }
 
-  private appDisplayName(appKey: string): string {
-    const usage = this.seatUsageModules().get(appKey);
-    if (usage) {
-      return moduleNameIn(usage.nameI18n, this.language());
-    }
-    const key = `wsActivation.apps.${appKey}`;
-    const translated = this.transloco.translate(key);
-    return translated !== key ? translated : appKey;
+  private appDisplayName(key: string): string {
+    return this.appNames().get(key)?.nameI18n[this.language()] || key;
   }
 
-  private addonDisplayName(addonKey: string): string {
-    const specificKey = `wsActivation.addons.${addonKey}`;
-    const specific = this.transloco.translate(specificKey);
-    if (specific && specific !== specificKey) return specific;
-    const fallback = this.transloco.translate('wsActivation.addons.unknown', { key: addonKey });
-    return fallback && fallback !== 'wsActivation.addons.unknown' ? fallback : addonKey;
+  private addonDisplayName(key: string): string {
+    return this.appDisplayName(key);
   }
 
   private setPendingState(key: string, value: PendingCommandState): void {

@@ -315,7 +315,7 @@ describe('PreviewTab: PDF errors', () => {
     c['pendingPdfIntent'] = { intentKey: 'k', idempotencyKey: 'idem-1' };
 
     c['handlePreviewError'](
-      new TemplateApiError(503, 'CORE.TEMPLATE.DEPENDENCY.UNAVAILABLE', 'corr-spec-503'),
+      new TemplateApiError(503, 'CORE.TEMPLATE.DEPENDENCY.UNAVAILABLE', undefined, { correlationId: 'corr-spec-503' }),
       c['runSeq'],
       false,
     );

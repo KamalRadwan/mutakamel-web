@@ -56,10 +56,10 @@ export interface AuditEvent {
   userAgent: string | null;
   metadata: Record<string, unknown> | null;
   schemaVersion: number | null;
-  sourceApp: AuditSourceApp;
-  sourceKind: AuditSourceKind;
-  outcome: AuditOutcome;
-  sensitivity: AuditSensitivity;
+  sourceApp: AuditSourceApp | null;
+  sourceKind: AuditSourceKind | null;
+  outcome: AuditOutcome | null;
+  sensitivity: AuditSensitivity | null;
   branchId: string | null;
   subjectOwnerUserId: string | null;
   entityLabel: string | null;
@@ -84,6 +84,7 @@ export interface AuditQuery {
   ownerUserId?: string;
   sourceApp?: AuditSourceApp;
   sourceKind?: AuditSourceKind;
+  includeRequests?: boolean;
   outcome?: AuditOutcome;
   sensitivity?: AuditSensitivity;
   from?: string;
@@ -141,7 +142,7 @@ export interface AuditHistoryGroup {
   createdAt: string;
   actorLabel: string | null;
   actorType: string;
-  outcome: AuditOutcome;
+  outcome: AuditOutcome | null;
   reason: string | null;
   diff: AuditHistoryChange[];
 }

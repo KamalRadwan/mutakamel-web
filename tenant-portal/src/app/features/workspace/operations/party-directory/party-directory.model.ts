@@ -1,4 +1,4 @@
-import type { CorePage, CorePageMeta } from '../../settings/core-response.model';
+import type { CorePage, CorePageMeta } from '../../../../core/api/core-page';
 
 export type PartyType = 'PERSON' | 'ORGANIZATION';
 export type PartyStatus = 'ACTIVE' | 'INACTIVE' | 'BLOCKED';
@@ -116,7 +116,7 @@ export interface PartyAddress {
   id: string;
   partyId: string;
   addressType: AddressType;
-  /** Geo references stored on the entity; the directory API does not write them yet. */
+  /** Core accepts and validates these geo references; this UI sends free text until Geo pickers are linked. */
   countryId: string | null;
   stateId: string | null;
   cityId: string | null;
@@ -318,16 +318,14 @@ export interface ListOrgContactsQuery {
   limit?: number;
 }
 
-export interface DirectorySettings {
-  id: string;
+export interface PartyRules {
+  version: number;
   duplicateScope: DuplicateScope;
   preventDuplicateEmail: boolean;
   preventDuplicatePhone: boolean;
   preventDuplicateWhatsapp: boolean;
   maxContactMethodsPerParty: number;
   maxAddressesPerParty: number;
-  createdAt: string;
-  updatedAt: string;
 }
 
 export const PARTY_LIMITS = {

@@ -14,6 +14,7 @@ import {
   fakeSetCompanyApplication,
   resetActivationFake,
   setFakeAddonCommandRejection,
+  setActivationFakeError,
 } from './activation.fake';
 import { ActivationWriteReceipt, AddonCommandStatusResponse, SetCompanyAddonResponse } from './activation.model';
 
@@ -312,5 +313,16 @@ describe('activation fake (core-app tenant/application-access)', () => {
         code: 'ACCESS_POLICY_BLOCKED',
       });
     });
+  });
+});
+
+describe('activation fake failure cases', () => {
+  afterEach(() => resetActivationFake());
+  it.each([
+    [403, 'TENANT_MAINTENANCE_ACTIVE'], [403, 'TENANT_MAINTENANCE_RELEASE_REQUIRED'],
+    [404, 'APPLICATION_NOT_FOUND'], [404, 'ADDON_NOT_FOUND'], [413, 'GW.BODY.TOO_LARGE'], [429, 'GW.RATE.LIMIT_EXCEEDED'],
+  ])('supports %s %s without a live backend', async (status, code) => {
+    setActivationFakeError(new ApiError(status, code));
+    await expect(fakeListCompanyActivations('co-eg')).rejects.toMatchObject({ status, code });
   });
 });

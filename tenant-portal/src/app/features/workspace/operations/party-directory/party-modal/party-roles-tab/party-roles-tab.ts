@@ -1,3 +1,4 @@
+import { isPartyTenantWide } from '../party-modal.util';
 import { Component, computed, effect, inject, input, output, signal, untracked, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../../../core/i18n/translation-events';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
@@ -8,10 +9,12 @@ import { Button } from '../../../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { Dropdown, DropdownOption } from '../../../../../../shared/ui/dropdown/dropdown';
 import { Field } from '../../../../../../shared/ui/field/field';
-import { ApiError, errorCodeOf } from '../../../../staff/shared/staff.api';
-import { StaffSession } from '../../../../staff/shared/staff-session';
-import { Branch } from '../../../../staff/shared/staff.model';
-import { addRole, deleteRole, getParty } from '../../party-directory.api';
+import { ApiError, errorCodeOf, isValidationError } from '../../../../../../core/api/api-errors';
+import { TenantScopeState } from '../../../../../../core/scope/tenant-scope';
+import {
+  WorkspaceBranch as Branch,
+} from '../../../../../../shared/widgets/workspace-lookups/workspace-lookups.model';
+import { PartyDirectoryApi } from '../../party-directory.api';
 import { PartyDetail, PartyRole, PartyRoleType } from '../../party-directory.model';
 import {
   PARTY_ROLE_TYPES,
@@ -32,12 +35,14 @@ export class PartyRolesTab {
   private static nextId = 0;
   protected readonly uid = `party-roles-tab-${++PartyRolesTab.nextId}`;
 
-  private readonly session = inject(StaffSession);
+  private readonly session = inject(TenantScopeState);
+  private readonly api = inject(PartyDirectoryApi);
   private readonly notify = inject(Notify);
   private readonly removeConfirm = viewChild.required<ConfirmDialog>('removeConfirm');
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
 
+  readonly readonly = input(false);
   readonly party = input.required<PartyDetail>();
   readonly branches = input<Branch[]>([]);
 
@@ -61,7 +66,8 @@ export class PartyRolesTab {
     this.i18n();
     this.session.me();
     const options: DropdownOption<string>[] = [];
-    if (this.session.isTenantWide('directory.role.manage')) {
+    if (this.readonly() || !canOnPartyBranch(this.session, 'directory.role.manage', this.party().branchId)) return options;
+    if (isPartyTenantWide(this.session, 'directory.role.manage')) {
       options.push({
         value: '',
         label: this.transloco.translate('wsPartyModal.roles.allBranches'),
@@ -70,7 +76,7 @@ export class PartyRolesTab {
     for (const branch of this.branches()) {
       if (
         branch.status === 'ACTIVE' &&
-        this.session.can('directory.role.manage', { branchId: branch.id })
+        canOnPartyBranch(this.session, 'directory.role.manage', branch.id)
       ) {
         options.push({ value: branch.id, label: branch.name });
       }
@@ -131,6 +137,8 @@ export class PartyRolesTab {
   protected canRemove(role: PartyRole): boolean {
     this.session.me();
     return (
+      !this.readonly() &&
+      canOnPartyBranch(this.session, 'directory.role.manage', this.party().branchId) &&
       !isAppManagedRole(role.appSource) &&
       canOnPartyBranch(this.session, 'directory.role.manage', role.branchId)
     );
@@ -176,21 +184,22 @@ export class PartyRolesTab {
 
     const roleType = this.selectedRole();
     const branchVal = this.selectedBranch();
+    if (!this.branchOptions().some((option) => option.value === branchVal)) return;
     this.roleServerError.set(null);
     this.savingAdd.set(true);
 
     try {
-      await addRole(this.party().id, {
+      await this.api.addRole(this.party().id, {
         roleType,
         ...(branchVal ? { branchId: branchVal } : {}),
       });
-      const fresh = await getParty(this.party().id);
+      const fresh = await this.api.getParty(this.party().id);
       this.partyUpdated.emit(fresh);
       this.adding.set(false);
       this.notify.success(this.transloco.translate('wsPartyModal.roles.added'));
     } catch (error) {
       const code = errorCodeOf(error);
-      if (code === 'PARTY_ROLE_ALREADY_EXISTS') {
+      if (code === 'PARTY_ROLE_ALREADY_EXISTS' || code === 'PARTY_ROLE_METADATA_INVALID' || isValidationError(error)) {
         this.roleServerError.set({
           message: resolvePartyError(error, this.transloco),
           role: roleType,
@@ -215,8 +224,8 @@ export class PartyRolesTab {
     if (!confirmed) return;
     this.removingRoleId.set(role.id);
     try {
-      await deleteRole(role.id);
-      const fresh = await getParty(this.party().id);
+      await this.api.deleteRole(role.id);
+      const fresh = await this.api.getParty(this.party().id);
       this.partyUpdated.emit(fresh);
       this.notify.success(this.transloco.translate('wsPartyModal.roles.removed'));
     } catch (error) {
@@ -227,6 +236,10 @@ export class PartyRolesTab {
         return;
       }
       this.notify.error(resolvePartyError(error, this.transloco));
+      if (code === 'PARTY_ROLE_NOT_FOUND') {
+        try { this.partyUpdated.emit(await this.api.getParty(this.party().id)); }
+        catch (failure) { this.notify.error(resolvePartyError(failure, this.transloco, 'read')); }
+      }
     } finally {
       this.removingRoleId.set(null);
     }

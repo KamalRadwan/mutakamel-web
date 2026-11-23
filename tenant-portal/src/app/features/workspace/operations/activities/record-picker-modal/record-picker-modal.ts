@@ -7,7 +7,7 @@ import { Button } from '../../../../../shared/ui/button/button';
 import { Dropdown, DropdownOption } from '../../../../../shared/ui/dropdown/dropdown';
 import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
-import { listActivityTargets } from '../../../../../shared/widgets/activities/activities.api';
+import { ActivitiesApi } from '../../../../../shared/widgets/activities/activities.api';
 import {
   ACTIVITY_TARGET_TYPES,
   ActivityTargetOption,
@@ -28,6 +28,7 @@ export class RecordPickerModal {
   private static nextId = 0;
   protected readonly uid = `ws-record-picker-${++RecordPickerModal.nextId}`;
 
+  private readonly api = inject(ActivitiesApi);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly modal = viewChild.required(Modal);
@@ -171,7 +172,7 @@ export class RecordPickerModal {
     this.loading.set(true);
     this.loadFailed.set(false);
     try {
-      const list = await listActivityTargets({ targetApp, targetType, search });
+      const list = await this.api.listActivityTargets({ targetApp, targetType, search });
       if (seq !== this.loadSeq) return;
       this.results.set(list);
       const current = this.selectedTarget();

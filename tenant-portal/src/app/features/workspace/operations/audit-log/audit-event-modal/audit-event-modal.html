@@ -7,7 +7,15 @@
   [closeLabel]="'wsAudit.modal.close' | transloco"
   (closed)="onClosed()"
 >
-  @if (event(); as ev) {
+  @if (loadFailed()) {
+    <ui-full-state
+      kind="load-failure"
+      [title]="'wsAudit.failed.title' | transloco"
+      [text]="loadCorrelationId() ? (('wsAudit.failed.supportRef' | transloco) + ': ' + loadCorrelationId()) : ''"
+      [actionLabel]="'wsAudit.failed.retry' | transloco"
+      (action)="retry()"
+    />
+  } @else if (event(); as ev) {
     <div class="flex flex-col gap-12">
       <dl class="grid grid-cols-2 gap-x-12 gap-y-8 rounded-10 border border-border bg-surface-muted p-10">
         <div class="col-span-2 flex min-w-0 flex-col gap-2">
@@ -43,7 +51,7 @@
         <div class="flex min-w-0 flex-col gap-2">
           <dt class="text-12 leading-18 text-text-muted">{{ 'wsAudit.modal.facts.appKind' | transloco }}</dt>
           <dd class="truncate text-12 leading-18 text-text">
-            {{ ('wsAudit.apps.' + ev.sourceApp) | transloco }} · {{ ('wsAudit.sourceKinds.' + ev.sourceKind) | transloco }}
+            {{ ev.sourceApp ? (('wsAudit.apps.' + ev.sourceApp) | transloco) : '—' }} · {{ ev.sourceKind ? (('wsAudit.sourceKinds.' + ev.sourceKind) | transloco) : '—' }}
           </dd>
         </div>
 
@@ -55,10 +63,10 @@
               [class]="
                 ev.outcome === 'SUCCESS'
                   ? 'bg-success-soft text-on-success-soft'
-                  : 'bg-danger-soft text-on-danger-soft'
+                  : ev.outcome === 'FAILURE' ? 'bg-danger-soft text-on-danger-soft' : 'bg-neutral-soft text-on-neutral-soft'
               "
             >
-              {{ ('wsAudit.outcomes.' + ev.outcome) | transloco }}
+              {{ ev.outcome ? (('wsAudit.outcomes.' + ev.outcome) | transloco) : '—' }}
             </span>
             @if (ev.outcome === 'FAILURE' && ev.reason) {
               <span class="text-12 leading-18 text-danger-text">{{ ev.reason }}</span>
@@ -74,7 +82,7 @@
                 {{ 'wsAudit.sensitivities.HIGH_CHIP' | transloco }}
               </span>
             } @else {
-              <span>{{ ('wsAudit.sensitivities.' + ev.sensitivity) | transloco }}</span>
+              <span>{{ ev.sensitivity ? (('wsAudit.sensitivities.' + ev.sensitivity) | transloco) : '—' }}</span>
             }
           </dd>
         </div>
@@ -276,17 +284,17 @@
   }
 
   <div modal-footer class="flex flex-1 items-center gap-8">
+    @if (event()?.correlationId && !loadFailed()) {
     <button
       type="button"
       uiButton
       variant="secondary"
-      [disabled]="!event()?.correlationId"
-      [title]="!event()?.correlationId ? ('wsAudit.modal.noCorrelationHint' | transloco) : ''"
       (click)="onShowRelated()"
     >
       <ng-icon name="tablerLink" size="15" aria-hidden="true" />
       <span>{{ 'wsAudit.modal.showRelated' | transloco }}</span>
     </button>
+    }
 
     <button type="button" uiButton variant="ghost" class="ms-auto" (click)="close()">
       {{ 'wsAudit.modal.close' | transloco }}

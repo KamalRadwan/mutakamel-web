@@ -7,7 +7,12 @@
   [dismissable]="!retiring()"
   (closed)="onModalClosed()"
 >
-  @if (asset(); as current) {
+  @if (detailError(); as error) {
+    <ui-full-state [kind]="error.status === 404 ? 'not-found' : error.status === 403 ? 'forbidden' : 'load-failure'"
+      [title]="(error.status === 404 ? 'templatesAssets.detailModal.noLongerAvailable' : 'templatesAssets.states.loadFailed.title') | transloco"
+      [actionLabel]="(error.status === 404 || error.status === 403 ? 'templates.actions.close' : 'templates.actions.retry') | transloco"
+      (action)="error.status === 404 || error.status === 403 ? closeModal() : retryDetail()" />
+  } @else if (asset(); as current) {
     <ng-container ngProjectAs="[modal-header-end]">
     <span
       modal-header-end
@@ -192,7 +197,7 @@
       {{ 'templates.actions.close' | transloco }}
     </button>
 
-    @if (canManage() && asset(); as current) {
+    @if (!detailError() && canManage() && asset(); as current) {
       <button
         type="button"
         uiButton
@@ -215,3 +220,5 @@
   [confirmLabel]="'templates.actions.retire' | transloco"
   [cancelLabel]="'templates.actions.cancel' | transloco"
 />
+
+<ui-conflict-dialog [(open)]="conflictOpen" (reload)="resolveRetireConflict(false)" (keepEditing)="resolveRetireConflict(true)" />

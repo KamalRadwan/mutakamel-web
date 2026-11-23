@@ -57,3 +57,4 @@
     </button>
   </div>
 </ui-modal>
+<ui-conflict-dialog [(open)]="conflictOpen" (reload)="resolveConflict(false)" (keepEditing)="resolveConflict(true)" />

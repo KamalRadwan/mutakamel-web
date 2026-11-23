@@ -1,14 +1,12 @@
 @if (sessionFailed()) {
   <app-session-failed-state (retry)="retrySession()" />
 } @else if (!canRead() || forbiddenError()) {
-  <section class="flex flex-1 flex-col items-center justify-center gap-8 p-16 text-center">
-    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-orange text-on-icon">
-      <ng-icon name="tablerLock" size="18" aria-hidden="true" />
-    </span>
-    <h1 class="text-16 leading-24 font-medium text-text">{{ 'wsActivities.states.forbiddenTitle' | transloco }}</h1>
-    <p class="text-12 leading-18 text-text-muted">{{ 'wsActivities.states.forbiddenText' | transloco }}</p>
-    <a uiButton routerLink="/">{{ 'wsActivities.states.backToHome' | transloco }}</a>
-  </section>
+  <ui-full-state kind="forbidden"
+    [title]="'wsActivities.states.forbiddenTitle' | transloco"
+    [text]="'wsActivities.states.forbiddenText' | transloco"
+    [actionLabel]="'wsActivities.states.backToHome' | transloco"
+    (action)="goHome()"
+  />
 } @else {
   <!-- Toolbar -->
   <div class="flex shrink-0 flex-wrap items-center gap-8 rounded-10 bg-surface p-8 shadow-card">
@@ -154,24 +152,12 @@
 
   <!-- States & views -->
   @if (loadError()) {
-    <section
-      role="alert"
-      class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card"
-    >
-      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
-        <ng-icon name="tablerRefresh" size="18" aria-hidden="true" />
-      </span>
-      <h2 class="text-16 leading-24 font-medium text-text">{{ 'wsActivities.states.loadFailedTitle' | transloco }}</h2>
-      <p class="text-12 leading-18 text-text-muted">{{ 'wsActivities.states.loadFailedText' | transloco }}</p>
-      @if (errorCorrelationId(); as corrId) {
-        <p class="text-11 leading-16 text-text-muted">
-          {{ 'wsActivities.states.reference' | transloco: { correlationId: corrId } }}
-        </p>
-      }
-      <button type="button" uiButton variant="primary" (click)="reload()">
-        {{ 'wsActivities.states.retry' | transloco }}
-      </button>
-    </section>
+    <ui-full-state kind="load-failure"
+      [title]="'wsActivities.states.loadFailedTitle' | transloco"
+      [text]="loadFailureText()"
+      [actionLabel]="'wsActivities.states.retry' | transloco"
+      (action)="reload()"
+    />
   } @else if (isFirstUseEmpty()) {
     <section class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
       <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-teal text-on-icon">

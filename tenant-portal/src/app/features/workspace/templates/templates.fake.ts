@@ -1,3 +1,7 @@
+import { ApiError } from '../../../core/api/api-errors';
+export { ApiError as TemplateApiError } from '../../../core/api/api-errors';
+export { newIdempotencyKey as newTemplateIdempotencyKey } from '../../../core/api/idempotency';
+
 import { FAKE_COMPANIES } from '../../../core/scope/scope.fake';
 import { toJsonPointer } from './shared/json-pointer';
 import type {
@@ -92,18 +96,7 @@ import type {
   ValidateTemplateDraftDto,
 } from './templates.model';
 
-/** Structured API error thrown by fake and real template transport layers. */
-export class TemplateApiError extends Error {
-  constructor(
-    readonly status: number,
-    readonly code: string,
-    readonly correlationId = 'corr-01948100-0000-7000-8000-000000000001',
-    readonly details?: Record<string, unknown>,
-  ) {
-    super(code);
-    this.name = 'TemplateApiError';
-  }
-}
+const FAKE_ERROR_OPTIONS = { correlationId: 'corr-01948100-0000-7000-8000-000000000001' };
 
 export function fakeDelay(ms = 180): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -123,10 +116,6 @@ function uuidv7(): string {
   bytes[8] = (bytes[8] & 0x3f) | 0x80;
   const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-}
-
-export function newTemplateIdempotencyKey(): string {
-  return uuidv7();
 }
 
 function pseudoSha256(seed: string): string {
@@ -2645,7 +2634,7 @@ function toDetail(def: StoredTemplateDefinition): TemplateDefinitionDetail {
 function parseIfMatchRevision(ifMatch: string | null | undefined, namespace?: string): number {
   const value = (ifMatch ?? '').trim();
   if (!value) {
-    throw new TemplateApiError(428, 'CORE.TEMPLATE.CONCURRENCY.PRECONDITION_REQUIRED');
+    throw new ApiError(428, 'CORE.TEMPLATE.CONCURRENCY.PRECONDITION_REQUIRED', undefined, FAKE_ERROR_OPTIONS);
   }
   const pattern = namespace
     ? new RegExp(`^"${namespace}:([1-9][0-9]*)"$`) // namespace is `draft-schema:<hex>`, no regex metacharacters
@@ -2653,7 +2642,7 @@ function parseIfMatchRevision(ifMatch: string | null | undefined, namespace?: st
   const match = pattern.exec(value);
   const revision = Number(match?.[1]);
   if (!match || !Number.isSafeInteger(revision)) {
-    throw new TemplateApiError(409, 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION');
+    throw new ApiError(409, 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION', undefined, FAKE_ERROR_OPTIONS);
   }
   return revision;
 }
@@ -2672,11 +2661,11 @@ function parseFakeDraftSavePrecondition(
   const revision = parseIfMatchRevision(ifMatch, descriptorChecksum ? `draft-schema:${descriptorChecksum}` : undefined);
   if (descriptorChecksum !== undefined) {
     if (def.dataSourceKey !== 'TRADE_QUOTATION_PRINT_V1') {
-      throw new TemplateApiError(409, 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION');
+      throw new ApiError(409, 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION', undefined, FAKE_ERROR_OPTIONS);
     }
     const retained = pseudoSha256(`${def.dataSourceKey}:${def.dataSourceSchemaVersion === 2 ? 2 : 1}`);
     if (descriptorChecksum !== retained) {
-      throw new TemplateApiError(409, 'CORE.TEMPLATE.CONCURRENCY.SCHEMA_CHANGED');
+      throw new ApiError(409, 'CORE.TEMPLATE.CONCURRENCY.SCHEMA_CHANGED', undefined, FAKE_ERROR_OPTIONS);
     }
   }
   return revision;
@@ -2684,7 +2673,7 @@ function parseFakeDraftSavePrecondition(
 
 function findDefinitionOrThrow(templateId: string): StoredTemplateDefinition {
   const def = STORE.definitions.find((item) => item.templateId === templateId);
-  if (!def) throw new TemplateApiError(404, 'CORE.TEMPLATE.NOT_FOUND');
+  if (!def) throw new ApiError(404, 'CORE.TEMPLATE.NOT_FOUND', undefined, FAKE_ERROR_OPTIONS);
   return def;
 }
 
@@ -2727,7 +2716,7 @@ function paginateByCursor<T>(
   if (cursor) {
     const idx = items.findIndex((item) => getId(item) === cursor);
     if (idx < 0) {
-      throw new TemplateApiError(400, 'CORE.TEMPLATE.CURSOR.INVALID');
+      throw new ApiError(400, 'CORE.TEMPLATE.CURSOR.INVALID', undefined, FAKE_ERROR_OPTIONS);
     }
     start = idx + 1;
   }
@@ -2877,11 +2866,11 @@ export async function fakeGetDataSourceSchema(
   await fakeDelay(120);
   const adapter = DATA_SOURCE_ADAPTERS.find((item) => item.adapterKey === adapterKey);
   if (!adapter) {
-    throw new TemplateApiError(404, 'CORE.TEMPLATE.NOT_FOUND');
+    throw new ApiError(404, 'CORE.TEMPLATE.NOT_FOUND', undefined, FAKE_ERROR_OPTIONS);
   }
   const isTrade = adapterKey.startsWith('TRADE_');
   if (!isTrade && query.schemaVersion !== 1) {
-    throw new TemplateApiError(404, 'CORE.TEMPLATE.NOT_FOUND');
+    throw new ApiError(404, 'CORE.TEMPLATE.NOT_FOUND', undefined, FAKE_ERROR_OPTIONS);
   }
 
   const fields =
@@ -2969,13 +2958,13 @@ export async function fakeCreateTemplate(
 
   const normalizedCode = body.code.trim().toUpperCase();
   if (STORE.definitions.some((d) => d.lifecycleStatus === 'ACTIVE' && d.code === normalizedCode)) {
-    throw new TemplateApiError(409, 'CORE.TEMPLATE.CODE.CONFLICT');
+    throw new ApiError(409, 'CORE.TEMPLATE.CODE.CONFLICT', undefined, FAKE_ERROR_OPTIONS);
   }
   if (body.outputChannel === 'EMAIL' && body.page) {
-    throw new TemplateApiError(422, 'CORE.TEMPLATE.LAYOUT.INCOMPATIBLE');
+    throw new ApiError(422, 'CORE.TEMPLATE.LAYOUT.INCOMPATIBLE', undefined, FAKE_ERROR_OPTIONS);
   }
   if (body.outputChannel === 'PRINT' && !body.page) {
-    throw new TemplateApiError(422, 'CORE.TEMPLATE.PAGE.MISSING');
+    throw new ApiError(422, 'CORE.TEMPLATE.PAGE.MISSING', undefined, FAKE_ERROR_OPTIONS);
   }
 
   const now = new Date().toISOString();
@@ -3094,28 +3083,28 @@ export async function fakeDuplicateTemplate(
   const sourceDef = findDefinitionOrThrow(templateId);
   const normalizedCode = body.code.trim().toUpperCase();
   if (STORE.definitions.some((d) => d.lifecycleStatus === 'ACTIVE' && d.code === normalizedCode)) {
-    throw new TemplateApiError(409, 'CORE.TEMPLATE.CODE.CONFLICT');
+    throw new ApiError(409, 'CORE.TEMPLATE.CODE.CONFLICT', undefined, FAKE_ERROR_OPTIONS);
   }
 
   let sourceDoc: TemplateDocumentV1;
   if (body.source.kind === 'CURRENT_DRAFT') {
     const draft = STORE.drafts.get(templateId);
-    if (!draft) throw new TemplateApiError(404, 'CORE.TEMPLATE.NOT_FOUND');
+    if (!draft) throw new ApiError(404, 'CORE.TEMPLATE.NOT_FOUND', undefined, FAKE_ERROR_OPTIONS);
     if (draft.revision !== body.source.expectedDraftRevision) {
-      throw new TemplateApiError(409, 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION');
+      throw new ApiError(409, 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION', undefined, FAKE_ERROR_OPTIONS);
     }
     sourceDoc = clone(draft.editorDocument);
   } else {
     const versionList = STORE.versions.get(templateId) ?? [];
     const targetVersionId = body.source.versionId;
     const ver = versionList.find((v) => v.templateVersionId === targetVersionId);
-    if (!ver) throw new TemplateApiError(404, 'CORE.TEMPLATE.NOT_FOUND');
+    if (!ver) throw new ApiError(404, 'CORE.TEMPLATE.NOT_FOUND', undefined, FAKE_ERROR_OPTIONS);
     sourceDoc = clone(ver.editorDocument);
   }
 
   if (body.conversion) {
     if (sourceDef.outputChannel !== 'PRINT') {
-      throw new TemplateApiError(422, 'CORE.TEMPLATE.LAYOUT.INCOMPATIBLE');
+      throw new ApiError(422, 'CORE.TEMPLATE.LAYOUT.INCOMPATIBLE', undefined, FAKE_ERROR_OPTIONS);
     }
     sourceDoc.layoutMode = body.conversion.layoutMode;
   }
@@ -3214,11 +3203,11 @@ export async function fakePatchTemplate(
   await fakeDelay();
   const def = findDefinitionOrThrow(templateId);
   if (def.lifecycleStatus === 'ARCHIVED') {
-    throw new TemplateApiError(409, 'CORE.TEMPLATE.DEFINITION.ARCHIVED');
+    throw new ApiError(409, 'CORE.TEMPLATE.DEFINITION.ARCHIVED', undefined, FAKE_ERROR_OPTIONS);
   }
   const expectedRev = parseIfMatchRevision(ifMatch);
   if (expectedRev !== def.revision) {
-    throw new TemplateApiError(409, 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION');
+    throw new ApiError(409, 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION', undefined, FAKE_ERROR_OPTIONS);
   }
 
   let updatedDraft: TemplateDraftDto | null = null;
@@ -3226,12 +3215,12 @@ export async function fakePatchTemplate(
 
   if (patch.direction !== undefined) {
     if (patch.expectedDraftRevision === undefined) {
-      throw new TemplateApiError(422, 'CORE.TEMPLATE.SCHEMA.INVALID');
+      throw new ApiError(422, 'CORE.TEMPLATE.SCHEMA.INVALID', undefined, FAKE_ERROR_OPTIONS);
     }
     const draft = STORE.drafts.get(templateId);
-    if (!draft) throw new TemplateApiError(404, 'CORE.TEMPLATE.NOT_FOUND');
+    if (!draft) throw new ApiError(404, 'CORE.TEMPLATE.NOT_FOUND', undefined, FAKE_ERROR_OPTIONS);
     if (patch.expectedDraftRevision !== draft.revision) {
-      throw new TemplateApiError(409, 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION');
+      throw new ApiError(409, 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION', undefined, FAKE_ERROR_OPTIONS);
     }
     def.direction = patch.direction;
     def.resolvedDirection = patch.direction === 'AUTO' ? (def.locale === 'ar-EG' ? 'RTL' : 'LTR') : patch.direction;
@@ -3278,11 +3267,11 @@ export async function fakeArchiveTemplate(templateId: string, ifMatch: string): 
   await fakeDelay();
   const def = findDefinitionOrThrow(templateId);
   if (def.systemProtected) {
-    throw new TemplateApiError(422, 'CORE.TEMPLATE.DEFINITION.SYSTEM_PROTECTED');
+    throw new ApiError(422, 'CORE.TEMPLATE.DEFINITION.SYSTEM_PROTECTED', undefined, FAKE_ERROR_OPTIONS);
   }
   const expectedRev = parseIfMatchRevision(ifMatch);
   if (expectedRev !== def.revision) {
-    throw new TemplateApiError(409, 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION');
+    throw new ApiError(409, 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION', undefined, FAKE_ERROR_OPTIONS);
   }
   const now = new Date().toISOString();
   def.lifecycleStatus = 'ARCHIVED';
@@ -3298,7 +3287,7 @@ export async function fakeRestoreTemplate(templateId: string, ifMatch: string): 
   const def = findDefinitionOrThrow(templateId);
   const expectedRev = parseIfMatchRevision(ifMatch);
   if (expectedRev !== def.revision) {
-    throw new TemplateApiError(409, 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION');
+    throw new ApiError(409, 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION', undefined, FAKE_ERROR_OPTIONS);
   }
   const now = new Date().toISOString();
   def.lifecycleStatus = 'ACTIVE';
@@ -3314,12 +3303,12 @@ export async function fakeDeleteTemplate(templateId: string, ifMatch: string): P
   const def = findDefinitionOrThrow(templateId);
   const expectedRev = parseIfMatchRevision(ifMatch);
   if (expectedRev !== def.revision) {
-    throw new TemplateApiError(409, 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION');
+    throw new ApiError(409, 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION', undefined, FAKE_ERROR_OPTIONS);
   }
   const hasVersions = (STORE.versions.get(templateId)?.length ?? 0) > 0;
   const hasAssignments = STORE.assignments.some((a) => a.definitionId === templateId);
   if (def.currentPublishedVersion !== null || hasVersions || hasAssignments) {
-    throw new TemplateApiError(409, 'CORE.TEMPLATE.DEFINITION.REFERENCED');
+    throw new ApiError(409, 'CORE.TEMPLATE.DEFINITION.REFERENCED', undefined, FAKE_ERROR_OPTIONS);
   }
   STORE.definitions = STORE.definitions.filter((item) => item.templateId !== templateId);
   STORE.drafts.delete(templateId);
@@ -3616,10 +3605,10 @@ export async function fakeGetTemplateThumbnail(templateId: string, query: Templa
   await fakeDelay(80);
   const def = findDefinitionOrThrow(templateId);
   if (def.thumbnail.state === 'PENDING') {
-    throw new TemplateApiError(409, 'CORE.TEMPLATE.THUMBNAIL.NOT_READY');
+    throw new ApiError(409, 'CORE.TEMPLATE.THUMBNAIL.NOT_READY', undefined, FAKE_ERROR_OPTIONS);
   }
   if (def.thumbnail.state === 'UNAVAILABLE') {
-    throw new TemplateApiError(410, 'CORE.TEMPLATE.THUMBNAIL.UNAVAILABLE');
+    throw new ApiError(410, 'CORE.TEMPLATE.THUMBNAIL.UNAVAILABLE', undefined, FAKE_ERROR_OPTIONS);
   }
   const doc =
     query.sourceKind === 'PUBLISHED'
@@ -3642,7 +3631,7 @@ export async function fakeGetTemplateThumbnailByPath(downloadPath: string): Prom
   const match = /\/templates\/([^/?]+)\/thumbnail(?:\?(.*))?$/.exec(downloadPath.trim());
   if (!match) {
     await fakeDelay(40);
-    throw new TemplateApiError(400, 'CORE.TEMPLATE.THUMBNAIL.SOURCE_INVALID');
+    throw new ApiError(400, 'CORE.TEMPLATE.THUMBNAIL.SOURCE_INVALID', undefined, FAKE_ERROR_OPTIONS);
   }
   const templateId = decodeURIComponent(match[1]);
   const params = new URLSearchParams(match[2] ?? '');
@@ -3653,7 +3642,7 @@ export async function fakeGetTemplateThumbnailByPath(downloadPath: string): Prom
     const versionId = params.get('versionId');
     if (!versionId || !sourceChecksum) {
       await fakeDelay(40);
-      throw new TemplateApiError(400, 'CORE.TEMPLATE.THUMBNAIL.SOURCE_INVALID');
+      throw new ApiError(400, 'CORE.TEMPLATE.THUMBNAIL.SOURCE_INVALID', undefined, FAKE_ERROR_OPTIONS);
     }
     return fakeGetTemplateThumbnail(templateId, {
       sourceKind: 'PUBLISHED',
@@ -3666,7 +3655,7 @@ export async function fakeGetTemplateThumbnailByPath(downloadPath: string): Prom
     const draftRevision = revRaw !== null ? Number(revRaw) : Number.NaN;
     if (!Number.isFinite(draftRevision) || !sourceChecksum) {
       await fakeDelay(40);
-      throw new TemplateApiError(400, 'CORE.TEMPLATE.THUMBNAIL.SOURCE_INVALID');
+      throw new ApiError(400, 'CORE.TEMPLATE.THUMBNAIL.SOURCE_INVALID', undefined, FAKE_ERROR_OPTIONS);
     }
     return fakeGetTemplateThumbnail(templateId, {
       sourceKind: 'DRAFT',
@@ -3675,7 +3664,7 @@ export async function fakeGetTemplateThumbnailByPath(downloadPath: string): Prom
     });
   }
   await fakeDelay(40);
-  throw new TemplateApiError(400, 'CORE.TEMPLATE.THUMBNAIL.SOURCE_INVALID');
+  throw new ApiError(400, 'CORE.TEMPLATE.THUMBNAIL.SOURCE_INVALID', undefined, FAKE_ERROR_OPTIONS);
 }
 
 /** Fake worker latency before a retried thumbnail job turns READY. */
@@ -3696,7 +3685,7 @@ export async function fakeRetryTemplateThumbnail(
   await fakeDelay();
   const def = findDefinitionOrThrow(templateId);
   if (!/^[0-9a-f]{64}$/.test(body.sourceChecksum)) {
-    throw new TemplateApiError(400, 'CORE.TEMPLATE.THUMBNAIL.SOURCE_INVALID');
+    throw new ApiError(400, 'CORE.TEMPLATE.THUMBNAIL.SOURCE_INVALID', undefined, FAKE_ERROR_OPTIONS);
   }
   const qs =
     body.sourceKind === 'DRAFT'
@@ -3707,7 +3696,7 @@ export async function fakeRetryTemplateThumbnail(
   const current = THUMBNAIL_JOBS.get(jobKey);
 
   if (def.thumbnail.state === 'READY') {
-    throw new TemplateApiError(409, 'CORE.TEMPLATE.THUMBNAIL.NOT_READY');
+    throw new ApiError(409, 'CORE.TEMPLATE.THUMBNAIL.NOT_READY', undefined, FAKE_ERROR_OPTIONS);
   }
   if (def.thumbnail.state === 'PENDING' && current) {
     return {
@@ -3750,7 +3739,7 @@ export async function fakeRetryTemplateThumbnail(
 export async function fakeGetStarterThumbnail(starterKey: string): Promise<Blob> {
   await fakeDelay(80);
   const starter = STARTER_REGISTRY.find((s) => s.starterKey === starterKey);
-  if (!starter) throw new TemplateApiError(410, 'CORE.TEMPLATE.THUMBNAIL.UNAVAILABLE');
+  if (!starter) throw new ApiError(410, 'CORE.TEMPLATE.THUMBNAIL.UNAVAILABLE', undefined, FAKE_ERROR_OPTIONS);
   return makePageThumbnailBlob({
     title: starter.displayName,
     outputChannel: starter.outputChannel,
@@ -3764,7 +3753,7 @@ export async function fakeGetDraft(templateId: string): Promise<TemplateDraftDto
   await fakeDelay(120);
   findDefinitionOrThrow(templateId);
   const draft = STORE.drafts.get(templateId);
-  if (!draft) throw new TemplateApiError(404, 'CORE.TEMPLATE.NOT_FOUND');
+  if (!draft) throw new ApiError(404, 'CORE.TEMPLATE.NOT_FOUND', undefined, FAKE_ERROR_OPTIONS);
   return clone(draft);
 }
 
@@ -3782,14 +3771,14 @@ export async function fakePatchDraft(
 
   const def = findDefinitionOrThrow(templateId);
   if (def.lifecycleStatus === 'ARCHIVED') {
-    throw new TemplateApiError(409, 'CORE.TEMPLATE.DEFINITION.ARCHIVED');
+    throw new ApiError(409, 'CORE.TEMPLATE.DEFINITION.ARCHIVED', undefined, FAKE_ERROR_OPTIONS);
   }
   const draft = STORE.drafts.get(templateId);
-  if (!draft) throw new TemplateApiError(404, 'CORE.TEMPLATE.NOT_FOUND');
+  if (!draft) throw new ApiError(404, 'CORE.TEMPLATE.NOT_FOUND', undefined, FAKE_ERROR_OPTIONS);
 
   const expectedRev = parseFakeDraftSavePrecondition(ifMatch, def);
   if (expectedRev !== draft.revision) {
-    throw new TemplateApiError(409, 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION');
+    throw new ApiError(409, 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION', undefined, FAKE_ERROR_OPTIONS);
   }
 
   const now = new Date().toISOString();
@@ -3894,14 +3883,14 @@ export async function fakeValidateDraft(
   await fakeDelay();
   const def = findDefinitionOrThrow(templateId);
   if (def.lifecycleStatus === 'ARCHIVED') {
-    throw new TemplateApiError(409, 'CORE.TEMPLATE.DEFINITION.ARCHIVED');
+    throw new ApiError(409, 'CORE.TEMPLATE.DEFINITION.ARCHIVED', undefined, FAKE_ERROR_OPTIONS);
   }
   const draft = STORE.drafts.get(templateId);
-  if (!draft) throw new TemplateApiError(404, 'CORE.TEMPLATE.NOT_FOUND');
+  if (!draft) throw new ApiError(404, 'CORE.TEMPLATE.NOT_FOUND', undefined, FAKE_ERROR_OPTIONS);
 
   const expectedRev = parseIfMatchRevision(ifMatch);
   if (expectedRev !== draft.revision || body.draftRevision !== draft.revision) {
-    throw new TemplateApiError(409, 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION');
+    throw new ApiError(409, 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION', undefined, FAKE_ERROR_OPTIONS);
   }
 
   const validPrint =
@@ -3911,7 +3900,7 @@ export async function fakeValidateDraft(
     body.rendererTargets[0] === 'EMAIL_HTML' &&
     body.rendererTargets[1] === 'EMAIL_TEXT';
   if (!validPrint && !validEmail) {
-    throw new TemplateApiError(422, 'CORE.TEMPLATE.COMPILER.TARGET_UNSUPPORTED');
+    throw new ApiError(422, 'CORE.TEMPLATE.COMPILER.TARGET_UNSUPPORTED', undefined, FAKE_ERROR_OPTIONS);
   }
 
   const issues = [...fakeGeometryIssues(draft.editorDocument), ...fakeEmailSubjectIssues(draft.editorDocument)];
@@ -3961,7 +3950,7 @@ export async function fakeGetValidationRun(templateId: string, runId: string): P
   findDefinitionOrThrow(templateId);
   const run = STORE.validationRuns.get(runId);
   if (!run || run.templateId !== templateId) {
-    throw new TemplateApiError(404, 'CORE.TEMPLATE.NOT_FOUND');
+    throw new ApiError(404, 'CORE.TEMPLATE.NOT_FOUND', undefined, FAKE_ERROR_OPTIONS);
   }
   return clone(run);
 }
@@ -3980,25 +3969,25 @@ export async function fakePublishTemplate(
 
   const def = findDefinitionOrThrow(templateId);
   if (def.lifecycleStatus === 'ARCHIVED') {
-    throw new TemplateApiError(409, 'CORE.TEMPLATE.DEFINITION.ARCHIVED');
+    throw new ApiError(409, 'CORE.TEMPLATE.DEFINITION.ARCHIVED', undefined, FAKE_ERROR_OPTIONS);
   }
   const draft = STORE.drafts.get(templateId);
-  if (!draft) throw new TemplateApiError(404, 'CORE.TEMPLATE.NOT_FOUND');
+  if (!draft) throw new ApiError(404, 'CORE.TEMPLATE.NOT_FOUND', undefined, FAKE_ERROR_OPTIONS);
 
   const expectedDraftRev = parseIfMatchRevision(ifMatch);
   if (expectedDraftRev !== draft.revision || body.draftRevision !== draft.revision) {
-    throw new TemplateApiError(409, 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION');
+    throw new ApiError(409, 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION', undefined, FAKE_ERROR_OPTIONS);
   }
   if (body.definitionRevision !== def.revision) {
-    throw new TemplateApiError(409, 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION');
+    throw new ApiError(409, 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION', undefined, FAKE_ERROR_OPTIONS);
   }
 
   const run = STORE.validationRuns.get(body.validationRunId);
   if (!run || run.templateId !== templateId || run.status !== 'PASSED') {
-    throw new TemplateApiError(422, 'CORE.TEMPLATE.PUBLISH.NOT_VALIDATED');
+    throw new ApiError(422, 'CORE.TEMPLATE.PUBLISH.NOT_VALIDATED', undefined, FAKE_ERROR_OPTIONS);
   }
   if (run.draftRevision !== draft.revision || run.candidateChecksum !== draft.contentChecksum) {
-    throw new TemplateApiError(409, 'CORE.TEMPLATE.PUBLISH.VALIDATION_STALE');
+    throw new ApiError(409, 'CORE.TEMPLATE.PUBLISH.VALIDATION_STALE', undefined, FAKE_ERROR_OPTIONS);
   }
 
   const existingVersions = STORE.versions.get(templateId) ?? [];
@@ -4155,7 +4144,7 @@ export async function fakeGetVersion(templateId: string, versionId: string): Pro
   await fakeDelay(120);
   findDefinitionOrThrow(templateId);
   const ver = (STORE.versions.get(templateId) ?? []).find((v) => v.templateVersionId === versionId);
-  if (!ver) throw new TemplateApiError(404, 'CORE.TEMPLATE.NOT_FOUND');
+  if (!ver) throw new ApiError(404, 'CORE.TEMPLATE.NOT_FOUND', undefined, FAKE_ERROR_OPTIONS);
   return clone(ver);
 }
 
@@ -4168,23 +4157,23 @@ export async function fakeRestoreVersion(
   await fakeDelay();
   const def = findDefinitionOrThrow(templateId);
   if (def.lifecycleStatus === 'ARCHIVED') {
-    throw new TemplateApiError(409, 'CORE.TEMPLATE.DEFINITION.ARCHIVED');
+    throw new ApiError(409, 'CORE.TEMPLATE.DEFINITION.ARCHIVED', undefined, FAKE_ERROR_OPTIONS);
   }
   const draft = STORE.drafts.get(templateId);
-  if (!draft) throw new TemplateApiError(404, 'CORE.TEMPLATE.NOT_FOUND');
+  if (!draft) throw new ApiError(404, 'CORE.TEMPLATE.NOT_FOUND', undefined, FAKE_ERROR_OPTIONS);
 
   const expectedRev = parseIfMatchRevision(ifMatch);
   if (expectedRev !== draft.revision) {
-    throw new TemplateApiError(409, 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION');
+    throw new ApiError(409, 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION', undefined, FAKE_ERROR_OPTIONS);
   }
 
   const ver = (STORE.versions.get(templateId) ?? []).find((v) => v.templateVersionId === versionId);
-  if (!ver) throw new TemplateApiError(404, 'CORE.TEMPLATE.NOT_FOUND');
+  if (!ver) throw new ApiError(404, 'CORE.TEMPLATE.NOT_FOUND', undefined, FAKE_ERROR_OPTIONS);
   if (def.currentPublishedVersion?.templateVersionId === versionId && !body.discardCurrentDraft) {
-    throw new TemplateApiError(409, 'CORE.TEMPLATE.VERSION.RESTORE_CURRENT');
+    throw new ApiError(409, 'CORE.TEMPLATE.VERSION.RESTORE_CURRENT', undefined, FAKE_ERROR_OPTIONS);
   }
   if (!body.discardCurrentDraft && draft.contentChecksum !== ver.templateContentChecksum) {
-    throw new TemplateApiError(409, 'CORE.TEMPLATE.DRAFT.DISCARD_CONFIRMATION_REQUIRED');
+    throw new ApiError(409, 'CORE.TEMPLATE.DRAFT.DISCARD_CONFIRMATION_REQUIRED', undefined, FAKE_ERROR_OPTIONS);
   }
 
   const now = new Date().toISOString();
@@ -4228,15 +4217,15 @@ export async function fakeRetireVersion(
   const def = findDefinitionOrThrow(templateId);
   const expectedRev = parseIfMatchRevision(ifMatch);
   if (expectedRev !== def.revision) {
-    throw new TemplateApiError(409, 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION');
+    throw new ApiError(409, 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION', undefined, FAKE_ERROR_OPTIONS);
   }
   if (def.currentPublishedVersion?.templateVersionId === versionId) {
-    throw new TemplateApiError(409, 'CORE.TEMPLATE.VERSION.RETIRE_CURRENT');
+    throw new ApiError(409, 'CORE.TEMPLATE.VERSION.RETIRE_CURRENT', undefined, FAKE_ERROR_OPTIONS);
   }
   const ver = (STORE.versions.get(templateId) ?? []).find((v) => v.templateVersionId === versionId);
-  if (!ver) throw new TemplateApiError(404, 'CORE.TEMPLATE.NOT_FOUND');
+  if (!ver) throw new ApiError(404, 'CORE.TEMPLATE.NOT_FOUND', undefined, FAKE_ERROR_OPTIONS);
   if (ver.lifecycleStatus === 'RETIRED') {
-    throw new TemplateApiError(422, 'CORE.TEMPLATE.VERSION.RETIRED');
+    throw new ApiError(422, 'CORE.TEMPLATE.VERSION.RETIRED', undefined, FAKE_ERROR_OPTIONS);
   }
 
   const now = new Date().toISOString();
@@ -4273,26 +4262,26 @@ export async function fakeRestoreRecoverySnapshot(
   await fakeDelay();
   const def = findDefinitionOrThrow(templateId);
   if (def.lifecycleStatus === 'ARCHIVED') {
-    throw new TemplateApiError(409, 'CORE.TEMPLATE.DEFINITION.ARCHIVED');
+    throw new ApiError(409, 'CORE.TEMPLATE.DEFINITION.ARCHIVED', undefined, FAKE_ERROR_OPTIONS);
   }
   const draft = STORE.drafts.get(templateId);
-  if (!draft) throw new TemplateApiError(404, 'CORE.TEMPLATE.NOT_FOUND');
+  if (!draft) throw new ApiError(404, 'CORE.TEMPLATE.NOT_FOUND', undefined, FAKE_ERROR_OPTIONS);
 
   const expectedRev = parseIfMatchRevision(ifMatch);
   if (expectedRev !== draft.revision) {
-    throw new TemplateApiError(409, 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION');
+    throw new ApiError(409, 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION', undefined, FAKE_ERROR_OPTIONS);
   }
 
   const record = (STORE.recoverySnapshots.get(templateId) ?? []).find((r) => r.item.snapshotId === snapshotId);
-  if (!record) throw new TemplateApiError(404, 'CORE.TEMPLATE.NOT_FOUND');
+  if (!record) throw new ApiError(404, 'CORE.TEMPLATE.NOT_FOUND', undefined, FAKE_ERROR_OPTIONS);
   if (record.item.restoredAt !== null) {
-    throw new TemplateApiError(409, 'CORE.TEMPLATE.DRAFT.RECOVERY_SNAPSHOT_ALREADY_RESTORED');
+    throw new ApiError(409, 'CORE.TEMPLATE.DRAFT.RECOVERY_SNAPSHOT_ALREADY_RESTORED', undefined, FAKE_ERROR_OPTIONS);
   }
   if (record.item.integrityStatus === 'QUARANTINED') {
-    throw new TemplateApiError(422, 'CORE.TEMPLATE.DRAFT.RECOVERY_SNAPSHOT_INTEGRITY_FAILED');
+    throw new ApiError(422, 'CORE.TEMPLATE.DRAFT.RECOVERY_SNAPSHOT_INTEGRITY_FAILED', undefined, FAKE_ERROR_OPTIONS);
   }
   if (record.item.snapshotChecksum !== body.expectedSnapshotChecksum) {
-    throw new TemplateApiError(409, 'CORE.TEMPLATE.DRAFT.RECOVERY_SNAPSHOT_STALE');
+    throw new ApiError(409, 'CORE.TEMPLATE.DRAFT.RECOVERY_SNAPSHOT_STALE', undefined, FAKE_ERROR_OPTIONS);
   }
 
   const now = new Date().toISOString();
@@ -4367,7 +4356,7 @@ export async function fakeListAssets(query: TemplateAssetsListQuery = {}): Promi
 export async function fakeGetAsset(assetId: string): Promise<TemplateAssetDetailResponse> {
   await fakeDelay(100);
   const asset = STORE.assets.find((a) => a.assetId === assetId);
-  if (!asset) throw new TemplateApiError(404, 'CORE.TEMPLATE.NOT_FOUND');
+  if (!asset) throw new ApiError(404, 'CORE.TEMPLATE.NOT_FOUND', undefined, FAKE_ERROR_OPTIONS);
 
   return {
     asset: clone(asset),
@@ -4381,7 +4370,7 @@ export async function fakeGetAsset(assetId: string): Promise<TemplateAssetDetail
 export async function fakeGetAssetContent(assetId: string): Promise<Blob> {
   await fakeDelay(80);
   const asset = STORE.assets.find((a) => a.assetId === assetId);
-  if (!asset) throw new TemplateApiError(404, 'CORE.TEMPLATE.NOT_FOUND');
+  if (!asset) throw new ApiError(404, 'CORE.TEMPLATE.NOT_FOUND', undefined, FAKE_ERROR_OPTIONS);
   return makeAssetBlob(asset);
 }
 
@@ -4397,10 +4386,10 @@ export async function fakeUploadAsset(
 
   const { metadata, file } = request;
   if (metadata.deliveryClass === 'EMAIL_PUBLIC' && metadata.confirmPublicEmailDelivery !== true) {
-    throw new TemplateApiError(422, 'CORE.TEMPLATE.ASSET.EMAIL_PUBLIC_NOT_ALLOWED');
+    throw new ApiError(422, 'CORE.TEMPLATE.ASSET.EMAIL_PUBLIC_NOT_ALLOWED', undefined, FAKE_ERROR_OPTIONS);
   }
   if (!/^[a-f0-9]{64}$/i.test(metadata.expectedRawSha256)) {
-    throw new TemplateApiError(422, 'CORE.TEMPLATE.ASSET.CHECKSUM_MISMATCH');
+    throw new ApiError(422, 'CORE.TEMPLATE.ASSET.CHECKSUM_MISMATCH', undefined, FAKE_ERROR_OPTIONS);
   }
 
   const now = new Date().toISOString();
@@ -4444,9 +4433,9 @@ export async function fakeUploadAsset(
 export async function fakeRetireAsset(assetId: string, ifMatch: string): Promise<void> {
   await fakeDelay();
   const asset = STORE.assets.find((a) => a.assetId === assetId);
-  if (!asset) throw new TemplateApiError(404, 'CORE.TEMPLATE.NOT_FOUND');
+  if (!asset) throw new ApiError(404, 'CORE.TEMPLATE.NOT_FOUND', undefined, FAKE_ERROR_OPTIONS);
   if (asset.etag !== ifMatch.trim()) {
-    throw new TemplateApiError(409, 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION');
+    throw new ApiError(409, 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION', undefined, FAKE_ERROR_OPTIONS);
   }
 
   // Check if any retained published version references this asset
@@ -4455,7 +4444,7 @@ export async function fakeRetireAsset(assetId: string, ifMatch: string): Promise
       (v) => v.lifecycleStatus === 'PUBLISHED' && v.assetManifest.some((ref) => ref.assetId === assetId),
     );
     if (used) {
-      throw new TemplateApiError(409, 'CORE.TEMPLATE.ASSET.IN_USE');
+      throw new ApiError(409, 'CORE.TEMPLATE.ASSET.IN_USE', undefined, FAKE_ERROR_OPTIONS);
     }
   }
 
@@ -4495,7 +4484,7 @@ function withProductionAssignment<T extends { adapterKey: TemplateDataSourceKey 
 /** Backend assertProductionAssignment: 422 CORE.TEMPLATE.ASSIGNMENT.OWNER_RUNTIME_UNAVAILABLE. */
 function assertProductionAssignment(adapterKey: string): void {
   if (!isProductionAssignableAdapterKey(adapterKey)) {
-    throw new TemplateApiError(422, 'CORE.TEMPLATE.ASSIGNMENT.OWNER_RUNTIME_UNAVAILABLE');
+    throw new ApiError(422, 'CORE.TEMPLATE.ASSIGNMENT.OWNER_RUNTIME_UNAVAILABLE', undefined, FAKE_ERROR_OPTIONS);
   }
 }
 
@@ -4562,8 +4551,21 @@ export async function fakeListAssignments(
 export async function fakeGetAssignment(assignmentId: string): Promise<TemplateAssignmentDto> {
   await fakeDelay(100);
   const found = STORE.assignments.find((a) => a.assignmentId === assignmentId);
-  if (!found) throw new TemplateApiError(404, 'CORE.TEMPLATE.NOT_FOUND');
+  if (!found) throw new ApiError(404, 'CORE.TEMPLATE.NOT_FOUND', undefined, FAKE_ERROR_OPTIONS);
   return clone(found);
+}
+
+function assertNoDefaultAssignmentOverlap(candidate: TemplateAssignmentDto): void {
+  if (!candidate.isDefault || candidate.status !== 'ACTIVE') return;
+  const scope = JSON.stringify(normalizeScopeAlias(candidate.scope));
+  const conflict = STORE.assignments.some((other) =>
+    other.assignmentId !== candidate.assignmentId && other.isDefault && other.status === 'ACTIVE' &&
+    other.documentType === candidate.documentType && other.outputChannel === candidate.outputChannel &&
+    other.adapterKey === candidate.adapterKey && other.locale === candidate.locale &&
+    other.priority === candidate.priority && JSON.stringify(normalizeScopeAlias(other.scope)) === scope &&
+    Date.parse(other.effectiveFrom) < (candidate.effectiveTo ? Date.parse(candidate.effectiveTo) : Infinity) &&
+    Date.parse(candidate.effectiveFrom) < (other.effectiveTo ? Date.parse(other.effectiveTo) : Infinity));
+  if (conflict) throw new ApiError(409, 'CORE.TEMPLATE.ASSIGNMENT.CONFLICT', undefined, FAKE_ERROR_OPTIONS);
 }
 
 export async function fakeCreateAssignment(
@@ -4578,10 +4580,10 @@ export async function fakeCreateAssignment(
 
   assertProductionAssignment(body.adapterKey);
   if (!isAssignmentTupleCompatible(body)) {
-    throw new TemplateApiError(422, 'CORE.TEMPLATE.ASSIGNMENT.VERSION_INCOMPATIBLE');
+    throw new ApiError(422, 'CORE.TEMPLATE.ASSIGNMENT.VERSION_INCOMPATIBLE', undefined, FAKE_ERROR_OPTIONS);
   }
-  if (body.effectiveTo && body.effectiveTo <= body.effectiveFrom) {
-    throw new TemplateApiError(422, 'CORE.TEMPLATE.ASSIGNMENT.CONFLICT');
+  if (body.effectiveTo && Date.parse(body.effectiveTo) <= Date.parse(body.effectiveFrom)) {
+    throw new ApiError(422, 'CORE.TEMPLATE.ASSIGNMENT.CONFLICT', undefined, FAKE_ERROR_OPTIONS);
   }
 
   let matchedVersion: TemplateVersionDetail | null = null;
@@ -4593,7 +4595,7 @@ export async function fakeCreateAssignment(
     }
   }
   if (!matchedVersion || matchedVersion.lifecycleStatus !== 'PUBLISHED') {
-    throw new TemplateApiError(422, 'CORE.TEMPLATE.ASSIGNMENT.VERSION_INCOMPATIBLE');
+    throw new ApiError(422, 'CORE.TEMPLATE.ASSIGNMENT.VERSION_INCOMPATIBLE', undefined, FAKE_ERROR_OPTIONS);
   }
 
   const def = findDefinitionOrThrow(matchedVersion.templateDefinitionId);
@@ -4605,7 +4607,7 @@ export async function fakeCreateAssignment(
   if (normalizedDefScope.type === 'COMPANY') {
     const targetCompanyId = normalizedBodyScope.type === 'TENANT' ? null : normalizedBodyScope.companyId;
     if (targetCompanyId !== normalizedDefScope.companyId) {
-      throw new TemplateApiError(422, 'CORE.TEMPLATE.ASSIGNMENT.SCOPE_INVALID');
+      throw new ApiError(422, 'CORE.TEMPLATE.ASSIGNMENT.SCOPE_INVALID', undefined, FAKE_ERROR_OPTIONS);
     }
   }
 
@@ -4633,6 +4635,7 @@ export async function fakeCreateAssignment(
     updatedBy: AUTHOR_USER,
   };
 
+  assertNoDefaultAssignmentOverlap(created);
   STORE.assignments.unshift(created);
   const response: TemplateAssignmentWriteResponse = {
     assignment: clone(created),
@@ -4649,16 +4652,17 @@ export async function fakePatchAssignment(
 ): Promise<TemplateAssignmentWriteResponse> {
   await fakeDelay();
   const assignment = STORE.assignments.find((a) => a.assignmentId === assignmentId);
-  if (!assignment) throw new TemplateApiError(404, 'CORE.TEMPLATE.NOT_FOUND');
+  if (!assignment) throw new ApiError(404, 'CORE.TEMPLATE.NOT_FOUND', undefined, FAKE_ERROR_OPTIONS);
 
   const expectedRev = parseIfMatchRevision(ifMatch);
   if (expectedRev !== assignment.revision) {
-    throw new TemplateApiError(409, 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION');
+    throw new ApiError(409, 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION', undefined, FAKE_ERROR_OPTIONS);
   }
   if ((patch.status ?? assignment.status) === 'ACTIVE') {
     assertProductionAssignment(assignment.adapterKey);
   }
 
+  const candidate = { ...assignment };
   if (patch.versionId !== undefined) {
     let ver: TemplateVersionDetail | null = null;
     for (const list of STORE.versions.values()) {
@@ -4669,38 +4673,40 @@ export async function fakePatchAssignment(
       }
     }
     if (!ver || ver.lifecycleStatus !== 'PUBLISHED') {
-      throw new TemplateApiError(422, 'CORE.TEMPLATE.ASSIGNMENT.VERSION_INCOMPATIBLE');
+      throw new ApiError(422, 'CORE.TEMPLATE.ASSIGNMENT.VERSION_INCOMPATIBLE', undefined, FAKE_ERROR_OPTIONS);
     }
-    assignment.versionId = ver.templateVersionId;
-    assignment.versionNumber = ver.versionNumber;
+    candidate.versionId = ver.templateVersionId;
+    candidate.versionNumber = ver.versionNumber;
   }
-  if (patch.priority !== undefined) assignment.priority = patch.priority;
-  if (patch.isDefault !== undefined) assignment.isDefault = patch.isDefault;
-  if (patch.effectiveFrom !== undefined) assignment.effectiveFrom = patch.effectiveFrom;
-  if (patch.effectiveTo !== undefined) assignment.effectiveTo = patch.effectiveTo;
-  if (patch.status !== undefined) assignment.status = patch.status;
+  if (patch.priority !== undefined) candidate.priority = patch.priority;
+  if (patch.isDefault !== undefined) candidate.isDefault = patch.isDefault;
+  if (patch.effectiveFrom !== undefined) candidate.effectiveFrom = patch.effectiveFrom;
+  if (patch.effectiveTo !== undefined) candidate.effectiveTo = patch.effectiveTo;
+  if (patch.status !== undefined) candidate.status = patch.status;
 
-  if (assignment.effectiveTo && assignment.effectiveTo <= assignment.effectiveFrom) {
-    throw new TemplateApiError(422, 'CORE.TEMPLATE.ASSIGNMENT.CONFLICT');
+  if (candidate.effectiveTo && Date.parse(candidate.effectiveTo) <= Date.parse(candidate.effectiveFrom)) {
+    throw new ApiError(422, 'CORE.TEMPLATE.ASSIGNMENT.CONFLICT', undefined, FAKE_ERROR_OPTIONS);
   }
 
-  assignment.revision += 1;
-  assignment.etag = `"${assignment.revision}"`;
-  assignment.updatedAt = new Date().toISOString();
+  assertNoDefaultAssignmentOverlap(candidate);
+  candidate.revision += 1;
+  candidate.etag = `"${candidate.revision}"`;
+  candidate.updatedAt = new Date().toISOString();
 
+  Object.assign(assignment, candidate);
   return {
     assignment: clone(assignment),
-    impact: buildAssignmentImpact(assignment.scope, assignment.locale),
+    impact: buildAssignmentImpact(candidate.scope, candidate.locale),
   };
 }
 
 export async function fakeDeactivateAssignment(assignmentId: string, ifMatch: string): Promise<void> {
   await fakeDelay();
   const assignment = STORE.assignments.find((a) => a.assignmentId === assignmentId);
-  if (!assignment) throw new TemplateApiError(404, 'CORE.TEMPLATE.NOT_FOUND');
+  if (!assignment) throw new ApiError(404, 'CORE.TEMPLATE.NOT_FOUND', undefined, FAKE_ERROR_OPTIONS);
   const expectedRev = parseIfMatchRevision(ifMatch);
   if (expectedRev !== assignment.revision) {
-    throw new TemplateApiError(409, 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION');
+    throw new ApiError(409, 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION', undefined, FAKE_ERROR_OPTIONS);
   }
   if (assignment.status !== 'INACTIVE') {
     assignment.status = 'INACTIVE';
@@ -4802,16 +4808,16 @@ function resolvePreviewSource(
 } {
   const def = findDefinitionOrThrow(templateId);
   if (def.lifecycleStatus === 'ARCHIVED') {
-    throw new TemplateApiError(409, 'CORE.TEMPLATE.DEFINITION.ARCHIVED');
+    throw new ApiError(409, 'CORE.TEMPLATE.DEFINITION.ARCHIVED', undefined, FAKE_ERROR_OPTIONS);
   }
   if (source.kind === 'DRAFT') {
     const draft = STORE.drafts.get(templateId);
-    if (!draft) throw new TemplateApiError(404, 'CORE.TEMPLATE.NOT_FOUND');
+    if (!draft) throw new ApiError(404, 'CORE.TEMPLATE.NOT_FOUND', undefined, FAKE_ERROR_OPTIONS);
     if (draft.revision !== source.draftRevision) {
-      throw new TemplateApiError(409, 'CORE.TEMPLATE.PREVIEW.SOURCE_STALE');
+      throw new ApiError(409, 'CORE.TEMPLATE.PREVIEW.SOURCE_STALE', undefined, FAKE_ERROR_OPTIONS);
     }
     if (draft.validation.state === 'FAILED') {
-      throw new TemplateApiError(422, 'CORE.TEMPLATE.VALIDATION.FAILED');
+      throw new ApiError(422, 'CORE.TEMPLATE.VALIDATION.FAILED', undefined, FAKE_ERROR_OPTIONS);
     }
     return {
       resolved: { kind: 'DRAFT', draftId: draft.draftId, draftRevision: draft.revision },
@@ -4819,7 +4825,7 @@ function resolvePreviewSource(
     };
   }
   const version = (STORE.versions.get(templateId) ?? []).find((v) => v.templateVersionId === source.versionId);
-  if (!version) throw new TemplateApiError(404, 'CORE.TEMPLATE.NOT_FOUND');
+  if (!version) throw new ApiError(404, 'CORE.TEMPLATE.NOT_FOUND', undefined, FAKE_ERROR_OPTIONS);
   return {
     resolved: { kind: 'VERSION', versionId: version.templateVersionId, versionNumber: version.versionNumber },
     contentChecksum: version.templateContentChecksum,
@@ -4878,7 +4884,7 @@ export async function fakePreviewHtml(
   await fakeDelay();
   const def = findDefinitionOrThrow(templateId);
   if (def.outputChannel !== 'PRINT') {
-    throw new TemplateApiError(422, 'CORE.TEMPLATE.LAYOUT.INCOMPATIBLE');
+    throw new ApiError(422, 'CORE.TEMPLATE.LAYOUT.INCOMPATIBLE', undefined, FAKE_ERROR_OPTIONS);
   }
   const src = resolvePreviewSource(templateId, body.source);
   const html = buildQuotationPreviewHtml(body.locale);
@@ -4902,7 +4908,7 @@ export async function fakePreviewEmail(
   await fakeDelay();
   const def = findDefinitionOrThrow(templateId);
   if (def.outputChannel !== 'EMAIL') {
-    throw new TemplateApiError(422, 'CORE.TEMPLATE.LAYOUT.INCOMPATIBLE');
+    throw new ApiError(422, 'CORE.TEMPLATE.LAYOUT.INCOMPATIBLE', undefined, FAKE_ERROR_OPTIONS);
   }
   const src = resolvePreviewSource(templateId, body.source);
   const isAr = body.locale === 'ar-EG';
@@ -4940,6 +4946,11 @@ export async function fakePreviewPdf(
     return clone(STORE.idempotency.get(idemKey) as TemplatePdfPreviewAcceptedDto);
   }
 
+  const activeJobs = [...STORE.pdfJobs.values()].filter((job) =>
+    ['PENDING', 'RESOLVING_SOURCE', 'RETRYING'].includes(job.status) && Date.parse(job.expiresAt) > Date.now());
+  if (activeJobs.length >= 3) {
+    throw new ApiError(429, 'CORE.TEMPLATE.PREVIEW.TOO_MANY_ACTIVE', undefined, FAKE_ERROR_OPTIONS);
+  }
   const def = findDefinitionOrThrow(templateId);
   const src = resolvePreviewSource(templateId, body.source);
   const jobId = uuidv7();
@@ -4986,10 +4997,19 @@ export async function fakePreviewPdf(
   return accepted;
 }
 
+function findPreviewJobOrThrow(jobId: string): TemplatePdfJobDto {
+  const job = STORE.pdfJobs.get(jobId);
+  if (!job) throw new ApiError(404, 'CORE.TEMPLATE.NOT_FOUND', undefined, FAKE_ERROR_OPTIONS);
+  if (Date.parse(job.expiresAt) <= Date.now() ||
+      (job.artifact && Date.parse(job.artifact.downloadUrlExpiresAt) <= Date.now())) {
+    throw new ApiError(410, 'CORE.TEMPLATE.PREVIEW.ARTIFACT_EXPIRED', undefined, FAKE_ERROR_OPTIONS);
+  }
+  return job;
+}
+
 export async function fakeGetPreviewJob(jobId: string): Promise<TemplatePdfJobDto> {
   await fakeDelay(120);
-  const job = STORE.pdfJobs.get(jobId);
-  if (!job) throw new TemplateApiError(404, 'CORE.TEMPLATE.NOT_FOUND');
+  const job = findPreviewJobOrThrow(jobId);
 
   // Progress PENDING jobs to COMPLETED on poll to simulate worker completion.
   if (job.status === 'PENDING' || job.status === 'RESOLVING_SOURCE') {
@@ -5021,10 +5041,9 @@ export async function fakeGetPreviewJob(jobId: string): Promise<TemplatePdfJobDt
 
 export async function fakeGetPreviewJobArtifact(jobId: string): Promise<Blob> {
   await fakeDelay(100);
-  const job = STORE.pdfJobs.get(jobId);
-  if (!job) throw new TemplateApiError(404, 'CORE.TEMPLATE.NOT_FOUND');
+  const job = findPreviewJobOrThrow(jobId);
   if (job.status !== 'COMPLETED' || !job.artifact) {
-    throw new TemplateApiError(409, 'CORE.TEMPLATE.PREVIEW.ARTIFACT_NOT_READY');
+    throw new ApiError(409, 'CORE.TEMPLATE.PREVIEW.ARTIFACT_NOT_READY', undefined, FAKE_ERROR_OPTIONS);
   }
   const minimalPdf = '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Count 1/Kids[3 0 R]>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]>>endobj\nxref\n0 4\n0000000000 65535 f \n0000000009 00000 n \n0000000056 00000 n \n0000000111 00000 n \ntrailer<</Size 4/Root 1 0 R>>\nstartxref\n178\n%%EOF';
   return new Blob([minimalPdf], { type: 'application/pdf' });
@@ -5032,10 +5051,9 @@ export async function fakeGetPreviewJobArtifact(jobId: string): Promise<Blob> {
 
 export async function fakeGetPreviewJobLayoutReceipt(jobId: string): Promise<TemplateLayoutReceiptV1> {
   await fakeDelay(100);
-  const job = STORE.pdfJobs.get(jobId);
-  if (!job) throw new TemplateApiError(404, 'CORE.TEMPLATE.NOT_FOUND');
+  const job = findPreviewJobOrThrow(jobId);
   if (job.status !== 'COMPLETED') {
-    throw new TemplateApiError(409, 'CORE.TEMPLATE.PREVIEW.ARTIFACT_NOT_READY');
+    throw new ApiError(409, 'CORE.TEMPLATE.PREVIEW.ARTIFACT_NOT_READY', undefined, FAKE_ERROR_OPTIONS);
   }
   return {
     layoutRuntimeChecksum: pseudoSha256(`layout-runtime:${jobId}`),

@@ -1,7 +1,7 @@
+import { errorMessage } from '../../../../core/api/api-errors';
 import type { ScopeCompany } from '../../../../core/scope/scope';
 import { templateFamilyMeta } from '../shared/template-family';
 import type {
-  TemplateAssignmentDto,
   TemplateDataSourceKey,
   TemplateDefinitionScope,
   TemplateDocumentType,
@@ -11,7 +11,6 @@ import type {
   AssignmentScopeOption,
   AssignmentSelectorOption,
   DocumentVisualDescriptor,
-  OverlapCandidate,
 } from './assignments.model';
 
 /**
@@ -136,10 +135,6 @@ export function scopeKeyOf(scope: TemplateScopeRef): string {
   if (scope.type === 'TENANT') return 'TENANT';
   if (scope.type === 'COMPANY') return `COMPANY:${scope.companyId}`;
   return `BRANCH:${scope.companyId}:${scope.branchId}`;
-}
-
-export function scopeKeyFromPortalSelection(companyId: string, branchId: string): string {
-  return `BRANCH:${companyId}:${branchId}`;
 }
 
 /** Mirrors CORE.TEMPLATE.ASSIGNMENT.SCOPE_INVALID: a Company-owned template targets only that Company or its Branches. */
@@ -325,39 +320,19 @@ export function dateTimeToIso(dateStr: string, timeStr: string | null): string {
   return `${dateStr}T${time}:00.000Z`;
 }
 
-/**
- * Checks whether an ACTIVE default assignment overlaps another ACTIVE default assignment
- * with identical selector identity and priority on [effectiveFrom, effectiveTo).
- */
-export function hasDefaultAssignmentOverlap(
-  candidate: OverlapCandidate,
-  existing: readonly TemplateAssignmentDto[],
-  excludeAssignmentId?: string | null,
+export function canManageAssignment(
+  me: { isTenantOwner?: boolean; permissions: readonly string[]; permissionScopes?: Record<string, {
+    tenantWide: boolean; companyIds: string[]; branchIds: string[];
+  }> } | null,
+  scope: TemplateScopeRef,
 ): boolean {
-  if (!candidate.isDefault || candidate.status !== 'ACTIVE') return false;
-  const candidateScopeKey = scopeKeyOf(candidate.scope);
-  const candFrom = Date.parse(candidate.effectiveFrom);
-  const candTo = candidate.effectiveTo ? Date.parse(candidate.effectiveTo) : Number.POSITIVE_INFINITY;
-  if (Number.isNaN(candFrom) || Number.isNaN(candTo)) return false;
-
-  for (const row of existing) {
-    if (excludeAssignmentId && row.assignmentId === excludeAssignmentId) continue;
-    if (row.status !== 'ACTIVE' || !row.isDefault) continue;
-    if (scopeKeyOf(row.scope) !== candidateScopeKey) continue;
-    if (row.documentType !== candidate.documentType) continue;
-    if (row.outputChannel !== candidate.outputChannel) continue;
-    if (row.adapterKey !== candidate.adapterKey) continue;
-    if (row.locale !== candidate.locale) continue;
-    if (row.priority !== candidate.priority) continue;
-
-    const rowFrom = Date.parse(row.effectiveFrom);
-    const rowTo = row.effectiveTo ? Date.parse(row.effectiveTo) : Number.POSITIVE_INFINITY;
-    if (Number.isNaN(rowFrom) || Number.isNaN(rowTo)) continue;
-
-    if (candFrom < rowTo && rowFrom < candTo) {
-      return true;
-    }
-  }
+  if (me?.isTenantOwner) return true;
+  const permission = 'templates.assignments.manage';
+  if (!me?.permissions.includes(permission)) return false;
+  const grant = me.permissionScopes?.[permission];
+  if (grant?.tenantWide) return true;
+  if (scope.type === 'COMPANY') return grant?.companyIds.includes(scope.companyId) ?? false;
+  if (scope.type === 'BRANCH') return grant?.branchIds.includes(scope.branchId) ?? false;
   return false;
 }
 
@@ -365,14 +340,5 @@ export function translateAssignmentError(
   error: unknown,
   translate: (key: string, params?: Record<string, unknown>) => string,
 ): string {
-  const code =
-    typeof error === 'object' && error !== null && typeof (error as { code?: unknown }).code === 'string'
-      ? (error as { code: string }).code
-      : null;
-  if (code) {
-    const key = `assignments.errors.${code}`;
-    const resolved = translate(key);
-    if (resolved && resolved !== key) return resolved;
-  }
-  return translate('assignments.errors.generic');
+  return errorMessage(error, 'assignments', translate);
 }

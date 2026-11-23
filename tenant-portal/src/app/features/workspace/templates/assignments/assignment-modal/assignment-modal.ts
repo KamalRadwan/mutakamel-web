@@ -11,7 +11,7 @@ import {
 } from '@angular/core';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { FormField, disabled, form, readonly, required, submit, validate } from '@angular/forms/signals';
-import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
+import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   tablerAlertTriangle,
@@ -19,6 +19,11 @@ import {
   tablerRoute,
   tablerX,
 } from '@ng-icons/tabler-icons';
+import { ApiError, errorCodeOf, fieldErrorsOf, isRetryableWriteError, isValidationError, writeErrorMessage } from '../../../../../core/api/api-errors';
+import { newIdempotencyKey } from '../../../../../core/api/idempotency';
+import { TenantScopeState } from '../../../../../core/scope/tenant-scope';
+import { ConflictDialog } from '../../../../../shared/ui/conflict-dialog/conflict-dialog';
+import { AssignmentsApi } from '../assignments.api';
 import { Notify } from '../../../../../core/notify/notify';
 import { Button } from '../../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
@@ -29,32 +34,22 @@ import { Modal } from '../../../../../shared/ui/modal/modal';
 import { Switch } from '../../../../../shared/ui/switch/switch';
 import { UnsavedDialog } from '../../../../../shared/ui/unsaved-dialog/unsaved-dialog';
 import {
-  TemplateApiError,
   TemplateAssignmentDto,
   TemplateDataSourceKey,
   TemplateDefinitionDetail,
-  TemplateDefinitionScope,
   TemplateDocumentType,
   TemplateListRow,
   TemplateLocale,
   TemplateOutputChannel,
   TemplateVersionItem,
-  createAssignment,
-  deactivateAssignment,
-  getAssignment,
-  getTemplate,
-  listAssignments,
-  listVersions,
-  newTemplateIdempotencyKey,
-  patchAssignment,
+  TemplatesApi,
 } from '../../templates.api';
-import type { AssignmentScopeOption, OverlapCandidate } from '../assignments.model';
+import type { AssignmentScopeOption } from '../assignments.model';
 import {
   dateInputToEndIso,
   dateInputToStartIso,
   describeAssignmentScope,
-  hasDefaultAssignmentOverlap,
-  isAssignmentScopeAllowed,
+  canManageAssignment,
   isProductionAssignableDocument,
   isoToDateInput,
   isoToEndDateInput,
@@ -121,6 +116,7 @@ function draftsEqual(a: AssignmentDraft, b: AssignmentDraft): boolean {
     TranslocoPipe,
     Button,
     ConfirmDialog,
+    ConflictDialog,
     DateField,
     Dropdown,
     Field,
@@ -128,6 +124,7 @@ function draftsEqual(a: AssignmentDraft, b: AssignmentDraft): boolean {
     Switch,
     UnsavedDialog,
   ],
+  viewProviders: [provideTranslocoScope('templates', { scope: 'templates-assignments', alias: 'assignments' })],
   providers: [provideIcons({ tablerAlertTriangle, tablerLock, tablerRoute, tablerX })],
   templateUrl: './assignment-modal.html',
 })
@@ -140,14 +137,24 @@ export class AssignmentModal {
   private readonly i18n = translationEvents(this.transloco);
 
   private readonly modal = viewChild.required<Modal>('assignmentModal');
-  private readonly conflictModal = viewChild.required<Modal>('conflictModal');
   private readonly unsavedDialog = viewChild.required<UnsavedDialog>('unsavedDialog');
   private readonly deactivateConfirm = viewChild.required<ConfirmDialog>('deactivateConfirm');
 
   readonly definitions = input.required<readonly TemplateListRow[]>();
   readonly scopeOptions = input.required<readonly AssignmentScopeOption[]>();
-  readonly existingAssignments = input<readonly TemplateAssignmentDto[]>([]);
-  readonly canManage = input(true);
+  private readonly api = inject(AssignmentsApi);
+  private readonly templatesApi = inject(TemplatesApi);
+  private readonly tenantScope = inject(TenantScopeState);
+  readonly canManage = computed(() => {
+    const scope = this.mode() === 'edit' ? this.baseAssignment()?.scope
+      : this.scopeOptions().find((opt) => opt.key === this.draft().scopeKey)?.scope;
+    return !!scope && canManageAssignment(this.tenantScope.me(), scope);
+  });
+  protected readonly pickerDefinitions = signal<readonly TemplateListRow[]>([]);
+  protected readonly definitionsLoading = signal(false);
+  protected readonly serverErrors = signal<Record<string, string>>({});
+  private definitionsSeq = 0;
+  private deactivateAction: { key: string; bodyJson: string } | null = null;
 
   readonly saved = output<{ assignment: TemplateAssignmentDto; isNew: boolean }>();
   readonly deactivated = output<string>();
@@ -159,16 +166,16 @@ export class AssignmentModal {
   protected readonly deactivating = signal(false);
   protected readonly guardBusy = signal(false);
   protected readonly conflictOpen = signal(false);
-  protected readonly effectiveFromServerError = signal<string | null>(null);
 
   protected readonly baseAssignment = signal<TemplateAssignmentDto | null>(null);
   protected readonly selectedDefinition = signal<TemplateDefinitionDetail | null>(null);
   protected readonly versions = signal<readonly TemplateVersionItem[]>([]);
   protected readonly baseDraft = signal<AssignmentDraft>(emptyCreateDraft('TENANT'));
   protected readonly draft = signal<AssignmentDraft>(emptyCreateDraft('TENANT'));
+  private readonly draftScopeKey = computed(() => this.draft().scopeKey);
 
   protected readonly assignmentForm = form(this.draft, (path) => {
-    disabled(path.templateId, { when: () => this.mode() !== 'create' || !this.canManage() || this.saving() });
+    disabled(path.templateId, { when: () => this.mode() !== 'create' || !this.canManage() || this.saving() || this.definitionsLoading() });
     disabled(path.versionId, { when: () => !this.canManage() || this.saving() || this.versionsLoading() });
     disabled(path.localeChoice, { when: () => this.mode() !== 'create' || !this.canManage() || this.saving() });
     disabled(path.scopeKey, { when: () => this.mode() !== 'create' || !this.canManage() || this.saving() });
@@ -204,7 +211,7 @@ export class AssignmentModal {
   private lastIdempotencyKey: string | null = null;
 
   protected readonly eligibleDefinitions = computed<readonly TemplateListRow[]>(() =>
-    this.definitions().filter(
+    this.pickerDefinitions().filter(
       (def) =>
         def.actions.manageAssignments.state === 'ENABLED' &&
         def.currentPublishedVersion !== null,
@@ -270,24 +277,8 @@ export class AssignmentModal {
     return opts;
   });
 
-  /** Owner scope of the chosen template; null until one is chosen, so every scope stays offered. */
-  private readonly templateOwnerScope = computed<TemplateDefinitionScope | null>(() => {
-    const templateId = this.draft().templateId;
-    if (!templateId) return null;
-    const row = this.definitions().find((def) => def.templateId === templateId);
-    if (row) return row.definitionScope;
-    const detail = this.selectedDefinition();
-    return detail?.templateId === templateId ? detail.scope : null;
-  });
-
-  private readonly allowedScopeOptions = computed<readonly AssignmentScopeOption[]>(() => {
-    const owner = this.templateOwnerScope();
-    const options = this.scopeOptions();
-    return owner ? options.filter((opt) => isAssignmentScopeAllowed(owner, opt.scope)) : options;
-  });
-
   protected readonly scopeDropdownOptions = computed<DropdownOption<string>[]>(() =>
-    this.allowedScopeOptions().map((opt) => ({ value: opt.key, label: opt.label })),
+    this.scopeOptions().map((opt) => ({ value: opt.key, label: opt.label })),
   );
 
   protected readonly dirty = computed(() => {
@@ -306,7 +297,7 @@ export class AssignmentModal {
       const fromList = this.definitions().find((d) => d.templateId === base.definitionId);
       if (fromList) return `${fromList.name} (${fromList.code})`;
     }
-    return this.transloco.translate('assignments.table.unknownTemplate');
+    return base?.definitionId ?? '';
   });
 
   protected readonly derivedDocumentTypeLabel = computed(() => {
@@ -347,7 +338,7 @@ export class AssignmentModal {
     const base = this.baseAssignment();
     if (!base) return '';
     const def = this.selectedDefinition() ?? this.definitions().find((d) => d.templateId === base.definitionId);
-    return def?.name ?? this.transloco.translate('assignments.table.unknownTemplate');
+    return def?.name ?? base.definitionId;
   });
 
   protected readonly deactivateTargetVersion = computed(() => {
@@ -357,6 +348,7 @@ export class AssignmentModal {
 
   protected readonly templateError = computed(() => {
     this.i18n();
+    if (this.serverErrors()['templateId']) return this.serverErrors()['templateId'];
     if (this.mode() !== 'create') return null;
     const state = this.assignmentForm.templateId();
     if (!state.touched() || !state.errors().length) return null;
@@ -365,6 +357,7 @@ export class AssignmentModal {
 
   protected readonly versionError = computed(() => {
     this.i18n();
+    if (this.serverErrors()['versionId']) return this.serverErrors()['versionId'];
     const state = this.assignmentForm.versionId();
     if (!state.touched() || !state.errors().length) return null;
     return this.transloco.translate('assignments.modal.versionRequired');
@@ -372,6 +365,7 @@ export class AssignmentModal {
 
   protected readonly priorityError = computed(() => {
     this.i18n();
+    if (this.serverErrors()['priority']) return this.serverErrors()['priority'];
     const state = this.assignmentForm.priority();
     if (!state.touched() || !state.errors().length) return null;
     return this.transloco.translate('assignments.modal.priorityError');
@@ -379,7 +373,7 @@ export class AssignmentModal {
 
   protected readonly effectiveFromError = computed(() => {
     this.i18n();
-    const serverErr = this.effectiveFromServerError();
+    const serverErr = this.serverErrors()['effectiveFrom'];
     if (serverErr) return serverErr;
     const state = this.assignmentForm.effectiveFrom();
     if (!state.touched() || !state.errors().length) return null;
@@ -388,6 +382,7 @@ export class AssignmentModal {
 
   protected readonly effectiveToError = computed(() => {
     this.i18n();
+    if (this.serverErrors()['effectiveTo']) return this.serverErrors()['effectiveTo'];
     const state = this.assignmentForm.effectiveTo();
     if (!state.touched() || !state.errors().length) return null;
     return this.transloco.translate('assignments.modal.effectiveToRangeError');
@@ -409,24 +404,15 @@ export class AssignmentModal {
     });
 
     effect(() => {
-      if (this.mode() !== 'create') return;
-      const allowed = this.allowedScopeOptions();
-      const scopeKey = this.draft().scopeKey;
-      if (allowed.length === 0 || allowed.some((opt) => opt.key === scopeKey)) return;
-      untracked(() => this.assignmentForm.scopeKey().value.set(allowed[0].key));
+      const open = this.isOpen();
+      const scopeKey = this.draftScopeKey();
+      if (open && this.mode() === 'create') untracked(() => void this.loadDefinitions(scopeKey));
     });
 
     effect(() => {
-      const d = this.draft();
-      void d.templateId;
-      void d.scopeKey;
-      void d.localeChoice;
-      void d.priority;
-      void d.isDefault;
-      void d.effectiveFrom;
-      void d.effectiveTo;
+      this.draft();
       untracked(() => {
-        this.effectiveFromServerError.set(null);
+        this.serverErrors.set({});
       });
     });
   }
@@ -434,6 +420,8 @@ export class AssignmentModal {
   openCreate(defaultScopeKey: string): void {
     this.loadSeq++;
     this.templateLoadSeq++;
+    this.definitionsSeq++;
+    this.deactivateAction = null;
     this.lastLoadedTemplateId = '';
     this.allowClose = false;
     this.guardBusy.set(false);
@@ -441,7 +429,7 @@ export class AssignmentModal {
     this.deactivating.set(false);
     this.loading.set(false);
     this.versionsLoading.set(false);
-    this.effectiveFromServerError.set(null);
+    this.serverErrors.set({});
     this.lastFingerprint = null;
     this.lastIdempotencyKey = null;
 
@@ -465,12 +453,17 @@ export class AssignmentModal {
   }
 
   openEdit(row: TemplateAssignmentDto): void {
+    this.definitionsSeq++;
+    this.templateLoadSeq++;
+    this.deactivateAction = null;
+    this.selectedDefinition.set(null);
+    this.versions.set([]);
     this.lastLoadedTemplateId = '';
     this.allowClose = false;
     this.guardBusy.set(false);
     this.conflictOpen.set(false);
     this.deactivating.set(false);
-    this.effectiveFromServerError.set(null);
+    this.serverErrors.set({});
     this.lastFingerprint = null;
     this.lastIdempotencyKey = null;
 
@@ -501,7 +494,7 @@ export class AssignmentModal {
 
   protected undoChanges(): void {
     if (!this.dirty() || this.saving() || this.deactivating()) return;
-    this.effectiveFromServerError.set(null);
+    this.serverErrors.set({});
     this.assignmentForm().reset({ ...this.baseDraft() });
   }
 
@@ -509,7 +502,7 @@ export class AssignmentModal {
     event?.preventDefault();
     if (!this.canManage() || this.loading() || this.saving() || this.deactivating()) return false;
 
-    this.effectiveFromServerError.set(null);
+    this.serverErrors.set({});
     let succeeded = false;
 
     await submit(this.assignmentForm, async () => {
@@ -545,12 +538,16 @@ export class AssignmentModal {
 
     this.deactivating.set(true);
     try {
-      await deactivateAssignment(base.assignmentId, base.etag);
+      const bodyJson = JSON.stringify([base.assignmentId, base.etag]);
+      if (this.deactivateAction?.bodyJson !== bodyJson) this.deactivateAction = { key: newIdempotencyKey(), bodyJson };
+      await this.api.deactivateAssignment(base.assignmentId, base.etag, this.deactivateAction!.key);
+      this.deactivateAction = null;
       this.notify.success(this.transloco.translate('assignments.toasts.deactivated'));
       this.deactivated.emit(base.assignmentId);
       this.closeImmediate();
     } catch (error) {
-      this.notify.error(translateAssignmentError(error, (k, p) => this.transloco.translate(k, p)));
+      if (!isRetryableWriteError(error) && !(error instanceof ApiError && error.status === 401)) this.deactivateAction = null;
+      this.handleWriteError(error);
     } finally {
       this.deactivating.set(false);
     }
@@ -578,41 +575,90 @@ export class AssignmentModal {
   protected async reloadFromConflict(): Promise<void> {
     const base = this.baseAssignment();
     this.conflictOpen.set(false);
-    this.conflictModal().close();
     if (!base) return;
     await this.loadEditRecord(base.assignmentId, base.definitionId);
   }
 
-  protected keepChangesAfterConflict(): void {
+  protected async keepChangesAfterConflict(): Promise<void> {
     this.conflictOpen.set(false);
-    this.conflictModal().close();
+    const base = this.baseAssignment();
+    if (!base) return;
+    this.loading.set(true);
+    try {
+      const latest = await this.api.getAssignment(base.assignmentId);
+      this.baseAssignment.update((current) => current ? { ...current, revision: latest.revision, etag: latest.etag } : current);
+      this.lastFingerprint = null;
+      this.lastIdempotencyKey = null;
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) this.closeGone();
+      this.notify.error(translateAssignmentError(error, (k, p) => this.transloco.translate(k, p)));
+    } finally { this.loading.set(false); }
   }
 
-  protected onConflictClosed(): void {
-    if (this.conflictOpen()) {
-      this.conflictOpen.set(false);
-    }
+  private async loadDefinitions(scopeKey: string): Promise<void> {
+    const seq = ++this.definitionsSeq;
+    const scope = this.scopeOptions().find((opt) => opt.key === scopeKey)?.scope;
+    if (!scope) return;
+    this.pickerDefinitions.set([]);
+    this.templateLoadSeq++;
+    this.lastLoadedTemplateId = '';
+    this.assignmentForm.templateId().value.set('');
+    this.assignmentForm.versionId().value.set('');
+    this.selectedDefinition.set(null);
+    this.versions.set([]);
+    this.definitionsLoading.set(true);
+    try {
+      const items: TemplateListRow[] = [];
+      let cursor: string | null = null;
+      do {
+        const page = await this.templatesApi.listTemplates({
+          assignmentScopeType: scope.type,
+          assignmentCompanyId: scope.type !== 'TENANT' ? scope.companyId : undefined,
+          assignmentBranchId: scope.type === 'BRANCH' ? scope.branchId : undefined,
+          cursor: cursor ?? undefined, limit: 100,
+        });
+        if (seq !== this.definitionsSeq || !this.isOpen()) return;
+        items.push(...page.items);
+        cursor = page.pageInfo.hasNextPage ? page.pageInfo.nextCursor : null;
+      } while (cursor);
+      this.pickerDefinitions.set(items);
+    } catch (error) {
+      if (seq === this.definitionsSeq) this.notify.error(translateAssignmentError(error, (k, p) => this.transloco.translate(k, p)));
+    } finally { if (seq === this.definitionsSeq) this.definitionsLoading.set(false); }
+  }
+
+  private async loadVersions(id: string): Promise<TemplateVersionItem[]> {
+    const items: TemplateVersionItem[] = [];
+    let cursor: string | null = null;
+    do {
+      const page = await this.templatesApi.listVersions(id, { lifecycleStatus: 'PUBLISHED', limit: 100, cursor: cursor ?? undefined });
+      items.push(...page.items);
+      cursor = page.pageInfo.hasNextPage ? page.pageInfo.nextCursor : null;
+    } while (cursor);
+    return items;
   }
 
   private async onTemplateSelected(templateId: string): Promise<void> {
     if (this.mode() !== 'create' || !templateId) return;
-    this.effectiveFromServerError.set(null);
+    this.serverErrors.set({});
     this.assignmentForm.versionId().value.set('');
+    this.selectedDefinition.set(null);
+    this.versions.set([]);
     const seq = ++this.templateLoadSeq;
     this.versionsLoading.set(true);
 
     try {
       const [detail, verPage] = await Promise.all([
-        getTemplate(templateId),
-        listVersions(templateId, { lifecycleStatus: 'PUBLISHED', limit: 100 }),
+        this.templatesApi.getTemplate(templateId),
+        this.loadVersions(templateId),
       ]);
       if (seq !== this.templateLoadSeq || this.mode() !== 'create') return;
 
       this.selectedDefinition.set(detail);
-      this.versions.set(verPage.items);
+      this.versions.set(verPage);
       const defaultVersionId =
         detail.currentPublishedVersion?.templateVersionId ??
-        verPage.items[0]?.templateVersionId ??
+        verPage[0]?.templateVersionId ??
         '';
       this.assignmentForm.versionId().value.set(defaultVersionId);
       this.assignmentForm.localeChoice().value.set(detail.locale);
@@ -634,33 +680,13 @@ export class AssignmentModal {
   ): Promise<boolean> {
     const def = this.selectedDefinition();
     const version = this.versions().find((v) => v.templateVersionId === d.versionId);
-    const scopeOpt = this.allowedScopeOptions().find((opt) => opt.key === d.scopeKey);
+    const scopeOpt = this.scopeOptions().find((opt) => opt.key === d.scopeKey);
     if (!def || !version || !scopeOpt) return false;
 
     const adapterKey: TemplateDataSourceKey = def.dataSourceKey;
     const documentType: TemplateDocumentType = def.documentType;
     const outputChannel: TemplateOutputChannel = def.outputChannel;
     const locale: TemplateLocale | null = d.localeChoice === 'DEFAULT' ? null : d.localeChoice;
-
-    if (
-      await this.checkDefaultOverlap(
-        {
-          scope: scopeOpt.scope,
-          documentType,
-          outputChannel,
-          adapterKey,
-          locale,
-          priority,
-          isDefault: d.isDefault,
-          status: 'ACTIVE',
-          effectiveFrom: effectiveFromIso,
-          effectiveTo: effectiveToIso,
-        },
-        null,
-      )
-    ) {
-      return false;
-    }
 
     const body = {
       versionId: d.versionId,
@@ -678,14 +704,14 @@ export class AssignmentModal {
     const fingerprint = JSON.stringify(body);
     if (fingerprint !== this.lastFingerprint || !this.lastIdempotencyKey) {
       this.lastFingerprint = fingerprint;
-      this.lastIdempotencyKey = newTemplateIdempotencyKey();
+      this.lastIdempotencyKey = newIdempotencyKey();
     }
 
     try {
-      const res = await createAssignment(body, this.lastIdempotencyKey);
+      const res = await this.api.createAssignment(body, this.lastIdempotencyKey);
       this.lastFingerprint = null;
       this.lastIdempotencyKey = null;
-      this.notify.success(this.transloco.translate('assignments.toasts.created'));
+      this.notify.success(this.transloco.translate('assignments.toasts.created'), this.transloco.translate(res.impact.effectiveNow ? 'assignments.toasts.impactNow' : 'assignments.toasts.impactLater', { count: res.impact.affectedSelectors.length }));
       this.saved.emit({ assignment: res.assignment, isNew: true });
       this.closeImmediate();
       return true;
@@ -721,37 +747,14 @@ export class AssignmentModal {
 
     if (Object.keys(patch).length === 0) return true;
 
-    const effectiveFromToCheck = patch.effectiveFrom ?? base.effectiveFrom;
-    const effectiveToToCheck = patch.effectiveTo !== undefined ? patch.effectiveTo : base.effectiveTo;
-
-    if (
-      await this.checkDefaultOverlap(
-        {
-          scope: base.scope,
-          documentType: base.documentType,
-          outputChannel: base.outputChannel,
-          adapterKey: base.adapterKey,
-          locale: base.locale,
-          priority,
-          isDefault: d.isDefault,
-          status: base.status,
-          effectiveFrom: effectiveFromToCheck,
-          effectiveTo: effectiveToToCheck,
-        },
-        base.assignmentId,
-      )
-    ) {
-      return false;
-    }
-
     const fingerprint = JSON.stringify({ id: base.assignmentId, rev: base.etag, patch });
     if (fingerprint !== this.lastFingerprint || !this.lastIdempotencyKey) {
       this.lastFingerprint = fingerprint;
-      this.lastIdempotencyKey = newTemplateIdempotencyKey();
+      this.lastIdempotencyKey = newIdempotencyKey();
     }
 
     try {
-      const res = await patchAssignment(base.assignmentId, patch, base.etag, this.lastIdempotencyKey);
+      const res = await this.api.patchAssignment(base.assignmentId, patch, base.etag, this.lastIdempotencyKey);
       this.lastFingerprint = null;
       this.lastIdempotencyKey = null;
       this.baseAssignment.set(res.assignment);
@@ -768,52 +771,46 @@ export class AssignmentModal {
     }
   }
 
-  private async checkDefaultOverlap(
-    candidate: OverlapCandidate,
-    excludeAssignmentId: string | null,
-  ): Promise<boolean> {
-    if (!candidate.isDefault || candidate.status !== 'ACTIVE') return false;
-
-    let pool = this.existingAssignments();
-    try {
-      const page = await listAssignments({
-        scopeType: candidate.scope.type,
-        companyId: candidate.scope.type !== 'TENANT' ? candidate.scope.companyId : undefined,
-        branchId: candidate.scope.type === 'BRANCH' ? candidate.scope.branchId : undefined,
-        documentType: candidate.documentType,
-        outputChannel: candidate.outputChannel,
-        adapterKey: candidate.adapterKey,
-        status: 'ACTIVE',
-        limit: 100,
-      });
-      pool = page.items;
-    } catch {
-      // Fallback to page-provided rows when lookup fails
-    }
-
-    if (hasDefaultAssignmentOverlap(candidate, pool, excludeAssignmentId)) {
-      this.effectiveFromServerError.set(
-        this.transloco.translate('assignments.errors.CORE.TEMPLATE.ASSIGNMENT.CONFLICT'),
-      );
-      return true;
-    }
-    return false;
+  private closeGone(): void {
+    const base = this.baseAssignment();
+    if (base) this.deactivated.emit(base.assignmentId);
+    this.closeImmediate();
   }
 
   private handleWriteError(error: unknown): void {
-    const code = error instanceof TemplateApiError ? error.code : null;
-    if (code === 'CORE.TEMPLATE.ASSIGNMENT.CONFLICT' || code === 'ASSIGNMENT.CONFLICT') {
-      this.effectiveFromServerError.set(
-        this.transloco.translate('assignments.errors.CORE.TEMPLATE.ASSIGNMENT.CONFLICT'),
-      );
-      return;
+    if (!isRetryableWriteError(error) && !(error instanceof ApiError && error.status === 401)) {
+      this.lastFingerprint = null;
+      this.lastIdempotencyKey = null;
     }
-    if (error instanceof TemplateApiError && error.status === 409 && code === 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION') {
-      this.conflictOpen.set(true);
-      this.conflictModal().open();
-      return;
+    const code = errorCodeOf(error);
+    const message = writeErrorMessage(error, 'assignments', (k, p) => this.transloco.translate(k, p));
+    if (error instanceof ApiError) {
+      if (error.status === 404 && this.mode() === 'edit') { this.closeGone(); return; }
+      if (error.status === 409 && code?.endsWith('STALE_REVISION')) { this.conflictOpen.set(true); return; }
+      if (code?.endsWith('ASSIGNMENT.CONFLICT')) {
+        this.serverErrors.set(error.status === 422
+          ? { effectiveTo: this.transloco.translate('assignments.modal.effectiveToRangeError') }
+          : { effectiveFrom: this.transloco.translate('assignments.modal.overlapError') });
+        return;
+      }
+      if (error.status === 422) {
+        const field = code?.endsWith('VERSION_INCOMPATIBLE') ? 'versionId'
+          : code?.endsWith('SCOPE_INVALID') ? 'scopeKey'
+          : code?.endsWith('OWNER_RUNTIME_UNAVAILABLE') ? 'templateId' : null;
+        if (field) { this.serverErrors.set({ [field]: message }); return; }
+      }
+      if (isValidationError(error) || (error.status === 400 && code?.endsWith('SCHEMA.INVALID'))) {
+        const fields = fieldErrorsOf(isValidationError(error) ? error : new ApiError(error.status, 'VALIDATION_ERROR', error.details));
+        const errors: Record<string, string> = {};
+        for (const path of Object.keys(fields)) {
+          const field = path.startsWith('scope') ? 'scopeKey' : path === 'locale' ? 'localeChoice'
+            : ['adapterKey', 'documentType', 'outputChannel'].includes(path) ? 'templateId' : path;
+          if (field in this.draft()) errors[field] = this.transloco.translate('assignments.modal.fieldInvalid');
+        }
+        if (Object.keys(errors).length) { this.serverErrors.set(errors); return; }
+      }
     }
-    this.notify.error(translateAssignmentError(error, (k, p) => this.transloco.translate(k, p)));
+    this.notify.error(message);
   }
 
   private async loadEditRecord(assignmentId: string, definitionId: string): Promise<void> {
@@ -821,21 +818,22 @@ export class AssignmentModal {
     this.loading.set(true);
     try {
       const [assignment, detail, verPage] = await Promise.all([
-        getAssignment(assignmentId),
-        getTemplate(definitionId),
-        listVersions(definitionId, { lifecycleStatus: 'PUBLISHED', limit: 100 }),
+        this.api.getAssignment(assignmentId),
+        this.templatesApi.getTemplate(definitionId),
+        this.loadVersions(definitionId),
       ]);
       if (seq !== this.loadSeq) return;
 
       this.baseAssignment.set(assignment);
       this.selectedDefinition.set(detail);
-      this.versions.set(verPage.items);
+      this.versions.set(verPage);
       const next = draftFromAssignment(assignment);
       this.baseDraft.set({ ...next });
       this.assignmentForm().reset({ ...next });
-      this.effectiveFromServerError.set(null);
+      this.serverErrors.set({});
     } catch (error) {
       if (seq !== this.loadSeq) return;
+      if (error instanceof ApiError && error.status === 404) this.closeGone();
       this.notify.error(translateAssignmentError(error, (k, p) => this.transloco.translate(k, p)));
     } finally {
       if (seq === this.loadSeq) {
@@ -875,13 +873,15 @@ export class AssignmentModal {
     this.allowClose = false;
     this.loadSeq++;
     this.templateLoadSeq++;
+    this.definitionsSeq++;
+    this.deactivateAction = null;
     this.lastLoadedTemplateId = '';
     this.isOpen.set(false);
     this.loading.set(false);
     this.versionsLoading.set(false);
     this.deactivating.set(false);
     this.conflictOpen.set(false);
-    this.effectiveFromServerError.set(null);
+    this.serverErrors.set({});
     this.lastFingerprint = null;
     this.lastIdempotencyKey = null;
   }

@@ -1,12 +1,15 @@
 import { Component, ElementRef, Injector, afterNextRender, computed, inject, signal, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
-import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
+import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { provideIcons } from '@ng-icons/core';
 import { tablerBuildingStore, tablerPuzzle } from '@ng-icons/tabler-icons';
 import { Button } from '../../../../../shared/ui/button/button';
 import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { newIdempotencyKey } from '../../../../../core/api/idempotency';
+import { ApiError, isRetryableWriteError, writeErrorMessage } from '../../../../../core/api/api-errors';
+import { Notify } from '../../../../../core/notify/notify';
+import { ConflictDialog } from '../../../../../shared/ui/conflict-dialog/conflict-dialog';
 import {
   ACTIVATION_REASON_MAX,
   ACTIVATION_REASON_MIN,
@@ -25,8 +28,9 @@ export type ReasonSubmitHandler = (reason: string, idempotencyKey: string) => Pr
 
 @Component({
   selector: 'app-activation-reason-modal',
-  imports: [TranslocoPipe, Button, Field, Modal],
+  imports: [TranslocoPipe, Button, Field, Modal, ConflictDialog],
   providers: [provideIcons({ tablerPuzzle, tablerBuildingStore })],
+  viewProviders: [provideTranslocoScope('settings', { scope: 'ws-app-activation', alias: 'wsActivation' })],
   templateUrl: './reason-modal.html',
 })
 export class ReasonModal {
@@ -36,6 +40,7 @@ export class ReasonModal {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
   private readonly transloco = inject(TranslocoService);
+  private readonly notify = inject(Notify);
   private readonly i18n = translationEvents(this.transloco);
   private readonly modal = viewChild.required<Modal>('modal');
 
@@ -50,6 +55,32 @@ export class ReasonModal {
   protected readonly touched = signal(false);
   protected readonly submitAttempted = signal(false);
   protected readonly submitting = signal(false);
+  protected readonly conflictOpen = signal(false);
+  private refreshConflict: ((keep: boolean) => Promise<void>) | null = null;
+
+  retainKeyFor(error: unknown): void {
+    if (!isRetryableWriteError(error) && !(error instanceof ApiError && error.status === 401)) {
+      this.lastIdempotencyKey = '';
+    }
+  }
+
+  showConflict(refresh: (keep: boolean) => Promise<void>): void {
+    this.refreshConflict = refresh;
+    this.conflictOpen.set(true);
+  }
+
+  protected async resolveConflict(keep: boolean): Promise<void> {
+    this.submitting.set(true);
+    try {
+      await this.refreshConflict?.(keep);
+      this.lastIdempotencyKey = '';
+      if (!keep) this.closeImmediate();
+    } catch (error) {
+      this.notify.error(writeErrorMessage(error, 'wsActivation', this.transloco));
+    } finally {
+      this.submitting.set(false);
+    }
+  }
 
   // UTF-16 units, the same count the backend applies to the 3..500 limit.
   protected readonly reasonCount = computed(() => this.reason().length);
@@ -86,6 +117,8 @@ export class ReasonModal {
 
   open(request: ReasonModalRequest, onSubmit: ReasonSubmitHandler): void {
     this.allowClose = false;
+    this.conflictOpen.set(false);
+    this.refreshConflict = null;
     this.submitHandler = onSubmit;
     this.title.set(request.title);
     this.confirmLabel.set(request.confirmLabel);

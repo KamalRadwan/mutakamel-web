@@ -1,11 +1,17 @@
 import { Component, DestroyRef, computed, effect, inject, resource, signal, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
-import { RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
+import { ApiError, errorCodeOf, isRetryableWriteError } from '../../../../../core/api/api-errors';
+import { newIdempotencyKey } from '../../../../../core/api/idempotency';
+import { TenantScopeState } from '../../../../../core/scope/tenant-scope';
+import { ConflictDialog } from '../../../../../shared/ui/conflict-dialog/conflict-dialog';
+import { FullState } from '../../../../../shared/ui/full-state/full-state';
+import { Field } from '../../../../../shared/ui/field/field';
+import { AssetsApi } from '../assets.api';
+import { TemplatesApi } from '../../templates.api';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
-  tablerChevronLeft,
-  tablerChevronRight,
   tablerLayoutGrid,
   tablerLock,
   tablerPhoto,
@@ -23,7 +29,6 @@ import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-d
 import { Dropdown, DropdownOption } from '../../../../../shared/ui/dropdown/dropdown';
 import { ViewOption, ViewSwitcher } from '../../../../../shared/ui/view-switcher/view-switcher';
 import {
-  TemplateApiError,
   TemplateAssetDeliveryClass,
   TemplateAssetDto,
   TemplateAssetQueryScope,
@@ -32,22 +37,18 @@ import {
   TemplateAssetType,
   TemplateAssetsListQuery,
   TemplateListRow,
-  getAssetContent,
-  listAssets,
-  listTemplates,
-  retireAsset,
-} from '../../templates.api';
+  TemplateListRequestDto,
+} from '../../templates.model';
 import { AssetDetailModal } from '../asset-detail-modal/asset-detail-modal';
 import { AssetUploadModal } from '../asset-upload-modal/asset-upload-modal';
 import {
   assetTypeTile,
+  canManageAssetScope,
   formatAssetDate,
   formatByteSize,
   formatStoredMime,
   translateAssetError,
 } from '../assets.service';
-
-const CAN_MANAGE = true; // later from the session permissions
 
 type AssetViewMode = 'cards' | 'table';
 type TypeFilterValue = TemplateAssetType | 'ALL';
@@ -57,7 +58,6 @@ type StatusFilterValue = TemplateAssetStatus | 'ALL';
 @Component({
   selector: 'app-assets-page',
   imports: [
-    RouterLink,
     TranslocoPipe,
     NgIcon,
     Button,
@@ -67,6 +67,9 @@ type StatusFilterValue = TemplateAssetStatus | 'ALL';
     ConfirmDialog,
     AssetUploadModal,
     AssetDetailModal,
+    ConflictDialog,
+    FullState,
+    Field,
   ],
   providers: [
     provideTranslocoScope('templates', { scope: 'templates-assets', alias: 'templatesAssets' }),
@@ -79,14 +82,16 @@ type StatusFilterValue = TemplateAssetStatus | 'ALL';
       tablerPhoto,
       tablerLock,
       tablerRefresh,
-      tablerChevronLeft,
-      tablerChevronRight,
     }),
   ],
   templateUrl: './assets-page.html',
   host: { class: 'flex flex-1 shrink-0 flex-col gap-8 p-12' },
 })
 export class AssetsPage {
+  private readonly api = inject(AssetsApi);
+  private readonly templatesApi = inject(TemplatesApi);
+  private readonly scope = inject(TenantScopeState);
+  private readonly router = inject(Router);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
@@ -97,7 +102,17 @@ export class AssetsPage {
   private readonly detailModal = viewChild(AssetDetailModal);
   private readonly retireConfirm = viewChild(ConfirmDialog);
 
-  protected readonly canManage = CAN_MANAGE;
+  protected readonly canManage = computed(() => canManageAssetScope(this.scope, null) ||
+    this.templatesList().some((item) => canManageAssetScope(this.scope, item.definitionScope)));
+  protected readonly canUpload = computed(() => canManageAssetScope(this.scope, null) || this.manageableTemplates().length > 0);
+  protected readonly manageableTemplates = computed(() => this.templatesList().filter((item) => canManageAssetScope(this.scope, item.definitionScope)));
+  private readonly detailAsset = signal<TemplateAssetDto | null>(null);
+  protected readonly detailCanManage = computed(() => {
+    const asset = this.detailAsset();
+    return asset !== null && this.canManageAsset(asset);
+  });
+  protected readonly conflictOpen = signal(false);
+  private retireAttempt: { assetId: string; etag: string; key: string } | null = null;
   protected readonly skeletonCards = [1, 2, 3, 4, 5, 6];
   protected readonly skeletonRows = [1, 2, 3, 4, 5];
 
@@ -110,18 +125,34 @@ export class AssetsPage {
   protected readonly definitionIdFilter = signal('');
   protected readonly sort = signal<TemplateAssetSort>('createdAt:desc');
   protected readonly cursor = signal<string | null>(null);
-  protected readonly cursorStack = signal<(string | null)[]>([]);
+  private readonly previousItems = signal<readonly TemplateAssetDto[]>([]);
   protected readonly retiringAsset = signal<TemplateAssetDto | null>(null);
   protected readonly blobUrls = signal<Readonly<Record<string, string>>>({});
 
   private readonly pendingBlobKeys = new Set<string>();
   private readonly ownedBlobUrls: string[] = [];
+  private lastScopeRevision: string | null = null;
 
+  protected readonly definitionSearch = signal('');
+  protected readonly definitionsNeedSearch = signal(false);
+  private readonly definitionScope = computed<TemplateListRequestDto | undefined>(() => {
+    const me = this.scope.me();
+    if (me?.isTenantOwner || (me?.permissions.includes('templates.read') && me.permissionScopes['templates.read']?.tenantWide)) {
+      return { assignmentScopeType: 'TENANT' };
+    }
+    const selection = this.scope.selection();
+    if (!selection) return undefined;
+    return selection.branchId
+      ? { assignmentScopeType: 'BRANCH', assignmentCompanyId: selection.companyId, assignmentBranchId: selection.branchId }
+      : { assignmentScopeType: 'COMPANY', assignmentCompanyId: selection.companyId };
+  });
   private readonly templatesResource = resource({
-    loader: () =>
-      listTemplates({ assignmentScopeType: 'TENANT', limit: 100 })
-        .then((res) => res.items)
-        .catch(() => [] as TemplateListRow[]),
+    params: () => {
+      this.api.scopeRevision();
+      const scope = this.definitionScope();
+      return scope ? { ...scope, ...(this.definitionSearch().trim() ? { name: this.definitionSearch().trim() } : {}) } : undefined;
+    },
+    loader: ({ params }) => this.loadDefinitions(params),
   });
 
   protected readonly templatesList = computed<readonly TemplateListRow[]>(() =>
@@ -154,29 +185,41 @@ export class AssetsPage {
   });
 
   private readonly loaded = resource({
-    params: () => this.queryParams(),
-    loader: ({ params }) => listAssets(params),
+    params: () => {
+      const revision = this.api.scopeRevision();
+      const query = this.queryParams();
+      return query.scope === 'DEFINITION' && !query.definitionId ? undefined : { query, revision };
+    },
+    loader: ({ params }) => this.api.listAssets(params.query),
   });
 
   protected readonly loading = this.loaded.isLoading;
-  protected readonly loadError = computed<TemplateApiError | null>(() => {
+  protected readonly loadError = computed<ApiError | null>(() => {
     if (this.loading()) return null;
     const raw = this.loaded.error();
     if (!raw) return null;
-    if (raw instanceof TemplateApiError) return raw;
-    if (typeof raw === 'object' && 'cause' in raw && (raw as { cause: unknown }).cause instanceof TemplateApiError) {
-      return (raw as { cause: TemplateApiError }).cause;
+    if (raw instanceof ApiError) return raw;
+    if (typeof raw === 'object' && 'cause' in raw && (raw as { cause: unknown }).cause instanceof ApiError) {
+      return (raw as { cause: ApiError }).cause;
     }
-    return new TemplateApiError(500, 'CORE.TEMPLATE.DEPENDENCY.UNAVAILABLE');
+    return new ApiError(500, 'CORE.TEMPLATE.DEPENDENCY.UNAVAILABLE');
   });
-  protected readonly isForbidden = computed(() => this.loadError()?.status === 403);
+  protected readonly isForbidden = computed(() => this.loadError()?.status === 403 &&
+    !['TENANT_MAINTENANCE_ACTIVE', 'TENANT_MAINTENANCE_RELEASE_REQUIRED'].includes(this.loadError()?.code ?? ''));
   protected readonly isFeatureDisabled = computed(
-    () => this.loadError()?.code === 'CORE.TEMPLATE.FEATURE.DISABLED',
+    () => ['CORE.TEMPLATE.FEATURE.DISABLED', 'FEATURE.DISABLED'].includes(this.loadError()?.code ?? ''),
   );
   protected readonly loadFailed = computed(() => !this.loading() && !!this.loaded.error());
+  protected readonly loadFailureText = computed(() => {
+    this.i18n();
+    const error = this.loadError();
+    if (!error) return '';
+    const message = translateAssetError(error, this.transloco);
+    return error.correlationId ? `${message} · ${this.transloco.translate('templates.states.loadFailed.reference', { correlationId: error.correlationId })}` : message;
+  });
 
   protected readonly items = computed<readonly TemplateAssetDto[]>(() =>
-    this.loaded.hasValue() ? this.loaded.value().items : [],
+    this.loaded.hasValue() ? [...this.previousItems(), ...this.loaded.value().items] : this.previousItems(),
   );
   protected readonly hasNextPage = computed(() =>
     this.loaded.hasValue() ? this.loaded.value().pageInfo.hasNextPage : false,
@@ -184,7 +227,6 @@ export class AssetsPage {
   protected readonly nextCursor = computed(() =>
     this.loaded.hasValue() ? this.loaded.value().pageInfo.nextCursor : null,
   );
-  protected readonly hasPrevPage = computed(() => this.cursorStack().length > 0);
 
   protected readonly hasActiveFilters = computed(
     () =>
@@ -270,6 +312,21 @@ export class AssetsPage {
 
   constructor() {
     effect(() => {
+      const revision = this.api.scopeRevision();
+      if (this.lastScopeRevision !== null && this.lastScopeRevision !== revision) {
+        this.resetPagination();
+        this.detailAsset.set(null);
+        for (const url of this.ownedBlobUrls) URL.revokeObjectURL(url);
+        this.ownedBlobUrls.length = 0;
+        this.blobUrls.set({});
+        this.pendingBlobKeys.clear();
+      }
+      this.lastScopeRevision = revision;
+    });
+    effect(() => {
+      if (['CORE.TEMPLATE.SCHEMA.INVALID', 'SCHEMA.INVALID'].includes(errorCodeOf(this.loadError()) ?? '')) this.resetDefinitionFilter();
+    });
+    effect(() => {
       const list = this.items();
       const existing = this.blobUrls();
       for (const asset of list) {
@@ -288,7 +345,38 @@ export class AssetsPage {
   }
 
   protected reload(): void {
+    this.resetPagination();
     this.loaded.reload();
+    this.templatesResource.reload();
+  }
+
+  protected backHome(): void {
+    void this.router.navigateByUrl('/workspace/home');
+  }
+
+  protected onDefinitionSearch(event: Event): void {
+    this.definitionSearch.set((event.target as HTMLInputElement).value.slice(0, 100));
+  }
+
+  private resetDefinitionFilter(): void {
+    this.resetPagination();
+    this.scopeFilter.set('ALL_AUTHORIZED');
+    this.definitionIdFilter.set('');
+  }
+
+  private async loadDefinitions(query: TemplateListRequestDto): Promise<TemplateListRow[]> {
+    const items: TemplateListRow[] = [];
+    let cursor: string | undefined;
+    do {
+      const page = await this.templatesApi.listTemplates({ ...query, cursor, limit: 100 });
+      items.push(...page.items);
+      if (page.totalCount > 500 || (items.length >= 500 && page.pageInfo.hasNextPage)) {
+        this.definitionsNeedSearch.set(true);
+        return query.name ? items.slice(0, 500) : [];
+      }
+      cursor = page.pageInfo.hasNextPage ? page.pageInfo.nextCursor ?? undefined : undefined;
+    } while (cursor);
+    return items;
   }
 
   protected setViewMode(mode: string): void {
@@ -357,31 +445,26 @@ export class AssetsPage {
     this.definitionIdFilter.set('');
   }
 
-  protected goPrevPage(): void {
-    const stack = this.cursorStack();
-    if (!stack.length) return;
-    const prev = stack[stack.length - 1];
-    this.cursorStack.set(stack.slice(0, -1));
-    this.cursor.set(prev);
-  }
-
   protected goNextPage(): void {
     const next = this.nextCursor();
     if (!this.hasNextPage() || !next) return;
-    this.cursorStack.update((stack) => [...stack, this.cursor()]);
+    this.previousItems.set(this.items());
     this.cursor.set(next);
   }
 
   protected openUpload(): void {
-    if (!this.canManage) return;
+    if (!this.canUpload()) return;
     const scope = this.scopeFilter();
     const defId = this.definitionIdFilter();
     this.uploadModal()?.open(
-      scope === 'DEFINITION' && defId ? { scope: 'DEFINITION', definitionId: defId } : { scope: 'REUSABLE' },
+      scope === 'DEFINITION' && defId ? { scope: 'DEFINITION', definitionId: defId }
+        : canManageAssetScope(this.scope, null) ? { scope: 'REUSABLE' }
+        : { scope: 'DEFINITION', definitionId: this.manageableTemplates()[0]?.templateId },
     );
   }
 
   protected openDetail(asset: TemplateAssetDto): void {
+    this.detailAsset.set(asset);
     const preview = this.previewUrlOf(asset);
     this.detailModal()?.openAsset(asset, preview);
   }
@@ -395,6 +478,7 @@ export class AssetsPage {
   }
 
   protected onRetired(): void {
+    this.resetPagination();
     this.loaded.reload();
   }
 
@@ -406,7 +490,7 @@ export class AssetsPage {
       icon: 'tablerEye',
       tile: 'bg-icon-blue',
     };
-    if (!this.canManage) return [openItem];
+    if (!this.canManageAsset(asset)) return [openItem];
     const retired = asset.status === 'RETIRED';
     return [
       openItem,
@@ -425,7 +509,7 @@ export class AssetsPage {
   protected onAction(asset: TemplateAssetDto, selection: ActionSelection): void {
     if (selection.id === 'open') {
       this.openDetail(asset);
-    } else if (selection.id === 'retire' && this.canManage && asset.status !== 'RETIRED') {
+    } else if (selection.id === 'retire' && this.canManageAsset(asset) && asset.status !== 'RETIRED') {
       void this.requestRetire(asset);
     }
   }
@@ -465,11 +549,43 @@ export class AssetsPage {
     this.retiringAsset.set(asset);
     const confirmed = await dialog.open();
     if (!confirmed) return;
+    await this.performRetire(asset);
+  }
 
+  protected canManageAsset(asset: TemplateAssetDto): boolean {
+    if (!asset.definitionId) return canManageAssetScope(this.scope, null);
+    const definition = this.templatesList().find((item) => item.templateId === asset.definitionId);
+    return definition ? canManageAssetScope(this.scope, definition.definitionScope) : canManageAssetScope(this.scope, null);
+  }
+
+  private async performRetire(asset: TemplateAssetDto): Promise<void> {
+    if (this.retireAttempt?.assetId !== asset.assetId || this.retireAttempt.etag !== asset.etag) {
+      this.retireAttempt = { assetId: asset.assetId, etag: asset.etag, key: newIdempotencyKey() };
+    }
     try {
-      await retireAsset(asset.assetId, asset.etag);
+      await this.api.retireAsset(asset.assetId, asset.etag, this.retireAttempt.key);
+      this.retireAttempt = null;
       this.notify.success(this.transloco.translate('templatesAssets.toasts.retired'));
+      this.resetPagination();
       this.loaded.reload();
+    } catch (error) {
+      if (!isRetryableWriteError(error) && !(error instanceof ApiError && error.status === 401)) this.retireAttempt = null;
+      if (error instanceof ApiError && error.status === 409 && !error.code.endsWith('ASSET.IN_USE') && !error.code.includes('IN_FLIGHT')) {
+        this.conflictOpen.set(true);
+      } else {
+        this.notify.error(translateAssetError(error, this.transloco, true));
+      }
+    }
+  }
+
+  protected async resolveRetireConflict(keep: boolean): Promise<void> {
+    this.conflictOpen.set(false);
+    const asset = this.retiringAsset();
+    if (!keep || !asset) { this.reload(); return; }
+    try {
+      const fresh = (await this.api.getAsset(asset.assetId)).asset;
+      this.retiringAsset.set(fresh);
+      await this.requestRetire(fresh);
     } catch (error) {
       this.notify.error(translateAssetError(error, this.transloco));
     }
@@ -477,13 +593,14 @@ export class AssetsPage {
 
   private resetPagination(): void {
     this.cursor.set(null);
-    this.cursorStack.set([]);
+    this.previousItems.set([]);
   }
 
   private async loadAssetBlob(assetId: string): Promise<void> {
     this.pendingBlobKeys.add(assetId);
     try {
-      const blob = await getAssetContent(assetId);
+      const blob = await this.api.getAssetContent(assetId);
+      if (this.destroyRef.destroyed) return;
       const url = URL.createObjectURL(blob);
       this.ownedBlobUrls.push(url);
       this.blobUrls.update((current) => ({ ...current, [assetId]: url }));

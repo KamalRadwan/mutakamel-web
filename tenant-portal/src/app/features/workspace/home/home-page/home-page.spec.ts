@@ -60,7 +60,9 @@ function cardNames(root: HTMLElement, group: string): string[] {
 }
 
 describe('HomePage on the apps overview', () => {
+  let languageBefore: { stored: string | null; lang: string; dir: string };
   beforeEach(() => {
+    languageBefore = { stored: localStorage.getItem('lang'), lang: document.documentElement.lang, dir: document.documentElement.dir };
     localStorage.removeItem('home.future.collapsed');
     TestBed.configureTestingModule({
       providers: [
@@ -76,7 +78,16 @@ describe('HomePage on the apps overview', () => {
     TestBed.inject(LanguageState).current.set('en');
   });
 
-  afterEach(() => TestBed.inject(HttpTestingController).verify());
+  afterEach(() => {
+    try { TestBed.inject(HttpTestingController).verify(); }
+    finally {
+      TestBed.resetTestingModule();
+      if (languageBefore.stored === null) localStorage.removeItem('lang');
+      else localStorage.setItem('lang', languageBefore.stored);
+      document.documentElement.lang = languageBefore.lang;
+      document.documentElement.dir = languageBefore.dir;
+    }
+  });
 
   it.each([
     ['en', 'ltr', 'Your apps', 'Add to your workspace', 'Coming soon', ['Point of Sale', 'Projects', 'Helpdesk']],

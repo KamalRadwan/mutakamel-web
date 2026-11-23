@@ -55,3 +55,13 @@ describe('assignments.service isAssignmentScopeAllowed', () => {
     expect(isAssignmentScopeAllowed(companyOwner, { type: 'BRANCH', companyId: 'c2', branchId: 'b9' })).toBe(false);
   });
 });
+
+describe('assignments service', () => {
+  it('catalogue matches the data sources', async () => {
+    const { fakeListDataSources } = await import('../templates.fake');
+    const registry = await fakeListDataSources({ scopeType: 'TENANT' });
+    const project = (item: { adapterKey: string; documentType: string; outputChannel: string; productionAssignmentEnabled: boolean; productionDisabledReason: string | null }) =>
+      [item.adapterKey, item.documentType, item.outputChannel, item.productionAssignmentEnabled, item.productionDisabledReason];
+    expect(ASSIGNMENT_SELECTOR_CATALOGUE.map(project).sort()).toEqual(registry.items.flatMap((item) => item.allowedOutputChannels.map((outputChannel) => project({ ...item, outputChannel }))).sort());
+  });
+});

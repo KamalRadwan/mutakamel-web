@@ -514,7 +514,7 @@ export class TemplateDuplicateModal {
     } catch (error: unknown) {
       if (seq !== this.loadSeq) return;
       this.loading.set(false);
-      this.loadCorrelationId.set(error instanceof TemplateApiError ? error.correlationId : null);
+      this.loadCorrelationId.set(error instanceof TemplateApiError ? (error.correlationId ?? null) : null);
       this.loadFailed.set(true);
     }
   }

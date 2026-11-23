@@ -1,9 +1,23 @@
 import { TranslocoService } from '@jsverse/transloco';
 import { Language } from '../../../../core/i18n/language';
-import { TemplateApiError, TemplateAssetType } from '../templates.api';
+import { ApiError, errorMessage, writeErrorMessage } from '../../../../core/api/api-errors';
+import type { TemplateAssetType, TemplateDefinitionScope } from '../templates.model';
+import type { TenantScopeState } from '../../../../core/scope/tenant-scope';
 
 export const ASSET_MAX_BYTES = 5 * 1024 * 1024;
-export const ASSET_ACCEPT = 'image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp';
+export const ASSET_ACCEPT = 'image/png,image/jpeg,.png,.jpg,.jpeg';
+
+export function canManageAssetScope(scope: TenantScopeState, definition: TemplateDefinitionScope | null): boolean {
+  const me = scope.me();
+  if (me?.isTenantOwner) return true;
+  const key = 'templates.assets.manage';
+  if (!me?.permissions.includes(key)) return false;
+  const grants = me.permissionScopes[key];
+  if (grants?.tenantWide) return true;
+  if (definition?.type !== 'COMPANY') return false;
+  return !!grants?.companyIds.includes(definition.companyId) ||
+    !!grants?.branchIds.some((id) => scope.branchCompanies().get(id) === definition.companyId);
+}
 
 export function formatStoredMime(mimeType: string): 'PNG' | 'JPEG' {
   const lower = mimeType.toLowerCase();
@@ -38,31 +52,25 @@ export function assetTypeTile(type: TemplateAssetType): string {
   }
 }
 
-export function extractErrorCode(error: unknown): string | null {
-  if (error instanceof TemplateApiError) return error.code;
-  if (error && typeof error === 'object' && 'code' in error && typeof (error as { code: unknown }).code === 'string') {
-    return (error as { code: string }).code;
-  }
-  return null;
+export function translateAssetError(error: unknown, transloco: TranslocoService, write = false): string {
+  return (write ? writeErrorMessage : errorMessage)(error, 'templatesAssets', transloco);
 }
 
-export function translateAssetError(error: unknown, transloco: TranslocoService): string {
-  const code = extractErrorCode(error);
-  if (code) {
-    const assetKey = `templatesAssets.errors.${code}`;
-    const assetMsg = transloco.translate(assetKey);
-    if (assetMsg !== assetKey) return assetMsg;
-
-    const sharedKey = `templates.errors.${code}`;
-    const sharedMsg = transloco.translate(sharedKey);
-    if (sharedMsg !== sharedKey) return sharedMsg;
+export function prepareAssetFile(file: File): File {
+  const name = file.name.trim().normalize('NFC');
+  if (!name || [...name].length > 255 || /[\\/\0\r\n]/.test(name) || name === '.' || name === '..') {
+    throw new ApiError(422, 'ASSET_FILE_NAME_INVALID');
   }
-  return transloco.translate('templates.errors.generic');
+  const mime = file.type.toLowerCase() || (/\.png$/i.test(name) ? 'image/png'
+    : /\.jpe?g$/i.test(name) ? 'image/jpeg' : '');
+  if (mime !== 'image/png' && mime !== 'image/jpeg') throw new ApiError(422, 'ASSET_FILE_TYPE_INVALID');
+  if (!file.size || file.size > ASSET_MAX_BYTES) throw new ApiError(413, 'ASSET_FILE_TOO_LARGE');
+  return new File([file], name, { type: mime, lastModified: file.lastModified });
 }
 
 export async function computeFileSha256(file: File): Promise<string> {
   if (!globalThis.crypto?.subtle) {
-    throw new TemplateApiError(0, 'CORE.TEMPLATE.ASSET.UPLOAD_INVALID');
+    throw new ApiError(0, 'CORE.TEMPLATE.ASSET.UPLOAD_INVALID');
   }
   const buffer = await file.arrayBuffer();
   const digest = await globalThis.crypto.subtle.digest('SHA-256', buffer);

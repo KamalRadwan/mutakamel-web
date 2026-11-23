@@ -1,12 +1,18 @@
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { signal } from '@angular/core';
+import { TestBed } from '@angular/core/testing';
+import { TenantScopeState } from '../../../../core/scope/tenant-scope';
+import { AuditLogApi } from './audit-log.api';
 import { setFakeActor } from '../../staff/shared/staff.fake';
 import {
-  AuditEvent,
-  listAuditEvents,
-  listDeletedRecords,
-  listEntityAuditEvents,
-  listRecordHistory,
-  listRelatedEntityHistory,
-} from './audit-log.api';
+  fakeListAuditEvents as listAuditEvents,
+  fakeListDeletedRecords as listDeletedRecords,
+  fakeListEntityAuditEvents as listEntityAuditEvents,
+  fakeListRecordHistory as listRecordHistory,
+  fakeListRelatedEntityHistory as listRelatedEntityHistory,
+} from './audit-log.fake';
+import type { AuditEvent } from './audit-log.model';
 import { ACME_CUSTOMER_ID, CUSTOMERS_FAKE_DB } from '../../../crm/customers/customers.fake';
 import { fakeAllOpportunityRows } from '../../../crm/opportunities/opportunities.fake';
 import { opportunityRef } from '../../../crm/opportunities/opportunities.model';
@@ -97,21 +103,21 @@ describe('audit-log fake follows TenantAuditController', () => {
       expect(page.items.every((item) => item.subjectKind === 'activity')).toBe(true);
     });
 
-    it('rejects bad relatedPartyIds with 400 AUDIT_QUERY_INVALID', async () => {
+    it('rejects bad relatedPartyIds with 400 CORE_VALIDATION_FAILED', async () => {
       const lead = await firstLeadEvent();
       const id = lead.entityId as string;
       const tooMany = Array.from({ length: 22 }, (_, i) => `019a7c20-0002-7000-8000-${String(i).padStart(12, '0')}`);
-      await rejectsWith(listRelatedEntityHistory('Lead', id, { relatedPartyIds: [] }), 400, 'AUDIT_QUERY_INVALID');
-      await rejectsWith(listRelatedEntityHistory('Lead', id, { relatedPartyIds: tooMany }), 400, 'AUDIT_QUERY_INVALID');
+      await rejectsWith(listRelatedEntityHistory('Lead', id, { relatedPartyIds: [] }), 400, 'CORE_VALIDATION_FAILED');
+      await rejectsWith(listRelatedEntityHistory('Lead', id, { relatedPartyIds: tooMany }), 400, 'CORE_VALIDATION_FAILED');
       await rejectsWith(
         listRelatedEntityHistory('Lead', id, { relatedPartyIds: [UUID_V7, UUID_V7] }),
         400,
-        'AUDIT_QUERY_INVALID',
+        'CORE_VALIDATION_FAILED',
       );
       await rejectsWith(
         listRelatedEntityHistory('Lead', id, { relatedPartyIds: ['0192b7ea-7c4f-4a7d-9c9f-51c7f2b3a9e1'] }),
         400,
-        'AUDIT_QUERY_INVALID',
+        'CORE_VALIDATION_FAILED',
       );
     });
 
@@ -154,17 +160,17 @@ describe('audit-log fake follows TenantAuditController', () => {
       );
     });
 
-    it('returns 400 AUDIT_QUERY_INVALID for a bad id or limit', async () => {
+    it('returns 400 CORE_VALIDATION_FAILED for a bad id or limit', async () => {
       await rejectsWith(
         listRecordHistory({ targetApp: 'CRM', targetType: 'LEAD', targetId: 'not-a-uuid' }),
         400,
-        'AUDIT_QUERY_INVALID',
+        'CORE_VALIDATION_FAILED',
       );
       const lead = await firstLeadEvent();
       await rejectsWith(
         listRecordHistory({ targetApp: 'CRM', targetType: 'LEAD', targetId: lead.entityId as string }, { limit: 101 }),
         400,
-        'AUDIT_QUERY_INVALID',
+        'CORE_VALIDATION_FAILED',
       );
     });
 
@@ -207,11 +213,11 @@ describe('audit-log fake follows TenantAuditController', () => {
     });
 
     it('still rejects ids that are neither UUIDs nor CRM fake ids', async () => {
-      await rejectsWith(listRecordHistory({ targetApp: 'CRM', targetType: 'LEAD', targetId: 'customer 1' }), 400, 'AUDIT_QUERY_INVALID');
+      await rejectsWith(listRecordHistory({ targetApp: 'CRM', targetType: 'LEAD', targetId: 'customer 1' }), 400, 'CORE_VALIDATION_FAILED');
       await rejectsWith(
         listRelatedEntityHistory('CustomerProfile', ACME_CUSTOMER_ID, { relatedPartyIds: ['not-a-party'] }),
         400,
-        'AUDIT_QUERY_INVALID',
+        'CORE_VALIDATION_FAILED',
       );
     });
 
@@ -266,5 +272,94 @@ describe('audit-log fake follows TenantAuditController', () => {
       const quotations = await listRelatedEntityHistory('Opportunity', row.id, { relatedPartyIds, historyCategory: 'quotation' });
       expect(quotations.items.map((item) => item.action)).toEqual(['QUOTATION_CREATED']);
     });
+  });
+});
+
+describe('AuditLogApi', () => {
+  let api: AuditLogApi;
+  let http: HttpTestingController;
+  const scope = { me: signal({ id: 'actor', permissions: ['audit.read'], permissionScopes: {}, isTenantOwner: true }), selection: signal(null) };
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting(), { provide: TenantScopeState, useValue: scope }] });
+    api = TestBed.inject(AuditLogApi);
+    http = TestBed.inject(HttpTestingController);
+  });
+  afterEach(() => http.verify());
+
+  it('list unwraps the cursor page', async () => {
+    const pending = api.listAuditEvents({ action: 'UPDATE', cursor: 'cursor-1' });
+    const request = http.expectOne((r) => r.url === '/api/tenant/core/v1/audit');
+    expect(request.request.withCredentials).toBe(true);
+    expect(request.request.params.get('action')).toBe('UPDATE');
+    expect(request.request.params.get('cursor')).toBe('cursor-1');
+    expect(request.request.headers.has('x-idempotency-key')).toBe(false);
+    expect(request.request.headers.has('If-Match')).toBe(false);
+    request.flush({ success: true, data: { items: [], nextCursor: 'next' } });
+    await expect(pending).resolves.toEqual({ items: [], nextCursor: 'next' });
+  });
+
+  it('list asks for 25 rows', async () => {
+    const pending = api.listAuditEvents();
+    const request = http.expectOne((r) => r.url === '/api/tenant/core/v1/audit');
+    expect(request.request.params.get('limit')).toBe('25');
+    request.flush({ success: true, data: { items: [], nextCursor: null } });
+    await pending;
+  });
+
+  it('links every remaining route and serializes related parties as CSV', async () => {
+    const cases = [
+      { run: () => api.listDeletedRecords({ q: 'Nile' }), path: '/deleted', data: { items: [], nextCursor: null } },
+      { run: () => api.getAuditEvent(UUID_V7), path: `/events/${UUID_V7}`, data: { id: UUID_V7 } },
+      { run: () => api.listEntityAuditEvents('Party/Entity', 'entity with space'), path: '/entities/Party%2FEntity/entity%20with%20space', data: { items: [], nextCursor: null } },
+      { run: () => api.listRelatedEntityHistory('Party', UUID_V7, { relatedPartyIds: [UUID_V7, '019a7c20-0002-7000-8000-000000000003'], historyCategory: 'contact' }), path: `/entities/Party/${UUID_V7}`, data: { items: [], nextCursor: null } },
+      { run: () => api.listRecordHistory({ targetApp: 'CRM', targetType: 'LEAD', targetId: UUID_V7 }, { historyCategory: 'lead' }), path: `/records/CRM/LEAD/${UUID_V7}/history`, data: { items: [], nextCursor: null } },
+    ];
+    for (const test of cases) {
+      const pending = test.run();
+      const request = http.expectOne((r) => r.url === `/api/tenant/core/v1/audit${test.path}`);
+      if (test.path === '/deleted') expect(request.request.params.get('q')).toBe('Nile');
+      if (request.request.params.has('relatedPartyIds')) expect(request.request.params.getAll('relatedPartyIds')).toEqual([`${UUID_V7},019a7c20-0002-7000-8000-000000000003`]);
+      request.flush({ success: true, data: test.data });
+      await pending;
+    }
+  });
+
+  it('rejects malformed success envelopes', async () => {
+    const pending = expect(api.listAuditEvents()).rejects.toMatchObject({ status: 502, code: 'COMMON.GENERIC.INTERNAL_ERROR' });
+    http.expectOne((r) => r.url.endsWith('/audit')).flush({ items: [], nextCursor: null });
+    await pending;
+  });
+
+  it('rechecks scope and refetches instead of retaining audit data', async () => {
+    for (const id of ['actor', 'other']) {
+      scope.me.update((me) => ({ ...me, id }));
+      const pending = api.listAuditEvents();
+      http.expectOne((r) => r.url.endsWith('/audit')).flush({ success: true, data: { items: [], nextCursor: null } });
+      await pending;
+    }
+  });
+
+  it('preserves gateway errors, correlation and Retry-After', async () => {
+    const pending = expect(api.listAuditEvents()).rejects.toMatchObject({ status: 429, code: 'GW.RATE.LIMIT_EXCEEDED', correlationId: 'support', details: { retryAfterSeconds: ['9'] } });
+    http.expectOne((r) => r.url.endsWith('/audit')).flush({ code: 'GW.RATE.LIMIT_EXCEEDED', correlationId: 'support' }, { status: 429, statusText: 'Rate limited', headers: { 'Retry-After': '9' } });
+    await pending;
+  });
+});
+
+describe('audit-log fake', () => {
+  beforeEach(() => { resetAuditFake(); setFakeActor('owner'); });
+  it('DTO faults return CORE_VALIDATION_FAILED', async () => {
+    for (const query of [{ limit: 101 }, { limit: 0 }, { action: 'x'.repeat(65) }, { from: 'bad' }, { sourceApp: 'bad' }]) {
+      await expect(listAuditEvents(query as import('./audit-log.model').AuditQuery)).rejects.toMatchObject({ status: 400, code: 'CORE_VALIDATION_FAILED' });
+    }
+    await expect(listAuditEvents({ cursor: 'broken' })).rejects.toMatchObject({ code: 'AUDIT_QUERY_INVALID' });
+  });
+  it('includeRequests includes requests and events while sourceKind still filters exactly', async () => {
+    const both = await listAuditEvents({ includeRequests: true, limit: 100 });
+    expect(both.items.some((row) => row.sourceKind === 'HTTP_COMMAND')).toBe(true);
+    expect(both.items.some((row) => row.sourceKind !== 'HTTP_COMMAND')).toBe(true);
+    const requests = await listAuditEvents({ includeRequests: true, sourceKind: 'HTTP_COMMAND' });
+    expect(requests.items.every((row) => row.sourceKind === 'HTTP_COMMAND')).toBe(true);
   });
 });

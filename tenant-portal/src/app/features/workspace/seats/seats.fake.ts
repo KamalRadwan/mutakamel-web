@@ -6,8 +6,6 @@ import {
   SUBSCRIBED_MODULE_CONFIGS,
   StaffSeatChangeInput,
   StaffSeatHolderSnapshot,
-  applyBulkRoleInStaffFake,
-  applyImportUsersInStaffFake,
   buildActorMeSync,
   computeStaffSeatPreviewDeltas,
   fakeListBranches,
@@ -17,13 +15,9 @@ import {
   registerSeatsOverlay,
   releaseUserSeatsInStaffFake,
   removeUserModuleRolesInStaffFake,
-  resolveStaffRoleRef,
 } from '../staff/shared/staff.fake';
 import {
-  BulkRoleResult,
   FreeUpPreview,
-  ImportResult,
-  ImportRowResult,
   ModuleUsage,
   MySeatState,
   CorePage,
@@ -104,6 +98,34 @@ const branchLookupByName = new Map<string, { id: string; companyId: string }>([
   ['Riyadh HQ', { id: 'br-ruh', companyId: 'co-sa' }],
   ['Jeddah', { id: 'br-jed', companyId: 'co-sa' }],
 ]);
+
+export function resetSeatsFake(): void {
+  FAKE_MODE = 'DERIVED';
+  FAKE_OVER_CAPACITY = false;
+  FAKE_GRACE = false;
+  FAKE_MIGRATION_SHORT = false;
+  revision = 1;
+  idempotencyStore.clear();
+  swapOverrides.clear();
+  addons = [
+    {
+      userId: 'u-nada',
+      moduleKey: 'crm',
+      addonKey: 'crm.outbound_email',
+      addonName: 'Outbound email',
+    },
+  ];
+  companyIdByName.clear();
+  companyIdByName.set('Mutakamel Egypt', 'co-eg');
+  companyIdByName.set('Mutakamel KSA', 'co-sa');
+  companyIdByName.set('Legacy Trading', 'co-old');
+  branchLookupByName.clear();
+  branchLookupByName.set('Cairo HQ', { id: 'br-cai', companyId: 'co-eg' });
+  branchLookupByName.set('Alexandria', { id: 'br-alx', companyId: 'co-eg' });
+  branchLookupByName.set('Mansoura', { id: 'br-mns', companyId: 'co-eg' });
+  branchLookupByName.set('Riyadh HQ', { id: 'br-ruh', companyId: 'co-sa' });
+  branchLookupByName.set('Jeddah', { id: 'br-jed', companyId: 'co-sa' });
+}
 
 function resolveScopeObject(rawScope: string): SeatHolderScope {
   if (!rawScope || rawScope === 'Workspace' || rawScope === 'TENANT') {
@@ -342,26 +364,6 @@ function findUser(idOrName: string): { userId: string; name: string; status: 'IN
   return match ? { userId: match.userId, name: match.name, status: match.status } : null;
 }
 
-function modulesForRole(roleRef: string): string[] {
-  return resolveStaffRoleRef(roleRef)?.modules ?? [];
-}
-
-function extractRoleStrings(raw: unknown): string[] {
-  if (typeof raw === 'string') return [raw];
-  if (Array.isArray(raw)) return raw.flatMap(extractRoleStrings);
-  if (raw && typeof raw === 'object') {
-    const rec = raw as Record<string, unknown>;
-    return [
-      ...(typeof rec['roleId'] === 'string' ? [rec['roleId']] : []),
-      ...(typeof rec['roleName'] === 'string' ? [rec['roleName']] : []),
-      ...(typeof rec['role'] === 'string' ? [rec['role']] : []),
-      ...(Array.isArray(rec['roles']) ? extractRoleStrings(rec['roles']) : []),
-      ...(Array.isArray(rec['roleIds']) ? extractRoleStrings(rec['roleIds']) : []),
-    ];
-  }
-  return [];
-}
-
 function computePreview(changes: readonly SeatChange[]): SeatPreview {
   if (FAKE_MODE === 'MANUAL') {
     return { mode: 'MANUAL', ok: true, modules: [] };
@@ -559,243 +561,6 @@ export async function fakeReleaseSeats(
   addons = addons.filter((a) => a.userId !== user.userId);
   revision += 1;
   return cloneJson(saveIdempotent(key, fingerprint, plan));
-}
-
-/** POST /api/tenant/core/v1/users/bulk-role-assignments */
-export async function fakeBulkAssignRole(
-  body: {
-    roleId: string;
-    scope: { target: 'TENANT' | 'COMPANY' | 'BRANCH'; companyId?: string; branchId?: string };
-    userIds: string[];
-    dryRun: boolean;
-  },
-  key = newIdempotencyKey(),
-  opts: { confirmAddonCascade?: boolean } = {},
-): Promise<BulkRoleResult> {
-  await fakeDelay();
-  const resolvedRoleId = resolveStaffRoleRef(body.roleId)?.id ?? body.roleId;
-  const resolvedUserIds = body.userIds.map((raw) => findUser(raw)?.userId ?? raw);
-  const fingerprint = JSON.stringify(['bulkAssignRole', body, Boolean(opts.confirmAddonCascade)]);
-  const replayed = replayIdempotent<BulkRoleResult>(key, fingerprint);
-  if (replayed) return replayed;
-
-  const preview = computePreview([
-    { kind: 'BULK_ROLE', roleId: resolvedRoleId, scope: body.scope, userIds: resolvedUserIds },
-  ]);
-
-  if (body.dryRun) {
-    return cloneJson(saveIdempotent(key, fingerprint, preview));
-  }
-
-  assertActorNotOverCapacity(
-    Array.from(new Set([...modulesForRole(resolvedRoleId), ...preview.modules.map((m) => m.moduleKey)])),
-  );
-
-  if (!preview.ok) {
-    throw buildCapacityError(preview.modules.filter((m) => m.usedAfter > m.capacity));
-  }
-
-  applyBulkRoleInStaffFake({
-    roleId: resolvedRoleId,
-    scope: body.scope,
-    userIds: resolvedUserIds,
-  });
-  revision += 1;
-
-  return cloneJson(saveIdempotent(key, fingerprint, preview));
-}
-
-/** POST /api/tenant/core/v1/users/import */
-export async function fakeImportUsers(
-  body: {
-    rows: unknown[];
-    mode: 'ALL_OR_NOTHING' | 'SKIP_ROLES_THAT_DONT_FIT';
-    dryRun: boolean;
-  },
-  key = newIdempotencyKey(),
-  opts: { confirmAddonCascade?: boolean } = {},
-): Promise<ImportResult> {
-  await fakeDelay();
-  const fingerprint = JSON.stringify(['importUsers', body, Boolean(opts.confirmAddonCascade)]);
-  const replayed = replayIdempotent<ImportResult>(key, fingerprint);
-  if (replayed) return replayed;
-
-  const remainingFree = new Map<string, number>();
-  for (const cfg of MODULE_CONFIGS) {
-    const used = currentHolders(cfg.moduleKey).length;
-    remainingFree.set(cfg.moduleKey, Math.max(0, effectiveCapacity(cfg) - used));
-  }
-
-  const toImportEntry = (
-    rawRow: unknown,
-    roleOverride?: {
-      roleRefs?: string[];
-      roleAssignments?: { branchId: string; roleId: string }[];
-    },
-  ): {
-    email: string;
-    name?: string;
-    firstName?: string;
-    lastName?: string;
-    roleRefs?: string[];
-    roleAssignments?: { branchId: string; roleId: string }[];
-  } | null => {
-    const row = (rawRow && typeof rawRow === 'object' ? rawRow : {}) as Record<string, unknown>;
-    const email = typeof row['email'] === 'string' ? row['email'].trim() : '';
-    if (!email || email.toLowerCase().endsWith('@bad.example.com')) return null;
-    const roleAssignments = Array.isArray(row['roleAssignments'])
-      ? (row['roleAssignments'] as { branchId: string; roleId: string }[])
-      : undefined;
-    return {
-      email,
-      name: typeof row['name'] === 'string' ? row['name'] : undefined,
-      firstName: typeof row['firstName'] === 'string' ? row['firstName'] : undefined,
-      lastName: typeof row['lastName'] === 'string' ? row['lastName'] : undefined,
-      roleRefs: roleOverride ? roleOverride.roleRefs : extractRoleStrings(row),
-      roleAssignments: roleOverride ? roleOverride.roleAssignments : roleAssignments,
-    };
-  };
-
-  if (body.mode === 'ALL_OR_NOTHING') {
-    // seat-user-operations importRowError: ALL_OR_NOTHING (dry run too) rethrows the first row error with the
-    // 0-based row appended as details.index: ['<n>'], keeping its code and status.
-    body.rows.forEach((rawRow, idx) => {
-      const row = (rawRow && typeof rawRow === 'object' ? rawRow : {}) as Record<string, unknown>;
-      const email = typeof row['email'] === 'string' ? row['email'].trim().toLowerCase() : '';
-      if (email.endsWith('@bad.example.com')) {
-        throw new ApiError(409, 'TENANT_EMAIL_TAKEN', { index: [String(idx)] });
-      }
-    });
-    const preview = computePreview([{ kind: 'IMPORT', rows: body.rows }]);
-    const results: ImportRowResult[] = body.rows.map((_rawRow, idx) => ({
-      index: idx + 1,
-      status: body.dryRun ? 'WOULD_CREATE' : 'CREATED',
-    }));
-
-    if (!body.dryRun) {
-      assertActorNotOverCapacity(preview.modules.map((m) => m.moduleKey));
-      if (!preview.ok) {
-        throw buildCapacityError(preview.modules.filter((m) => m.usedAfter > m.capacity));
-      }
-      const entries = body.rows
-        .map((r) => toImportEntry(r))
-        .filter((e): e is NonNullable<typeof e> => e !== null);
-      applyImportUsersInStaffFake(entries);
-      revision += 1;
-    }
-
-    return cloneJson(
-      saveIdempotent(key, fingerprint, {
-        results,
-        seats: preview,
-      }),
-    );
-  }
-
-  const fittingRows: unknown[] = [];
-  const entriesToCommit: NonNullable<ReturnType<typeof toImportEntry>>[] = [];
-  const results: ImportRowResult[] = [];
-
-  body.rows.forEach((rawRow, idx) => {
-    const row = (rawRow && typeof rawRow === 'object' ? rawRow : {}) as Record<string, unknown>;
-    const email = typeof row['email'] === 'string' ? row['email'].trim() : '';
-    if (email.toLowerCase().endsWith('@bad.example.com')) {
-      results.push({ index: idx + 1, status: 'ERROR', code: 'TENANT_EMAIL_TAKEN' });
-      return;
-    }
-
-    const rawAssignments = Array.isArray(row['roleAssignments'])
-      ? (row['roleAssignments'] as { branchId?: unknown; roleId?: unknown }[])
-      : [];
-    const candidateAssignments: { roleId: string; branchId: string; ref?: string }[] = [];
-    if (rawAssignments.length > 0) {
-      for (const item of rawAssignments) {
-        if (!item || typeof item !== 'object') continue;
-        const roleId = typeof item.roleId === 'string' ? item.roleId.trim() : '';
-        const branchId = typeof item.branchId === 'string' ? item.branchId.trim() : '';
-        if (roleId) {
-          candidateAssignments.push({ roleId, branchId });
-        }
-      }
-    } else {
-      const rowBranchId = typeof row['branchId'] === 'string' ? row['branchId'].trim() : '';
-      for (const ref of extractRoleStrings(row)) {
-        const resolved = resolveStaffRoleRef(ref);
-        candidateAssignments.push({
-          roleId: resolved?.id ?? ref,
-          branchId: rowBranchId,
-          ref,
-        });
-      }
-    }
-
-    const rowClaimedModules = new Set<string>();
-    const keptAssignments: { branchId: string; roleId: string }[] = [];
-    const keptRefs: string[] = [];
-    const skippedRoles: { roleId: string; branchId: string }[] = [];
-
-    for (const candidate of candidateAssignments) {
-      const neededModules = modulesForRole(candidate.roleId);
-      const newlyNeeded = neededModules.filter((moduleKey) => !rowClaimedModules.has(moduleKey));
-      const fits = newlyNeeded.every((moduleKey) => (remainingFree.get(moduleKey) ?? 0) > 0);
-      if (fits) {
-        for (const moduleKey of newlyNeeded) {
-          remainingFree.set(moduleKey, (remainingFree.get(moduleKey) ?? 0) - 1);
-          rowClaimedModules.add(moduleKey);
-        }
-        keptAssignments.push({ branchId: candidate.branchId, roleId: candidate.roleId });
-        if (candidate.ref) keptRefs.push(candidate.ref);
-      } else {
-        skippedRoles.push({ roleId: candidate.roleId, branchId: candidate.branchId });
-      }
-    }
-
-    fittingRows.push({
-      ...row,
-      roleAssignments: keptAssignments,
-      roleName: undefined,
-      role: undefined,
-      roles: undefined,
-      roleIds: undefined,
-    });
-    const useAssignmentsOnCommit =
-      rawAssignments.length > 0 || keptAssignments.every((item) => Boolean(item.branchId));
-    const entry = toImportEntry(
-      row,
-      useAssignmentsOnCommit
-        ? { roleAssignments: keptAssignments }
-        : { roleRefs: keptRefs },
-    );
-    if (entry) entriesToCommit.push(entry);
-
-    if (skippedRoles.length > 0) {
-      results.push({
-        index: idx + 1,
-        status: 'ROLES_SKIPPED',
-        skippedRoles,
-      });
-    } else {
-      results.push({
-        index: idx + 1,
-        status: body.dryRun ? 'WOULD_CREATE' : 'CREATED',
-      });
-    }
-  });
-
-  const seats = computePreview([{ kind: 'IMPORT', rows: fittingRows }]);
-
-  if (!body.dryRun) {
-    assertActorNotOverCapacity(seats.modules.map((m) => m.moduleKey));
-    applyImportUsersInStaffFake(entriesToCommit);
-    revision += 1;
-  }
-
-  return cloneJson(
-    saveIdempotent(key, fingerprint, {
-      results,
-      seats,
-    }),
-  );
 }
 
 /** POST /api/tenant/core/v1/seats/free-up/preview */

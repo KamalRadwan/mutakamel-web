@@ -21,13 +21,8 @@ import { ConfirmDialog } from '../../../../../../shared/ui/confirm-dialog/confir
 import { Dropdown, DropdownOption } from '../../../../../../shared/ui/dropdown/dropdown';
 import { Field } from '../../../../../../shared/ui/field/field';
 import { UnsavedDialog } from '../../../../../../shared/ui/unsaved-dialog/unsaved-dialog';
-import { ApiError, errorCodeOf } from '../../../../staff/shared/staff.api';
-import {
-  addAddress,
-  deleteAddress,
-  getParty,
-  updateAddress,
-} from '../../party-directory.api';
+import { ApiError, errorCodeOf, fieldErrorsOf, isValidationError } from '../../../../../../core/api/api-errors';
+import { PartyDirectoryApi } from '../../party-directory.api';
 import {
   AddressType,
   CreateAddressBody,
@@ -107,6 +102,7 @@ export class PartyAddressesTab implements EditableModalTab {
   private static nextId = 0;
   protected readonly uid = `party-addresses-tab-${++PartyAddressesTab.nextId}`;
 
+  private readonly api = inject(PartyDirectoryApi);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
@@ -115,7 +111,7 @@ export class PartyAddressesTab implements EditableModalTab {
   private readonly unsavedDialog = viewChild.required<UnsavedDialog>('unsavedDialog');
 
   readonly party = input.required<PartyDetail>();
-  readonly maxAddresses = input<number>(PARTY_LIMITS.defaultMaxAddresses);
+  readonly maxAddresses = input<number | null>(null);
   readonly readonly = input(false);
 
   readonly partyUpdated = output<PartyDetail>();
@@ -134,6 +130,7 @@ export class PartyAddressesTab implements EditableModalTab {
     isPrimary: false,
   });
 
+  private readonly serverFields = signal<Record<string, string>>({});
   protected readonly submitAttempted = signal(false);
   protected readonly busyRowId = signal<string | null>(null);
   private confirmingUnsaved = false;
@@ -215,7 +212,7 @@ export class PartyAddressesTab implements EditableModalTab {
   });
 
   protected readonly addresses = computed(() => this.party().addresses);
-  protected readonly atLimit = computed(() => this.addresses().length >= this.maxAddresses());
+  protected readonly atLimit = computed(() => this.maxAddresses() !== null && this.addresses().length >= this.maxAddresses()!);
 
   protected readonly typeOptions = computed<DropdownOption<AddressType>[]>(() => {
     this.i18n();
@@ -236,10 +233,12 @@ export class PartyAddressesTab implements EditableModalTab {
   }
 
   protected maxErr(
+    field: string,
     fieldState: { touched(): boolean; errors(): readonly { kind: string }[] },
     max: number,
   ): string | null {
     this.i18n();
+    if (this.serverFields()[field]) return this.serverFields()[field];
     const err = fieldState.touched() || this.submitAttempted() ? fieldState.errors()[0] : undefined;
     if (!err) return null;
     if (err.kind === 'maxLength') {
@@ -298,6 +297,7 @@ export class PartyAddressesTab implements EditableModalTab {
     const key = this.editingKey();
     if (this.readonly() || this.addressForm().submitting() || key === null) return false;
 
+    this.serverFields.set({});
     this.submitAttempted.set(true);
     let ok = false;
 
@@ -322,7 +322,7 @@ export class PartyAddressesTab implements EditableModalTab {
             ...(d.postalCode.trim() ? { postalCode: d.postalCode.trim() } : {}),
             ...(primary ? { isPrimary: true } : {}),
           };
-          await addAddress(this.party().id, body);
+          await this.api.addAddress(this.party().id, body);
           this.notify.success(this.transloco.translate('wsPartyModal.addresses.added'));
         } else {
           const existing = this.addresses().find((a) => a.id === key);
@@ -342,7 +342,7 @@ export class PartyAddressesTab implements EditableModalTab {
           if (d.postalCode.trim() !== (existing.postalCode ?? '')) patch.postalCode = d.postalCode.trim();
 
           if (Object.keys(patch).length > 0) {
-            await updateAddress(existing.id, patch);
+            await this.api.updateAddress(existing.id, patch);
             this.notify.success(this.transloco.translate('wsPartyModal.addresses.saved'));
           }
         }
@@ -364,7 +364,7 @@ export class PartyAddressesTab implements EditableModalTab {
 
     this.busyRowId.set(item.id);
     try {
-      await updateAddress(item.id, { isPrimary: true });
+      await this.api.updateAddress(item.id, { isPrimary: true });
       await this.reloadParty();
       this.notify.success(this.transloco.translate('wsPartyModal.addresses.primaryUpdated'));
     } catch (error) {
@@ -381,7 +381,7 @@ export class PartyAddressesTab implements EditableModalTab {
 
     this.busyRowId.set(item.id);
     try {
-      await deleteAddress(item.id);
+      await this.api.deleteAddress(item.id);
       if (this.editingKey() === item.id) {
         this.resetEditState();
       }
@@ -395,18 +395,31 @@ export class PartyAddressesTab implements EditableModalTab {
   }
 
   private async reloadParty(): Promise<void> {
-    const fresh = await getParty(this.party().id);
+    const fresh = await this.api.getParty(this.party().id);
     this.partyUpdated.emit(fresh);
   }
 
   private handleMutationError(error: unknown): void {
     const code = errorCodeOf(error);
-    if (code === 'PARTY_NOT_FOUND' || (error instanceof ApiError && error.status === 404 && !code?.includes('ADDRESS'))) {
+    if (isValidationError(error) || code === 'PARTY_ADDRESS_GEO_INVALID' || code === 'PARTY_ADDRESS_GEO_INCOMPLETE') {
+      const fields = Object.keys(fieldErrorsOf(error));
+      const message = resolvePartyError(error, this.transloco);
+      this.serverFields.set(Object.fromEntries((fields.length ? fields : ['country', 'city', 'area']).map((field) => {
+        const visible = ({ countryId: 'country', stateId: 'country', cityId: 'city', districtId: 'area' } as Record<string, string>)[field] ?? field;
+        return [visible, message];
+      })));
+      return;
+    }
+    if (code === 'PARTY_NOT_FOUND'  || (error instanceof ApiError && error.status === 404 && !code?.includes('ADDRESS'))) {
       this.notify.error(resolvePartyError(error, this.transloco));
       this.deletedRemotely.emit();
       return;
     }
     this.notify.error(resolvePartyError(error, this.transloco));
+    if (code === 'PARTY_ADDRESS_NOT_FOUND') {
+      this.resetEditState();
+      void this.reloadParty().catch((failure) => this.notify.error(resolvePartyError(failure, this.transloco, 'read')));
+    }
   }
 
   private async resolveActiveEdit(): Promise<boolean> {
@@ -430,6 +443,7 @@ export class PartyAddressesTab implements EditableModalTab {
   }
 
   private resetEditState(): void {
+    this.serverFields.set({});
     this.editingKey.set(null);
     this.submitAttempted.set(false);
     this.addressType.set('WORK');

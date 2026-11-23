@@ -14,6 +14,7 @@ const SEED_TIMESTAMP = '2026-01-10T09:00:00.000Z';
 function createInitialSettings(): DirectorySettings {
   return {
     id: SINGLETON_ID,
+    version: 1,
     duplicateScope: 'TENANT',
     preventDuplicateEmail: true,
     preventDuplicatePhone: true,
@@ -102,6 +103,7 @@ export async function fakeGetDirectorySettings(): Promise<DirectorySettings> {
 
 export async function fakeUpdateDirectorySettings(
   patch: Partial<DirectorySettingsPatch>,
+  ifMatch: string,
 ): Promise<DirectorySettings> {
   await fakeDelay();
   requirePermissionGuard();
@@ -147,6 +149,12 @@ export async function fakeUpdateDirectorySettings(
 
   assertTenantWideManage();
 
+  if (!ifMatch) throw new ApiError(428, 'DIRECTORY_SETTINGS_VERSION_REQUIRED');
+  if (ifMatch !== `"${state.version}"`) {
+    throw new ApiError(409, 'DIRECTORY_SETTINGS_VERSION_CONFLICT');
+  }
+
+  next.version++;
   next.updatedAt = new Date().toISOString();
   state = next;
   return { ...state };

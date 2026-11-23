@@ -85,11 +85,14 @@
             {{ row.branch.name }}
           </span>
 
-          @if (row.failed || !row.resource) {
+          @if (row.forbidden) {
+            <span class="shrink-0 text-12 text-text-muted">{{ 'wsActivation.branchModal.noAccess' | transloco }}</span>
+          } @else if (row.failed || !row.resource) {
             <span class="shrink-0 text-12 text-danger-text">
               {{ 'wsActivation.branchModal.branchLoadFailed' | transloco }}
             </span>
-          } @else if (canManage()) {
+            <button type="button" uiButton variant="secondary" size="small" (click)="refreshBranchRow(row.branch.id, context()!.appKey, context()!.addonKey)">{{ 'wsActivation.states.retry' | transloco }}</button>
+          } @else if (canManageBranch()(row.branch.id)) {
             <span
               class="inline-flex shrink-0"
               [attr.title]="blockedReason(row)"

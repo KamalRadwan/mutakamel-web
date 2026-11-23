@@ -1,7 +1,9 @@
 import { TranslocoService } from '@jsverse/transloco';
-import { errorCodeOf, errorMessage } from '../../../staff/shared/staff.api';
-import { StaffSession } from '../../../staff/shared/staff-session';
-import { TenantUser } from '../../../staff/shared/staff.model';
+import { errorMessage, writeErrorMessage } from '../../../../../core/api/api-errors';
+import { TenantScopeState } from '../../../../../core/scope/tenant-scope';
+import {
+  WorkspaceUser as TenantUser,
+} from '../../../../../shared/widgets/workspace-lookups/workspace-lookups.model';
 import {
   AddressType,
   ContactMethodType,
@@ -35,8 +37,6 @@ export const PARTY_LIMITS = {
   relationshipLabel: 120,
   imageMaxBytes: 2 * 1024 * 1024,
   createContactsCap: 3,
-  defaultMaxContacts: 20,
-  defaultMaxAddresses: 20,
 } as const;
 
 export const PARTY_STATUSES: readonly PartyStatus[] = ['ACTIVE', 'INACTIVE', 'BLOCKED'];
@@ -97,14 +97,10 @@ export const CONTACT_TYPE_META: Record<
 };
 
 export interface PartyDirectoryLimits {
-  maxContactMethodsPerParty: number;
-  maxAddressesPerParty: number;
+  maxContactMethodsPerParty: number | null;
+  maxAddressesPerParty: number | null;
 }
 
-export const DEFAULT_PARTY_LIMITS: PartyDirectoryLimits = {
-  maxContactMethodsPerParty: PARTY_LIMITS.defaultMaxContacts,
-  maxAddressesPerParty: PARTY_LIMITS.defaultMaxAddresses,
-};
 
 export interface EditableModalTab {
   dirty(): boolean;
@@ -117,11 +113,16 @@ const PHONE_VALUE_PATTERN = /^\+?[0-9 ().-]+$/;
 const EMAIL_VALUE_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function canOnPartyBranch(
-  session: StaffSession,
+  session: TenantScopeState,
   permission: string,
   branchId: string | null,
 ): boolean {
-  return branchId === null ? session.isTenantWide(permission) : session.can(permission, { branchId });
+  const me = session.me();
+  if (!me) return false;
+  if (me.isTenantOwner) return true;
+  if (!me.permissions.includes(permission)) return false;
+  const grant = me.permissionScopes[permission];
+  return grant?.tenantWide === true || (branchId !== null && (grant?.branchIds.includes(branchId) ?? false));
 }
 
 export function composePersonDisplayName(title: string, first: string, last: string): string {
@@ -207,16 +208,22 @@ export function tenantUserName(user: Pick<TenantUser, 'firstName' | 'lastName' |
   return full || user.email;
 }
 
-export function resolvePartyError(error: unknown, transloco: TranslocoService): string {
-  const code = errorCodeOf(error);
-  if (code) {
-    const listKey = `wsParty.errors.${code}`;
-    const listMsg = transloco.translate(listKey);
-    if (listMsg && listMsg !== listKey) return listMsg;
+export function hasPartyPermission(session: TenantScopeState, permission: string): boolean {
+  const me = session.me();
+  return me?.isTenantOwner === true || me?.permissions.includes(permission) === true;
+}
 
-    const modalKey = `wsPartyModal.errors.${code}`;
-    const modalMsg = transloco.translate(modalKey);
-    if (modalMsg && modalMsg !== modalKey) return modalMsg;
-  }
-  return errorMessage(error, 'wsParty', transloco);
+export function isPartyTenantWide(session: TenantScopeState, permission: string): boolean {
+  return canOnPartyBranch(session, permission, null);
+}
+
+export function duplicateContactMessage(type: ContactMethodType, transloco: TranslocoService): string {
+  const key = type === 'PHONE' || type === 'MOBILE' ? 'duplicateNumber'
+    : type === 'EMAIL' ? 'duplicateEmail' : type === 'WHATSAPP' ? 'duplicateWhatsapp' : 'duplicateError';
+  return transloco.translate(`wsPartyModal.contacts.${key}`);
+}
+
+export function resolvePartyError(error: unknown, transloco: TranslocoService, operation: 'read' | 'write' = 'write'): string {
+  return operation === 'write' ? writeErrorMessage(error, 'wsPartyModal', transloco)
+    : errorMessage(error, 'wsPartyModal', transloco);
 }

@@ -1063,7 +1063,7 @@ export class TemplateCreateWizard {
     } catch (error: unknown) {
       if (seq !== this.initSeq) return;
       this.loading.set(false);
-      this.loadCorrelationId.set(error instanceof TemplateApiError ? error.correlationId : null);
+      this.loadCorrelationId.set(error instanceof TemplateApiError ? (error.correlationId ?? null) : null);
       this.loadFailed.set(true);
     }
   }
@@ -1138,7 +1138,7 @@ export class TemplateCreateWizard {
     } catch (error: unknown) {
       if (seq !== this.startersSeq) return;
       this.startersLoading.set(false);
-      this.startersCorrelationId.set(error instanceof TemplateApiError ? error.correlationId : null);
+      this.startersCorrelationId.set(error instanceof TemplateApiError ? (error.correlationId ?? null) : null);
       this.startersFailed.set(true);
     }
   }

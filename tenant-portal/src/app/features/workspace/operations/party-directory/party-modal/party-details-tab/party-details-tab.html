@@ -11,6 +11,7 @@
       @if (imageSrc(); as src) {
         <img
           [src]="src"
+          (error)="onImageError()"
           [alt]="p.displayName"
           class="size-dropzone shrink-0 rounded-10 border border-border object-cover"
         />
@@ -29,6 +30,7 @@
           <ui-file-drop
             class="min-w-0 flex-1"
             accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp"
+            [describedBy]="imageError() ? uid + '-image-error' : null"
             [maxBytes]="limitsConst.imageMaxBytes"
             [title]="'wsPartyModal.image.title' | transloco"
             [hint]="'wsPartyModal.image.hint' | transloco"
@@ -54,6 +56,9 @@
         </div>
       }
     </div>
+    @if (imageError()) {
+      <p class="mb-8 text-11 leading-16 text-danger-text" role="alert">{{ imageError() }}</p>
+    }
   }
 
   <form [id]="uid + '-form'" class="grid grid-cols-2 gap-x-10 gap-y-8" novalidate (submit)="save($event)">
@@ -64,7 +69,7 @@
         [hint]="'wsPartyModal.fields.honorificTitleHint' | transloco"
         [count]="!readonly() ? honorificTitleCount() : null"
         [max]="!readonly() ? limitsConst.honorificTitle : null"
-        [error]="maxErr(detailsForm.honorificTitle(), limitsConst.honorificTitle)"
+        [error]="fieldError('honorificTitle', detailsForm.honorificTitle(), limitsConst.honorificTitle)"
       >
         <input
           [id]="uid + '-title'"
@@ -75,7 +80,7 @@
           [formField]="detailsForm.honorificTitle"
           [readOnly]="readonly() || saving()"
           [attr.aria-readonly]="readonly() ? 'true' : null"
-          [attr.aria-invalid]="maxErr(detailsForm.honorificTitle(), limitsConst.honorificTitle) ? 'true' : null"
+          [attr.aria-invalid]="fieldError('honorificTitle', detailsForm.honorificTitle(), limitsConst.honorificTitle) ? 'true' : null"
           (input)="onPersonNameInput()"
         />
       </ui-field>
@@ -86,7 +91,7 @@
         [hint]="'wsPartyModal.fields.firstNameHint' | transloco"
         [count]="!readonly() ? firstNameCount() : null"
         [max]="!readonly() ? limitsConst.firstName : null"
-        [error]="maxErr(detailsForm.firstName(), limitsConst.firstName)"
+        [error]="fieldError('firstName', detailsForm.firstName(), limitsConst.firstName)"
       >
         <input
           [id]="uid + '-first-name'"
@@ -96,7 +101,7 @@
           [formField]="detailsForm.firstName"
           [readOnly]="readonly() || saving()"
           [attr.aria-readonly]="readonly() ? 'true' : null"
-          [attr.aria-invalid]="maxErr(detailsForm.firstName(), limitsConst.firstName) ? 'true' : null"
+          [attr.aria-invalid]="fieldError('firstName', detailsForm.firstName(), limitsConst.firstName) ? 'true' : null"
           (input)="onPersonNameInput()"
         />
       </ui-field>
@@ -107,7 +112,7 @@
         [hint]="'wsPartyModal.fields.lastNameHint' | transloco"
         [count]="!readonly() ? lastNameCount() : null"
         [max]="!readonly() ? limitsConst.lastName : null"
-        [error]="maxErr(detailsForm.lastName(), limitsConst.lastName)"
+        [error]="fieldError('lastName', detailsForm.lastName(), limitsConst.lastName)"
       >
         <input
           [id]="uid + '-last-name'"
@@ -117,7 +122,7 @@
           [formField]="detailsForm.lastName"
           [readOnly]="readonly() || saving()"
           [attr.aria-readonly]="readonly() ? 'true' : null"
-          [attr.aria-invalid]="maxErr(detailsForm.lastName(), limitsConst.lastName) ? 'true' : null"
+          [attr.aria-invalid]="fieldError('lastName', detailsForm.lastName(), limitsConst.lastName) ? 'true' : null"
           (input)="onPersonNameInput()"
         />
       </ui-field>
@@ -150,7 +155,7 @@
         [hint]="'wsPartyModal.fields.organizationNameHint' | transloco"
         [count]="!readonly() ? organizationNameCount() : null"
         [max]="!readonly() ? limitsConst.organizationName : null"
-        [error]="maxErr(detailsForm.organizationName(), limitsConst.organizationName)"
+        [error]="fieldError('organizationName', detailsForm.organizationName(), limitsConst.organizationName)"
       >
         <input
           [id]="uid + '-org-name'"
@@ -160,7 +165,7 @@
           [formField]="detailsForm.organizationName"
           [readOnly]="readonly() || saving()"
           [attr.aria-readonly]="readonly() ? 'true' : null"
-          [attr.aria-invalid]="maxErr(detailsForm.organizationName(), limitsConst.organizationName) ? 'true' : null"
+          [attr.aria-invalid]="fieldError('organizationName', detailsForm.organizationName(), limitsConst.organizationName) ? 'true' : null"
           (input)="onOrganizationNameInput()"
         />
       </ui-field>
@@ -194,7 +199,7 @@
           [hint]="'wsPartyModal.fields.legalNameHint' | transloco"
           [count]="!readonly() ? legalNameCount() : null"
           [max]="!readonly() ? limitsConst.legalName : null"
-          [error]="maxErr(detailsForm.legalName(), limitsConst.legalName)"
+          [error]="fieldError('legalName', detailsForm.legalName(), limitsConst.legalName)"
         >
           <input
             [id]="uid + '-legal-name'"
@@ -204,7 +209,7 @@
             [formField]="detailsForm.legalName"
             [readOnly]="readonly() || saving()"
             [attr.aria-readonly]="readonly() ? 'true' : null"
-            [attr.aria-invalid]="maxErr(detailsForm.legalName(), limitsConst.legalName) ? 'true' : null"
+            [attr.aria-invalid]="fieldError('legalName', detailsForm.legalName(), limitsConst.legalName) ? 'true' : null"
           />
         </ui-field>
       </div>
@@ -215,7 +220,7 @@
         [hint]="'wsPartyModal.fields.taxNumberHint' | transloco"
         [count]="!readonly() ? taxNumberCount() : null"
         [max]="!readonly() ? limitsConst.taxNumber : null"
-        [error]="maxErr(detailsForm.taxNumber(), limitsConst.taxNumber)"
+        [error]="fieldError('taxNumber', detailsForm.taxNumber(), limitsConst.taxNumber)"
       >
         <input
           [id]="uid + '-tax-number'"
@@ -225,7 +230,7 @@
           [formField]="detailsForm.taxNumber"
           [readOnly]="readonly() || saving()"
           [attr.aria-readonly]="readonly() ? 'true' : null"
-          [attr.aria-invalid]="maxErr(detailsForm.taxNumber(), limitsConst.taxNumber) ? 'true' : null"
+          [attr.aria-invalid]="fieldError('taxNumber', detailsForm.taxNumber(), limitsConst.taxNumber) ? 'true' : null"
         />
       </ui-field>
 
@@ -235,7 +240,7 @@
         [hint]="'wsPartyModal.fields.commercialRegistrationNumberHint' | transloco"
         [count]="!readonly() ? commercialRegistrationCount() : null"
         [max]="!readonly() ? limitsConst.commercialRegistrationNumber : null"
-        [error]="maxErr(detailsForm.commercialRegistrationNumber(), limitsConst.commercialRegistrationNumber)"
+        [error]="fieldError('commercialRegistrationNumber', detailsForm.commercialRegistrationNumber(), limitsConst.commercialRegistrationNumber)"
       >
         <input
           [id]="uid + '-cr-number'"
@@ -245,7 +250,7 @@
           [formField]="detailsForm.commercialRegistrationNumber"
           [readOnly]="readonly() || saving()"
           [attr.aria-readonly]="readonly() ? 'true' : null"
-          [attr.aria-invalid]="maxErr(detailsForm.commercialRegistrationNumber(), limitsConst.commercialRegistrationNumber) ? 'true' : null"
+          [attr.aria-invalid]="fieldError('commercialRegistrationNumber', detailsForm.commercialRegistrationNumber(), limitsConst.commercialRegistrationNumber) ? 'true' : null"
         />
       </ui-field>
     }
@@ -297,6 +302,7 @@
       [error]="ownerError()"
     >
       <app-party-owner-picker
+        [branchId]="branchId()"
         [fieldId]="uid + '-owner'"
         [describedBy]="uid + '-owner-hint' + (ownerError() ? ' ' + uid + '-owner-error' : '')"
         [hasError]="!!ownerError()"
@@ -467,10 +473,11 @@
           [for]="uid + '-create-roles'"
           [label]="'wsPartyModal.fields.roles' | transloco"
           [hint]="'wsPartyModal.fields.rolesHint' | transloco"
+          [error]="roleError()"
         >
           <app-party-role-select
             [fieldId]="uid + '-create-roles'"
-            [describedBy]="uid + '-create-roles-hint'"
+            [describedBy]="uid + '-create-roles-hint' + (roleError() ? ' ' + uid + '-create-roles-error' : '')"
             [label]="'wsPartyModal.fields.roles' | transloco"
             [placeholder]="'wsPartyModal.fields.rolesPlaceholder' | transloco"
             [removeLabel]="'wsPartyModal.common.remove' | transloco"

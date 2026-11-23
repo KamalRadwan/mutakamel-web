@@ -490,7 +490,7 @@ export class FunctionsPage {
 
   private handleLoadError(error: unknown): void {
     if (error instanceof TemplateApiError) {
-      this.correlationId.set(error.correlationId);
+      this.correlationId.set(error.correlationId ?? null);
       if (error.code === 'CORE.TEMPLATE.FEATURE.DISABLED') {
         this.errorState.set('featureDisabled');
         return;

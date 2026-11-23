@@ -382,8 +382,19 @@ function createSeedStore(): ActivationStore {
 
 let store: ActivationStore = createSeedStore();
 
+let fakeError: ApiError | null = null;
+
+export function setActivationFakeError(error: ApiError | null): void {
+  fakeError = error;
+}
+
+function assertAvailable(): void {
+  if (fakeError) throw fakeError;
+}
+
 export function resetActivationFake(): void {
   store = createSeedStore();
+  fakeError = null;
   fakeRejection = null;
   clearStoredFakeCommands();
 }
@@ -719,6 +730,7 @@ function branchOverrideResource(
 
 /** GET companies/:companyId/application-activations (ANY read/manage; page 1..1000000, limit 1..100). */
 export async function fakeListCompanyActivations(companyId: string, page = 1, limit = 20): Promise<ActivationListResponse> {
+  assertAvailable();
   const me = fakeActorMe();
   requireAnyPermission(me, READ_PERMISSIONS);
   if (!Number.isInteger(page) || page < 1 || page > 1_000_000) invalid();
@@ -749,6 +761,7 @@ export async function fakeGetCompanyApplication(
   companyId: string,
   appKey: string,
 ): Promise<ActivationSingleton<ApplicationActivationResource>> {
+  assertAvailable();
   const me = fakeActorMe();
   requireAnyPermission(me, READ_PERMISSIONS);
   if (!canRead(me, companyId)) denied();
@@ -770,6 +783,7 @@ export async function fakeGetCompanyAddon(
   appKey: string,
   addonKey: string,
 ): Promise<ActivationSingleton<AddonActivationResource>> {
+  assertAvailable();
   const me = fakeActorMe();
   requireAnyPermission(me, READ_PERMISSIONS);
   if (!canRead(me, companyId)) denied();
@@ -792,6 +806,7 @@ export async function fakeGetBranchAddon(
   appKey: string,
   addonKey: string,
 ): Promise<ActivationSingleton<BranchOverrideResource>> {
+  assertAvailable();
   const me = fakeActorMe();
   requireAnyPermission(me, READ_PERMISSIONS);
   const companyId = await branchCompanyId(branchId);
@@ -817,6 +832,7 @@ export async function fakeSetCompanyApplication(
   body: SetCompanyApplicationBody,
   key: string,
 ): Promise<ActivationWriteReceipt> {
+  assertAvailable();
   assertIdempotencyKey(key);
   const me = fakeActorMe();
   requirePermission(me, MANAGE_PERMISSION);
@@ -865,6 +881,7 @@ export async function fakeSetCompanyAddon(
   body: SetCompanyAddonBody,
   key: string,
 ): Promise<SetCompanyAddonResponse> {
+  assertAvailable();
   assertIdempotencyKey(key);
   const me = fakeActorMe();
   requirePermission(me, MANAGE_PERMISSION);
@@ -950,6 +967,7 @@ export async function fakeGetAddonCommand(
   addonKey: string,
   commandId: string,
 ): Promise<AddonCommandStatusResponse> {
+  assertAvailable();
   const me = fakeActorMe();
   requireAnyPermission(me, READ_PERMISSIONS);
   if (!UUID_V7_PATTERN.test(commandId)) invalid();
@@ -979,6 +997,7 @@ export async function fakeSetBranchOverride(
   body: SetBranchOverrideBody,
   key: string,
 ): Promise<ActivationWriteReceipt> {
+  assertAvailable();
   assertIdempotencyKey(key);
   const me = fakeActorMe();
   requirePermission(me, MANAGE_PERMISSION);

@@ -1,3 +1,7 @@
+import { FullState } from '../../../../../shared/ui/full-state/full-state';
+import { PartyOwnerPicker } from '../party-modal/party-owner-picker/party-owner-picker';
+import { WorkspaceLookups } from '../../../../../shared/widgets/workspace-lookups/workspace-lookups.api';
+import { hasPartyPermission, isPartyTenantWide, canOnPartyBranch } from '../party-modal/party-modal.util';
 import {
   Component,
   DestroyRef,
@@ -14,7 +18,7 @@ import {
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
@@ -47,18 +51,13 @@ import { Modal } from '../../../../../shared/ui/modal/modal';
 import { rectInPage, viewport } from '../../../../../shared/ui/overlay/zoom';
 import { Pagination } from '../../../../../shared/ui/pagination/pagination';
 import { PhoneActions, PhoneActionSource } from '../../../../../shared/widgets/phone-actions/phone-actions';
-import { StaffSession } from '../../../staff/shared/staff-session';
-import { SessionFailedState } from '../../shared/session-failed-state/session-failed-state';
+import { TenantScopeState } from '../../../../../core/scope/tenant-scope';
+import { ApiError, errorCodeOf, errorMessage, writeErrorMessage } from '../../../../../core/api/api-errors';
 import {
-  ApiError,
-  errorCodeOf,
-  errorMessage,
-  listAllPages,
-  listBranches,
-  listUsers,
-} from '../../../staff/shared/staff.api';
-import { Branch, TenantUser } from '../../../staff/shared/staff.model';
-import { deleteParty, listParties, partyImageSrc, updateParty } from '../party-directory.api';
+  WorkspaceBranch as Branch,
+  WorkspaceUser as TenantUser,
+} from '../../../../../shared/widgets/workspace-lookups/workspace-lookups.model';
+import { PartyDirectoryApi, partyImageSrc } from '../party-directory.api';
 import {
   PARTY_ROLE_TYPES,
   PARTY_STATUSES,
@@ -114,8 +113,7 @@ function parsePageSize(raw: string | null): number {
 @Component({
   selector: 'app-party-directory-page',
   imports: [
-    SessionFailedState,
-    RouterLink,
+    FullState,
     NgIcon,
     TranslocoPipe,
     ActionsMenu,
@@ -126,6 +124,7 @@ function parsePageSize(raw: string | null): number {
     Modal,
     Pagination,
     PartyModal,
+    PartyOwnerPicker,
     PhoneActions,
   ],
   providers: [
@@ -162,13 +161,14 @@ export class PartyDirectoryPage {
   private readonly router = inject(Router);
   private readonly injector = inject(Injector);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly api = inject(PartyDirectoryApi);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly language = inject(LanguageState).current;
-  private readonly session = inject(StaffSession);
+  private readonly lookups = inject(WorkspaceLookups);
+  private readonly session = inject(TenantScopeState);
 
-  protected readonly sessionFailed = computed(() => !this.session.me() && this.session.state() === 'failed');
   private readonly queryParams = toSignal(this.route.queryParamMap);
 
   private readonly partyModal = viewChild(PartyModal);
@@ -229,16 +229,16 @@ export class PartyDirectoryPage {
     () =>
       // Until the session has loaded (or if loading failed) do not show the 403 state; the API decides.
       !this.session.me() ||
-      this.session.isTenantWide('directory.party.read') ||
-      this.session.can('directory.party.read') ||
-      this.branches().some((b) => this.session.can('directory.party.read', { branchId: b.id })),
+      isPartyTenantWide(this.session, 'directory.party.read') ||
+      hasPartyPermission(this.session, 'directory.party.read') ||
+      this.branches().some((b) => canOnPartyBranch(this.session, 'directory.party.read', b.id)),
   );
 
   protected readonly canManageAny = computed(
     () =>
-      this.session.isTenantWide('directory.party.manage') ||
-      this.session.can('directory.party.manage') ||
-      this.branches().some((b) => this.session.can('directory.party.manage', { branchId: b.id })),
+      isPartyTenantWide(this.session, 'directory.party.manage') ||
+      hasPartyPermission(this.session, 'directory.party.manage') ||
+      this.branches().some((b) => canOnPartyBranch(this.session, 'directory.party.manage', b.id)),
   );
 
   protected readonly activeFilterCount = computed(() => {
@@ -319,16 +319,6 @@ export class PartyDirectoryPage {
     ];
   });
 
-  protected readonly ownerOptions = computed<DropdownOption<string>[]>(() => {
-    this.i18n();
-    return [
-      { value: 'ALL', label: this.transloco.translate('wsParty.filters.all') },
-      ...this.users().map((user) => ({
-        value: user.id,
-        label: this.userFullName(user),
-      })),
-    ];
-  });
 
   protected readonly activeFilterChips = computed<ActiveFilterChip[]>(() => {
     this.i18n();
@@ -383,14 +373,8 @@ export class PartyDirectoryPage {
     return chips;
   });
 
-  protected retrySession(): void {
-    void this.session.load().catch(() => undefined);
-  }
 
   constructor() {
-    if (!this.session.me()) {
-      void this.session.load().catch(() => undefined);
-    }
     void this.loadLookups();
 
     const onCaptureScroll = () => this.closeNewMenu();
@@ -472,6 +456,10 @@ export class PartyDirectoryPage {
     });
   }
 
+  protected goHome(): void {
+    void this.router.navigate(['/workspace/home']);
+  }
+
   protected reload(): void {
     void this.loadLookups();
     if (!this.canRead()) return;
@@ -494,7 +482,9 @@ export class PartyDirectoryPage {
   }
 
   protected onSearchInput(event: Event): void {
-    const next = (event.target as HTMLInputElement).value;
+    const input = event.target as HTMLInputElement;
+    const next = input.value.slice(0, 200);
+    input.value = next;
     this.searchDraft.set(next);
     this.clearSearchTimer();
     this.searchTimer = setTimeout(() => {
@@ -548,9 +538,10 @@ export class PartyDirectoryPage {
     this.setPage(DEFAULT_PAGE, true);
   }
 
-  protected setOwnerFilter(value: string): void {
-    if (value === this.ownerFilter()) return;
-    this.ownerFilter.set(value);
+  protected setOwnerFilter(value: string | null): void {
+    const owner = value ?? 'ALL';
+    if (owner === this.ownerFilter()) return;
+    this.ownerFilter.set(owner);
     this.setPage(DEFAULT_PAGE, true);
   }
 
@@ -912,7 +903,7 @@ export class PartyDirectoryPage {
 
     this.setBusy(party.id, true);
     try {
-      await deleteParty(party.id);
+      await this.api.deleteParty(party.id);
       this.notify.success(this.transloco.translate('wsParty.toast.deleted'));
       this.reload();
     } catch (error) {
@@ -921,7 +912,7 @@ export class PartyDirectoryPage {
         this.inUseDialog().open();
         return;
       }
-      this.notify.error(this.resolveError(error));
+      this.notify.error(this.resolveError(error, true));
     } finally {
       this.setBusy(party.id, false);
       this.pendingDeleteParty.set(null);
@@ -933,12 +924,12 @@ export class PartyDirectoryPage {
     if (!party || this.settingInactive()) return;
     this.settingInactive.set(true);
     try {
-      await updateParty(party.id, { status: 'INACTIVE' });
+      await this.api.updateParty(party.id, { status: 'INACTIVE' });
       this.inUseDialog().close();
       this.notify.success(this.transloco.translate('wsParty.toast.setInactive'));
       this.reload();
     } catch (error) {
-      this.notify.error(this.resolveError(error));
+      this.notify.error(this.resolveError(error, true));
     } finally {
       this.settingInactive.set(false);
     }
@@ -951,9 +942,9 @@ export class PartyDirectoryPage {
 
   private canManageParty(party: PartyListItem): boolean {
     if (party.branchId === null) {
-      return this.session.isTenantWide('directory.party.manage');
+      return isPartyTenantWide(this.session, 'directory.party.manage');
     }
-    return this.session.can('directory.party.manage', { branchId: party.branchId });
+    return canOnPartyBranch(this.session, 'directory.party.manage', party.branchId);
   }
 
   private placeNewMenu(seq: number, triggerEl: HTMLElement): void {
@@ -983,15 +974,10 @@ export class PartyDirectoryPage {
   }
 
   private async loadLookups(): Promise<void> {
-    const [branchesRes, usersRes] = await Promise.allSettled([
-      listAllPages(listBranches, { limit: 100 }),
-      listAllPages(listUsers, { limit: 100 }),
-    ]);
-    if (branchesRes.status === 'fulfilled') {
-      this.branches.set(branchesRes.value);
-    }
-    if (usersRes.status === 'fulfilled') {
-      this.users.set(usersRes.value);
+    try {
+      this.branches.set(await this.lookups.allBranches());
+    } catch {
+      this.branches.set([]);
     }
   }
 
@@ -1024,7 +1010,7 @@ export class PartyDirectoryPage {
         ...(params.owner !== 'ALL' ? { ownerUserId: params.owner } : {}),
       };
 
-      const result = await listParties({
+      const result = await this.api.listParties({
         ...baseQuery,
         ...(params.branch !== 'ALL' ? { branchId: params.branch } : {}),
         page: params.page,
@@ -1032,15 +1018,18 @@ export class PartyDirectoryPage {
       });
       if (seq !== this.loadSeq) return;
       this.rows.set(result.data);
+      this.brokenImageIds.set(new Set());
+      void this.resolveOwners(result.data);
       this.total.set(result.meta.total);
     } catch (error) {
       if (seq !== this.loadSeq) return;
-      if (error instanceof ApiError && error.status === 403) {
+      if (error instanceof ApiError && error.status === 403 && !['TENANT_MAINTENANCE_ACTIVE', 'TENANT_MAINTENANCE_RELEASE_REQUIRED', 'GW.AUTH.CSRF_INVALID'].includes(error.code)) {
         this.forbidden.set(true);
         this.rows.set([]);
         this.total.set(0);
         return;
       }
+      if (error instanceof ApiError && [400, 429].includes(error.status) || ['TENANT_MAINTENANCE_ACTIVE', 'TENANT_MAINTENANCE_RELEASE_REQUIRED', 'ACCESS_POLICY_UNAVAILABLE'].includes(errorCodeOf(error) ?? '')) this.notify.error(this.resolveError(error));
       this.loadFailed.set(true);
       this.errorCorrelationId.set(this.extractCorrelationId(error));
       this.rows.set([]);
@@ -1099,8 +1088,14 @@ export class PartyDirectoryPage {
     }
   }
 
-  private resolveError(error: unknown): string {
-    const msg = errorMessage(error, 'wsParty', this.transloco);
+  private async resolveOwners(rows: PartyListItem[]): Promise<void> {
+    const ids = [...new Set(rows.map((row) => row.ownerUserId).filter((id): id is string => !!id))];
+    const results = await Promise.allSettled(ids.map((id) => this.lookups.user(id)));
+    this.users.set(results.flatMap((result) => result.status === 'fulfilled' ? [result.value] : []));
+  }
+
+  private resolveError(error: unknown, write = false): string {
+    const msg = write ? writeErrorMessage(error, 'wsParty', this.transloco) : errorMessage(error, 'wsParty', this.transloco);
     if (msg && msg !== 'settings.errors.generic') return msg;
     const fallback = this.transloco.translate('wsParty.errors.generic');
     return fallback !== 'wsParty.errors.generic' ? fallback : msg;

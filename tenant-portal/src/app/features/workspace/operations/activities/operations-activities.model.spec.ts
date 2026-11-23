@@ -46,9 +46,10 @@ describe('canActOnActivity (activity-authorizer assertActivityPermission + permi
   });
 });
 
-describe('isForbiddenError', () => {
-  it('is true for any 403: MISSING_REQUIRED_PERMISSIONS and ACTIVITY_ACCESS_DENIED', () => {
+describe('operations-activities model', () => {
+  it('isForbiddenError uses the status', () => {
     expect(isForbiddenError(new ApiError(403, 'MISSING_REQUIRED_PERMISSIONS', { permissions: ['activities.read'] }))).toBe(true);
+    expect(isForbiddenError(new ApiError(403, 'ACCESS_POLICY_BLOCKED'))).toBe(true);
     expect(isForbiddenError(new ActivityError('ACTIVITY_ACCESS_DENIED'))).toBe(true);
   });
 

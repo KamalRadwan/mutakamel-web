@@ -1,3 +1,4 @@
+import { isPartyTenantWide, canOnPartyBranch } from '../party-modal.util';
 import { Component, computed, effect, inject, input, output, signal, untracked, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../../../core/i18n/translation-events';
 import { FormField, form, maxLengthError, readonly, requiredError, submit, validate } from '@angular/forms/signals';
@@ -5,22 +6,16 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerBuilding, tablerLock, tablerPlus, tablerTrash, tablerUser } from '@ng-icons/tabler-icons';
 import { Notify } from '../../../../../../core/notify/notify';
-import { ScopeState } from '../../../../../../core/scope/scope';
 import { Button } from '../../../../../../shared/ui/button/button';
 import { Dropdown, DropdownOption } from '../../../../../../shared/ui/dropdown/dropdown';
 import { Field } from '../../../../../../shared/ui/field/field';
 import { FileDrop } from '../../../../../../shared/ui/file-drop/file-drop';
-import { ApiError, errorCodeOf } from '../../../../staff/shared/staff.api';
-import { StaffSession } from '../../../../staff/shared/staff-session';
-import { Branch } from '../../../../staff/shared/staff.model';
+import { ApiError, errorCodeOf, fieldErrorsOf, isValidationError } from '../../../../../../core/api/api-errors';
+import { TenantScopeState } from '../../../../../../core/scope/tenant-scope';
 import {
-  createParty,
-  deletePartyImage,
-  getParty,
-  partyImageSrc,
-  updateParty,
-  uploadPartyImage,
-} from '../../party-directory.api';
+  WorkspaceBranch as Branch,
+} from '../../../../../../shared/widgets/workspace-lookups/workspace-lookups.model';
+import { PartyDirectoryApi, partyImageSrc } from '../../party-directory.api';
 import {
   ContactMethodType,
   CreatePartyBody,
@@ -31,6 +26,7 @@ import {
   UpdatePartyBody,
 } from '../../party-directory.model';
 import {
+  duplicateContactMessage,
   CONTACT_METHOD_TYPES,
   CONTACT_TYPE_META,
   EditableModalTab,
@@ -97,8 +93,8 @@ export class PartyDetailsTab implements EditableModalTab {
   private static nextContactRowId = 0;
   protected readonly uid = `party-details-tab-${++PartyDetailsTab.nextId}`;
 
-  private readonly session = inject(StaffSession);
-  private readonly scope = inject(ScopeState);
+  private readonly session = inject(TenantScopeState);
+  private readonly api = inject(PartyDirectoryApi);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
@@ -129,6 +125,10 @@ export class PartyDetailsTab implements EditableModalTab {
   protected readonly selectedRoles = signal<PartyRoleType[]>([]);
   protected readonly submitAttempted = signal(false);
 
+  protected readonly imageError = signal<string | null>(null);
+  private readonly brokenImageUrl = signal<string | null>(null);
+  private readonly serverFields = signal<Record<string, { message: string; value: string }>>({});
+  protected readonly roleError = signal<string | null>(null);
   protected readonly uploadingImage = signal(false);
   protected readonly removingImage = signal(false);
   protected readonly imageBusy = computed(() => this.uploadingImage() || this.removingImage());
@@ -136,7 +136,7 @@ export class PartyDetailsTab implements EditableModalTab {
   private readonly fieldsServerError = signal<{ message: string; value: string } | null>(null);
   private readonly branchServerError = signal<{ message: string; value: string | null } | null>(null);
   private readonly ownerServerError = signal<{ message: string; value: string | null } | null>(null);
-  private readonly contactServerErrors = signal<Record<number, string>>({});
+  private readonly contactServerErrors = signal<Record<number, { value?: string; label?: string }>>({});
 
   private displayNameEditedByUser = false;
   private syncedMode: 'create' | 'edit' | null = null;
@@ -202,11 +202,12 @@ export class PartyDetailsTab implements EditableModalTab {
 
   protected readonly imageSrc = computed(() => {
     const current = this.party();
-    return current ? partyImageSrc(current) : null;
+    const url = current ? partyImageSrc(current) : null;
+    return url && url !== this.brokenImageUrl() ? url : null;
   });
 
   protected readonly maxCreateContacts = computed(() =>
-    Math.max(0, Math.min(PARTY_LIMITS.createContactsCap, this.limits().maxContactMethodsPerParty)),
+    Math.max(0, Math.min(PARTY_LIMITS.createContactsCap, (this.limits().maxContactMethodsPerParty ?? PARTY_LIMITS.createContactsCap))),
   );
 
   protected readonly displayNameCount = computed(() => Array.from(this.textDraft().displayName).length);
@@ -227,7 +228,7 @@ export class PartyDetailsTab implements EditableModalTab {
     this.session.me();
     const list = this.branches();
     const currentBranchId = this.party()?.branchId ?? null;
-    const tenantWide = this.session.isTenantWide('directory.party.manage');
+    const tenantWide = isPartyTenantWide(this.session, 'directory.party.manage');
     const options: DropdownOption<string>[] = [];
 
     if (tenantWide || (this.mode() === 'edit' && currentBranchId === null)) {
@@ -238,7 +239,7 @@ export class PartyDetailsTab implements EditableModalTab {
     }
 
     for (const branch of list) {
-      const permitted = this.session.can('directory.party.manage', { branchId: branch.id });
+      const permitted = canOnPartyBranch(this.session, 'directory.party.manage', branch.id);
       const isExisting = this.mode() === 'edit' && branch.id === currentBranchId;
       if ((branch.status === 'ACTIVE' && permitted) || isExisting) {
         options.push({ value: branch.id, label: branch.name });
@@ -321,7 +322,8 @@ export class PartyDetailsTab implements EditableModalTab {
         } else if (!validateContactValue(row.methodType, val)) {
           entry.value = this.transloco.translate('wsPartyModal.validation.contactValueInvalid');
         } else {
-          const norm = `${row.methodType}:${normalizeContactForCompare(row.methodType, val)}`;
+          const family = row.methodType === 'MOBILE' ? 'PHONE' : row.methodType;
+          const norm = `${family}:${normalizeContactForCompare(row.methodType, val)}`;
           if (seen.has(norm)) {
             entry.value = this.transloco.translate('wsPartyModal.validation.contactDuplicateInForm');
           } else {
@@ -331,7 +333,8 @@ export class PartyDetailsTab implements EditableModalTab {
       }
 
       if (!entry.value && serverErrs[row.id]) {
-        entry.value = serverErrs[row.id];
+        entry.value = serverErrs[row.id].value;
+        entry.label ??= serverErrs[row.id].label;
       }
 
       if (entry.value || entry.label) {
@@ -387,6 +390,8 @@ export class PartyDetailsTab implements EditableModalTab {
 
   protected readonly displayNameError = computed(() => {
     this.i18n();
+    const field = this.serverFields()['displayName'];
+    if (field && field.value === this.textDraft().displayName) return field.message;
     const server = this.fieldsServerError();
     if (server && server.value === this.textDraft().displayName.trim()) return server.message;
     const state = this.detailsForm.displayName();
@@ -432,7 +437,7 @@ export class PartyDetailsTab implements EditableModalTab {
       } else if (m === 'create' && !this.dirty() && branchCount > 0) {
         untracked(() => {
           const defaultBranch = this.computeDefaultCreateBranch();
-          if (this.baselineBranchId() === null && defaultBranch !== null && !this.session.isTenantWide('directory.party.manage')) {
+          if (this.baselineBranchId() === null && defaultBranch !== null && !isPartyTenantWide(this.session, 'directory.party.manage')) {
             this.baselineBranchId.set(defaultBranch);
             this.branchId.set(defaultBranch);
           }
@@ -441,11 +446,14 @@ export class PartyDetailsTab implements EditableModalTab {
     });
   }
 
-  protected maxErr(
+  protected fieldError(
+    field: keyof DetailsTextDraft,
     fieldState: { touched(): boolean; errors(): readonly { kind: string }[] },
     max: number,
   ): string | null {
     this.i18n();
+    const server = this.serverFields()[field];
+    if (server && server.value === this.textDraft()[field]) return server.message;
     const err = fieldState.touched() || this.submitAttempted() ? fieldState.errors()[0] : undefined;
     if (!err) return null;
     if (err.kind === 'maxLength') {
@@ -539,13 +547,19 @@ export class PartyDetailsTab implements EditableModalTab {
   protected async onImagePicked(file: File): Promise<void> {
     const current = this.party();
     if (!current || this.readonly() || this.imageBusy()) return;
+    this.imageError.set(null);
     this.uploadingImage.set(true);
     try {
-      const updated = await uploadPartyImage(current.id, file);
+      const updated = await this.api.uploadPartyImage(current.id, file);
+      this.brokenImageUrl.set(null);
       this.notify.success(this.transloco.translate('wsPartyModal.image.uploaded'));
       this.imageChanged.emit(updated);
     } catch (error) {
       const code = errorCodeOf(error);
+      if (code === 'PARTY_IMAGE_REQUIRED' || code === 'PARTY_IMAGE_INVALID' || error instanceof ApiError && [413, 415].includes(error.status)) {
+        this.imageError.set(resolvePartyError(error, this.transloco));
+        return;
+      }
       if (code === 'PARTY_NOT_FOUND' || (error instanceof ApiError && error.status === 404)) {
         this.notify.error(resolvePartyError(error, this.transloco));
         this.deletedRemotely.emit();
@@ -557,11 +571,15 @@ export class PartyDetailsTab implements EditableModalTab {
     }
   }
 
+  protected onImageError(): void {
+    this.brokenImageUrl.set(this.imageSrc());
+  }
+
   protected onImageRejected(reason: 'type' | 'size'): void {
     if (reason === 'size') {
-      this.notify.error(this.transloco.translate('wsPartyModal.image.tooLarge'));
+      this.imageError.set(this.transloco.translate('wsPartyModal.image.tooLarge'));
     } else {
-      this.notify.error(this.transloco.translate('wsPartyModal.image.invalidType'));
+      this.imageError.set(this.transloco.translate('wsPartyModal.image.invalidType'));
     }
   }
 
@@ -570,8 +588,8 @@ export class PartyDetailsTab implements EditableModalTab {
     if (!current || this.readonly() || this.imageBusy() || !this.imageSrc()) return;
     this.removingImage.set(true);
     try {
-      await deletePartyImage(current.id);
-      const fresh = await getParty(current.id).catch(() => ({
+      await this.api.deletePartyImage(current.id);
+      const fresh = await this.api.getParty(current.id).catch(() => ({
         ...current,
         imageUrl: null,
         imageRevision: null,
@@ -580,6 +598,10 @@ export class PartyDetailsTab implements EditableModalTab {
       this.imageChanged.emit(fresh);
     } catch (error) {
       const code = errorCodeOf(error);
+      if (code === 'PARTY_IMAGE_NOT_FOUND') {
+        this.imageChanged.emit({ ...current, imageUrl: null, imageRevision: null });
+        return;
+      }
       if (code === 'PARTY_NOT_FOUND' || (error instanceof ApiError && error.status === 404)) {
         this.notify.error(resolvePartyError(error, this.transloco));
         this.deletedRemotely.emit();
@@ -679,7 +701,7 @@ export class PartyDetailsTab implements EditableModalTab {
     }
 
     try {
-      const createdParty = await createParty(body);
+      const createdParty = await this.api.createParty(body);
       this.notify.success(this.transloco.translate('wsPartyModal.toast.created'));
       this.syncedMode = 'edit';
       this.syncedType = createdParty.partyType;
@@ -744,7 +766,7 @@ export class PartyDetailsTab implements EditableModalTab {
     }
 
     try {
-      const updated = await updateParty(base.id, patch);
+      const updated = await this.api.updateParty(base.id, patch);
       this.notify.success(this.transloco.translate('wsPartyModal.toast.saved'));
       this.syncedMode = 'edit';
       this.syncedType = updated.partyType;
@@ -767,11 +789,37 @@ export class PartyDetailsTab implements EditableModalTab {
 
   private handleSaveError(error: unknown): void {
     const code = errorCodeOf(error);
+    if (isValidationError(error)) {
+      const fields = fieldErrorsOf(error);
+      const message = resolvePartyError(error, this.transloco);
+      const textErrors: Record<string, { message: string; value: string }> = {};
+      const contactErrors: Record<number, { value?: string; label?: string }> = {};
+      for (const field of Object.keys(fields)) {
+        if (field in this.textDraft()) textErrors[field] = { message, value: this.textDraft()[field as keyof DetailsTextDraft] };
+        else if (field === 'branchId') this.branchServerError.set({ message, value: this.branchId() });
+        else if (field === 'ownerUserId') this.ownerServerError.set({ message, value: this.ownerUserId() });
+        else if (field.startsWith('roles')) this.roleError.set(message);
+        else {
+          const match = /^contactMethods\.(\d+)(?:\.|$)/.exec(field);
+          const row = match ? this.contactRows()[Number(match[1])] : null;
+          if (row) contactErrors[row.id] = { ...contactErrors[row.id], [field.endsWith('.label') ? 'label' : 'value']: message };
+          else this.notify.error(message);
+        }
+      }
+      this.serverFields.set(textErrors);
+      this.contactServerErrors.set(contactErrors);
+      if (!Object.keys(fields).length) this.notify.error(message);
+      return;
+    }
     if (code === 'PARTY_FIELDS_INVALID') {
       this.fieldsServerError.set({
         message: resolvePartyError(error, this.transloco),
         value: this.textDraft().displayName.trim(),
       });
+      return;
+    }
+    if (code === 'PARTY_ROLE_ALREADY_EXISTS' || code === 'PARTY_ROLE_METADATA_INVALID') {
+      this.roleError.set(resolvePartyError(error, this.transloco));
       return;
     }
     if (code === 'PARTY_BRANCH_INVALID') {
@@ -794,13 +842,12 @@ export class PartyDetailsTab implements EditableModalTab {
     ) {
       const rows = this.contactRows();
       if (rows.length > 0) {
-        const message =
-          code === 'PARTY_DUPLICATE_CONTACT_METHOD'
-            ? this.transloco.translate('wsPartyModal.contacts.duplicateError')
-            : resolvePartyError(error, this.transloco);
-        const target =
-          rows.find((row) => !validateContactValue(row.methodType, row.value)) ?? rows[0];
-        this.contactServerErrors.set({ [target.id]: message });
+        const methodType = error instanceof ApiError ? error.details?.['methodType'] : null;
+        const target = rows.find((row) => Array.isArray(methodType) && methodType.includes(row.methodType))
+          ?? rows.find((row) => !validateContactValue(row.methodType, row.value)) ?? rows[0];
+        const message = code === 'PARTY_DUPLICATE_CONTACT_METHOD'
+          ? duplicateContactMessage(target.methodType, this.transloco) : resolvePartyError(error, this.transloco);
+        this.contactServerErrors.set({ [target.id]: { value: message } });
         return;
       }
     }
@@ -850,13 +897,13 @@ export class PartyDetailsTab implements EditableModalTab {
   }
 
   private computeDefaultCreateBranch(): string | null {
-    if (this.session.isTenantWide('directory.party.manage')) {
+    if (isPartyTenantWide(this.session, 'directory.party.manage')) {
       return null;
     }
     const activePermitted = this.branches().filter(
-      (b) => b.status === 'ACTIVE' && this.session.can('directory.party.manage', { branchId: b.id }),
+      (b) => b.status === 'ACTIVE' && canOnPartyBranch(this.session, 'directory.party.manage', b.id),
     );
-    const scopeBranchId = this.scope.branch()?.id;
+    const scopeBranchId = this.session.selection()?.branchId;
     if (scopeBranchId && activePermitted.some((b) => b.id === scopeBranchId)) {
       return scopeBranchId;
     }
@@ -864,6 +911,8 @@ export class PartyDetailsTab implements EditableModalTab {
   }
 
   private clearServerErrors(): void {
+    this.serverFields.set({});
+    this.roleError.set(null);
     this.fieldsServerError.set(null);
     this.branchServerError.set(null);
     this.ownerServerError.set(null);

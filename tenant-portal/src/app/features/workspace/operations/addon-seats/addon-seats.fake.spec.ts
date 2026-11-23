@@ -4,7 +4,7 @@ import type { Me } from '../../staff/shared/staff.model';
 import { setFakeActorOverride } from '../shared/fake-actor';
 
 
-import { newIdempotencyKey } from '../../staff/shared/staff.api';
+import { newIdempotencyKey } from '../../../../core/api/idempotency';
 import { resetStaffFake } from '../../staff/shared/staff.fake';
 import {
   fakeAssignAddon,
@@ -13,6 +13,7 @@ import {
   fakeRemoveAddon,
   resetAddonSeatsFake,
   setFakeAddonLocalState,
+  setFakeAddonFailure,
 } from './addon-seats.fake';
 
 async function settle<T>(promise: Promise<T>): Promise<T> {
@@ -108,6 +109,34 @@ describe('addon seats fake (Core application-access contract)', () => {
       ),
     );
     expect([error.status, error.code]).toEqual([400, 'INVALID_IDEMPOTENCY_KEY']);
+  });
+
+  it('returns the live selection seat count in options', async () => {
+    const page = await settle(fakeListAddonOptions('u-mona'));
+    expect(page.data.find((item) => item.addonSelectionId === HOMES_SELECTION)?.seats).toEqual({ used: 3, total: 3 });
+  });
+
+  it('rejects both writes with MISSING_REQUIRED_PERMISSIONS before their input checks', async () => {
+    setFakeActorOverride(scopedActor({}));
+    const assign = await failure(fakeAssignAddon('u-mona', {
+      addonSelectionId: HOMES_SELECTION, expectedAllowanceRevision: '1', expectedParentAssignmentRevision: '1',
+    }, newIdempotencyKey()));
+    const remove = await failure(fakeRemoveAddon('u-mona', 'assignment', {
+      expectedAssignmentRevision: '1', expectedAllowanceRevision: '1',
+    }, newIdempotencyKey()));
+    expect([assign.code, remove.code]).toEqual(['MISSING_REQUIRED_PERMISSIONS', 'MISSING_REQUIRED_PERMISSIONS']);
+  });
+
+  it.each([
+    new ApiError(403, 'TENANT_MAINTENANCE_ACTIVE'),
+    new ApiError(429, 'GW.RATE.LIMIT_EXCEEDED', { retryAfterSeconds: ['12'] }),
+    new ApiError(0, 'NETWORK_ERROR'),
+  ])('can simulate a shared transport failure: $code', async (expected) => {
+    setFakeAddonFailure(expected);
+    const error = await failure(fakeAssignAddon('u-mona', {
+      addonSelectionId: HOMES_SELECTION, expectedAllowanceRevision: '1', expectedParentAssignmentRevision: '1',
+    }, newIdempotencyKey()));
+    expect(error).toBe(expected);
   });
 
   it('treats an unknown addon selection as 409 APPLICATION_ALLOWANCE_NOT_READY', async () => {

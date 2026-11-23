@@ -27,13 +27,8 @@ import { Dropdown, DropdownOption } from '../../../../../../shared/ui/dropdown/d
 import { Field } from '../../../../../../shared/ui/field/field';
 import { UnsavedDialog } from '../../../../../../shared/ui/unsaved-dialog/unsaved-dialog';
 import { PhoneActionSource, PhoneActions } from '../../../../../../shared/widgets/phone-actions/phone-actions';
-import { ApiError, errorCodeOf } from '../../../../staff/shared/staff.api';
-import {
-  addContactMethod,
-  deleteContactMethod,
-  getParty,
-  updateContactMethod,
-} from '../../party-directory.api';
+import { ApiError, errorCodeOf, fieldErrorsOf, isValidationError } from '../../../../../../core/api/api-errors';
+import { PartyDirectoryApi } from '../../party-directory.api';
 import {
   ContactMethodType,
   CreateContactMethodBody,
@@ -42,6 +37,7 @@ import {
   UpdateContactMethodBody,
 } from '../../party-directory.model';
 import {
+  duplicateContactMessage,
   CONTACT_METHOD_TYPES,
   CONTACT_TYPE_META,
   EditableModalTab,
@@ -102,6 +98,7 @@ export class PartyContactsTab implements EditableModalTab {
   private static nextId = 0;
   protected readonly uid = `party-contacts-tab-${++PartyContactsTab.nextId}`;
 
+  private readonly api = inject(PartyDirectoryApi);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
@@ -110,7 +107,7 @@ export class PartyContactsTab implements EditableModalTab {
   private readonly unsavedDialog = viewChild.required<UnsavedDialog>('unsavedDialog');
 
   readonly party = input.required<PartyDetail>();
-  readonly maxContacts = input<number>(PARTY_LIMITS.defaultMaxContacts);
+  readonly maxContacts = input<number | null>(null);
   readonly readonly = input(false);
 
   readonly partyUpdated = output<PartyDetail>();
@@ -134,6 +131,7 @@ export class PartyContactsTab implements EditableModalTab {
   protected readonly submitAttempted = signal(false);
   protected readonly busyRowId = signal<string | null>(null);
   protected readonly deletingValue = signal('');
+  protected readonly labelServerError = signal<string | null>(null);
   private readonly valueServerError = signal<{ message: string; value: string; type: ContactMethodType } | null>(
     null,
   );
@@ -174,7 +172,7 @@ export class PartyContactsTab implements EditableModalTab {
   });
 
   protected readonly contacts = computed(() => this.party().contactMethods);
-  protected readonly atLimit = computed(() => this.contacts().length >= this.maxContacts());
+  protected readonly atLimit = computed(() => this.maxContacts() !== null && this.contacts().length >= this.maxContacts()!);
 
   protected readonly phoneSource = computed<PhoneActionSource>(() => ({
     type: 'PARTY',
@@ -216,6 +214,7 @@ export class PartyContactsTab implements EditableModalTab {
   });
 
   protected readonly labelError = computed(() => {
+    if (this.labelServerError()) return this.labelServerError();
     this.i18n();
     const state = this.contactForm.label();
     const err = state.touched() || this.submitAttempted() ? state.errors()[0] : undefined;
@@ -294,6 +293,7 @@ export class PartyContactsTab implements EditableModalTab {
     const key = this.editingKey();
     if (this.readonly() || this.contactForm().submitting() || key === null) return false;
 
+    this.labelServerError.set(null);
     this.submitAttempted.set(true);
     this.valueServerError.set(null);
     const trimmedVal = this.draft().value.trim();
@@ -311,7 +311,7 @@ export class PartyContactsTab implements EditableModalTab {
             ...(trimmedLabel ? { label: trimmedLabel } : {}),
             ...(primary ? { isPrimary: true } : {}),
           };
-          await addContactMethod(this.party().id, body);
+          await this.api.addContactMethod(this.party().id, body);
           this.notify.success(this.transloco.translate('wsPartyModal.contacts.added'));
         } else {
           const existing = this.contacts().find((c) => c.id === key);
@@ -322,7 +322,7 @@ export class PartyContactsTab implements EditableModalTab {
           if (trimmedLabel !== (existing.label ?? '')) patch.label = trimmedLabel;
           if (primary !== existing.isPrimary) patch.isPrimary = primary;
           if (Object.keys(patch).length > 0) {
-            await updateContactMethod(existing.id, patch);
+            await this.api.updateContactMethod(existing.id, patch);
             this.notify.success(this.transloco.translate('wsPartyModal.contacts.saved'));
           }
         }
@@ -344,7 +344,7 @@ export class PartyContactsTab implements EditableModalTab {
 
     this.busyRowId.set(item.id);
     try {
-      await updateContactMethod(item.id, { isPrimary: true });
+      await this.api.updateContactMethod(item.id, { isPrimary: true });
       await this.reloadParty();
       this.notify.success(this.transloco.translate('wsPartyModal.contacts.primaryUpdated'));
     } catch (error) {
@@ -362,7 +362,7 @@ export class PartyContactsTab implements EditableModalTab {
 
     this.busyRowId.set(item.id);
     try {
-      await deleteContactMethod(item.id);
+      await this.api.deleteContactMethod(item.id);
       if (this.editingKey() === item.id) {
         this.resetEditState();
       }
@@ -376,12 +376,20 @@ export class PartyContactsTab implements EditableModalTab {
   }
 
   private async reloadParty(): Promise<void> {
-    const fresh = await getParty(this.party().id);
+    const fresh = await this.api.getParty(this.party().id);
     this.partyUpdated.emit(fresh);
   }
 
   private handleMutationError(error: unknown, value = '', type: ContactMethodType = 'MOBILE'): void {
     const code = errorCodeOf(error);
+    if (isValidationError(error)) {
+      const fields = fieldErrorsOf(error);
+      const message = resolvePartyError(error, this.transloco);
+      if (fields['label']) this.labelServerError.set(message);
+      if (fields['value'] || fields['methodType']) this.valueServerError.set({ message, value, type });
+      if (!fields['label'] && !fields['value'] && !fields['methodType']) this.notify.error(message);
+      return;
+    }
     if (code === 'PARTY_CONTACT_VALUE_INVALID') {
       this.valueServerError.set({
         message: resolvePartyError(error, this.transloco),
@@ -392,7 +400,7 @@ export class PartyContactsTab implements EditableModalTab {
     }
     if (code === 'PARTY_DUPLICATE_CONTACT_METHOD') {
       this.valueServerError.set({
-        message: this.transloco.translate('wsPartyModal.contacts.duplicateError'),
+        message: duplicateContactMessage(type, this.transloco),
         value,
         type,
       });
@@ -404,6 +412,10 @@ export class PartyContactsTab implements EditableModalTab {
       return;
     }
     this.notify.error(resolvePartyError(error, this.transloco));
+    if (code === 'PARTY_CONTACT_METHOD_NOT_FOUND') {
+      this.resetEditState();
+      void this.reloadParty().catch((failure) => this.notify.error(resolvePartyError(failure, this.transloco, 'read')));
+    }
   }
 
   private async resolveActiveEdit(): Promise<boolean> {
@@ -427,6 +439,7 @@ export class PartyContactsTab implements EditableModalTab {
   }
 
   private resetEditState(): void {
+    this.labelServerError.set(null);
     this.editingKey.set(null);
     this.submitAttempted.set(false);
     this.valueServerError.set(null);

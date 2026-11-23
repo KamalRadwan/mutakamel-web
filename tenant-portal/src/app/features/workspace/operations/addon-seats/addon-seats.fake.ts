@@ -1,7 +1,7 @@
 import { FAKE_ADDON_HOMES, FAKE_ADDON_WHATSAPP } from '../../billing/shared/addon-catalogue.fake';
 import { listSeatHolders } from '../../seats/seats.api';
 import { ApiError } from '../../../../core/api/api-errors';
-import { newIdempotencyKey } from '../../staff/shared/staff.api';
+import { newIdempotencyKey } from '../../../../core/api/idempotency';
 import { getStaffSeatSource } from '../../staff/shared/staff.fake';
 import { fakeActorMe } from '../shared/fake-actor';
 import {
@@ -25,7 +25,7 @@ interface FakeAddonAllowance {
   allowanceId: string;
   allowanceRevision: string;
   selectedDefinitionVersionId: string;
-  capacity: number; // Enforced internally only; never returned by S1/S2 by design.
+  capacity: number;
   localState: AddonOptionLocalState;
 }
 
@@ -173,12 +173,18 @@ let allowances: FakeAddonAllowance[] = createInitialAllowances();
 let liveAssignments: StoredAddonAssignment[] = createInitialAssignments();
 let removedAssignments = new Map<string, RemovedAddonAssignment>();
 let idempotencyStore = new Map<string, IdempotencyEntry>();
+let nextFailure: ApiError | null = null;
 
 export function resetAddonSeatsFake(): void {
   allowances = createInitialAllowances();
   liveAssignments = createInitialAssignments();
   removedAssignments = new Map<string, RemovedAddonAssignment>();
   idempotencyStore = new Map<string, IdempotencyEntry>();
+  nextFailure = null;
+}
+
+export function setFakeAddonFailure(error: ApiError): void {
+  nextFailure = error;
 }
 
 export function setFakeAddonLocalState(addonKey: string, patch: Partial<AddonOptionLocalState>): void {
@@ -188,8 +194,13 @@ export function setFakeAddonLocalState(addonKey: string, patch: Partial<AddonOpt
   allowance.allowanceRevision = String(Number(allowance.allowanceRevision) + 1);
 }
 
-function fakeDelay(ms = 200): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+async function fakeDelay(ms = 200): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+  if (nextFailure) {
+    const error = nextFailure;
+    nextFailure = null;
+    throw error;
+  }
 }
 
 function clone<T>(value: T): T {
@@ -422,6 +433,10 @@ export async function fakeListAddonOptions(
         parentAssignment: parentByApp.get(allowance.applicationKey) ?? null,
         assignment: existing ? { id: existing.assignmentId, revision: existing.assignmentRevision } : null,
         localState: { ...allowance.localState },
+        seats: {
+          used: liveAssignments.filter((row) => row.addonSelectionId === allowance.addonSelectionId).length,
+          total: allowance.capacity,
+        },
         observation: 'LOCAL_PROJECTION',
         operationalUse: 'NOT_EVALUATED',
       };

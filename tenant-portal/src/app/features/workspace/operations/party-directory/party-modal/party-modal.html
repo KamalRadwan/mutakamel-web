@@ -89,18 +89,11 @@
         </div>
       </div>
     } @else if (mode() === 'edit' && loadFailed()) {
-      <div class="flex min-h-0 flex-1 flex-col items-center justify-center gap-8 p-16 text-center" role="alert">
-        <span
-          class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon"
-          aria-hidden="true"
-        >
-          <ng-icon name="tablerCloudOff" size="20" />
-        </span>
-        <p class="text-12 text-danger-text">{{ 'wsPartyModal.loadFailed' | transloco }}</p>
-        <button type="button" uiButton variant="secondary" size="small" (click)="retryLoad()">
-          {{ 'wsPartyModal.common.retry' | transloco }}
-        </button>
-      </div>
+      <ui-full-state kind="load-failure"
+        [title]="'wsPartyModal.loadFailed' | transloco"
+        [text]="loadReference() ? ('wsParty.states.referenceLabel' | transloco) + ' ' + loadReference() : ''"
+        [actionLabel]="'wsPartyModal.common.retry' | transloco"
+        (action)="retryLoad()" />
     } @else if (isOpen() && mode() === 'create') {
       <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
         <app-party-details-tab
@@ -160,6 +153,7 @@
             <app-party-roles-tab
               [party]="p"
               [branches]="branches()"
+              [readonly]="rolesReadonly()"
               (partyUpdated)="onPartyUpdated($event)"
               (deletedRemotely)="onDeletedRemotely()"
             />
@@ -169,7 +163,7 @@
               [party]="p"
               [readonly]="peopleReadonly()"
               (openPerson)="openLinkedPerson($event)"
-              (changed)="onPeopleChanged()"
+              (partyUpdated)="onPartyUpdated($event)"
             />
           }
         }
