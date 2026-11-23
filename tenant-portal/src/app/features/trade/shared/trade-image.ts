@@ -1,39 +1,34 @@
+import { scopeFor, type TradeContext } from './trade-api';
 import type { ItemImageSummary } from './trade-foundation.model';
+import { tradeHttp } from './trade-http';
 
-function hashIndex(id: string): number {
-  let hash = 0;
-  for (let i = 0; i < id.length; i += 1) {
-    hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
-  }
-  return (hash % 10) + 1;
-}
+export type ItemImageRendition = 'thumb' | 'print';
 
-function readToken(varName: string): string {
-  if (typeof document === 'undefined') {
-    return 'currentColor';
-  }
-  const value = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
-  return value || 'currentColor';
-}
-
-export async function itemThumbUrl(itemId: string, image: ItemImageSummary | null): Promise<string | null> {
+// GET /api/tenant/trade/v1/items/:id/images/:imageId/:rendition (raw binary blob, OPTIONAL scope)
+export async function itemImageRenditionUrl(
+  itemId: string,
+  image: Pick<ItemImageSummary, 'id'> | null,
+  rendition: ItemImageRendition = 'thumb',
+  ctx: TradeContext = {},
+): Promise<string | null> {
   if (!image) {
     return null;
   }
+  const scope = scopeFor(ctx, 'OPTIONAL');
+  const blob = await tradeHttp().readBlob(
+    `/items/${encodeURIComponent(itemId)}/images/${encodeURIComponent(image.id)}/${rendition}`,
+    undefined,
+    { scope },
+  );
+  return URL.createObjectURL(blob);
+}
 
-  // Real API: GET /api/tenant/trade/v1/items/{itemId}/images/{image.id}/thumb as a blob with auth headers -> URL.createObjectURL(blob)
-  const bg = readToken(`--chart-${hashIndex(itemId)}`);
-  const fg = readToken('--on-icon');
-
-  const svg = [
-    '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">',
-    `<rect width="256" height="256" rx="32" fill="${bg}"/>`,
-    `<rect x="64" y="64" width="128" height="128" rx="20" fill="${fg}" opacity="0.35"/>`,
-    `<circle cx="128" cy="128" r="32" fill="${fg}" opacity="0.35"/>`,
-    '</svg>',
-  ].join('');
-
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+export function itemThumbUrl(
+  itemId: string,
+  image: ItemImageSummary | null,
+  ctx: TradeContext = {},
+): Promise<string | null> {
+  return itemImageRenditionUrl(itemId, image, 'thumb', ctx);
 }
 
 export function releaseThumbUrl(url: string | null | undefined): void {

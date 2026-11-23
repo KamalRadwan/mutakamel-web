@@ -1,4 +1,5 @@
 import { Injectable, computed, signal } from '@angular/core';
+import { ApiError } from '../../shared/trade-api';
 import { countCategories, getTreeLevel } from './categories.api';
 import type { CategoryPathStep, CategorySummary } from './categories.model';
 
@@ -24,6 +25,7 @@ export class CategoriesService {
   readonly counts = signal<CategoryCounts>({ all: 0, active: 0, inactive: 0 });
   readonly initialLoading = signal(false);
   readonly loadFailed = signal(false);
+  readonly forbidden = signal(false);
   readonly expandingAll = signal(false);
 
   readonly roots = computed<CategorySummary[]>(() => this.levels().get(ROOT_LEVEL_KEY) ?? []);
@@ -66,11 +68,16 @@ export class CategoriesService {
     const seq = ++this.initialSeq;
     this.initialLoading.set(true);
     this.loadFailed.set(false);
+    this.forbidden.set(false);
     try {
       await Promise.all([this.loadLevel(null, { force: true }), this.refreshCounts()]);
-    } catch {
+    } catch (error) {
       if (seq === this.initialSeq) {
-        this.loadFailed.set(true);
+        if (error instanceof ApiError && error.status === 403) {
+          this.forbidden.set(true);
+        } else {
+          this.loadFailed.set(true);
+        }
       }
     } finally {
       if (seq === this.initialSeq) {

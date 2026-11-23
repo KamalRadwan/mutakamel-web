@@ -8,6 +8,7 @@ import {
   inject,
   input,
   linkedSignal,
+  runInInjectionContext,
   signal,
   untracked,
   viewChild,
@@ -38,10 +39,12 @@ import {
 } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
-import { errorCodeOf, errorKey, newIdempotencyKey } from '../../shared/trade-api';
+import { tenantWide } from '../../shared/trade-access';
+import { ApiError, errorCodeOf, errorKey, newIdempotencyKey } from '../../shared/trade-api';
 import { actionKey } from '../action-keys';
 import { ActionItem, ActionSelection, ActionsMenu } from '../../../../shared/ui/actions-menu/actions-menu';
 import { Button } from '../../../../shared/ui/button/button';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { Modal } from '../../../../shared/ui/modal/modal';
 import { StepFilter, StepOption } from '../../../../shared/ui/step-filter/step-filter';
 import { ViewOption, ViewSwitcher } from '../../../../shared/ui/view-switcher/view-switcher';
@@ -83,8 +86,6 @@ import { type CategoryMoveConfirmEvent, CategoryMoveDialog } from './category-mo
 import { type CategoryReasonMode, CategoryReasonDialog } from './category-reason-dialog/category-reason-dialog';
 import { CategoryTreeColumns } from './category-tree-columns/category-tree-columns';
 import { CategoryTreeRows } from './category-tree-rows/category-tree-rows';
-
-const CAN_MANAGE = true; // later from the session permissions
 
 const SEARCH_DEBOUNCE_MS = 300;
 const RESULTS_PAGE_LIMIT = 100;
@@ -129,6 +130,7 @@ type PendingConflict =
     TranslocoPipe,
     ActionsMenu,
     Button,
+    FullState,
     Modal,
     StepFilter,
     ViewSwitcher,
@@ -191,7 +193,9 @@ export class CategoriesPage {
   readonly view = input<string>();
   readonly status = input<string>();
 
-  protected readonly canManage = CAN_MANAGE;
+  protected readonly canManage = computed(() =>
+    runInInjectionContext(this.injector, () => tenantWide('trade.catalog_master.manage')),
+  );
   protected readonly searchMax = CATEGORY_NAME_MAX;
   protected readonly skeletonRows = [1, 2, 3, 4, 5, 6];
 
@@ -213,7 +217,9 @@ export class CategoriesPage {
   protected readonly resultsLoading = signal(false);
   protected readonly resultsLoadingMore = signal(false);
   protected readonly resultsFailed = signal(false);
+  private readonly resultsForbidden = signal(false);
 
+  protected readonly forbidden = computed(() => this.service.forbidden() || this.resultsForbidden());
   protected readonly conflictBusy = signal(false);
 
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
@@ -263,6 +269,7 @@ export class CategoriesPage {
 
   protected readonly actionsForNode = computed<(node: CategorySummary) => ActionItem[]>(() => {
     this.i18n();
+    this.canManage();
     return (node: CategorySummary) => this.buildNodeActions(node);
   });
 
@@ -282,6 +289,7 @@ export class CategoriesPage {
           this.resultsLoading.set(false);
           this.resultsLoadingMore.set(false);
           this.resultsFailed.set(false);
+          this.resultsForbidden.set(false);
         });
         return;
       }
@@ -295,7 +303,13 @@ export class CategoriesPage {
         return;
       }
       untracked(() => {
-        void this.service.reloadAllLoaded().catch((error) => this.toastError(error));
+        void this.service.reloadAllLoaded().catch((error) => {
+          if (error instanceof ApiError && error.status === 403) {
+            this.service.forbidden.set(true);
+            return;
+          }
+          this.toastError(error);
+        });
         if (this.isResultsMode()) {
           void this.loadResults(1, false);
         }
@@ -303,7 +317,12 @@ export class CategoriesPage {
     });
   }
 
+  protected goHome(): void {
+    void this.router.navigateByUrl('/');
+  }
+
   protected reload(): void {
+    this.resultsForbidden.set(false);
     if (this.isResultsMode()) {
       void Promise.all([this.loadResults(1, false), this.service.refreshCounts().catch(() => undefined)]);
       return;
@@ -312,7 +331,7 @@ export class CategoriesPage {
   }
 
   protected openCreateRoot(): void {
-    if (!this.canManage) return;
+    if (!this.canManage()) return;
     this.categoryModal().openCreate(null);
   }
 
@@ -371,6 +390,10 @@ export class CategoriesPage {
     try {
       await this.service.toggleExpand(id);
     } catch (error) {
+      if (error instanceof ApiError && error.status === 403) {
+        this.service.forbidden.set(true);
+        return;
+      }
       this.toastError(error);
     }
   }
@@ -408,34 +431,34 @@ export class CategoriesPage {
         return;
 
       case 'addChild':
-        if (!this.canManage || node.depth >= 8 || !node.effectiveActive) return;
+        if (!this.canManage() || node.depth >= 8 || !node.effectiveActive) return;
         this.categoryModal().openCreate(node);
         return;
 
       case 'move':
-        if (!this.canManage) return;
+        if (!this.canManage()) return;
         this.moveDialog().open(node);
         return;
 
       case 'moveUp':
-        if (!this.canManage) return;
+        if (!this.canManage()) return;
         await this.stepSibling(node, -1);
         return;
 
       case 'moveDown':
-        if (!this.canManage) return;
+        if (!this.canManage()) return;
         await this.stepSibling(node, 1);
         return;
 
       case 'activate':
       case 'deactivate':
-        if (!this.canManage) return;
+        if (!this.canManage()) return;
         if (action === 'activate' && node.inactiveAncestorId !== null) return;
         this.openReasonPrompt(action, node);
         return;
 
       case 'delete':
-        if (!this.canManage) return;
+        if (!this.canManage()) return;
         await this.startDelete(node);
         return;
 
@@ -446,7 +469,7 @@ export class CategoriesPage {
   }
 
   protected async onTreeReorder(event: CategoryReorderEvent): Promise<void> {
-    if (!this.canManage) return;
+    if (!this.canManage()) return;
     const node = this.service.nodesById().get(event.id);
     if (!node) return;
     await this.executeReorder(event.id, event.parentId, event.beforeId, node.version, this.service.treeVersion());
@@ -477,14 +500,14 @@ export class CategoriesPage {
   }
 
   protected onModalStatusRequested(detail: CategoryDetail): void {
-    if (!this.canManage) return;
+    if (!this.canManage()) return;
     const mode: CategoryReasonMode = detail.status === 'ACTIVE' ? 'deactivate' : 'activate';
     if (mode === 'activate' && detail.inactiveAncestorId !== null) return;
     this.openReasonPrompt(mode, detail);
   }
 
   protected async onModalDeleteRequested(detail: CategoryDetail): Promise<void> {
-    if (!this.canManage) return;
+    if (!this.canManage()) return;
     if (!detail.usage.canDelete) {
       this.notifyDeleteBlockers(detail);
       return;
@@ -493,7 +516,7 @@ export class CategoriesPage {
   }
 
   protected async onMoveConfirmed(event: CategoryMoveConfirmEvent): Promise<void> {
-    if (!this.canManage) return;
+    if (!this.canManage()) return;
     const { source, targetParentId } = event;
     const expectedTreeVersion = Math.max(this.service.treeVersion(), source.treeVersion);
     const body = { expectedTreeVersion, parentId: targetParentId, beforeId: null };
@@ -508,7 +531,11 @@ export class CategoriesPage {
       await this.refreshAfterMove(source.id, source.parentId, targetParentId);
       this.toastReceipt(receipt, 'tradeCategories.toast.moved');
     } catch (error) {
-      if (errorCodeOf(error) === 'TRADE.CONCURRENCY.STALE_VERSION') {
+      const code = errorCodeOf(error);
+      if (code === 'GW.IDEM.MISMATCH' || code === 'TRADE.IDEMPOTENCY.MISMATCH') {
+        action.done();
+      }
+      if (code === 'TRADE.CONCURRENCY.STALE_VERSION') {
         this.pendingConflict.set({
           kind: 'move',
           id: source.id,
@@ -527,9 +554,10 @@ export class CategoriesPage {
 
   protected async onReasonConfirmed(submission: CategoryReasonPayload): Promise<void> {
     const pending = this.pendingReasonAction;
-    if (!pending || !this.canManage) return;
+    if (!pending || !this.canManage()) return;
 
     this.reasonDialog().setSubmitting(true);
+    let currentAction: { key: string; done: () => void } | null = null;
     try {
       const expectedTreeVersion = this.service.treeVersion();
 
@@ -540,6 +568,7 @@ export class CategoriesPage {
           ...(submission.reasonNote ? { reasonNote: submission.reasonNote } : {}),
         };
         const action = actionKey('delete', pending.node.id, pending.node.version, body);
+        currentAction = action;
         const receipt = await deleteCategory(pending.node.id, body, pending.node.version, action.key);
         action.done();
         this.service.observeTreeVersion(receipt.treeVersion);
@@ -558,6 +587,7 @@ export class CategoriesPage {
         ...(submission.reasonNote ? { reasonNote: submission.reasonNote } : {}),
       };
       const action = actionKey('status', pending.node.id, pending.node.version, body);
+      currentAction = action;
       const receipt = await setCategoryStatus(pending.node.id, body, pending.node.version, action.key);
       action.done();
       this.service.observeTreeVersion(receipt.treeVersion);
@@ -566,7 +596,11 @@ export class CategoriesPage {
       await this.refreshAfterStatus(pending.node.id, pending.node.parentId);
       this.toastReceipt(receipt, 'tradeCategories.toast.statusChanged');
     } catch (error) {
-      if (errorCodeOf(error) === 'TRADE.CONCURRENCY.STALE_VERSION') {
+      const code = errorCodeOf(error);
+      if (code === 'GW.IDEM.MISMATCH' || code === 'TRADE.IDEMPOTENCY.MISMATCH') {
+        currentAction?.done();
+      }
+      if (code === 'TRADE.CONCURRENCY.STALE_VERSION') {
         const stale = staleKindOf(error);
         if (pending.kind === 'delete') {
           this.pendingConflict.set({
@@ -796,7 +830,7 @@ export class CategoriesPage {
   }
 
   private buildNodeActions(node: CategorySummary): ActionItem[] {
-    if (!this.canManage) {
+    if (!this.canManage()) {
       return [
         {
           id: 'open',
@@ -928,8 +962,10 @@ export class CategoriesPage {
     version: number,
     expectedTreeVersion: number,
   ): Promise<void> {
+    let currentAction: { key: string; done: () => void } | null = null;
     try {
       const action = actionKey('reorder', id, version, expectedTreeVersion, beforeId);
+      currentAction = action;
       const receipt = await reorderCategory(id, { expectedTreeVersion, beforeId }, version, action.key);
       action.done();
       this.service.observeTreeVersion(receipt.treeVersion);
@@ -937,7 +973,11 @@ export class CategoriesPage {
       await this.afterWriteCommon();
       this.toastReceipt(receipt, 'tradeCategories.toast.saved');
     } catch (error) {
-      if (errorCodeOf(error) === 'TRADE.CONCURRENCY.STALE_VERSION') {
+      const code = errorCodeOf(error);
+      if (code === 'GW.IDEM.MISMATCH' || code === 'TRADE.IDEMPOTENCY.MISMATCH') {
+        currentAction?.done();
+      }
+      if (code === 'TRADE.CONCURRENCY.STALE_VERSION') {
         this.pendingConflict.set({
           kind: 'reorder',
           id,
@@ -1050,6 +1090,7 @@ export class CategoriesPage {
     } else {
       this.resultsLoading.set(true);
       this.resultsFailed.set(false);
+      this.resultsForbidden.set(false);
     }
 
     try {
@@ -1073,6 +1114,10 @@ export class CategoriesPage {
       this.results.update((prev) => (append ? [...prev, ...response.items] : response.items));
     } catch (error) {
       if (seq !== this.resultsSeq) return;
+      if (error instanceof ApiError && error.status === 403) {
+        this.resultsForbidden.set(true);
+        return;
+      }
       if (append) {
         this.toastError(error);
       } else {

@@ -1,4 +1,4 @@
-import { Component, DestroyRef, ElementRef, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, Injector, computed, effect, inject, runInInjectionContext, signal, untracked, viewChild } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { translationEvents } from '../../../../core/i18n/translation-events';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -12,12 +12,16 @@ import {
   tablerSearch,
   tablerX,
 } from '@ng-icons/tabler-icons';
+import { ApiError as CoreApiError } from '../../../../core/api/api-errors';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
+import { TenantScopeState } from '../../../../core/scope/tenant-scope';
 import { Button } from '../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { StepFilter, StepOption } from '../../../../shared/ui/step-filter/step-filter';
-import { errorCodeOf, errorKey, newIdempotencyKey, ApiError } from '../../shared/trade-api';
+import { anyGrant, tenantWide } from '../../shared/trade-access';
+import { errorCodeOf, errorKey, newIdempotencyKey, ApiError, type TradeContext } from '../../shared/trade-api';
 import type { StatusCounts, Uom, UomStatus } from '../../shared/trade-foundation.model';
 import { UnitModal } from './unit-modal/unit-modal';
 import { countUoms, listAllUoms, uomReferences, updateUom } from './units.api';
@@ -30,7 +34,6 @@ import {
 } from './units.model';
 import { UnitsTable } from './units-table/units-table';
 
-const CAN_MANAGE = true; // later from the session permissions
 const SEARCH_DEBOUNCE_MS = 200;
 
 function parseStatusFilter(raw: string | null | undefined): UnitStatusFilter {
@@ -40,9 +43,21 @@ function parseStatusFilter(raw: string | null | undefined): UnitStatusFilter {
   return 'ACTIVE';
 }
 
+function isForbiddenError(error: unknown): boolean {
+  return (error instanceof ApiError || error instanceof CoreApiError) && error.status === 403;
+}
+
+function optionalTradeContext(tenantScope: TenantScopeState): TradeContext {
+  const selection = tenantScope.selection?.();
+  if (!selection?.companyId) return {};
+  return selection.branchId
+    ? { companyId: selection.companyId, branchId: selection.branchId }
+    : { companyId: selection.companyId };
+}
+
 @Component({
   selector: 'app-units-page',
-  imports: [NgIcon, TranslocoPipe, Button, ConfirmDialog, StepFilter, UnitsTable, UnitModal],
+  imports: [NgIcon, TranslocoPipe, Button, ConfirmDialog, FullState, StepFilter, UnitsTable, UnitModal],
   providers: [
     provideTranslocoScope('settings', { scope: 'trade-shared', alias: 'tradeShared' }, { scope: 'trade-units', alias: 'tradeUnits' }),
     provideIcons({
@@ -60,18 +75,27 @@ function parseStatusFilter(raw: string | null | undefined): UnitStatusFilter {
 export class UnitsPage {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly injector = inject(Injector);
   private readonly destroyRef = inject(DestroyRef);
   private readonly notify = inject(Notify);
+  private readonly tenantScope = inject(TenantScopeState);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly language = inject(LanguageState).current;
   private readonly queryParams = toSignal(this.route.queryParamMap);
 
-  private readonly unitModal = viewChild.required(UnitModal);
+  private readonly unitModal = viewChild(UnitModal);
   private readonly retireDialog = viewChild.required<ConfirmDialog>('retireDialog');
   private readonly searchInput = viewChild<ElementRef<HTMLInputElement>>('searchInput');
 
-  protected readonly canManage = CAN_MANAGE;
+  protected readonly forbidden = signal(false);
+  protected readonly canRead = computed(() =>
+    runInInjectionContext(this.injector, () => anyGrant('trade.items.read')),
+  );
+  protected readonly canManage = computed(() =>
+    !this.forbidden() && runInInjectionContext(this.injector, () => tenantWide('trade.catalog_master.manage')),
+  );
+  private readonly readContext = computed<TradeContext>(() => optionalTradeContext(this.tenantScope));
   protected readonly searchMax = UOM_LIMITS.searchMax;
 
   protected readonly units = signal<Uom[]>([]);
@@ -91,6 +115,8 @@ export class UnitsPage {
 
   private lastUrlQ = this.initialQ;
   private lastUrlStatus: UnitStatusFilter = this.initialStatus;
+  private initialLoaded = false;
+  private lastLoadedContextKey: string | null = null;
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
   private loadSeq = 0;
   private countsSeq = 0;
@@ -185,43 +211,85 @@ export class UnitsPage {
       });
     });
 
+    effect(() => {
+      const allowed = this.canRead();
+      const ctx = this.readContext();
+      const ctxKey = `${ctx.companyId ?? ''}:${ctx.branchId ?? ''}`;
+      untracked(() => {
+        if (!allowed) {
+          this.loadSeq += 1;
+          this.countsSeq += 1;
+          this.forbidden.set(true);
+          this.failed.set(false);
+          this.loading.set(false);
+          return;
+        }
+        if (!this.initialLoaded || ctxKey !== this.lastLoadedContextKey) {
+          this.initialLoaded = true;
+          this.lastLoadedContextKey = ctxKey;
+          this.forbidden.set(false);
+          void this.load();
+        }
+      });
+    });
+
     this.destroyRef.onDestroy(() => {
       this.destroyed = true;
       this.clearSearchDebounce();
     });
-    void this.load();
+  }
+
+  protected goHome(): void {
+    void this.router.navigateByUrl('/workspace/home');
+  }
+
+  protected onForbidden(): void {
+    this.forbidden.set(true);
   }
 
   protected async load(): Promise<void> {
+    if (!this.canRead()) {
+      this.forbidden.set(true);
+      this.failed.set(false);
+      this.loading.set(false);
+      return;
+    }
     const seq = ++this.loadSeq;
     const cSeq = ++this.countsSeq;
+    const ctx = this.readContext();
     this.loading.set(true);
+    this.forbidden.set(false);
     this.failed.set(false);
     try {
-      const [items, counts] = await Promise.all([listAllUoms(), countUoms()]);
-      if (seq !== this.loadSeq) return;
+      const [items, counts] = await Promise.all([listAllUoms(undefined, ctx), countUoms(ctx)]);
+      if (seq !== this.loadSeq || this.destroyed) return;
       this.units.set(items);
       if (cSeq === this.countsSeq) {
         this.statusCounts.set(counts);
       }
       this.hasLoaded.set(true);
-    } catch {
-      if (seq !== this.loadSeq) return;
-      this.failed.set(true);
+    } catch (error) {
+      if (seq !== this.loadSeq || this.destroyed) return;
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+        this.failed.set(false);
+      } else {
+        this.failed.set(true);
+      }
     } finally {
-      if (seq === this.loadSeq) {
+      if (seq === this.loadSeq && !this.destroyed) {
         this.loading.set(false);
       }
     }
   }
 
   protected openCreate(): void {
-    if (!this.canManage) return;
-    this.unitModal().openCreate();
+    if (!this.canManage()) return;
+    this.unitModal()?.openCreate();
   }
 
   protected openUnit(unit: Uom): void {
-    this.unitModal().openEdit(unit);
+    this.unitModal()?.openEdit(unit);
   }
 
   protected onSearchInput(event: Event): void {
@@ -269,12 +337,16 @@ export class UnitsPage {
   }
 
   protected async onRetireRequested(unit: Uom): Promise<void> {
-    if (!this.canManage || this.busyIds().has(unit.id)) return;
+    if (!this.canManage() || this.busyIds().has(unit.id)) return;
     this.setBusy(unit.id, true);
     let refs;
     try {
-      refs = await uomReferences(unit.id);
+      refs = await uomReferences(unit.id, this.readContext());
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+        return;
+      }
       this.notify.error(this.transloco.translate(errorKey(error)));
       return;
     } finally {
@@ -282,7 +354,7 @@ export class UnitsPage {
     }
     if (this.destroyed) return;
     if (refs.blocking) {
-      this.unitModal().openInUseWarning(refs.groups);
+      this.unitModal()?.openInUseWarning(refs.groups);
       return;
     }
 
@@ -297,18 +369,22 @@ export class UnitsPage {
   }
 
   protected async onActivateRequested(unit: Uom): Promise<void> {
-    if (!this.canManage || this.busyIds().has(unit.id)) return;
+    if (!this.canManage() || this.busyIds().has(unit.id)) return;
     await this.changeStatus(unit, 'ACTIVE');
   }
 
   private async refreshCounts(): Promise<void> {
+    if (!this.canRead()) return;
     const seq = ++this.countsSeq;
     try {
-      const counts = await countUoms();
+      const counts = await countUoms(this.readContext());
       if (seq === this.countsSeq && !this.destroyed) {
         this.statusCounts.set(counts);
       }
-    } catch {
+    } catch (error) {
+      if (isForbiddenError(error) && !this.destroyed) {
+        this.forbidden.set(true);
+      }
       // Silent background count refresh; existing counts stay shown until next reload.
     }
   }
@@ -327,16 +403,24 @@ export class UnitsPage {
         ),
       );
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.pendingRowKeys.delete(unit.id);
+        this.forbidden.set(true);
+        return;
+      }
       const code = errorCodeOf(error);
+      if (code === 'GW.IDEM.MISMATCH' || code === 'TRADE.IDEMPOTENCY.MISMATCH') {
+        this.pendingRowKeys.delete(unit.id);
+      }
       if (code === 'TRADE.CATALOG.UOM_RETIRE_REFERENCED') {
         this.pendingRowKeys.delete(unit.id);
         const details = error instanceof ApiError ? error.details : undefined;
-        this.unitModal().openInUseWarning(parseUomRefGroupsFromDetails(details));
+        this.unitModal()?.openInUseWarning(parseUomRefGroupsFromDetails(details));
         return;
       }
       if (code === 'TRADE.CONCURRENCY.STALE_VERSION') {
         this.pendingRowKeys.delete(unit.id);
-        this.unitModal().openConflictFromRow(unit, targetStatus);
+        this.unitModal()?.openConflictFromRow(unit, targetStatus);
         return;
       }
       this.notify.error(this.transloco.translate(errorKey(error)));

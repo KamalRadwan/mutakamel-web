@@ -91,6 +91,14 @@
           <div class="h-field motion-safe:animate-pulse rounded-8 bg-neutral-soft"></div>
         </aside>
       </div>
+    } @else if (forbiddenState()) {
+      <ui-full-state
+        kind="forbidden"
+        [title]="'errors.forbidden.title' | transloco"
+        [text]="'errors.forbidden.text' | transloco"
+        [actionLabel]="'tradeShared.common.close' | transloco"
+        (action)="requestClose()"
+      />
     } @else if (notFound()) {
       <div class="flex flex-1 flex-col items-center justify-center gap-8 p-16 text-center">
         <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
@@ -140,7 +148,7 @@
   </div>
 
   <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
-    @if (canManage && !notFound() && !loadFailed()) {
+    @if (!forbiddenState() && canManage() && !notFound() && !loadFailed()) {
       <button
         type="button"
         uiButton
@@ -159,7 +167,7 @@
       </button>
     }
 
-    @if (mode() === 'create' && canManage) {
+    @if (!forbiddenState() && mode() === 'create' && canManage()) {
       <button
         type="button"
         uiButton
@@ -171,7 +179,7 @@
       </button>
     }
 
-    @if (!notFound() && !loadFailed()) {
+    @if (!forbiddenState() && !notFound() && !loadFailed()) {
       <button
         type="button"
         uiButton
@@ -184,7 +192,7 @@
       </button>
     }
 
-    @if (canManage && isDirty()) {
+    @if (!forbiddenState() && canManage() && isDirty()) {
       <button
         type="button"
         uiButton
@@ -207,7 +215,7 @@
       </button>
     }
 
-    @if (canDiscontinue()) {
+    @if (!forbiddenState() && canDiscontinue()) {
       <button
         type="button"
         uiButton

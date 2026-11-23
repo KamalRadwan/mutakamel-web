@@ -1,3 +1,14 @@
+@if (isForbidden()) {
+  <div class="flex flex-1 rounded-10 border border-border bg-surface shadow-card">
+    <ui-full-state
+      kind="forbidden"
+      [title]="'errors.forbidden.title' | transloco"
+      [text]="'errors.forbidden.text' | transloco"
+      [actionLabel]="'errors.notFound.action' | transloco"
+      (action)="goHome()"
+    />
+  </div>
+} @else {
 <header class="relative shrink-0 overflow-hidden rounded-10 border border-border bg-surface shadow-card">
   @if (loading()) {
     <div aria-busy="true">
@@ -106,12 +117,12 @@
         </div>
       }
 
-      @if (mode() === 'edit' && navPosition() && (canManage || actionItems().length > 0)) {
+      @if (mode() === 'edit' && navPosition() && (canEditAnything() || actionItems().length > 0)) {
         <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
       }
 
       <div class="flex flex-wrap items-center gap-8">
-        @if (canManage && anyDirty()) {
+        @if (canEditAnything() && anyDirty()) {
           <button
             type="button"
             uiButton
@@ -124,7 +135,7 @@
           <span class="text-12 leading-18 text-text-muted">{{ 'tradeShared.common.unsaved' | transloco }}</span>
         }
 
-        @if (canManage && (mode() === 'create' || anyDirty())) {
+        @if (mode() === 'create' ? canManageMaster() : (canEditAnything() && anyDirty())) {
           <button
             type="button"
             uiButton
@@ -232,7 +243,7 @@
         <app-item-form
           layout="page"
           [mode]="mode()"
-          [readonly]="!canManage"
+          [readonly]="!canManageMaster()"
           [errors]="itemErrors()"
           [itemId]="itemId()"
           [image]="detail()?.image ?? null"
@@ -268,9 +279,9 @@
             [uoms]="uoms()"
             [hasServerProfile]="companyProfile() !== null"
             [trackingLocked]="isTrackingLocked()"
-            [readonly]="!canManage"
-            [canViewCost]="canViewCost"
-            [canManageCost]="canManageCost"
+            [readonly]="!canManageProfile()"
+            [canViewCost]="canViewCost()"
+            [canManageCost]="canManageCost()"
             [errors]="companyErrors()"
             [draft]="companyDraft()"
             (draftChange)="onCompanyDraftChange($event)"
@@ -292,7 +303,7 @@
             [branchName]="branchName()"
             [hasCompanyProfile]="companyProfile() !== null || companyDraft().enabled"
             [nodes]="fulfillmentNodes()"
-            [readonly]="!canManage"
+            [readonly]="!canManageProfile()"
             [errors]="branchErrors()"
             [draft]="branchDraft()"
             (draftChange)="onBranchDraftChange($event)"
@@ -311,13 +322,15 @@
             [itemId]="itemId()!"
             [itemStatus]="itemDraft().status"
             [companyProfile]="companyProfile()"
-            [readonly]="!canManage"
+            [readonly]="!canManageProfile()"
+            (forbidden)="onForbidden()"
           />
         </div>
       }
     </div>
   </div>
 </div>
+}
 
 <ui-unsaved-dialog
   #unsavedDialog

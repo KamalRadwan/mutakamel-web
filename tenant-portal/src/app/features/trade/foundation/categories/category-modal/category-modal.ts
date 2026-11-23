@@ -5,7 +5,7 @@ import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerCategory, tablerLock } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../../core/i18n/language';
 import { Notify } from '../../../../../core/notify/notify';
-import { errorCodeOf, errorKey, newIdempotencyKey } from '../../../shared/trade-api';
+import { ApiError, errorCodeOf, errorKey, newIdempotencyKey } from '../../../shared/trade-api';
 import { Button } from '../../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { Field } from '../../../../../shared/ui/field/field';
@@ -102,7 +102,7 @@ export class CategoryModal {
 
   private readonly touched = signal<Partial<Record<CategoryFormField, boolean>>>({});
   private readonly revealAllErrors = signal(false);
-  private readonly serverFieldErrors = signal<Partial<Record<'code' | 'displayName', string>>>({});
+  private readonly serverFieldErrors = signal<Partial<Record<CategoryFormField, string>>>({});
 
   private loadSeq = 0;
   private allowClose = false;
@@ -268,11 +268,9 @@ export class CategoryModal {
   }
 
   protected errorText(field: CategoryFormField): string | null {
-    if (field === 'code' && this.serverFieldErrors().code) {
-      return this.serverFieldErrors().code ?? null;
-    }
-    if (field === 'displayName' && this.serverFieldErrors().displayName) {
-      return this.serverFieldErrors().displayName ?? null;
+    const serverErr = this.serverFieldErrors()[field];
+    if (serverErr) {
+      return serverErr;
     }
     const err = this.validationErrors()[field];
     if (!err) return null;
@@ -295,9 +293,7 @@ export class CategoryModal {
     if (!this.canManage()) return;
     const value = (event.target as HTMLInputElement).value;
     this.form.update((curr) => ({ ...curr, [field]: value }));
-    if (field === 'displayName') {
-      this.clearServerFieldError('displayName');
-    }
+    this.clearServerFieldError(field);
   }
 
   protected markTouched(field: CategoryFormField): void {
@@ -386,6 +382,20 @@ export class CategoryModal {
       this.modal().close();
     } catch (error) {
       const code = errorCodeOf(error);
+      if (code === 'GW.IDEM.MISMATCH' || code === 'TRADE.IDEMPOTENCY.MISMATCH') {
+        this.pendingIdempotency = null;
+      }
+      if (error instanceof ApiError && code === 'TRADE.VALIDATION_FAILED' && error.details) {
+        const mapped: Partial<Record<CategoryFormField, string>> = {};
+        if (error.details['code']?.[0]) mapped.code = error.details['code'][0];
+        if (error.details['displayName']?.[0]) mapped.displayName = error.details['displayName'][0];
+        if (error.details['localizedNames.en']?.[0]) mapped.nameEn = error.details['localizedNames.en'][0];
+        if (error.details['localizedNames.ar']?.[0]) mapped.nameAr = error.details['localizedNames.ar'][0];
+        if (Object.keys(mapped).length > 0) {
+          this.serverFieldErrors.update((curr) => ({ ...curr, ...mapped }));
+          return;
+        }
+      }
       if (code === 'TRADE.CATALOG.CATEGORY_CODE_TAKEN') {
         this.serverFieldErrors.update((curr) => ({
           ...curr,
@@ -482,7 +492,7 @@ export class CategoryModal {
     return key;
   }
 
-  private clearServerFieldError(field: 'code' | 'displayName'): void {
+  private clearServerFieldError(field: CategoryFormField): void {
     if (!this.serverFieldErrors()[field]) return;
     this.serverFieldErrors.update((curr) => ({ ...curr, [field]: undefined }));
   }

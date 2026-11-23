@@ -1,4 +1,18 @@
-import { Component, DestroyRef, ElementRef, computed, effect, inject, input, resource, signal, untracked, viewChild } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  ElementRef,
+  Injector,
+  computed,
+  effect,
+  inject,
+  input,
+  resource,
+  runInInjectionContext,
+  signal,
+  untracked,
+  viewChild,
+} from '@angular/core';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
@@ -14,6 +28,7 @@ import {
   tablerRefresh,
   tablerTable,
 } from '@ng-icons/tabler-icons';
+import { ApiError as CoreApiError } from '../../../../../core/api/api-errors';
 import { LanguageState } from '../../../../../core/i18n/language';
 import { Notify } from '../../../../../core/notify/notify';
 import { ScopeState } from '../../../../../core/scope/scope';
@@ -22,6 +37,7 @@ import { Dropdown, type DropdownOption } from '../../../../../shared/ui/dropdown
 import { FacetSearch } from '../../../../../shared/ui/facet-search/facet-search';
 import type { SearchFacet, SearchField } from '../../../../../shared/ui/facet-search/facet-search.model';
 import { Field } from '../../../../../shared/ui/field/field';
+import { FullState } from '../../../../../shared/ui/full-state/full-state';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { Pagination } from '../../../../../shared/ui/pagination/pagination';
 import { Segmented, type SegmentedOption } from '../../../../../shared/ui/segmented/segmented';
@@ -29,7 +45,8 @@ import { StepFilter, type StepOption } from '../../../../../shared/ui/step-filte
 import { UnsavedDialog } from '../../../../../shared/ui/unsaved-dialog/unsaved-dialog';
 import { ViewSwitcher, type ViewOption } from '../../../../../shared/ui/view-switcher/view-switcher';
 import { TradeReasonPicker, type ReasonPickerValue } from '../../../shared/pickers/reason-picker/reason-picker';
-import { errorCodeOf, tradeContext, type TradeContext } from '../../../shared/trade-api';
+import { anyGrant, tenantWide } from '../../../shared/trade-access';
+import { ApiError, errorCodeOf, tradeContext, type TradeContext } from '../../../shared/trade-api';
 import { itemName, listCategoryOptions, listUoms } from '../../../shared/trade-foundation.api';
 import type { ItemRow, ItemStatus, Uom } from '../../../shared/trade-foundation.model';
 import { ITEM_STATUS_KEY } from '../../../shared/trade-labels';
@@ -59,8 +76,11 @@ import {
   type ItemView,
 } from '../items.model';
 
-const CAN_MANAGE = true; // later from the session permissions
 const SHOW_ITEM_THUMBS = true; // exception X1 (Q-F6), pending owner approval
+
+function isForbiddenError(error: unknown): boolean {
+  return (error instanceof ApiError || error instanceof CoreApiError) && error.status === 403;
+}
 
 const DEFAULT_PAGE = 1;
 const VIEW_ICONS: Record<ItemView, string> = {
@@ -84,6 +104,7 @@ function parsePositiveInt(raw: string | undefined, fallback: number): number {
     Dropdown,
     FacetSearch,
     Field,
+    FullState,
     Modal,
     Pagination,
     Segmented,
@@ -118,6 +139,7 @@ function parsePositiveInt(raw: string | undefined, fallback: number): number {
 })
 export class ItemsPage {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly scopeState = inject(ScopeState);
@@ -148,7 +170,20 @@ export class ItemsPage {
   readonly channelParam = input<string | undefined>(undefined, { alias: 'channel' });
   readonly itemParam = input<string | undefined>(undefined, { alias: 'item' });
 
-  protected readonly canManage = CAN_MANAGE;
+  protected readonly forbidden = signal(false);
+  protected readonly canRead = computed(() =>
+    runInInjectionContext(this.injector, () => anyGrant('trade.items.read')),
+  );
+  protected readonly isForbidden = computed(
+    () =>
+      !this.canRead() ||
+      this.forbidden() ||
+      isForbiddenError(this.pageResource.error()) ||
+      isForbiddenError(this.countsResource.error()),
+  );
+  protected readonly canManage = computed(
+    () => !this.isForbidden() && runInInjectionContext(this.injector, () => tenantWide('trade.catalog_master.manage')),
+  );
   protected readonly showThumbs = SHOW_ITEM_THUMBS;
   protected readonly pageSizes = ITEM_PAGE_SIZES;
   protected readonly skeletonCards = [1, 2, 3, 4, 5, 6];
@@ -239,6 +274,7 @@ export class ItemsPage {
   });
 
   private readonly uomsResource = resource({
+    params: () => (!this.canRead() || this.forbidden() ? undefined : true),
     loader: () => listUoms().catch(() => []),
   });
 
@@ -248,21 +284,27 @@ export class ItemsPage {
   });
 
   private readonly categoriesResource = resource({
-    params: () => ({
-      ctx: this.currentScope() === 'company' ? this.context() : {},
-      lang: this.language(),
-    }),
+    params: () =>
+      !this.canRead() || this.forbidden()
+        ? undefined
+        : {
+            ctx: this.currentScope() === 'company' ? this.context() : {},
+            lang: this.language(),
+          },
     loader: ({ params }) => listCategoryOptions(params.ctx).catch(() => []),
   });
 
   private readonly countsResource = resource({
-    params: () => ({ ctx: this.context(), filter: this.countFilter(), tick: this.refreshTick() }),
+    params: () =>
+      !this.canRead() || this.forbidden()
+        ? undefined
+        : { ctx: this.context(), filter: this.countFilter(), tick: this.refreshTick() },
     loader: ({ params }) => countItemsByStatus(params.ctx, params.filter),
   });
 
   private readonly pageResource = resource({
     params: () => {
-      if (this.currentView() === 'board') return undefined;
+      if (!this.canRead() || this.forbidden() || this.currentView() === 'board') return undefined;
       const status = this.currentStatus();
       return {
         ctx: this.context(),
@@ -536,7 +578,7 @@ export class ItemsPage {
   }
 
   protected openCreate(): void {
-    if (!this.canManage) return;
+    if (!this.canManage()) return;
     void this.router.navigate([], {
       relativeTo: this.route,
       queryParams: { item: 'new' },
@@ -568,6 +610,14 @@ export class ItemsPage {
     void this.router.navigate(['/trade/foundation/items', id], {
       state: { listIds: this.visibleListIds() },
     });
+  }
+
+  protected goHome(): void {
+    void this.router.navigateByUrl('/workspace/home');
+  }
+
+  protected onForbidden(): void {
+    this.forbidden.set(true);
   }
 
   protected reload(): void {
@@ -677,10 +727,16 @@ export class ItemsPage {
             freshMove.done();
             this.refreshAll();
           } catch (retryError) {
+            if (isForbiddenError(retryError)) {
+              this.forbidden.set(true);
+              return;
+            }
             this.notify.error(this.transloco.translate(itemErrorKey(retryError)));
             this.refreshAll();
           }
         }
+      } else if (isForbiddenError(error)) {
+        this.forbidden.set(true);
       } else {
         this.notify.error(this.transloco.translate(itemErrorKey(error)));
       }

@@ -120,7 +120,7 @@ export interface ListingCreateBody {
 }
 
 export interface ListingPatchBody {
-  publicationStatus: ListingStatus;
+  publicationStatus?: ListingStatus;
 }
 
 export interface ListingChannelOption extends Channel {

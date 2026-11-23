@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, input, signal, untracked, viewChild } from '@angular/core';
+import { Component, computed, effect, inject, input, output, signal, untracked, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../../../core/i18n/translation-events';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
@@ -18,6 +18,7 @@ import {
   tablerRefresh,
   tablerShoppingCart,
 } from '@ng-icons/tabler-icons';
+import { ApiError as CoreApiError } from '../../../../../../core/api/api-errors';
 import { LanguageState } from '../../../../../../core/i18n/language';
 import { Notify } from '../../../../../../core/notify/notify';
 import { ScopeState } from '../../../../../../core/scope/scope';
@@ -28,7 +29,7 @@ import { Field } from '../../../../../../shared/ui/field/field';
 import { SectionBar } from '../../../../../../shared/ui/section-bar/section-bar';
 import { Segmented, type SegmentedOption } from '../../../../../../shared/ui/segmented/segmented';
 import { UnsavedDialog } from '../../../../../../shared/ui/unsaved-dialog/unsaved-dialog';
-import { errorCodeOf, newIdempotencyKey, tradeContext, type TradeContext } from '../../../../shared/trade-api';
+import { ApiError, errorCodeOf, newIdempotencyKey, tradeContext, type TradeContext } from '../../../../shared/trade-api';
 import { formatDate } from '../../../../shared/trade-format';
 import type {
   ChannelListing,
@@ -55,6 +56,10 @@ const LISTING_STATUS_BADGE: Record<ListingStatus, string> = {
   PUBLISHED: BADGE_CLASS.published,
   RETIRED: BADGE_CLASS.muted,
 };
+
+function isForbiddenError(error: unknown): boolean {
+  return (error instanceof ApiError || error instanceof CoreApiError) && error.status === 403;
+}
 
 @Component({
   selector: 'app-item-channels-tab',
@@ -96,6 +101,8 @@ export class ChannelsTab {
   readonly itemStatus = input.required<ItemStatus>();
   readonly companyProfile = input<ItemCompanyProfile | null>(null);
   readonly readonly = input(false);
+
+  readonly forbidden = output<void>();
 
   protected readonly listingScope = signal<ListingScope>('company');
   protected readonly channels = signal<ListingChannelOption[]>([]);
@@ -320,12 +327,17 @@ export class ChannelsTab {
 
     this.busy.set(true);
     try {
-      const created = await createListing(ctx, itemId, body, this.createKey);
+      await createListing(ctx, itemId, body, this.createKey);
       this.createKey = null;
       this.lastCreateFingerprint = null;
-      this.listings.update((prev) => [created, ...prev.filter((row) => row.id !== created.id)]);
+      const refreshed = await listItemListings(ctx, itemId, 1, 50);
+      this.listings.set(refreshed.items);
       this.notify.success(this.transloco.translate('itemForm.toast.listingSaved'));
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.forbidden.emit();
+        return;
+      }
       this.notify.error(this.transloco.translate(itemErrorKey(error)));
     } finally {
       this.busy.set(false);
@@ -347,7 +359,7 @@ export class ChannelsTab {
 
     this.busy.set(true);
     try {
-      const updated = await patchListing(
+      await patchListing(
         ctx,
         itemId,
         listing.channelId,
@@ -356,9 +368,14 @@ export class ChannelsTab {
         action.key,
       );
       action.done();
-      this.listings.update((prev) => prev.map((row) => (row.id === updated.id ? updated : row)));
+      const refreshed = await listItemListings(ctx, itemId, 1, 50);
+      this.listings.set(refreshed.items);
       this.notify.success(this.transloco.translate('itemForm.toast.listingSaved'));
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.forbidden.emit();
+        return;
+      }
       if (errorCodeOf(error) === 'TRADE.CONCURRENCY.STALE_VERSION') {
         this.busy.set(false);
         const choice = await this.conflictDialog().open();
@@ -392,10 +409,14 @@ export class ChannelsTab {
       if (seq !== this.loadSeq) return;
       this.channels.set(channelsRes);
       this.listings.set(listingsRes.items);
-    } catch {
+    } catch (error) {
       if (seq !== this.loadSeq) return;
       this.channels.set([]);
       this.listings.set([]);
+      if (isForbiddenError(error)) {
+        this.forbidden.emit();
+        return;
+      }
       this.loadFailed.set(true);
     } finally {
       if (seq === this.loadSeq) {

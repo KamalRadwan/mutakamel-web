@@ -28,6 +28,7 @@ import {
   tablerPlus,
   tablerRefresh,
 } from '@ng-icons/tabler-icons';
+import { ApiError as CoreApiError } from '../../../../../core/api/api-errors';
 import { LanguageState } from '../../../../../core/i18n/language';
 import { Notify } from '../../../../../core/notify/notify';
 import { Button } from '../../../../../shared/ui/button/button';
@@ -35,7 +36,7 @@ import { Modal } from '../../../../../shared/ui/modal/modal';
 import { rectInPage } from '../../../../../shared/ui/overlay/zoom';
 import { UnsavedDialog } from '../../../../../shared/ui/unsaved-dialog/unsaved-dialog';
 import { TradeReasonPicker, type ReasonPickerValue } from '../../../shared/pickers/reason-picker/reason-picker';
-import { errorCodeOf, type TradeContext } from '../../../shared/trade-api';
+import { ApiError, errorCodeOf, type TradeContext } from '../../../shared/trade-api';
 import { itemName } from '../../../shared/trade-foundation.api';
 import type { ItemRow, ItemStatus } from '../../../shared/trade-foundation.model';
 import { ALLOWED_ITEM_STATUS_MOVES, ITEM_STATUS_KEY } from '../../../shared/trade-labels';
@@ -68,6 +69,10 @@ const STATUS_BAR_CLASS: Record<ItemStatus, string> = {
 
 function isDraggedItem(data: Record<string | symbol, unknown>): data is Record<string | symbol, unknown> & DraggedItem {
   return typeof data['itemId'] === 'string' && typeof data['fromStatus'] === 'string';
+}
+
+function isForbiddenError(error: unknown): boolean {
+  return (error instanceof ApiError || error instanceof CoreApiError) && error.status === 403;
 }
 
 function readCollapsed(): ReadonlySet<ItemStatus> {
@@ -262,6 +267,7 @@ export class ItemBoard {
   readonly open = output<ItemRow>();
   readonly clearSearch = output<void>();
   readonly countsChanged = output<void>();
+  readonly forbidden = output<void>();
 
   protected readonly skeletonCards = [1, 2, 3];
   protected readonly statusKey = ITEM_STATUS_KEY;
@@ -421,6 +427,10 @@ export class ItemBoard {
         }),
       );
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.forbidden.emit();
+        return;
+      }
       this.notify.error(this.transloco.translate(itemErrorKey(error)));
     } finally {
       if (this.loadingMore() === lane.status) {
@@ -455,6 +465,10 @@ export class ItemBoard {
       );
     } catch (error) {
       if (seq !== this.loadSeq) return;
+      if (isForbiddenError(error)) {
+        this.forbidden.emit();
+        return;
+      }
       this.failed.set(true);
       this.notify.error(this.transloco.translate(itemErrorKey(error)));
     } finally {
@@ -487,6 +501,10 @@ export class ItemBoard {
         }),
       );
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.forbidden.emit();
+        return;
+      }
       this.notify.error(this.transloco.translate(itemErrorKey(error)));
     }
   }
@@ -612,10 +630,16 @@ export class ItemBoard {
             await this.reloadColumns([fromStatus, toStatus]);
             this.countsChanged.emit();
           } catch (retryError) {
+            if (isForbiddenError(retryError)) {
+              this.forbidden.emit();
+              return;
+            }
             this.notify.error(this.transloco.translate(itemErrorKey(retryError)));
             await this.reloadColumns([fromStatus, toStatus]);
           }
         }
+      } else if (isForbiddenError(error)) {
+        this.forbidden.emit();
       } else {
         this.notify.error(this.transloco.translate(itemErrorKey(error)));
       }

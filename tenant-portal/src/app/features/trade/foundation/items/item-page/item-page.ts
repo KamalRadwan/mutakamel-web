@@ -9,6 +9,7 @@ import {
   effect,
   inject,
   input,
+  runInInjectionContext,
   signal,
   untracked,
   viewChild,
@@ -39,14 +40,18 @@ import {
   tablerTool,
 } from '@ng-icons/tabler-icons';
 import { filter } from 'rxjs';
+import { ApiError as CoreApiError } from '../../../../../core/api/api-errors';
 import { LanguageState } from '../../../../../core/i18n/language';
 import { Notify } from '../../../../../core/notify/notify';
 import { ScopeState } from '../../../../../core/scope/scope';
+import { TenantScopeState } from '../../../../../core/scope/tenant-scope';
 import { ActionsMenu, type ActionItem, type ActionSelection } from '../../../../../shared/ui/actions-menu/actions-menu';
 import { Button } from '../../../../../shared/ui/button/button';
+import { FullState } from '../../../../../shared/ui/full-state/full-state';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { UnsavedDialog } from '../../../../../shared/ui/unsaved-dialog/unsaved-dialog';
 import { TradeReasonPicker, type ReasonPickerValue } from '../../../shared/pickers/reason-picker/reason-picker';
+import { anyGrant, branchGrants, tenantWide } from '../../../shared/trade-access';
 import { ApiError, errorCodeOf, newIdempotencyKey, tradeContext } from '../../../shared/trade-api';
 import { itemName, listUoms } from '../../../shared/trade-foundation.api';
 import type {
@@ -126,12 +131,12 @@ import {
 } from '../item-profile-tabs/company-profile-tab/company-profile-tab';
 import { smoothScrollBehavior } from '../../../../../shared/ui/scroll/scroll-into-view';
 
-const CAN_MANAGE = true; // later from the session permissions
-const CAN_VIEW_COST = true; // later from the session permissions
-const CAN_MANAGE_COST = true; // later from the session permissions
-
 export type ItemPageTab = 'overview' | 'company' | 'branch' | 'channels';
 type HeaderActionId = 'activate' | 'deactivate' | 'discontinue' | 'copyCode';
+
+function isForbiddenError(error: unknown): boolean {
+  return (error instanceof ApiError || error instanceof CoreApiError) && error.status === 403;
+}
 
 const ITEM_PAGE_TABS: readonly ItemPageTab[] = ['overview', 'company', 'branch', 'channels'];
 
@@ -153,6 +158,7 @@ function readListIdsFromHistory(): string[] {
     TranslocoPipe,
     ActionsMenu,
     Button,
+    FullState,
     Modal,
     TradeReasonPicker,
     UnsavedDialog,
@@ -200,6 +206,7 @@ export class ItemPage {
   private readonly location = inject(Location);
   private readonly injector = inject(Injector);
   private readonly scopeState = inject(ScopeState);
+  private readonly tenantScope = inject(TenantScopeState);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
@@ -217,13 +224,35 @@ export class ItemPage {
   readonly idParam = input<string | undefined>(undefined, { alias: 'id' });
   readonly tabParam = input<string | undefined>(undefined, { alias: 'tab' });
 
-  protected readonly canManage = CAN_MANAGE;
-  protected readonly canViewCost = CAN_VIEW_COST;
-  protected readonly canManageCost = CAN_MANAGE_COST;
-
   protected readonly itemId = signal<string | null>(null);
   protected readonly mode = computed<'create' | 'edit'>(() => (this.itemId() ? 'edit' : 'create'));
   protected readonly listIds = signal<string[]>(readListIdsFromHistory());
+
+  protected readonly forbidden = signal(false);
+  protected readonly canRead = computed(() =>
+    runInInjectionContext(this.injector, () => anyGrant('trade.items.read')),
+  );
+  protected readonly canManageMaster = computed(
+    () => !this.forbidden() && runInInjectionContext(this.injector, () => tenantWide('trade.catalog_master.manage')),
+  );
+  private readonly activeBranchId = computed(
+    () => this.tenantScope.selection?.()?.branchId ?? this.scopeState.branch()?.id ?? null,
+  );
+  protected readonly canManageProfile = computed(
+    () => !this.forbidden() && this.hasBranchGrant('trade.items.manage'),
+  );
+  protected readonly canViewCost = computed(
+    () => !this.forbidden() && this.hasBranchGrant('trade.pricing.view_cost'),
+  );
+  protected readonly canManageCost = computed(
+    () => !this.forbidden() && this.hasBranchGrant('trade.pricing.manage'),
+  );
+  protected readonly canEditAnything = computed(
+    () => this.canManageMaster() || this.canManageProfile() || this.canManageCost(),
+  );
+  protected readonly isForbidden = computed(
+    () => !this.canRead() || this.forbidden() || (this.mode() === 'create' && !this.canManageMaster()),
+  );
 
   protected readonly detail = signal<ItemDetail | null>(null);
   protected readonly itemVersion = signal(1);
@@ -322,7 +351,7 @@ export class ItemPage {
   protected readonly costDirty = computed(
     () =>
       this.mode() === 'edit' &&
-      this.canManageCost &&
+      this.canManageCost() &&
       (this.companyProfile() !== null || this.companyDraft().enabled) &&
       this.standardCostBase().trim() !== this.standardCostDraft().trim(),
   );
@@ -335,7 +364,11 @@ export class ItemPage {
   );
 
   protected readonly anyDirty = computed(
-    () => this.itemDirty() || this.companyDirty() || this.costDirty() || this.branchDirty(),
+    () =>
+      (this.canManageMaster() && this.itemDirty()) ||
+      (this.canManageProfile() && this.companyDirty()) ||
+      (this.canManageCost() && this.costDirty()) ||
+      (this.canManageProfile() && this.branchDirty()),
   );
 
   protected readonly itemErrors = computed<DraftErrors>(() => {
@@ -350,7 +383,7 @@ export class ItemPage {
     const client = validateCompanyProfileDraft(
       this.companyDraft(),
       this.standardCostDraft(),
-      this.canManageCost,
+      this.canManageCost(),
       this.companyProfile() !== null,
     );
     return { ...client, ...srv };
@@ -428,7 +461,7 @@ export class ItemPage {
 
     const items: ActionItem[] = [];
     const legalMoves = ALLOWED_ITEM_STATUS_MOVES[current.status];
-    if (this.canManage) {
+    if (this.canManageMaster()) {
       if (legalMoves.includes('ACTIVE')) {
         items.push({
           id: 'activate',
@@ -454,7 +487,7 @@ export class ItemPage {
       tile: 'bg-icon-teal',
     });
 
-    if (this.canManage && legalMoves.includes('DISCONTINUED')) {
+    if (this.canManageMaster() && legalMoves.includes('DISCONTINUED')) {
       items.push({
         id: 'discontinue',
         title: this.transloco.translate('tradeItems.actions.discontinue'),
@@ -569,6 +602,7 @@ export class ItemPage {
       }
 
       this.resetDraftKeys();
+      this.forbidden.set(false);
       this.submitted.set(false);
       this.itemServerErrors.set({});
       this.companyServerErrors.set({});
@@ -580,7 +614,9 @@ export class ItemPage {
         nextVisited.add(initialTab);
         this.visited.set(nextVisited);
         this.activeTab.set(initialTab);
-        void this.loadAllForEdit(nextId);
+        if (this.canRead()) {
+          void this.loadAllForEdit(nextId);
+        }
       } else {
         this.visited.set(new Set<ItemPageTab>(['overview']));
         this.activeTab.set('overview');
@@ -595,7 +631,9 @@ export class ItemPage {
         this.itemBase.set(fresh);
         this.itemDraft.set(carried ? structuredClone(carried.draft) : structuredClone(fresh));
         this.pendingImageFile.set(carried?.file ?? null);
-        void this.loadCreateLookups();
+        if (this.canRead() && this.canManageMaster()) {
+          void this.loadCreateLookups();
+        }
       }
     });
 
@@ -624,18 +662,21 @@ export class ItemPage {
     };
     effect(() => {
       const current = this.detail();
+      const ctx = tradeContext(this.scopeState, 'BRANCH');
       const seq = ++thumbSeq;
       if (!current?.image) {
         setThumb(null);
         return;
       }
-      void itemThumbUrl(current.id, current.image).then((url) => {
-        if (seq !== thumbSeq) {
-          releaseThumbUrl(url);
-          return;
-        }
-        setThumb(url);
-      });
+      void itemThumbUrl(current.id, current.image, ctx)
+        .catch(() => null)
+        .then((url) => {
+          if (seq !== thumbSeq) {
+            releaseThumbUrl(url);
+            return;
+          }
+          setThumb(url);
+        });
     });
 
     destroyRef.onDestroy(() => {
@@ -649,7 +690,8 @@ export class ItemPage {
   async confirmLeave(): Promise<boolean> {
     if (this.bypassGuard) return true;
     if (
-      !this.canManage ||
+      this.isForbidden() ||
+      !this.canEditAnything() ||
       !this.anyDirty() ||
       this.loading() ||
       this.loadFailed() ||
@@ -670,6 +712,21 @@ export class ItemPage {
     } finally {
       this.confirmingLeave = false;
     }
+  }
+
+  protected goHome(): void {
+    void this.router.navigateByUrl('/workspace/home');
+  }
+
+  protected onForbidden(): void {
+    this.forbidden.set(true);
+  }
+
+  private hasBranchGrant(key: string): boolean {
+    const grants = runInInjectionContext(this.injector, () => branchGrants(key));
+    if (grants === 'ALL') return true;
+    const branchId = this.activeBranchId();
+    return branchId ? grants.has(branchId) : grants.size > 0;
   }
 
   protected async goBack(): Promise<void> {
@@ -801,7 +858,7 @@ export class ItemPage {
   }
 
   protected async onImagePicked(file: File): Promise<void> {
-    if (!this.canManage) return;
+    if (!this.canManageMaster()) return;
     if (this.mode() === 'create') {
       this.pendingImageFile.set(file);
       this.onImageClientError(null);
@@ -813,7 +870,7 @@ export class ItemPage {
   }
 
   protected async onImageRemove(): Promise<void> {
-    if (!this.canManage) return;
+    if (!this.canManageMaster()) return;
     if (this.mode() === 'create') {
       this.pendingImageFile.set(null);
       this.onImageClientError(null);
@@ -865,7 +922,7 @@ export class ItemPage {
   }
 
   protected async onStatusChange(targetStatus: ItemStatus): Promise<void> {
-    if (!this.canManage || this.mode() !== 'edit') return;
+    if (!this.canManageMaster() || this.mode() !== 'edit') return;
     const current = this.detail();
     const id = this.itemId();
     if (
@@ -945,7 +1002,8 @@ export class ItemPage {
 
   protected async save(options?: { navigateAfterCreate?: boolean }): Promise<boolean> {
     if (
-      !this.canManage ||
+      this.isForbidden() ||
+      (this.mode() === 'create' ? !this.canManageMaster() : !this.canEditAnything()) ||
       this.saving() ||
       this.uploadingImage() ||
       this.updatingStatus() ||
@@ -1017,6 +1075,10 @@ export class ItemPage {
       }
       return true;
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+        return false;
+      }
       const mapped = mapItemServerError(error);
       if (mapped) {
         this.itemServerErrors.set(mapped);
@@ -1040,17 +1102,17 @@ export class ItemPage {
     this.companyServerErrors.set({});
     this.branchServerErrors.set({});
 
-    const iErr = this.itemDirty() ? validateDraft(this.itemDraft(), 'edit', id) : {};
+    const iErr = this.canManageMaster() && this.itemDirty() ? validateDraft(this.itemDraft(), 'edit', id) : {};
     const cErr =
-      this.companyDirty() || this.costDirty()
+      (this.canManageProfile() && this.companyDirty()) || (this.canManageCost() && this.costDirty())
         ? validateCompanyProfileDraft(
             this.companyDraft(),
             this.standardCostDraft(),
-            this.canManageCost,
+            this.canManageCost(),
             this.companyProfile() !== null,
           )
         : {};
-    const bErr = this.branchDirty() ? validateBranchProfileDraft(this.branchDraft()) : {};
+    const bErr = this.canManageProfile() && this.branchDirty() ? validateBranchProfileDraft(this.branchDraft()) : {};
 
     if (Object.keys(iErr).length > 0) {
       this.focusTabError('overview');
@@ -1075,7 +1137,7 @@ export class ItemPage {
 
     try {
       // 1. Item PATCH
-      if (this.itemDirty()) {
+      if (this.canManageMaster() && this.itemDirty()) {
         currentStep = 'overview';
         const patch = toPatchBody(this.itemBase(), this.itemDraft());
         const fp = JSON.stringify({ id, version: this.itemVersion(), patch });
@@ -1096,7 +1158,7 @@ export class ItemPage {
       }
 
       // 2. Company profile POST / PATCH
-      if (this.companyDirty()) {
+      if (this.canManageProfile() && this.companyDirty()) {
         currentStep = 'company';
         const existingCp = this.companyProfile();
         const cpDraft = this.companyDraft();
@@ -1132,7 +1194,7 @@ export class ItemPage {
       }
 
       // 3. Standard cost PATCH (uses the profile version returned by company profile save)
-      if (this.costDirty() && this.companyProfile() !== null) {
+      if (this.canManageCost() && this.costDirty() && this.companyProfile() !== null) {
         currentStep = 'company';
         const cleanCost = this.standardCostDraft().trim() || null;
         const costFp = JSON.stringify({
@@ -1161,7 +1223,7 @@ export class ItemPage {
       }
 
       // 4. Branch profile POST / PATCH
-      if (this.branchDirty()) {
+      if (this.canManageProfile() && this.branchDirty()) {
         currentStep = 'branch';
         const existingBp = this.branchProfile();
         const bpDraft = this.branchDraft();
@@ -1200,6 +1262,10 @@ export class ItemPage {
       this.notify.success(this.transloco.translate('itemForm.toast.saved'));
       return true;
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+        return false;
+      }
       const code = errorCodeOf(error);
 
       if (code === 'TRADE.CATALOG.TRACKING_LOCKED') {
@@ -1273,7 +1339,7 @@ export class ItemPage {
     const oldBpDraft = this.branchDraft();
 
     await this.loadAllForEdit(id);
-    if (this.loadFailed() || this.notFound()) return false;
+    if (this.loadFailed() || this.notFound() || this.forbidden()) return false;
 
     if (choice === 'save') {
       this.submitted.set(false);
@@ -1372,7 +1438,7 @@ export class ItemPage {
       const currency = refRes?.companyCurrencyCode ?? detailRes.companyProfile?.currencyCode ?? null;
       this.applyScopeProfiles(detailRes, currency);
 
-      if (detailRes.companyProfile && this.canViewCost) {
+      if (detailRes.companyProfile && this.canViewCost()) {
         try {
           const costRes = await getStandardCost(companyCtx, id);
           if (seq !== this.loadSeq) return;
@@ -1390,7 +1456,9 @@ export class ItemPage {
       }
     } catch (error) {
       if (seq !== this.loadSeq) return;
-      if (error instanceof ApiError && error.status === 404) {
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+      } else if (error instanceof ApiError && error.status === 404) {
         this.notFound.set(true);
       } else {
         this.loadFailed.set(true);
@@ -1440,7 +1508,7 @@ export class ItemPage {
       const currency = refRes?.companyCurrencyCode ?? detailRes.companyProfile?.currencyCode ?? null;
       this.applyScopeProfiles(detailRes, currency);
 
-      if (detailRes.companyProfile && this.canViewCost) {
+      if (detailRes.companyProfile && this.canViewCost()) {
         try {
           const costRes = await getStandardCost(companyCtx, id);
           if (seq !== this.scopeLoadSeq || this.itemId() !== id) return;
@@ -1458,6 +1526,10 @@ export class ItemPage {
       }
     } catch (error) {
       if (seq !== this.scopeLoadSeq || this.itemId() !== id) return;
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+        return;
+      }
       this.notify.error(this.transloco.translate(itemErrorKey(error)));
     }
   }
@@ -1501,18 +1573,30 @@ export class ItemPage {
       });
       this.notify.success(this.transloco.translate('itemForm.toast.statusChanged'));
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+        return;
+      }
       if (errorCodeOf(error) === 'TRADE.CONCURRENCY.STALE_VERSION') {
         this.updatingStatus.set(false);
         const choice = await this.conflictDialog().open();
         if (choice === 'cancel') return;
-        const fresh = await getItemDetail(tradeContext(this.scopeState, 'BRANCH'), id);
-        if (choice === 'save') {
-          await this.loadAllForEdit(id);
-          return;
+        try {
+          const fresh = await getItemDetail(tradeContext(this.scopeState, 'BRANCH'), id);
+          if (choice === 'save') {
+            await this.loadAllForEdit(id);
+            return;
+          }
+          this.detail.set(fresh);
+          this.itemVersion.set(fresh.version);
+          await this.executeStatusMove(id, targetStatus, reason);
+        } catch (retryError) {
+          if (isForbiddenError(retryError)) {
+            this.forbidden.set(true);
+            return;
+          }
+          this.notify.error(this.transloco.translate(itemErrorKey(retryError)));
         }
-        this.detail.set(fresh);
-        this.itemVersion.set(fresh.version);
-        await this.executeStatusMove(id, targetStatus, reason);
         return;
       }
       const mapped = mapItemServerError(error);
@@ -1539,6 +1623,10 @@ export class ItemPage {
       this.onImageClientError(null);
       this.notify.success(this.transloco.translate('itemForm.toast.imageSaved'));
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+        return;
+      }
       if (errorCodeOf(error) === 'TRADE.CONCURRENCY.STALE_VERSION') {
         this.uploadingImage.set(false);
         const choice = await this.conflictDialog().open();
@@ -1547,10 +1635,18 @@ export class ItemPage {
           await this.loadAllForEdit(id);
           return;
         }
-        const fresh = await getItemDetail(tradeContext(this.scopeState, 'BRANCH'), id);
-        this.detail.set(fresh);
-        this.itemVersion.set(fresh.version);
-        await this.uploadImageEdit(id, file);
+        try {
+          const fresh = await getItemDetail(tradeContext(this.scopeState, 'BRANCH'), id);
+          this.detail.set(fresh);
+          this.itemVersion.set(fresh.version);
+          await this.uploadImageEdit(id, file);
+        } catch (retryError) {
+          if (isForbiddenError(retryError)) {
+            this.forbidden.set(true);
+            return;
+          }
+          this.notify.error(this.transloco.translate(itemErrorKey(retryError)));
+        }
         return;
       }
       const mapped = mapItemServerError(error);
@@ -1577,6 +1673,10 @@ export class ItemPage {
       this.onImageClientError(null);
       this.notify.success(this.transloco.translate('itemForm.toast.imageRemoved'));
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.forbidden.set(true);
+        return;
+      }
       if (errorCodeOf(error) === 'TRADE.CONCURRENCY.STALE_VERSION') {
         this.uploadingImage.set(false);
         const choice = await this.conflictDialog().open();
@@ -1585,10 +1685,18 @@ export class ItemPage {
           await this.loadAllForEdit(id);
           return;
         }
-        const fresh = await getItemDetail(tradeContext(this.scopeState, 'BRANCH'), id);
-        this.detail.set(fresh);
-        this.itemVersion.set(fresh.version);
-        await this.removeImageEdit(id);
+        try {
+          const fresh = await getItemDetail(tradeContext(this.scopeState, 'BRANCH'), id);
+          this.detail.set(fresh);
+          this.itemVersion.set(fresh.version);
+          await this.removeImageEdit(id);
+        } catch (retryError) {
+          if (isForbiddenError(retryError)) {
+            this.forbidden.set(true);
+            return;
+          }
+          this.notify.error(this.transloco.translate(itemErrorKey(retryError)));
+        }
         return;
       }
       this.notify.error(this.transloco.translate(itemErrorKey(error)));

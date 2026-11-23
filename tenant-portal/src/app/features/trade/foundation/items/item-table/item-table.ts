@@ -15,8 +15,10 @@ import {
   tablerTool,
 } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../../core/i18n/language';
+import { ScopeState } from '../../../../../core/scope/scope';
 import { ActionsMenu, type ActionItem, type ActionSelection } from '../../../../../shared/ui/actions-menu/actions-menu';
 import { Checkbox } from '../../../../../shared/ui/checkbox/checkbox';
+import { tradeContext } from '../../../shared/trade-api';
 import { formatDate, formatMoney } from '../../../shared/trade-format';
 import { itemName, uomById } from '../../../shared/trade-foundation.api';
 import type { ItemRow, Uom } from '../../../shared/trade-foundation.model';
@@ -53,6 +55,7 @@ import { itemActions, type ItemActionId } from '../item-card/item-card';
   host: { class: 'flex flex-1 shrink-0 flex-col' },
 })
 export class ItemTable {
+  private readonly scopeState = inject(ScopeState);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly headerCheckboxEl = viewChild('pageCb', { read: ElementRef<HTMLElement> });
@@ -111,6 +114,7 @@ export class ItemTable {
     effect(() => {
       const list = this.items();
       const enabled = this.showThumbs();
+      const ctx = tradeContext(this.scopeState, 'BRANCH');
       const loadId = ++seq;
 
       if (!enabled) {
@@ -125,7 +129,10 @@ export class ItemTable {
       }
 
       void Promise.all(
-        targets.map(async (row) => [row.id, await itemThumbUrl(row.id, row.image)] as const),
+        targets.map(async (row) => [
+          row.id,
+          await itemThumbUrl(row.id, row.image, ctx).catch(() => null),
+        ] as const),
       ).then((entries) => {
         if (loadId !== seq) {
           for (const [, url] of entries) {

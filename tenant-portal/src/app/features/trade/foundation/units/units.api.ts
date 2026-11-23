@@ -1,61 +1,114 @@
-import { ifMatch } from '../../shared/trade-api';
-import type { StatusCounts, Uom } from '../../shared/trade-foundation.model';
+import type { CoreQuery } from '../../../../core/api/core-http';
 import {
-  fakeCountUoms,
-  fakeCreateUom,
-  fakeGetUom,
-  fakeListUomsPage,
-  fakeUomReferences,
-  fakeUpdateUom,
-} from './units.fake';
+  assertIdempotencyKey,
+  ifMatch,
+  newIdempotencyKey,
+  scopeFor,
+  type TradeContext,
+} from '../../shared/trade-api';
+import { tradeHttp } from '../../shared/trade-http';
+import type { StatusCounts, Uom } from '../../shared/trade-foundation.model';
 import {
   compareUomsByCode,
   type CreateUomBody,
+  type UomListPage,
   type UomReferences,
   type UpdateUomBody,
 } from './units.model';
 
 const LIST_PAGE_LIMIT = 100;
 
-// GET /api/tenant/trade/v1/uoms?page=1&limit=100&search= (merged across pages, sorted by code; no company/branch headers)
-// The real endpoint sends `search` (<= 80 characters) and returns code prefix matches first, then name substring matches.
-export async function listAllUoms(search?: string): Promise<Uom[]> {
+// GET /api/tenant/trade/v1/uoms?page=1&limit=100&search= (OPTIONAL_COMPANY_BRANCH; merged across pages)
+export async function listAllUoms(search?: string, ctx: TradeContext = {}): Promise<Uom[]> {
+  const trimmed = search?.trim();
+  const scope = scopeFor(ctx, 'OPTIONAL');
   const all: Uom[] = [];
   let page = 1;
 
   while (true) {
-    const res = await fakeListUomsPage(page, LIST_PAGE_LIMIT, search);
+    const query: CoreQuery = trimmed
+      ? { page, limit: LIST_PAGE_LIMIT, search: trimmed }
+      : { page, limit: LIST_PAGE_LIMIT };
+    const res = await tradeHttp().read<UomListPage>('/uoms', query, { scope });
     all.push(...res.items);
-    if (page * res.limit >= res.total || res.items.length === 0) {
+    if (res.items.length === 0 || all.length >= res.total || page * res.limit >= res.total) {
       break;
     }
     page += 1;
   }
 
-  return search?.trim() ? all : all.sort(compareUomsByCode);
+  return trimmed ? all : all.sort(compareUomsByCode);
 }
 
-// GET /api/tenant/trade/v1/uoms/status-counts (Gateway mode NONE: no company or branch header)
-export function countUoms(): Promise<StatusCounts<'ACTIVE' | 'RETIRED'>> {
-  return fakeCountUoms();
+// GET /api/tenant/trade/v1/uoms/status-counts?search= (OPTIONAL_COMPANY_BRANCH)
+export function countUoms(
+  ctx: TradeContext = {},
+  search?: string,
+): Promise<StatusCounts<'ACTIVE' | 'RETIRED'>> {
+  const trimmed = search?.trim();
+  return tradeHttp().read<StatusCounts<'ACTIVE' | 'RETIRED'>>(
+    '/uoms/status-counts',
+    trimmed ? { search: trimmed } : undefined,
+    { scope: scopeFor(ctx, 'OPTIONAL') },
+  );
 }
 
-// GET /api/tenant/trade/v1/uoms/:id/references (Gateway mode NONE: no company or branch header)
-export function uomReferences(id: string): Promise<UomReferences> {
-  return fakeUomReferences(id);
+// GET /api/tenant/trade/v1/uoms/:id/references (OPTIONAL_COMPANY_BRANCH)
+export function uomReferences(id: string, ctx: TradeContext = {}): Promise<UomReferences> {
+  return tradeHttp().read<UomReferences>(
+    `/uoms/${encodeURIComponent(id)}/references`,
+    undefined,
+    { scope: scopeFor(ctx, 'OPTIONAL') },
+  );
 }
 
-// GET /api/tenant/trade/v1/uoms/:id
-export function getUom(id: string): Promise<Uom> {
-  return fakeGetUom(id);
+// GET /api/tenant/trade/v1/uoms/:id (OPTIONAL_COMPANY_BRANCH)
+export function getUom(id: string, ctx: TradeContext = {}): Promise<Uom> {
+  return tradeHttp().read<Uom>(
+    `/uoms/${encodeURIComponent(id)}`,
+    undefined,
+    { scope: scopeFor(ctx, 'OPTIONAL') },
+  );
 }
 
-// POST /api/tenant/trade/v1/uoms (header x-idempotency-key; Gateway mode NONE)
-export function createUom(body: CreateUomBody, idempotencyKey: string): Promise<Uom> {
-  return fakeCreateUom(body, idempotencyKey);
+// POST /api/tenant/trade/v1/uoms (x-idempotency-key; Gateway mode NONE)
+export async function createUom(
+  body: CreateUomBody,
+  idempotencyKey: string = newIdempotencyKey(),
+): Promise<Uom> {
+  const payload: CreateUomBody = {
+    code: body.code,
+    displayName: body.displayName,
+    localizedNames: { ...body.localizedNames },
+  };
+  const { data } = await tradeHttp().write<Uom>('POST', '/uoms', payload, {
+    key: assertIdempotencyKey(idempotencyKey),
+    scope: scopeFor({}, 'NONE'),
+  });
+  return data;
 }
 
-// PATCH /api/tenant/trade/v1/uoms/:id (headers x-idempotency-key + If-Match)
-export function updateUom(id: string, body: UpdateUomBody, version: number, idempotencyKey: string): Promise<Uom> {
-  return fakeUpdateUom(id, body, ifMatch(version), idempotencyKey);
+// PATCH /api/tenant/trade/v1/uoms/:id (x-idempotency-key + If-Match; Gateway mode NONE)
+export async function updateUom(
+  id: string,
+  body: UpdateUomBody,
+  version: number,
+  idempotencyKey: string = newIdempotencyKey(),
+): Promise<Uom> {
+  const payload: UpdateUomBody = {
+    ...(body.displayName !== undefined ? { displayName: body.displayName } : {}),
+    ...(body.localizedNames !== undefined ? { localizedNames: { ...body.localizedNames } } : {}),
+    ...(body.status !== undefined ? { status: body.status } : {}),
+  };
+  const { data } = await tradeHttp().write<Uom>(
+    'PATCH',
+    `/uoms/${encodeURIComponent(id)}`,
+    payload,
+    {
+      key: assertIdempotencyKey(idempotencyKey),
+      ifMatch: ifMatch(version),
+      scope: scopeFor({}, 'NONE'),
+    },
+  );
+  return data;
 }

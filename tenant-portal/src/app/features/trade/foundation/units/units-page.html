@@ -1,5 +1,16 @@
+@if (!canRead() || forbidden()) {
+  <div class="flex flex-1 rounded-10 border border-border bg-surface shadow-card">
+    <ui-full-state
+      kind="forbidden"
+      [title]="'errors.forbidden.title' | transloco"
+      [text]="'errors.forbidden.text' | transloco"
+      [actionLabel]="'errors.notFound.action' | transloco"
+      (action)="goHome()"
+    />
+  </div>
+} @else {
 <div class="flex shrink-0 items-center gap-8 rounded-10 bg-surface p-8 shadow-card">
-  @if (canManage) {
+  @if (canManage()) {
     <button type="button" uiButton class="shrink-0" (click)="openCreate()">
       <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
       {{ 'tradeUnits.toolbar.new' | transloco }}
@@ -73,7 +84,7 @@
     </button>
   </div>
 } @else if (loading()) {
-  <app-units-table [units]="[]" [loading]="true" [canManage]="canManage" />
+  <app-units-table [units]="[]" [loading]="true" [canManage]="canManage()" />
 } @else if (units().length === 0) {
   <div
     class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card"
@@ -83,7 +94,7 @@
     </span>
     <h2 class="text-15 leading-22 font-medium text-text">{{ 'tradeUnits.empty.title' | transloco }}</h2>
     <p class="text-12 leading-18 text-text-muted">{{ 'tradeUnits.empty.text' | transloco }}</p>
-    @if (canManage) {
+    @if (canManage()) {
       <button type="button" uiButton (click)="openCreate()">
         <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
         {{ 'tradeUnits.toolbar.new' | transloco }}
@@ -113,18 +124,20 @@
   <app-units-table
     [units]="visibleUoms()"
     [loading]="false"
-    [canManage]="canManage"
+    [canManage]="canManage()"
     [busyIds]="busyIds()"
     (openUnit)="openUnit($event)"
     (retireUnit)="onRetireRequested($event)"
     (activateUnit)="onActivateRequested($event)"
   />
 }
+}
 
 <app-unit-modal
-  [canManage]="canManage"
+  [canManage]="canManage()"
   (saved)="onUnitSaved($event)"
   (reloaded)="onUnitReloaded($event)"
+  (forbidden)="onForbidden()"
 />
 
 <ui-confirm-dialog

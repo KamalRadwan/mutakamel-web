@@ -3,13 +3,15 @@ import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerAlertTriangle, tablerLock, tablerRuler2 } from '@ng-icons/tabler-icons';
+import { ApiError as CoreApiError } from '../../../../../core/api/api-errors';
 import { Notify } from '../../../../../core/notify/notify';
+import { TenantScopeState } from '../../../../../core/scope/tenant-scope';
 import { Button } from '../../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { Switch } from '../../../../../shared/ui/switch/switch';
-import { ApiError, errorCodeOf, errorKey, newIdempotencyKey } from '../../../shared/trade-api';
+import { ApiError, errorCodeOf, errorKey, newIdempotencyKey, type TradeContext } from '../../../shared/trade-api';
 import type { Uom, UomStatus } from '../../../shared/trade-foundation.model';
 import { createUom, getUom, uomReferences, updateUom } from '../units.api';
 import {
@@ -52,6 +54,50 @@ function uomToForm(unit: Uom): UnitFormValue {
   };
 }
 
+function isForbiddenError(error: unknown): boolean {
+  return (error instanceof ApiError || error instanceof CoreApiError) && error.status === 403;
+}
+
+function optionalTradeContext(tenantScope: TenantScopeState): TradeContext {
+  const selection = tenantScope.selection?.();
+  if (!selection?.companyId) return {};
+  return selection.branchId
+    ? { companyId: selection.companyId, branchId: selection.branchId }
+    : { companyId: selection.companyId };
+}
+
+function mapValidationFieldErrors(details: Record<string, string[]> | undefined): Partial<Record<UnitField, string>> {
+  if (!details) return {};
+  const mapped: Partial<Record<UnitField, string>> = {};
+
+  for (const [field, messages] of Object.entries(details)) {
+    const text = messages.join(' ').toLowerCase();
+    if (field === 'code') {
+      mapped.code =
+        text.includes('match') || text.includes('pattern') || text.includes('shorter') || text.includes('longer')
+          ? 'tradeUnits.modal.codePattern'
+          : 'tradeShared.errors.TRADE_VALIDATION_FAILED';
+    } else if (field === 'displayName') {
+      mapped.displayName =
+        text.includes('empty') || text.includes('required')
+          ? 'tradeShared.common.required'
+          : 'tradeShared.errors.TRADE_VALIDATION_FAILED';
+    } else if (field === 'localizedNames.en' || field === 'localizedNames') {
+      mapped.nameEn =
+        text.includes('empty') || text.includes('required')
+          ? 'tradeShared.common.required'
+          : 'tradeShared.errors.TRADE_VALIDATION_FAILED';
+    } else if (field === 'localizedNames.ar') {
+      mapped.nameAr =
+        text.includes('empty') || text.includes('required')
+          ? 'tradeShared.common.required'
+          : 'tradeShared.errors.TRADE_VALIDATION_FAILED';
+    }
+  }
+
+  return mapped;
+}
+
 @Component({
   selector: 'app-unit-modal',
   imports: [NgIcon, TranslocoPipe, Button, ConfirmDialog, Field, Modal, Switch],
@@ -63,6 +109,7 @@ export class UnitModal {
   protected readonly uid = `unit-modal-${++UnitModal.nextId}`;
 
   private readonly notify = inject(Notify);
+  private readonly tenantScope = inject(TenantScopeState);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
 
@@ -75,6 +122,7 @@ export class UnitModal {
   readonly canManage = input(true);
   readonly saved = output<{ unit: Uom; isNew: boolean }>();
   readonly reloaded = output<Uom>();
+  readonly forbidden = output<void>();
 
   protected readonly limits = UOM_LIMITS;
   protected readonly inUseReasonKeys = [
@@ -95,7 +143,7 @@ export class UnitModal {
   protected readonly inUseGroups = signal<readonly UomReferenceGroup[]>([]);
   private readonly touched = signal<Partial<Record<UnitField, boolean>>>({});
   private readonly revealAllErrors = signal(false);
-  private readonly serverCodeErrorKey = signal<string | null>(null);
+  private readonly serverFieldErrors = signal<Partial<Record<UnitField, string>>>({});
   private readonly pendingRowConflict = signal<{ unit: Uom; targetStatus: UomStatus } | null>(null);
 
   private destroyed = false;
@@ -226,8 +274,9 @@ export class UnitModal {
 
   protected errorText(field: UnitField): string | null {
     this.i18n();
-    if (field === 'code' && this.serverCodeErrorKey()) {
-      return this.transloco.translate(this.serverCodeErrorKey()!);
+    const serverKey = this.serverFieldErrors()[field];
+    if (serverKey) {
+      return this.transloco.translate(serverKey);
     }
     const key = this.validationErrors()[field];
     if (!key) return null;
@@ -243,13 +292,14 @@ export class UnitModal {
       target.value = upper;
     }
     this.form.update((current) => ({ ...current, code: upper }));
-    this.serverCodeErrorKey.set(null);
+    this.clearServerFieldError('code');
   }
 
   protected onFieldInput(field: 'displayName' | 'nameEn' | 'nameAr', event: Event): void {
     if (!this.canManage()) return;
     const value = (event.target as HTMLInputElement).value;
     this.form.update((current) => ({ ...current, [field]: value }));
+    this.clearServerFieldError(field);
   }
 
   protected setActive(checked: boolean): void {
@@ -307,8 +357,15 @@ export class UnitModal {
         this.saving.set(true);
         let refs: UomReferences;
         try {
-          refs = await uomReferences(base.id);
+          refs = await uomReferences(base.id, optionalTradeContext(this.tenantScope));
         } catch (error) {
+          if (isForbiddenError(error)) {
+            this.pendingIdempotency = null;
+            this.allowClose = true;
+            this.modal().close();
+            this.forbidden.emit();
+            return;
+          }
           this.notify.error(this.transloco.translate(errorKey(error)));
           return;
         } finally {
@@ -385,7 +442,7 @@ export class UnitModal {
     const fromRow = this.pendingRowConflict() !== null;
     this.conflictBusy.set(true);
     try {
-      const fresh = await getUom(base.id);
+      const fresh = await getUom(base.id, optionalTradeContext(this.tenantScope));
       this.conflictModal().close();
       this.pendingRowConflict.set(null);
       this.pendingIdempotency = null;
@@ -396,6 +453,17 @@ export class UnitModal {
       }
       this.reloaded.emit(fresh);
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.conflictModal().close();
+        this.pendingRowConflict.set(null);
+        this.pendingIdempotency = null;
+        if (!fromRow) {
+          this.allowClose = true;
+          this.modal().close();
+        }
+        this.forbidden.emit();
+        return;
+      }
       this.notify.error(this.transloco.translate(errorKey(error)));
     } finally {
       this.conflictBusy.set(false);
@@ -408,7 +476,7 @@ export class UnitModal {
     const rowConflict = this.pendingRowConflict();
     this.conflictBusy.set(true);
     try {
-      const fresh = await getUom(base.id);
+      const fresh = await getUom(base.id, optionalTradeContext(this.tenantScope));
       this.conflictModal().close();
       this.pendingRowConflict.set(null);
       this.pendingIdempotency = null;
@@ -425,6 +493,17 @@ export class UnitModal {
         this.modal().open();
       }
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.conflictModal().close();
+        this.pendingRowConflict.set(null);
+        this.pendingIdempotency = null;
+        if (!rowConflict) {
+          this.allowClose = true;
+          this.modal().close();
+        }
+        this.forbidden.emit();
+        return;
+      }
       this.notify.error(this.transloco.translate(errorKey(error)));
     } finally {
       this.conflictBusy.set(false);
@@ -436,10 +515,27 @@ export class UnitModal {
   }
 
   private handleSaveError(error: unknown): void {
-    const code = errorCodeOf(error);
-    if (code === 'TRADE.CATALOG.UOM_CODE_TAKEN') {
-      this.serverCodeErrorKey.set('tradeUnits.modal.codeTaken');
+    if (isForbiddenError(error)) {
+      this.pendingIdempotency = null;
+      this.allowClose = true;
+      this.modal().close();
+      this.forbidden.emit();
       return;
+    }
+    const code = errorCodeOf(error);
+    if (code === 'GW.IDEM.MISMATCH' || code === 'TRADE.IDEMPOTENCY.MISMATCH') {
+      this.pendingIdempotency = null;
+    }
+    if (code === 'TRADE.CATALOG.UOM_CODE_TAKEN') {
+      this.serverFieldErrors.set({ code: 'tradeUnits.modal.codeTaken' });
+      return;
+    }
+    if (code === 'TRADE.VALIDATION_FAILED' && error instanceof ApiError) {
+      const mapped = mapValidationFieldErrors(error.details);
+      if (Object.keys(mapped).length > 0) {
+        this.serverFieldErrors.set(mapped);
+        return;
+      }
     }
     if (code === 'TRADE.CONCURRENCY.STALE_VERSION') {
       this.pendingRowConflict.set(null);
@@ -466,10 +562,19 @@ export class UnitModal {
     return key;
   }
 
+  private clearServerFieldError(field: UnitField): void {
+    this.serverFieldErrors.update((current) => {
+      if (!current[field]) return current;
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+  }
+
   private resetValidation(): void {
     this.touched.set({});
     this.revealAllErrors.set(false);
-    this.serverCodeErrorKey.set(null);
+    this.serverFieldErrors.set({});
   }
 
   private async confirmModalClose(): Promise<void> {

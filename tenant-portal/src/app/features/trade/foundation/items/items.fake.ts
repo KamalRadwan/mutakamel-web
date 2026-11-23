@@ -1245,7 +1245,9 @@ export async function fakePatchListing(
 
     validateListingEligibility(companyId, ctx.branchId, item, cp, channelId);
 
-    existing.publicationStatus = body.publicationStatus;
+    if (body.publicationStatus !== undefined) {
+      existing.publicationStatus = body.publicationStatus;
+    }
     bumpVersion(existing);
     return clone(toPublicListing(existing));
   });

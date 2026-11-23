@@ -9,6 +9,7 @@ import {
   inject,
   input,
   output,
+  runInInjectionContext,
   signal,
   untracked,
   viewChild,
@@ -30,13 +31,16 @@ import {
   tablerTool,
   tablerX,
 } from '@ng-icons/tabler-icons';
+import { ApiError as CoreApiError } from '../../../../../core/api/api-errors';
 import { LanguageState } from '../../../../../core/i18n/language';
 import { Notify } from '../../../../../core/notify/notify';
 import { ScopeState } from '../../../../../core/scope/scope';
 import { Button } from '../../../../../shared/ui/button/button';
+import { FullState } from '../../../../../shared/ui/full-state/full-state';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { UnsavedDialog } from '../../../../../shared/ui/unsaved-dialog/unsaved-dialog';
 import { TradeReasonPicker, type ReasonPickerValue } from '../../../shared/pickers/reason-picker/reason-picker';
+import { tenantWide } from '../../../shared/trade-access';
 import { ApiError, errorCodeOf, newIdempotencyKey, tradeContext } from '../../../shared/trade-api';
 import { itemName, listUoms } from '../../../shared/trade-foundation.api';
 import type {
@@ -76,9 +80,9 @@ import {
 import { ItemDraftStore } from '../item-form/item-draft-store';
 import { ItemForm } from '../item-form/item-form';
 
-const CAN_MANAGE = true; // later from the session permissions
-const CAN_VIEW_COST = true; // later from the session permissions
-const CAN_MANAGE_COST = true; // later from the session permissions
+function isForbiddenError(error: unknown): boolean {
+  return (error instanceof ApiError || error instanceof CoreApiError) && error.status === 403;
+}
 
 function toItemRow(detail: ItemDetail): ItemRow {
   const {
@@ -93,7 +97,7 @@ function toItemRow(detail: ItemDetail): ItemRow {
 
 @Component({
   selector: 'app-item-modal',
-  imports: [NgIcon, TranslocoPipe, Button, Modal, UnsavedDialog, TradeReasonPicker, ItemForm],
+  imports: [NgIcon, TranslocoPipe, Button, FullState, Modal, UnsavedDialog, TradeReasonPicker, ItemForm],
   providers: [
     provideTranslocoScope(
       'settings',
@@ -147,10 +151,12 @@ export class ItemModal {
   readonly closed = output<void>();
   readonly saved = output<ItemRow>();
   readonly openFull = output<string>();
+  readonly forbidden = output<void>();
 
-  protected readonly canManage = CAN_MANAGE;
-  protected readonly canViewCost = CAN_VIEW_COST;
-  protected readonly canManageCost = CAN_MANAGE_COST;
+  protected readonly forbiddenState = signal(false);
+  protected readonly canManage = computed(() =>
+    !this.forbiddenState() && runInInjectionContext(this.injector, () => tenantWide('trade.catalog_master.manage')),
+  );
 
   protected readonly activeId = signal<string | null>(null);
   protected readonly mode = signal<'create' | 'edit'>('create');
@@ -193,11 +199,11 @@ export class ItemModal {
   );
 
   protected readonly isReadonly = computed(
-    () => !this.canManage || this.loading() || this.loadFailed() || this.notFound(),
+    () => !this.canManage() || this.loading() || this.loadFailed() || this.notFound() || this.forbiddenState(),
   );
 
   protected readonly canDiscontinue = computed(() => {
-    if (!this.canManage || this.mode() !== 'edit') return false;
+    if (!this.canManage() || this.mode() !== 'edit') return false;
     const status = this.detail()?.status;
     return Boolean(status && ALLOWED_ITEM_STATUS_MOVES[status].includes('DISCONTINUED'));
   });
@@ -276,7 +282,7 @@ export class ItemModal {
 
   async confirmLeave(): Promise<boolean> {
     if (this.skippingLeaveForFullPage) return true;
-    if (!this.canManage || !this.isDirty()) return true;
+    if (this.forbiddenState() || !this.canManage() || !this.isDirty()) return true;
     if (this.loading() || this.loadFailed() || this.notFound()) return true;
     if (this.saving() || this.uploadingImage() || this.updatingStatus()) return false;
     if (this.guardBusy()) return false;
@@ -320,7 +326,7 @@ export class ItemModal {
   }
 
   protected async onImagePicked(file: File): Promise<void> {
-    if (!this.canManage) return;
+    if (!this.canManage()) return;
     if (this.mode() === 'create') {
       this.pendingImageFile.set(file);
       this.onImageClientError(null);
@@ -333,7 +339,7 @@ export class ItemModal {
   }
 
   protected async onImageRemove(): Promise<void> {
-    if (!this.canManage) return;
+    if (!this.canManage()) return;
     if (this.mode() === 'create') {
       this.pendingImageFile.set(null);
       this.onImageClientError(null);
@@ -346,7 +352,7 @@ export class ItemModal {
   }
 
   protected async onStatusChange(targetStatus: ItemStatus): Promise<void> {
-    if (!this.canManage || this.mode() !== 'edit') return;
+    if (!this.canManage() || this.mode() !== 'edit') return;
     const current = this.detail();
     const id = this.activeId();
     if (!current || !id || this.updatingStatus() || this.saving() || this.uploadingImage()) return;
@@ -393,13 +399,14 @@ export class ItemModal {
 
   protected async save(addAnother: boolean, updateUrl = true): Promise<boolean> {
     if (
-      !this.canManage ||
+      !this.canManage() ||
       this.saving() ||
       this.uploadingImage() ||
       this.updatingStatus() ||
       this.loading() ||
       this.loadFailed() ||
-      this.notFound()
+      this.notFound() ||
+      this.forbiddenState()
     ) {
       return false;
     }
@@ -472,7 +479,7 @@ export class ItemModal {
       this.modal().open();
       return;
     }
-    if (!this.allowClose && this.canManage && this.isDirty()) {
+    if (!this.allowClose && this.canManage() && this.isDirty()) {
       this.modal().open();
       void this.confirmModalClose();
       return;
@@ -520,7 +527,7 @@ export class ItemModal {
       return;
     }
     if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key === 'Enter') {
-      if (event.defaultPrevented || !this.canManage) return;
+      if (event.defaultPrevented || !this.canManage()) return;
       event.preventDefault();
       void this.save(false);
       return;
@@ -570,6 +577,7 @@ export class ItemModal {
     this.lastImageFile = null;
     this.attemptedSubmit.set(false);
     this.serverErrors.set({});
+    this.forbiddenState.set(false);
     this.pendingImageFile.set(null);
 
     if (!id) {
@@ -643,7 +651,10 @@ export class ItemModal {
       this.draft.set(structuredClone(mapped));
     } catch (error) {
       if (seq !== this.loadSeq) return;
-      if (error instanceof ApiError && error.status === 404) {
+      if (isForbiddenError(error)) {
+        this.forbiddenState.set(true);
+        this.forbidden.emit();
+      } else if (error instanceof ApiError && error.status === 404) {
         this.notFound.set(true);
       } else {
         this.loadFailed.set(true);
@@ -817,6 +828,11 @@ export class ItemModal {
       }
       return this.save(false);
     } catch (error) {
+      if (isForbiddenError(error)) {
+        this.forbiddenState.set(true);
+        this.forbidden.emit();
+        return false;
+      }
       this.notify.error(this.transloco.translate(itemErrorKey(error)));
       return false;
     }
@@ -953,6 +969,11 @@ export class ItemModal {
   }
 
   private handleWriteError(error: unknown): void {
+    if (isForbiddenError(error)) {
+      this.forbiddenState.set(true);
+      this.forbidden.emit();
+      return;
+    }
     const mapped = mapItemServerError(error);
     if (mapped) {
       this.serverErrors.set(mapped);

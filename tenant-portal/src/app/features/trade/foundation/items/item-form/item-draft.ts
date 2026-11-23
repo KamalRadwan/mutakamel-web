@@ -551,6 +551,8 @@ export function mapItemServerError(error: unknown): DraftErrors | null {
       return { image: { key: 'tradeShared.errors.TRADE_CATALOG_ITEM_IMAGE_TOO_LARGE' } };
     case 'TRADE.CATALOG.ITEM_IMAGE_INVALID':
       return { image: { key: 'tradeShared.errors.TRADE_CATALOG_ITEM_IMAGE_INVALID' } };
+    case 'TRADE.CATALOG.ITEM_IMAGE_PRINT_BUDGET_EXCEEDED':
+      return { image: { key: 'tradeShared.errors.TRADE_CATALOG_ITEM_IMAGE_PRINT_BUDGET_EXCEEDED' } };
     default:
       return null;
   }

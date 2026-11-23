@@ -14,7 +14,9 @@ import {
   tablerTool,
 } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../../core/i18n/language';
+import { ScopeState } from '../../../../../core/scope/scope';
 import { ActionsMenu, type ActionItem, type ActionSelection } from '../../../../../shared/ui/actions-menu/actions-menu';
+import { tradeContext } from '../../../shared/trade-api';
 import { formatMoney } from '../../../shared/trade-format';
 import { itemName } from '../../../shared/trade-foundation.api';
 import type { ItemRow } from '../../../shared/trade-foundation.model';
@@ -110,6 +112,7 @@ export function itemActions(
   host: { class: 'block min-w-0' },
 })
 export class ItemCard {
+  private readonly scopeState = inject(ScopeState);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   protected readonly language = inject(LanguageState).current;
@@ -169,18 +172,21 @@ export class ItemCard {
     effect(() => {
       const current = this.item();
       const enabled = this.showThumb();
+      const ctx = tradeContext(this.scopeState, 'BRANCH');
       const loadId = ++seq;
       if (!enabled || !current.image) {
         setThumb(null);
         return;
       }
-      void itemThumbUrl(current.id, current.image).then((url) => {
-        if (loadId !== seq) {
-          releaseThumbUrl(url);
-          return;
-        }
-        setThumb(url);
-      });
+      void itemThumbUrl(current.id, current.image, ctx)
+        .catch(() => null)
+        .then((url) => {
+          if (loadId !== seq) {
+            releaseThumbUrl(url);
+            return;
+          }
+          setThumb(url);
+        });
     });
 
     inject(DestroyRef).onDestroy(() => {

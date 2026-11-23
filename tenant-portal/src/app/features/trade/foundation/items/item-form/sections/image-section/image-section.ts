@@ -16,11 +16,13 @@ import { translationEvents } from '../../../../../../../core/i18n/translation-ev
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerPhoto, tablerTrash } from '@ng-icons/tabler-icons';
+import { ScopeState } from '../../../../../../../core/scope/scope';
 import { Button } from '../../../../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { Field } from '../../../../../../../shared/ui/field/field';
 import { FileDrop } from '../../../../../../../shared/ui/file-drop/file-drop';
 import type { RecordLayout } from '../../../../../../../shared/ui/section-bar/record-layout';
+import { tradeContext } from '../../../../../shared/trade-api';
 import type { ItemImageSummary } from '../../../../../shared/trade-foundation.model';
 import { itemThumbUrl, releaseThumbUrl } from '../../../../../shared/trade-image';
 import { ITEM_IMAGE_RULES } from '../../../items.model';
@@ -37,6 +39,7 @@ export class ImageSection {
   private static nextId = 0;
   protected readonly uid = `item-img-${++ImageSection.nextId}`;
 
+  private readonly scopeState = inject(ScopeState);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly removeDialog = viewChild.required<ConfirmDialog>('removeDialog');
@@ -93,6 +96,7 @@ export class ImageSection {
       const pending = this.pendingFile();
       const id = this.itemId();
       const img = this.image();
+      const ctx = tradeContext(this.scopeState, 'BRANCH');
       const loadSeq = ++seq;
 
       if (pending) {
@@ -105,13 +109,15 @@ export class ImageSection {
         return;
       }
 
-      void itemThumbUrl(id, img).then((url) => {
-        if (loadSeq !== seq) {
-          releaseThumbUrl(url);
-          return;
-        }
-        setPreview(url);
-      });
+      void itemThumbUrl(id, img, ctx)
+        .catch(() => null)
+        .then((url) => {
+          if (loadSeq !== seq) {
+            releaseThumbUrl(url);
+            return;
+          }
+          setPreview(url);
+        });
     });
 
     effect(() => {
