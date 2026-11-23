@@ -56,6 +56,7 @@ import type {
   RestoreTemplateVersionResponse,
   RetireTemplateVersionResponse,
   TemplateCreationScopesResponse,
+  TemplateCommandResponseMap,
   TemplateCursorPage,
   TemplateDataSourceKey,
   TemplateDataSourceSchemaDto,
@@ -68,6 +69,7 @@ import type {
   TemplateHtmlOrEmailPreviewRequestDto,
   TemplateHtmlPreviewResponseDto,
   TemplateLayoutReceiptV1,
+  TemplateLayoutReceiptResponseDto,
   TemplateListRequestDto,
   TemplateListResponse,
   TemplatePdfJobDto,
@@ -148,11 +150,11 @@ export class TemplatesApi {
   }
 
   createTemplate(body: CreateTemplateDto, key: string): Promise<CoreWriteResult<CreateTemplateResponse>> {
-    return this.write('POST', TEMPLATES_PATH, body, key);
+    return this.write('create', 'POST', TEMPLATES_PATH, body, key);
   }
 
   duplicateTemplate(templateId: string, body: DuplicateTemplateDto, key: string): Promise<CoreWriteResult<CreateTemplateResponse>> {
-    return this.write('POST', `${this.path(templateId)}/duplicate`, body, key);
+    return this.write('create', 'POST', `${this.path(templateId)}/duplicate`, body, key);
   }
 
   getTemplate(templateId: string): Promise<TemplateDefinitionDetail> {
@@ -160,19 +162,19 @@ export class TemplatesApi {
   }
 
   patchTemplate(templateId: string, body: PatchTemplateDefinitionDto, ifMatch: string, key: string): Promise<CoreWriteResult<PatchTemplateDefinitionResponse>> {
-    return this.write('PATCH', this.path(templateId), body, key, ifMatch);
+    return this.write('patchDefinition', 'PATCH', this.path(templateId), body, key, ifMatch);
   }
 
   archiveTemplate(templateId: string, ifMatch: string, key: string): Promise<CoreWriteResult<TemplateDefinitionDetail>> {
-    return this.write('POST', `${this.path(templateId)}/archive`, undefined, key, ifMatch);
+    return this.write('lifecycle', 'POST', `${this.path(templateId)}/archive`, undefined, key, ifMatch);
   }
 
   restoreTemplate(templateId: string, ifMatch: string, key: string): Promise<CoreWriteResult<TemplateDefinitionDetail>> {
-    return this.write('POST', `${this.path(templateId)}/restore`, undefined, key, ifMatch);
+    return this.write('lifecycle', 'POST', `${this.path(templateId)}/restore`, undefined, key, ifMatch);
   }
 
   async deleteTemplate(templateId: string, ifMatch: string, key: string): Promise<void> {
-    await this.write('DELETE', this.path(templateId), undefined, key, ifMatch);
+    await this.write('delete', 'DELETE', this.path(templateId), undefined, key, ifMatch);
   }
 
   getTemplateThumbnail(downloadPath: string): Promise<Blob>;
@@ -183,7 +185,7 @@ export class TemplatesApi {
   }
 
   retryTemplateThumbnail(templateId: string, body: TemplateThumbnailRetryRequest, key: string): Promise<CoreWriteResult<TemplateThumbnailRetryResponse>> {
-    return this.write('POST', `${this.path(templateId)}/thumbnail/retry`, body, key);
+    return this.write('retryThumbnail', 'POST', `${this.path(templateId)}/thumbnail/retry`, body, key);
   }
 
   getDraft(templateId: string): Promise<TemplateDraftDto> {
@@ -191,11 +193,11 @@ export class TemplatesApi {
   }
 
   patchDraft(templateId: string, body: PatchTemplateDraftDto, ifMatch: string, key: string): Promise<CoreWriteResult<PatchTemplateDraftResponse>> {
-    return this.write('PATCH', `${this.path(templateId)}/draft`, body, key, ifMatch);
+    return this.write('patchDraft', 'PATCH', `${this.path(templateId)}/draft`, body, key, ifMatch);
   }
 
   validateDraft(templateId: string, body: ValidateTemplateDraftDto, ifMatch: string, key: string): Promise<CoreWriteResult<TemplateValidationRunDto>> {
-    return this.write('POST', `${this.path(templateId)}/validate`, body, key, ifMatch);
+    return this.write('validate', 'POST', `${this.path(templateId)}/validate`, body, key, ifMatch);
   }
 
   getValidationRun(templateId: string, runId: string): Promise<TemplateValidationRunDto> {
@@ -203,7 +205,7 @@ export class TemplatesApi {
   }
 
   publishTemplate(templateId: string, body: PublishTemplateRequestDto, ifMatch: string, key: string): Promise<CoreWriteResult<PublishTemplateResponseDto>> {
-    return this.write('POST', `${this.path(templateId)}/publish`, body, key, ifMatch);
+    return this.write('publish', 'POST', `${this.path(templateId)}/publish`, body, key, ifMatch);
   }
 
   listVersions(templateId: string, query: TemplateVersionsListQuery = {}): Promise<TemplateCursorPage<TemplateVersionItem>> {
@@ -216,20 +218,23 @@ export class TemplatesApi {
   }
 
   restoreVersion(templateId: string, versionId: string, body: RestoreTemplateVersionDto, ifMatch: string, key: string): Promise<CoreWriteResult<RestoreTemplateVersionResponse>> {
-    return this.write('POST', `${this.path(templateId)}/versions/${encodeURIComponent(versionId)}/restore`, body, key, ifMatch);
+    return this.write('restoreVersion', 'POST', `${this.path(templateId)}/versions/${encodeURIComponent(versionId)}/restore`, body, key, ifMatch);
   }
 
   retireVersion(templateId: string, versionId: string, ifMatch: string, key: string): Promise<CoreWriteResult<RetireTemplateVersionResponse>> {
-    return this.write('POST', `${this.path(templateId)}/versions/${encodeURIComponent(versionId)}/retire`, undefined, key, ifMatch);
+    return this.write('retireVersion', 'POST', `${this.path(templateId)}/versions/${encodeURIComponent(versionId)}/retire`, undefined, key, ifMatch);
   }
 
   listRecoverySnapshots(templateId: string, query: TemplateRecoverySnapshotsQuery = {}): Promise<TemplateCursorPage<TemplateRecoverySnapshotItem>> {
     const path = `${this.path(templateId)}/draft/recovery-snapshots`;
-    return this.read(path, { ...query }, () => this.http.cursorPage(path, { ...query }));
+    return this.read(path, { ...query }, async () => {
+      const page = await this.http.cursorPage<unknown>(path, { ...query });
+      return { ...page, items: page.items.map(item => this.http.recoverySnapshot(item)) };
+    });
   }
 
   restoreRecoverySnapshot(templateId: string, snapshotId: string, body: RestoreRecoverySnapshotDto, ifMatch: string, key: string): Promise<CoreWriteResult<RestoreRecoverySnapshotResponse>> {
-    return this.write('POST', `${this.path(templateId)}/draft/recovery-snapshots/${encodeURIComponent(snapshotId)}/restore`, body, key, ifMatch);
+    return this.write('restoreRecovery', 'POST', `${this.path(templateId)}/draft/recovery-snapshots/${encodeURIComponent(snapshotId)}/restore`, body, key, ifMatch);
   }
 
   previewHtml(templateId: string, body: TemplateHtmlOrEmailPreviewRequestDto): Promise<TemplateHtmlPreviewResponseDto> {
@@ -243,7 +248,7 @@ export class TemplatesApi {
   }
 
   previewPdf(templateId: string, body: TemplatePdfPreviewRequestDto, key: string): Promise<CoreWriteResult<TemplatePdfPreviewAcceptedDto>> {
-    return this.write('POST', `${this.path(templateId)}/preview/pdf`, body, key);
+    return this.write('previewPdf', 'POST', `${this.path(templateId)}/preview/pdf`, body, key);
   }
 
   getPreviewJob(jobId: string): Promise<TemplatePdfJobDto> {
@@ -254,8 +259,9 @@ export class TemplatesApi {
     return this.blob(`${TEMPLATES_PATH}/preview-jobs/${encodeURIComponent(jobId)}/artifact`);
   }
 
-  getPreviewJobLayoutReceipt(jobId: string): Promise<TemplateLayoutReceiptV1> {
-    return this.read(`${TEMPLATES_PATH}/preview-jobs/${encodeURIComponent(jobId)}/layout-receipt`);
+  getPreviewJobLayoutReceipt(jobId: string): Promise<TemplateLayoutReceiptResponseDto> {
+    const path = `${TEMPLATES_PATH}/preview-jobs/${encodeURIComponent(jobId)}/layout-receipt`;
+    return this.read(path, {}, () => this.http.layoutReceipt(path));
   }
 
   private path(templateId: string): string {
@@ -285,9 +291,10 @@ export class TemplatesApi {
     return this.read(path, query, () => this.http.readBlob(path, query));
   }
 
-  private async write<T>(method: CoreWriteMethod, path: string, body: unknown, key: string, ifMatch?: string): Promise<CoreWriteResult<T>> {
+  private async write<K extends keyof TemplateCommandResponseMap>(command: K, method: CoreWriteMethod, path: string,
+    body: unknown, key: string, ifMatch?: string): Promise<CoreWriteResult<TemplateCommandResponseMap[K]>> {
     const revision = this.scopeRevision();
-    const result = await this.http.write<T>(method, path, body, { key, ifMatch });
+    const result = await this.http.command(command, method, path, body, { key, ifMatch });
     const filters = { queryKey: [TEMPLATES_QUERY_KEY, revision] };
     await this.queries.cancelQueries(filters);
     await this.queries.invalidateQueries({ ...filters, refetchType: 'none' });

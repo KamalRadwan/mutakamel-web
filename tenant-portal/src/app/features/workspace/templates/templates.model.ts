@@ -1505,6 +1505,28 @@ export interface RestoreRecoverySnapshotResponse {
   replacedDraftRecovery: TemplateMigrationRecoverySummary | null;
 }
 
+/** Core recoveryDto serializes actor IDs, without a user-directory projection. */
+export type TemplateRecoverySnapshotWireItem = Omit<TemplateRecoverySnapshotItem, 'createdBy' | 'restoredBy'> & {
+  createdBy: string;
+  restoredBy: string | null;
+};
+
+/** Source-verified command bodies; controllers expose generic idempotent executions. */
+export interface TemplateCommandResponseMap {
+  create: CreateTemplateResponse;
+  patchDefinition: PatchTemplateDefinitionResponse;
+  lifecycle: TemplateDefinitionDetail;
+  delete: void;
+  retryThumbnail: TemplateThumbnailRetryResponse;
+  patchDraft: PatchTemplateDraftResponse;
+  validate: TemplateValidationRunDto;
+  publish: PublishTemplateResponseDto;
+  restoreVersion: RestoreTemplateVersionResponse;
+  retireVersion: RetireTemplateVersionResponse;
+  restoreRecovery: RestoreRecoverySnapshotResponse;
+  previewPdf: TemplatePdfPreviewAcceptedDto;
+}
+
 /** Assets (§10). */
 export type TemplateAssetQueryScope = 'ALL_AUTHORIZED' | 'REUSABLE' | 'DEFINITION';
 
@@ -1874,6 +1896,7 @@ export interface TemplatePdfJobDto {
   ownerDownloadPath?: string;
 }
 
+/** Legacy fake-facade geometry, retained until compatibility exports are removed. */
 export interface TemplateLayoutReceiptPage {
   pageIndex: number;
   width: number;
@@ -1889,6 +1912,7 @@ export interface TemplateLayoutReceiptFragment {
   height: number;
 }
 
+/** @deprecated Fake-facade compatibility only; live reads use TemplateLayoutReceiptResponseDto. */
 export interface TemplateLayoutReceiptV1 {
   layoutRuntimeChecksum: string;
   pagedRuntimeChecksum?: string;
@@ -1900,3 +1924,44 @@ export interface TemplateLayoutReceiptV1 {
   dataRows?: Record<string, unknown>[];
   fonts?: string[];
 }
+
+export interface TemplateLayoutBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface TemplateLayoutObject {
+  sourceNodeId: string;
+  pageId: string;
+  bounds: TemplateLayoutBounds;
+}
+
+/** Actual Core/worker layout receipt. Page IDs and measured bounds stay intact. */
+export type TemplateLayoutReceiptResponseDto = {
+  layoutRuntimeChecksum: string;
+  pagedRuntimeChecksum?: string;
+} & (
+  | {
+      geometryUnit: 'MM';
+      pageLayoutMode: 'UNIFORM';
+      pages: {
+        pageId: string;
+        widthMm: number;
+        heightMm: number;
+        contentBox: TemplateLayoutBounds;
+        headerBox?: TemplateLayoutBounds;
+        footerBox?: TemplateLayoutBounds;
+      }[];
+      fragments: (TemplateLayoutObject & { continuationIndex: number; rowIndex?: number })[];
+      fonts: { family: string; weight: string; style: string }[];
+    }
+  | {
+      geometryUnit: 'CSS_PX';
+      pageLayoutMode: 'EXPLICIT';
+      pages: { pageId: string; paper: TemplateLayoutBounds; content: TemplateLayoutBounds }[];
+      objects: TemplateLayoutObject[];
+      dataRows: (TemplateLayoutObject & { rowIndex: number })[];
+    }
+);

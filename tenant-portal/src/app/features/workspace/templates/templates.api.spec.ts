@@ -42,6 +42,59 @@ const starters: TemplateStartersQuery = {
   locale: 'en-US', direction: 'LTR', definitionScopeType: 'TENANT',
 };
 
+const definitionReceipt = { templateId: id, revision: 8, etag: '"8"' };
+const draftReceipt = { draftId: 'draft', templateId: id, revision: 8, etag: '"8"' };
+const thumbnailReceipt = { state: 'PENDING', sourceChecksum: 'checksum' };
+const recoveryReceipt = { snapshotId: 'snapshot', createdBy: 'creator-id', restoredBy: 'restorer-id' };
+const pdfReceipt = { templateId: id, source: { kind: 'DRAFT', draftId: 'draft', draftRevision: 7 }, kind: 'PDF_ACCEPTED', renderTarget: 'PDF',
+  outputProfile: 'DOCUMENT_PRINT', renderJobId: 'job', status: 'PENDING', location: `${base}/preview-jobs/job`,
+  createdAt: '2026-11-23T12:00:00Z', expiresAt: '2026-11-23T13:00:00Z',
+  templateContentChecksum: 'content', compiledArtifactChecksum: 'compiled' };
+const layoutReceipt = { layoutRuntimeChecksum: 'a'.repeat(64), geometryUnit: 'MM', pageLayoutMode: 'UNIFORM',
+  pages: [{ pageId: 'page-1', widthMm: 210, heightMm: 297, contentBox: { x: 10, y: 10, width: 190, height: 277 } }],
+  fragments: [], fonts: [{ family: 'Tajawal', weight: '400', style: 'normal' }] };
+
+/** Source-shaped receipts, selected independently by the outgoing route. */
+function flushCommand(request: TestRequest): void {
+  const url = request.request.url;
+  let status = 200;
+  let data: object = {};
+  if (request.request.method === 'DELETE') {
+    request.flush(null, { status: 204, statusText: 'No Content' });
+    return;
+  }
+  if (url === base || url.endsWith('/duplicate')) {
+    status = 201;
+    data = { definition: definitionReceipt, draft: draftReceipt };
+  } else if (url.endsWith('/preview/pdf')) {
+    status = 202;
+    data = pdfReceipt;
+  } else if (url.endsWith('/thumbnail/retry')) {
+    status = 202;
+    data = { kind: 'THUMBNAIL_ACCEPTED', thumbnailJobId: 'thumbnail-job', state: 'PENDING',
+      generation: 1, sourceChecksum: 'checksum', location: `${path}/thumbnail` };
+  } else if (url.endsWith('/publish')) {
+    status = 201;
+    data = { version: { templateVersionId: 'version' }, thumbnail: thumbnailReceipt,
+      definitionRevision: 8, definitionEtag: '"8"', consumedDraftRevision: 7, draftEtag: '"8"' };
+  } else if (url.endsWith('/validate')) {
+    data = { validationRunId: 'run', templateId: id, draftId: 'draft', draftRevision: 7,
+      status: 'PASSED', issues: [], rendererTargets: ['HTML', 'PDF'] };
+  } else if (url.includes('/recovery-snapshots/')) {
+    data = { draft: draftReceipt, migrationRecovery: null, recoveredFrom: recoveryReceipt, replacedDraftRecovery: null };
+  } else if (url.includes('/versions/')) {
+    data = url.endsWith('/retire') ? { version: { templateVersionId: 'version' }, definitionRevision: 8, definitionEtag: '"8"' }
+      : { draft: draftReceipt, migrationRecovery: null };
+  } else if (url.endsWith('/draft')) {
+    data = { draft: draftReceipt, thumbnail: thumbnailReceipt, migrationRecovery: null };
+  } else if (request.request.method === 'PATCH') {
+    data = { definition: definitionReceipt, draft: null };
+  } else {
+    data = definitionReceipt;
+  }
+  request.flush({ success: true, data }, { status, statusText: 'OK', headers: { ETag: '"8"', Location: '/version' } });
+}
+
 describe('TemplatesApi', () => {
   let api: TemplatesApi;
   let http: HttpTestingController;
@@ -137,7 +190,7 @@ describe('TemplatesApi', () => {
       const request = http.expectOne(url);
       writeHeaders(request, key);
       expect(request.request.body).toEqual(body);
-      request.flush({ success: true, data: { definition: {}, draft: {} } },
+      request.flush({ success: true, data: { definition: definitionReceipt, draft: draftReceipt } },
         { status: 201, statusText: 'Created', headers: { Location: '/created' } });
       await expect(pending).resolves.toMatchObject({ status: 201, location: '/created', data: { definition: {}, draft: {} } });
     }
@@ -155,7 +208,7 @@ describe('TemplatesApi', () => {
       const request = http.expectOne(url);
       writeHeaders(request, key, '"7"');
       expect(request.request.method).toBe(method);
-      request.flush({ success: true, data: {} });
+      flushCommand(request);
       await pending;
     }
   });
@@ -164,6 +217,38 @@ describe('TemplatesApi', () => {
     const pending = api.deleteTemplate(id, '"7"', newIdempotencyKey());
     http.expectOne(path).flush(null, { status: 204, statusText: 'No Content' });
     await expect(pending).resolves.toBeUndefined();
+  });
+
+  it('rejects unknown command receipts on every keyed platform route', async () => {
+    for (const call of keyedWrites()) {
+      const pending = call(newIdempotencyKey());
+      const request = http.expectOne(() => true);
+      const url = request.request.url;
+      const status = url === base || url.endsWith('/duplicate') || url.endsWith('/publish') ? 201
+        : url.endsWith('/preview/pdf') || url.endsWith('/thumbnail/retry') ? 202 : 200;
+      request.flush({ success: true, data: {} }, { status, statusText: 'OK' });
+      await expect(pending).rejects.toMatchObject({ status: 502, code: 'COMMON.GENERIC.INTERNAL_ERROR' });
+    }
+  });
+
+  it('adapts recovery actor IDs without inventing user names and preserves page info', async () => {
+    const pending = api.listRecoverySnapshots(id, { limit: 10, cursor: 'cursor' });
+    const payload = { ...page, items: [recoveryReceipt, { ...recoveryReceipt, snapshotId: 'unrestored', restoredBy: null }],
+      pageInfo: { limit: 10, hasNextPage: true, nextCursor: 'next' } };
+    http.expectOne(`${path}/draft/recovery-snapshots?limit=10&cursor=cursor`).flush({ success: true, data: payload });
+    await expect(pending).resolves.toMatchObject({ pageInfo: payload.pageInfo, items: [
+      { snapshotId: 'snapshot', createdBy: { kind: 'USER', actorId: 'creator-id', displayName: 'creator-id' },
+        restoredBy: { kind: 'USER', actorId: 'restorer-id', displayName: 'restorer-id' } },
+      { snapshotId: 'unrestored', restoredBy: null },
+    ] });
+
+    const restored = api.restoreRecoverySnapshot(id, 'snapshot', {
+      expectedSnapshotChecksum: 'checksum', reason: 'Restore', discardCurrentDraft: true,
+    }, '"7"', newIdempotencyKey());
+    flushCommand(http.expectOne(`${path}/draft/recovery-snapshots/snapshot/restore`));
+    await expect(restored).resolves.toMatchObject({ etag: '"8"', data: {
+      draft: draftReceipt, recoveredFrom: { createdBy: { actorId: 'creator-id' }, restoredBy: { actorId: 'restorer-id' } },
+    } });
   });
 
   it('stale and missing precondition reach the caller', async () => {
@@ -194,7 +279,7 @@ describe('TemplatesApi', () => {
     const request = http.expectOne(`${path}/draft`);
     writeHeaders(request, key, tag);
     expect(request.request.body).toEqual(body);
-    request.flush({ success: true, data: {} });
+    flushCommand(request);
     await pending;
   });
 
@@ -207,7 +292,7 @@ describe('TemplatesApi', () => {
       const pending = call(key);
       const request = http.expectOne(url);
       writeHeaders(request, key, '"7"');
-      request.flush({ success: true, data: {} }, { status, statusText: 'OK', headers: { Location: '/version' } });
+      flushCommand(request);
       await expect(pending).resolves.toMatchObject({ status, location: '/version' });
     }
   });
@@ -223,7 +308,7 @@ describe('TemplatesApi', () => {
       const pending = call(key);
       const request = http.expectOne(url);
       writeHeaders(request, key, '"7"');
-      request.flush({ success: true, data: {} });
+      flushCommand(request);
       await pending;
     }
   });
@@ -247,9 +332,23 @@ describe('TemplatesApi', () => {
     const pending = api.previewPdf(id, preview, key);
     const request = http.expectOne(`${path}/preview/pdf`);
     writeHeaders(request, key);
-    request.flush({ success: true, data: { renderJobId: 'job' } },
+    request.flush({ success: true, data: pdfReceipt },
       { status: 202, statusText: 'Accepted', headers: { Location: `${base}/preview-jobs/job` } });
     await expect(pending).resolves.toMatchObject({ status: 202, data: { renderJobId: 'job' }, location: `${base}/preview-jobs/job` });
+  });
+
+  it('accepts owner source-resolution receipts and rejects unresolved source identities', async () => {
+    for (const source of [{ kind: 'DRAFT', draftId: 'draft', draftRevision: 7 },
+      { kind: 'VERSION', versionId: 'version', versionNumber: 1 }]) {
+      const pending = api.previewPdf(id, preview, newIdempotencyKey());
+      const data = { ...pdfReceipt, source, status: 'RESOLVING_SOURCE' };
+      http.expectOne(`${path}/preview/pdf`).flush({ success: true, data }, { status: 202, statusText: 'Accepted' });
+      await expect(pending).resolves.toMatchObject({ data });
+    }
+    const pending = api.previewPdf(id, preview, newIdempotencyKey());
+    http.expectOne(`${path}/preview/pdf`).flush({ success: true, data: { ...pdfReceipt, source: {} } },
+      { status: 202, statusText: 'Accepted' });
+    await expect(pending).rejects.toMatchObject({ status: 502, code: 'COMMON.GENERIC.INTERNAL_ERROR' });
   });
 
   it('binary reads return a Blob', async () => {
@@ -312,7 +411,7 @@ describe('TemplatesApi', () => {
       [`${path}/validation-runs/run%2Fid`, {}, () => api.getValidationRun(id, 'run/id'), { validationRunId: 'run/id' }],
       [`${path}/versions/version`, {}, () => api.getVersion(id, 'version'), { templateVersionId: 'version' }],
       [`${base}/preview-jobs/job%2Fid`, {}, () => api.getPreviewJob('job/id'), { renderJobId: 'job/id' }],
-      [`${base}/preview-jobs/job/layout-receipt`, {}, () => api.getPreviewJobLayoutReceipt('job'), { pages: [] }],
+      [`${base}/preview-jobs/job/layout-receipt`, {}, () => api.getPreviewJobLayoutReceipt('job'), layoutReceipt],
     ] as const) {
       const pending = call();
       const request = http.expectOne((req) => req.url === url);
@@ -327,7 +426,7 @@ describe('TemplatesApi', () => {
     const request = http.expectOne(`${path}/thumbnail/retry`);
     writeHeaders(request, key);
     expect(request.request.body).toEqual(body);
-    request.flush({ success: true, data: { kind: 'THUMBNAIL_ACCEPTED' } }, { status: 202, statusText: 'Accepted' });
+    flushCommand(request);
     await expect(pending).resolves.toMatchObject({ status: 202 });
   });
 
@@ -346,14 +445,14 @@ describe('TemplatesApi', () => {
         const retry = http.expectOne(() => true);
         writeHeaders(retry, key, request.request.headers.get('If-Match') ?? undefined);
         expect(retry.request.body).toEqual(request.request.body);
-        retry.flush({ success: true, data: {} });
+        flushCommand(retry);
         await retried;
         const changedKey = newIdempotencyKey();
         const changed = api.createTemplate({ ...create, name: 'Changed' }, changedKey);
         const next = http.expectOne(base);
         expect(next.request.headers.get('x-idempotency-key')).not.toBe(key);
         expect(next.request.body).not.toEqual(request.request.body);
-        next.flush({ success: true, data: {} });
+        flushCommand(next);
         await changed;
       }
     }
@@ -403,7 +502,7 @@ describe('TemplatesApi', () => {
     const oldResult = old.catch((error: unknown) => error);
     const pendingRead = http.expectOne(path);
     const saved = api.patchTemplate(id, { name: 'Updated' }, '"7"', newIdempotencyKey());
-    http.expectOne(path).flush({ success: true, data: {} });
+    flushCommand(http.expectOne(path));
     await saved;
     await oldResult;
     pendingRead.flush({ success: true, data: { etag: '"7"' } });
