@@ -1,5 +1,9 @@
-import { describe, expect, it } from 'vitest';
-import { CHANGE_PLAN_PATH, ChangePrefill, changeLink, parseChangePrefill } from './change-link';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { TestBed } from '@angular/core/testing';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { SUBSCRIPTION } from '../subscription/subscription.spec-helpers';
+import { CHANGE_PLAN_PATH, ChangePrefill, changeLink, loadSeatsChangeQueries, parseChangePrefill } from './change-link';
 
 describe('changeLink', () => {
   it('builds the app query', () => {
@@ -11,6 +15,64 @@ describe('changeLink', () => {
 
   it('builds the seats query', () => {
     expect(changeLink({ kind: 'seats', itemId: 'i1' }).queryParams.add).toBe('seats:i1');
+  });
+});
+
+describe('loadSeatsChangeQueries with BillingApi', () => {
+  let http: HttpTestingController;
+  const path = '/api/tenant/core/v1/subscription';
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting()],
+    });
+    http = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => {
+    http.verify();
+    TestBed.resetTestingModule();
+  });
+
+  it('maps the real subscription projection to seat links in the existing constructor call context', async () => {
+    const result = TestBed.runInInjectionContext(() => loadSeatsChangeQueries());
+    const request = http.expectOne(path);
+    expect(request.request.method).toBe('GET');
+    expect(request.request.withCredentials).toBe(true);
+    expect(request.request.headers.has('x-company-id')).toBe(false);
+    expect(request.request.headers.has('x-branch-id')).toBe(false);
+    request.flush({ success: true, data: SUBSCRIPTION });
+
+    expect(await result).toEqual(new Map([['crm', { add: 'seats:item' }]]));
+  });
+
+  it.each([401, 403, 404, 409, 503])('leaves seat links unavailable on HTTP %s', async (status) => {
+    const result = TestBed.runInInjectionContext(() => loadSeatsChangeQueries());
+    http.expectOne(path).flush({ errorCode: 'SUBSCRIPTION_READ_UNAVAILABLE' }, { status, statusText: 'Failed' });
+    expect(await result).toEqual(new Map());
+  });
+
+  it('leaves seat links unavailable while offline', async () => {
+    const result = TestBed.runInInjectionContext(() => loadSeatsChangeQueries());
+    http.expectOne(path).error(new ProgressEvent('error'));
+    expect(await result).toEqual(new Map());
+  });
+
+  it('does not manufacture seat links from an invalid response envelope', async () => {
+    const result = TestBed.runInInjectionContext(() => loadSeatsChangeQueries());
+    http.expectOne(path).flush(SUBSCRIPTION);
+    expect(await result).toEqual(new Map());
+  });
+
+  it('rejects the items-only projection instead of treating it as the full subscription', async () => {
+    const result = TestBed.runInInjectionContext(() => loadSeatsChangeQueries());
+    http.expectOne(path).flush({ success: true, data: {
+      subscriptionId: SUBSCRIPTION.subscription.id,
+      subscriptionRevision: SUBSCRIPTION.subscriptionRevision,
+      baseItems: SUBSCRIPTION.baseItems,
+      addonSelections: SUBSCRIPTION.addonSelections,
+    } });
+    expect(await result).toEqual(new Map());
   });
 });
 

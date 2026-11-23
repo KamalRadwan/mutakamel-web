@@ -280,15 +280,62 @@ describe('CataloguePage with BillingApi', () => {
     expect(TestBed.inject(Notify).toasts()).toEqual([]);
   });
 
-  it('catalogue without subscription marks', async () => {
+  it('catalogue without subscription marks only when the backend confirms no subscription', async () => {
     fixture = TestBed.createComponent(CataloguePage);
-    http.expectOne(BASE).flush({ errorCode: 'COMMON.GENERIC.INTERNAL_ERROR' }, { status: 503, statusText: 'Unavailable' });
+    http.expectOne(BASE).flush({ errorCode: 'SUBSCRIPTION_NOT_FOUND' }, { status: 404, statusText: 'Not Found' });
     await flushPage([tier()]);
     await render();
     expect(root().querySelector('app-offer-card')).not.toBeNull();
     expect(root().querySelector('app-billing-failed')).toBeNull();
     expect(fixture.componentInstance['groups']()[0].subscribed).toBe(false);
     expect(fixture.componentInstance['groups']()[0].tiers[0].current).toBe(false);
+  });
+
+  it.each([401, 404, 409, 503])('shows subscription HTTP %s failures instead of offering an empty plan', async (status) => {
+    fixture = TestBed.createComponent(CataloguePage);
+    http.expectOne(BASE).flush(
+      { errorCode: 'SUBSCRIPTION_READ_UNAVAILABLE', correlationId: 'subscription-ref' },
+      { status, statusText: 'Failed' },
+    );
+    await flushPage([tier()]);
+    await render();
+    expect(root().querySelector('app-billing-failed')).not.toBeNull();
+    expect(root().querySelector('app-offer-card')).toBeNull();
+    expect(text()).toContain('subscription-ref');
+  });
+
+  it('shows forbidden when the real subscription read rejects owner access', async () => {
+    fixture = TestBed.createComponent(CataloguePage);
+    http.expectOne(BASE).flush({ errorCode: 'TENANT_OWNER_REQUIRED' }, { status: 403, statusText: 'Forbidden' });
+    await flushPage([tier()]);
+    await render();
+    expect(root().querySelector('app-billing-forbidden')).not.toBeNull();
+    expect(root().querySelector('app-offer-card')).toBeNull();
+  });
+
+  it('shows a failure when a successful subscription response contains an items-only projection', async () => {
+    fixture = TestBed.createComponent(CataloguePage);
+    const view = subscription(true);
+    http.expectOne(BASE).flush({ success: true, data: {
+      subscriptionId: view.subscription.id,
+      subscriptionRevision: view.subscriptionRevision,
+      baseItems: view.baseItems,
+      addonSelections: view.addonSelections,
+    } });
+    await flushPage([tier()]);
+    await render();
+    expect(root().querySelector('app-billing-failed')).not.toBeNull();
+    expect(root().querySelector('app-offer-card')).toBeNull();
+  });
+
+  it('shows the network failure state when the subscription read is offline', async () => {
+    fixture = TestBed.createComponent(CataloguePage);
+    http.expectOne(BASE).error(new ProgressEvent('error'));
+    await flushPage([tier()]);
+    await render();
+    expect(root().querySelector('app-billing-failed')).not.toBeNull();
+    expect(root().querySelector('app-offer-card')).toBeNull();
+    expect(TestBed.inject(Notify).toasts()).toEqual([expect.objectContaining({ type: 'error', pinned: true })]);
   });
 
   it('catalogue search is local', async () => {

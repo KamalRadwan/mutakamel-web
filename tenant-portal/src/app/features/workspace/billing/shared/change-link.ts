@@ -1,4 +1,5 @@
-import { getSubscription } from '../billing.api';
+import { inject } from '@angular/core';
+import { BillingApi } from '../billing.api';
 
 export const CHANGE_PLAN_PATH = '/workspace/billing/subscription/change';
 
@@ -63,9 +64,11 @@ export function parseChangePrefill(add: string | null): ChangePrefill | null {
  * Best-effort map from a seat module key to the `?add=seats:<itemId>` query of its subscription item,
  * so the Seats pages can open the change page ready to add seats. Empty when the subscription cannot be read.
  */
-export async function loadSeatsChangeQueries(): Promise<ReadonlyMap<string, { add: string }>> {
+export async function loadSeatsChangeQueries(
+  api: Pick<BillingApi, 'getSubscription'> = inject(BillingApi),
+): Promise<ReadonlyMap<string, { add: string }>> {
   try {
-    const view = await getSubscription();
+    const view = await api.getSubscription();
     return new Map(
       view.baseItems.map((item) => [item.applicationKey, changeLink({ kind: 'seats', itemId: item.id }).queryParams]),
     );

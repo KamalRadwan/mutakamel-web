@@ -53,6 +53,7 @@ import {
 import { BillingFailed } from '../../shared/billing-failed/billing-failed';
 import { BillingForbidden } from '../../shared/billing-forbidden/billing-forbidden';
 import { BillingSession } from '../../shared/billing-session';
+import { loadAllCatalogue } from '../../catalogue/catalogue.service';
 import { catalogueNames, localizeOffers, localizeSubscription } from '../../shared/catalogue-names';
 import { ChangePrefill, parseChangePrefill } from '../../shared/change-link';
 import { operationPollDelay } from '../../shared/billing-poll';
@@ -835,15 +836,7 @@ export class ChangePage {
   }
 
   private async loadAllCatalogue(): Promise<SubscriptionOffer[]> {
-    const all: SubscriptionOffer[] = [];
-    let page = 1;
-    while (page <= 20) {
-      const res = await this.api.listCatalogue({ page, limit: 100 });
-      all.push(...res.data);
-      if (!res.meta.hasNext) break;
-      page += 1;
-    }
-    return all;
+    return loadAllCatalogue(this.api);
   }
 
   private applyUrlPrefill(): void {
@@ -1041,10 +1034,11 @@ export class ChangePage {
   private setOperation(op: CommercialOperation, body: PrepareBody): void {
     this.activeOperation = op;
     this.operation.set(op);
+    const preview = this.preview();
     writeChangeJournal({
       operationId: op.operationId,
       operationRevision: op.operationRevision,
-      ...(this.preview() ? { previewId: this.preview()!.previewId } : {}),
+      ...(preview ? { previewId: preview.previewId } : {}),
       body,
     });
   }
@@ -1092,9 +1086,11 @@ export class ChangePage {
   }
 
   protected async recover(): Promise<void> {
+    const operation = this.activeOperation;
+    const preparedBody = this.preparedBody;
     if (
-      !this.activeOperation ||
-      !this.preparedBody ||
+      !operation ||
+      !preparedBody ||
       this.recovering() ||
       this.operation()?.state !== 'BLOCKED'
     )
@@ -1102,25 +1098,27 @@ export class ChangePage {
     this.recovering.set(true);
     try {
       const body: RecoveryBody = {
-        expectedOperationRevision: this.activeOperation.operationRevision,
+        expectedOperationRevision: operation.operationRevision,
         action: 'RECONCILE',
         reason: 'Resume blocked plan change',
       };
       this.recoveryCommand = holdCommand(this.recoveryCommand, body);
+      const key = this.recoveryCommand.key;
       const op = await this.withSingleNetworkRetry(() =>
         this.api.recoverOperation(
-          this.activeOperation!.operationId,
+          operation.operationId,
           body,
-          this.recoveryCommand!.key,
+          key,
         ),
       );
-      if (!this.destroyed)
-        await this.pollAndQuote(op, this.preparedBody, operationPollDelay(0, op.retryAfterSeconds));
+      if (!this.destroyed && this.preparedBody === preparedBody)
+        await this.pollAndQuote(op, preparedBody, operationPollDelay(0, op.retryAfterSeconds));
     } catch (error) {
+      if (this.destroyed || this.preparedBody !== preparedBody) return;
       if (errorCodeOf(error) === 'COMMERCIAL_RECOVERY_REVISION_STALE') {
         try {
-          const op = await this.api.getOperation(this.activeOperation!.operationId);
-          if (!this.destroyed && !(await this.handleOperation(op, this.preparedBody!)))
+          const op = await this.api.getOperation(operation.operationId);
+          if (!this.destroyed && this.preparedBody === preparedBody && !(await this.handleOperation(op, preparedBody)))
             this.reviewPhase.set('timeout');
         } catch (readError) {
           this.notify.error(billingErrorMessage(readError, this.transloco));

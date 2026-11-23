@@ -140,7 +140,12 @@ export class CataloguePage {
     try {
       const [offers, subscription] = await Promise.all([
         loadAllCatalogue(this.api),
-        this.api.getSubscription().catch(() => null),
+        this.api.getSubscription().catch((error: unknown) => {
+          if (error instanceof ApiError && error.status === 404 && error.code === 'SUBSCRIPTION_NOT_FOUND') {
+            return null;
+          }
+          throw error;
+        }),
       ]);
       if (seq !== this.loadSeq) return;
       this.notify.connectionRestored();

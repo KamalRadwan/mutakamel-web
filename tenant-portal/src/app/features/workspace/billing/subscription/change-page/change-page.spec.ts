@@ -641,11 +641,39 @@ describe('subscription plan change HTTP contract', () => {
     respond(request('/subscription'), SUBSCRIPTION);
     respond(request('/billing/summary'), SUMMARY);
     for (let page = 1; page <= 20; page++) {
-      catalogue(OFFERS, true, page);
+      catalogue(OFFERS, page < 20, page);
       await tick();
     }
     http.expectNone((r) => r.url.endsWith('/catalogue'));
     expect(c['catalogueOffers']()).toHaveLength(20);
+  });
+  it('rejects an incomplete catalogue after twenty pages', async () => {
+    fixture = TestBed.createComponent(ChangePage);
+    c = fixture.componentInstance as unknown as PageState;
+    respond(request('/subscription'), SUBSCRIPTION);
+    respond(request('/billing/summary'), SUMMARY);
+    for (let page = 1; page <= 20; page++) {
+      catalogue(OFFERS, true, page);
+      await tick();
+    }
+    http.expectNone((r) => r.url.endsWith('/catalogue'));
+    expect(c['loadFailed']()).toBe(true);
+    expect(c['catalogueOffers']()).toHaveLength(0);
+    fixture.detectChanges();
+    expect(root().querySelector('app-billing-failed')).not.toBeNull();
+  });
+  it('does not restore a discarded cart when recovery completes late', async () => {
+    await render();
+    await terminal('BLOCKED');
+    void c['recover']();
+    const recovery = request('/subscription/operations/op/recovery');
+    c['updateRow'](0, { ...c['cart']()[0], newSeats: '5' });
+    respond(recovery, operation('READY'), 202);
+    await tick();
+    expect(c['step']()).toBe(1);
+    expect(c['activeOperation']).toBeNull();
+    expect(c['preview']()).toBeNull();
+    http.expectNone((r) => r.url.endsWith('/subscription/plan-change-previews'));
   });
   it('preview 401 keeps its command key', async () => {
     await render();
