@@ -14,10 +14,6 @@ import { branchOptions, sessionBranch } from '../shared/lookups/session-branch';
 import { listPageSizes as sharedPageSizes } from '../shared/lookups/page-sizes';
 import type { CustomerDetail } from '../customers/customers.model';
 import { isRequiredForOperation, type CustomField } from '../settings/custom-fields/custom-fields.model';
-import {
-  fakeGetRelatedCounts,
-  fakeListCustomerOpportunities,
-} from './opportunities.fake';
 import type {
   BoardBody,
   BoardResponse,
@@ -30,7 +26,6 @@ import type {
   LinkedQuotation,
   MoveStageBody,
   OpportunityCapabilities,
-  OpportunityRelatedCounts,
   OpportunityRow,
   OpportunitySearchBody,
   OpportunityTag,
@@ -245,11 +240,6 @@ export function listAssignableOwners(branchId: string): Promise<OwnerOption[]> {
   return listOwners(branchId, 'update');
 }
 
-/** POST /api/tenant/trade/v1/documents/counts-by-crm-opportunity */
-export function getRelatedCounts(id: string): Promise<OpportunityRelatedCounts> {
-  return fakeGetRelatedCounts(id);
-}
-
 /** No scope headers: branchId is in the counts-by-party body. */
 export function countOpportunitiesByParty(branchId: string, partyIds: string[]): Promise<{ items: { partyId: string; count: number }[] }> {
   return write('POST', '/opportunities/counts-by-party', { branchId, partyIds });
@@ -320,16 +310,6 @@ export async function searchOpportunities(
       }
     },
   });
-}
-
-/** GET /api/tenant/crm/v1/opportunities?branchId=:branchId&customerProfileId=:customerProfileId */
-export function listCustomerOpportunities(
-  branchId: string,
-  customerProfileId: string,
-  page: number,
-  limit: number,
-): Promise<Page<OpportunityRow>> {
-  return fakeListCustomerOpportunities(branchId, customerProfileId, page, limit);
 }
 
 /** GET /api/tenant/crm/v1/opportunities/:id */
