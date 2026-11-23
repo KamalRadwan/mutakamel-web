@@ -47,6 +47,7 @@ import {
   RecoveryBody,
   SubscriptionOffer,
   SubscriptionView,
+  subscriptionViewSchema,
   TenantInvoiceView,
   TopupBody,
   TopupResult,
@@ -116,8 +117,10 @@ export class BillingApi {
     return this.write('/payments/topup', body, key);
   }
 
-  getSubscription(): Promise<SubscriptionView> {
-    return this.read('/subscription', undefined, true);
+  async getSubscription(): Promise<SubscriptionView> {
+    const result = subscriptionViewSchema.safeParse(await this.read<unknown>('/subscription', undefined, true));
+    if (!result.success) throw new ApiError(502, 'COMMON.GENERIC.INTERNAL_ERROR');
+    return result.data;
   }
 
   prepareChange(body: PrepareBody, key: string): Promise<CommercialOperation> {

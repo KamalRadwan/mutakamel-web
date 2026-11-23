@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 export type { CorePage } from '../../../core/api/core-page';
 
 export type Money = string; // ^(?:0|[1-9][0-9]{0,13})\.[0-9]{4}$ ; signed deltas may start with '-'
@@ -317,6 +319,94 @@ export interface SubscriptionView {
   totals: { baseRecurringUsd: Money; addonRecurringUsd: Money; combinedRecurringUsd: Money };
   projection: { observation: 'NOT_OBSERVED'; state: null; safeReasonCode: 'TENANT_PROJECTION_NOT_OBSERVED' };
 }
+
+// GET /subscription returns the complete DETAIL view. The /subscription/items
+// projection is insufficient: never invent a header, allowances or totals for it.
+// Source: core-app admin/subscriptions/addons/subscription-read.contract.ts.
+const billingCycleSchema = z.enum(['MONTHLY', 'ANNUAL']);
+const lifecycleSchema = z.enum(['DRAFT', 'ACTIVE', 'DEPRECATED', 'DISABLED']).nullable();
+const acceptedPricingSchema = z.object({
+  billingCycle: billingCycleSchema,
+  currencyCode: z.literal('USD'),
+  recurringAmountUsd: z.string(),
+  priceRevision: z.string(),
+  breakdown: z.array(z.object({
+    minUsers: z.number().int(),
+    maxUsers: z.number().int().nullable(),
+    chargedUsers: z.number().int(),
+    unitPriceUsd: z.string(),
+    amountUsd: z.string(),
+  })),
+});
+
+export const subscriptionViewSchema: z.ZodType<SubscriptionView> = z.object({
+  subscription: z.object({
+    id: z.string(),
+    tenantId: z.string(),
+    allowedUsers: z.number().int(),
+    status: z.enum(['PENDING_ACTIVATION', 'TRIAL', 'ACTIVE', 'PAST_DUE', 'CANCELLED']),
+    billingCycle: billingCycleSchema,
+    currencyCode: z.literal('USD'),
+    startedAt: z.string(),
+    currentPeriodStart: z.string().nullable(),
+    currentPeriodEnd: z.string(),
+    pendingPeriodStart: z.string().nullable(),
+    pendingPeriodEnd: z.string().nullable(),
+    trialDays: z.number().int(),
+    trialStartedAt: z.string().nullable(),
+    trialEndsAt: z.string().nullable(),
+    activationScheduledAt: z.string().nullable(),
+    activatedAt: z.string().nullable(),
+    cancelAt: z.string().nullable(),
+    totalPrice: z.string().nullable(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+    currentCollectionInvoiceId: z.string().nullable(),
+  }),
+  subscriptionRevision: z.string(),
+  baseItems: z.array(z.object({
+    id: z.string(),
+    applicationId: z.string(),
+    applicationKey: z.string(),
+    applicationName: z.string().nullable(),
+    tierId: z.string(),
+    tierKey: z.string(),
+    tierName: z.string().nullable(),
+    tierRank: z.number().int(),
+    seats: z.number().int(),
+    acceptedPricing: acceptedPricingSchema,
+  })),
+  addonSelections: z.array(z.object({
+    id: z.string(),
+    parentItemId: z.string(),
+    addonId: z.string(),
+    addonKey: z.string(),
+    definitionVersionId: z.string(),
+    seats: z.number().int(),
+    acceptedPricing: acceptedPricingSchema,
+    effectiveState: z.object({
+      applicationLifecycleStatus: lifecycleSchema,
+      addonLifecycleStatus: lifecycleSchema,
+      definitionState: z.enum(['PUBLISHED', 'REVOKED', 'UNAVAILABLE']),
+      operationalUse: z.literal('NOT_EVALUATED'),
+    }),
+  })),
+  baseAllowance: z.object({
+    allowedUsers: z.number().int(),
+    effectiveAllowedUsers: z.number().int(),
+    enabledApplications: z.array(z.string()),
+  }),
+  totals: z.object({
+    baseRecurringUsd: z.string(),
+    addonRecurringUsd: z.string(),
+    combinedRecurringUsd: z.string(),
+  }),
+  projection: z.object({
+    observation: z.literal('NOT_OBSERVED'),
+    state: z.null(),
+    safeReasonCode: z.literal('TENANT_PROJECTION_NOT_OBSERVED'),
+  }),
+});
 
 // --- catalogue
 export interface PriceBracket {

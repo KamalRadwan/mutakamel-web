@@ -10,7 +10,7 @@ import { CoreHttp } from '../../../core/api/core-http';
 import { AuthSession } from '../../../core/auth/auth-session';
 import { newIdempotencyKey } from '../../../core/api/idempotency';
 import { BillingApi, billingErrorMessage, seatDowngradeDetails, seatDowngradeMessage, seatHoldersDetails } from './billing.api';
-import type { BillingSummary, PrepareBody, QuoteBody, RecoveryBody } from './billing.model';
+import type { BillingSummary, PrepareBody, QuoteBody, RecoveryBody, SubscriptionView } from './billing.model';
 
 const DETAILS = { moduleKey: ['crm'], used: ['4'], target: ['2'], excess: ['2'] };
 
@@ -74,6 +74,29 @@ const PREPARE: PrepareBody = {
 };
 const QUOTE: QuoteBody = { ...PREPARE, preparationId: 'op' };
 const RECOVERY: RecoveryBody = { expectedOperationRevision: '1', action: 'RECONCILE', reason: 'check_status' };
+const PRICING = {
+  billingCycle: 'MONTHLY' as const, currencyCode: 'USD' as const, recurringAmountUsd: '12.3456', priceRevision: 'price-1',
+  breakdown: [{ minUsers: 1, maxUsers: null, chargedUsers: 3, unitPriceUsd: '4.1152', amountUsd: '12.3456' }],
+};
+const SUBSCRIPTION: SubscriptionView = {
+  subscription: {
+    id: 'sub', tenantId: 'tenant', allowedUsers: 3, status: 'ACTIVE', billingCycle: 'MONTHLY', currencyCode: 'USD',
+    startedAt: '2026-01-01T00:00:00.000Z', currentPeriodStart: null, currentPeriodEnd: '2026-12-01T00:00:00.000Z',
+    pendingPeriodStart: null, pendingPeriodEnd: null, trialDays: 14, trialStartedAt: null, trialEndsAt: null,
+    activationScheduledAt: null, activatedAt: null, cancelAt: null, totalPrice: '24.6912',
+    createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-11-23T00:00:00.000Z', currentCollectionInvoiceId: null,
+  },
+  subscriptionRevision: '9007199254740993',
+  baseItems: [{ id: 'base', applicationId: 'app', applicationKey: 'crm', applicationName: null,
+    tierId: 'tier', tierKey: 'pro', tierName: null, tierRank: 1, seats: 3, acceptedPricing: PRICING }],
+  addonSelections: [{ id: 'selection', parentItemId: 'base', addonId: 'addon', addonKey: 'crm.calls',
+    definitionVersionId: 'definition', seats: 3, acceptedPricing: PRICING, effectiveState: {
+      applicationLifecycleStatus: 'ACTIVE', addonLifecycleStatus: null, definitionState: 'UNAVAILABLE', operationalUse: 'NOT_EVALUATED',
+    } }],
+  baseAllowance: { allowedUsers: 3, effectiveAllowedUsers: 3, enabledApplications: ['crm'] },
+  totals: { baseRecurringUsd: '12.3456', addonRecurringUsd: '12.3456', combinedRecurringUsd: '24.6912' },
+  projection: { observation: 'NOT_OBSERVED', state: null, safeReasonCode: 'TENANT_PROJECTION_NOT_OBSERVED' },
+};
 
 function assertBare(req: TestRequest, params: string[] = []): void {
   expect(req.request.method).toBe('GET');
@@ -163,7 +186,6 @@ describe('BillingApi Core transport', () => {
   it('subscription reads are bare', async () => {
     const spy = vi.spyOn(TestBed.inject(CoreHttp), 'read');
     for (const [path, read] of [
-      ['/subscription', () => api.getSubscription()],
       ['/subscription/operations/op%2Fa', () => api.getOperation('op/a')],
       ['/subscription/plan-change-previews/p%2Fa/receipt', () => api.getReceipt('p/a')],
     ] as const) {
@@ -174,6 +196,42 @@ describe('BillingApi Core transport', () => {
       req.flush({ success: true, data: { id: path } });
       expect(await result).toEqual({ id: path });
     }
+  });
+
+  it('adapts the complete subscription DETAIL contract without synthesizing values', async () => {
+    const spy = vi.spyOn(TestBed.inject(CoreHttp), 'read');
+    const result = api.getSubscription();
+    const req = http.expectOne(`${BASE}/subscription`);
+    assertBare(req);
+    expect(spy).toHaveBeenCalledWith(req.request.url, undefined, { bare: true });
+    req.flush({ success: true, data: SUBSCRIPTION });
+    expect(await result).toEqual(SUBSCRIPTION);
+  });
+
+  it('rejects an items-only subscription or incomplete nested evidence through ApiError', async () => {
+    const { subscription: header, ...withoutHeader } = SUBSCRIPTION;
+    const { baseAllowance, ...withoutAllowance } = SUBSCRIPTION;
+    const { totals, ...withoutTotals } = SUBSCRIPTION;
+    const { projection, ...withoutProjection } = SUBSCRIPTION;
+    for (const data of [
+      null,
+      { subscriptionId: header.id, subscriptionRevision: '1', baseItems: [], addonSelections: [] },
+      withoutHeader, withoutAllowance, withoutTotals, withoutProjection,
+      { ...SUBSCRIPTION, subscription: { ...header, billingCycle: null } },
+      { ...SUBSCRIPTION, baseItems: [{ ...SUBSCRIPTION.baseItems[0], acceptedPricing: { ...PRICING, breakdown: [{}] } }] },
+      { ...SUBSCRIPTION, addonSelections: [{ ...SUBSCRIPTION.addonSelections[0], effectiveState: null }] },
+    ]) {
+      const result = expect(api.getSubscription()).rejects.toMatchObject({ status: 502, code: 'COMMON.GENERIC.INTERNAL_ERROR' });
+      http.expectOne(`${BASE}/subscription`).flush({ success: true, data });
+      await result;
+    }
+  });
+
+  it('accepts complete subscriptions with no addons and strips unconsumed additive fields', async () => {
+    const data = { ...SUBSCRIPTION, addonSelections: [], extra: 'ignored' };
+    const result = api.getSubscription();
+    http.expectOne(`${BASE}/subscription`).flush({ success: true, data });
+    expect(await result).toEqual({ ...SUBSCRIPTION, addonSelections: [] });
   });
 
   it('catalogue read sends only listed params', async () => {
@@ -208,6 +266,45 @@ describe('BillingApi Core transport', () => {
     const result = api.getActivePaymentIntent('i/a');
     http.expectOne(`${BASE}/billing/invoices/i%2Fa/payment-intents/active`).flush({ success: true, data: null });
     expect(await result).toBeNull();
+  });
+
+  it('preserves an active payment intent and keeps repeated status reads fresh', async () => {
+    for (const status of ['PENDING', 'REQUIRES_REVIEW']) {
+      const data = { paymentId: 'p', status, checkoutUrl: null, requiresExternalPayment: false,
+        expiresAt: null, recoveryAction: status === 'PENDING' ? 'CHECK_STATUS' : 'RECONCILIATION_REQUIRED' };
+      const result = api.getActivePaymentIntent('i');
+      const req = http.expectOne(`${BASE}/billing/invoices/i/payment-intents/active`);
+      assertBare(req);
+      req.flush({ success: true, data });
+      expect(await result).toEqual(data);
+    }
+  });
+
+  it('all ten linked methods propagate backend failures without fallback data or automatic retries', async () => {
+    const calls = [
+      () => api.getBillingSummary(), () => api.listInvoices({ page: 1, limit: 20 }), () => api.getInvoice('i'),
+      () => api.listPaymentCurrencies(), () => api.createPaymentQuote('i', 'USD'),
+      () => api.createPaymentIntent('i', 'q', newIdempotencyKey()), () => api.getActivePaymentIntent('i'),
+      () => api.getPayment('p'), () => api.getWallet(), () => api.listWalletLedger({ page: 1, limit: 20 }),
+    ];
+    for (const call of calls) {
+      for (const [status, code] of [
+        [401, 'COMMON.GENERIC.UNAUTHORIZED'], [403, 'TENANT_OWNER_REQUIRED'], [404, 'INVOICE_NOT_FOUND'],
+        [409, 'PAYMENT_QUOTE_EXPIRED'], [422, 'WALLET_NOT_ACTIVE'], [429, 'COMMON.RATE_LIMIT.EXCEEDED'],
+        [503, 'PAYMENT_PROVIDER_UNCONFIGURED'],
+      ] as const) {
+        const details = { _: ['unavailable'] };
+        const result = expect(call()).rejects.toMatchObject({ status, code, details, correlationId: 'billing-ref' });
+        http.expectOne(() => true).flush({ success: false, errorCode: code, details, correlationId: 'billing-ref' },
+          { status, statusText: 'Failure' });
+        await result;
+        http.expectNone(() => true);
+      }
+      const offline = expect(call()).rejects.toMatchObject({ status: 0, code: 'NETWORK_ERROR' });
+      http.expectOne(() => true).error(new ProgressEvent('error'));
+      await offline;
+      http.expectNone(() => true);
+    }
   });
 
   it('wallet, payment and currency reads preserve the payload', async () => {
