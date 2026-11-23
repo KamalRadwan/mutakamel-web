@@ -39,13 +39,19 @@ export class StaffUserAccessApi {
     return this.write(userId, 'PUT', 'assignments', { assignments }, { key, ...opts });
   }
 
+  addBranchRole(userId: string, { branchId, roleId }: BranchRoleInput, key: string, opts?: ConfirmAddonCascadeOptions): Promise<BranchRoleAssignment> {
+    this.guardRoles(userId);
+    return this.write(userId, 'POST', 'assignments', { branchId, roleId }, { key, ...opts });
+  }
+
   removeBranchRole(userId: string, assignmentId: string, key: string, opts?: ConfirmAddonCascadeOptions): Promise<void> {
     this.guardRoles(userId);
     return this.write(userId, 'DELETE', `assignments/${encodeURIComponent(assignmentId)}`, undefined, { key, ...opts });
   }
 
   listScopeRoles(userId: string): Promise<ScopeRoleAssignment[]> {
-    this.guardRoles(userId, true);
+    // Core permits the owner to read their own exact-scope grants, but not replace them.
+    if (!this.session.isOwner()) throw new ApiError(403, 'COMMON.GENERIC.FORBIDDEN');
     return this.read(userId, 'scope-role-assignments');
   }
 
