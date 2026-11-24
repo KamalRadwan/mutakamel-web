@@ -6,7 +6,7 @@ import { format, isSameDay, parseISO } from 'date-fns';
 import { LanguageState } from '../../../../../core/i18n/language';
 import type { EntityRef, WidgetExecution } from '../../../../ui/chart/chart.model';
 import { DASH, formatDate } from '../../../../ui/chart/chart-format';
-import { FAKE_NOW } from '../../analytics-api';
+import { analyticsNow } from '../../analytics-api';
 
 interface ActivityFeedItem {
   id: string;
@@ -52,7 +52,7 @@ export class ActivityFeedKind {
       return [];
     }
 
-    const nowDate = parseISO(FAKE_NOW);
+    const nowDate = parseISO(analyticsNow());
     return exec.result.events.map((event) => {
       const text = lang === 'ar' ? (event.titleAr ?? event.title) : event.title;
       const formatted = formatEventTime(event.occurredAt, nowDate, lang, chartT);

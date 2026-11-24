@@ -1,4 +1,4 @@
-import { fakeId } from '../../settings/shared/settings-api';
+import { newIdempotencyKey } from '../../../../core/api/idempotency';
 import {
   CardColor,
   CurrencyCode,
@@ -215,7 +215,7 @@ const PHONE_CHARS_RE = /^[+\d\s().-]+$/;
 
 export function newContact(primary: boolean): ContactDraft {
   return {
-    key: fakeId(),
+    key: newIdempotencyKey(),
     contactPartyId: null,
     honorificTitle: '',
     firstName: '',
@@ -298,7 +298,7 @@ export function draftFromDetail(detail: LeadDetail): LeadDraft {
   const contacts: ContactDraft[] = corporate
     ? detail.contacts.length > 0
       ? detail.contacts.map((c) => ({
-          key: c.partyId || fakeId(),
+          key: c.partyId || newIdempotencyKey(),
           contactPartyId: c.partyId || null,
           honorificTitle: c.honorificTitle ?? '',
           firstName: c.firstName ?? c.displayName,

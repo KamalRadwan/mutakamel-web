@@ -127,12 +127,6 @@ const AVATAR_TONES = [
   'bg-icon-gray',
 ] as const;
 
-const FAKE_USER_ALIASES: Readonly<Record<string, string>> = {
-  'u-owner': 'u1',
-  'u-mona': 'u2',
-  'u-omar': 'u3',
-};
-
 export function defaultFilterState(): ActivitiesFilterState {
   return {
     show: 'mine',
@@ -234,9 +228,7 @@ export function dateRangeToApiBounds(range: DateRangeValue | null): { dueFrom?: 
 
 export function isSameUser(userId: string | null | undefined, meId: string | null | undefined): boolean {
   if (!userId || !meId) return false;
-  const a = FAKE_USER_ALIASES[userId] ?? userId;
-  const b = FAKE_USER_ALIASES[meId] ?? meId;
-  return a === b;
+  return userId === meId;
 }
 
 export type ActivityAction = 'complete' | 'cancel';
