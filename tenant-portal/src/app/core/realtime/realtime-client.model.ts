@@ -440,6 +440,7 @@ export interface RealtimeSocket {
 }
 export interface RealtimeSocketOptions {
   path: '/realtime/socket.io';
+  transports: ['websocket'];
   autoConnect: false;
   reconnection: false;
   forceNew: true;

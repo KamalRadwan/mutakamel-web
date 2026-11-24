@@ -183,6 +183,7 @@ describe('RealtimeClient RT10 ownership and lifecycle', () => {
     expect(socket.connect).toHaveBeenCalledOnce();
     expect(options[0]).toEqual({
       path: '/realtime/socket.io',
+      transports: ['websocket'],
       autoConnect: false,
       reconnection: false,
       forceNew: true,

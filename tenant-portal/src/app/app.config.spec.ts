@@ -73,6 +73,7 @@ describe('app infrastructure registration', () => {
     if (factory === null) throw new Error('Realtime socket factory is missing');
     const options: RealtimeSocketOptions = {
       path: '/realtime/socket.io',
+      transports: ['websocket'],
       autoConnect: false,
       reconnection: false,
       forceNew: true,

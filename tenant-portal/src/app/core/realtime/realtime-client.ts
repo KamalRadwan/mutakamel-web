@@ -280,6 +280,8 @@ export class RealtimeClient {
       this.setState('connecting', null);
       const socket = this.factory({
         path: '/realtime/socket.io',
+        // WebSocket only: browsers omit Origin on same-origin polling GETs, and Realtime admission requires Origin (REALTIME.AUTH.ORIGIN_NOT_ALLOWED). The upgrade request always carries it.
+        transports: ['websocket'],
         autoConnect: false,
         reconnection: false,
         forceNew: true,
