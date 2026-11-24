@@ -6,7 +6,6 @@ import type { FullStateKind } from '../../../../shared/ui/full-state/full-state'
 export { ApiError, errorCodeOf, errorMessage } from '../../../../core/api/api-errors';
 export { newIdempotencyKey } from '../../../../core/api/idempotency';
 export type { SettingsTranslator } from '../../../../core/api/settings-translator';
-export { fakeDelay, fakeId } from '../../../../core/fake/fake-utils';
 
 /** Message and state metadata; the caller chooses a load state or a write toast. */
 export function crmSettingsError(transloco: SettingsTranslator, error: unknown, pageScope: string): {

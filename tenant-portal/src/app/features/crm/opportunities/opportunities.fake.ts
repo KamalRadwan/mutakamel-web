@@ -1,3 +1,4 @@
+import { fakeDelay, fakeId } from '../../../core/fake/fake-utils';
 import { FAKE_COMPANIES } from '../../../core/scope/scope.fake';
 import { ACME_CUSTOMER_ID, CUSTOMERS_FAKE_DB } from '../customers/customers.fake';
 import type { CustomerDetail } from '../customers/customers.model';
@@ -5,7 +6,7 @@ import { fakeListCustomFields } from '../settings/custom-fields/custom-fields.fa
 import { isRequiredForOperation, type CustomField } from '../settings/custom-fields/custom-fields.model';
 import { fakeGetReasons, fakeListReasons } from '../settings/reasons/reasons.fake';
 import type { Reason } from '../settings/reasons/reasons.model';
-import { ApiError, fakeDelay, fakeId } from '../settings/shared/settings-api';
+import { ApiError } from '../settings/shared/settings-api';
 import { listTags } from '../settings/tags/tags.api';
 import type { Tag } from '../settings/tags/tags.model';
 import { fakeGetWorkspaceSettings } from '../../workspace/settings/workspace-settings/workspace-settings.fake';

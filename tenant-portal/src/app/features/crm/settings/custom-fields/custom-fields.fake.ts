@@ -1,4 +1,5 @@
-import { ApiError, fakeDelay, fakeId } from '../shared/settings-api';
+import { fakeDelay, fakeId } from '../../../../core/fake/fake-utils';
+import { ApiError } from '../shared/settings-api';
 import {
   CREATABLE_OWNER_TYPES,
   CreatableOwnerType,

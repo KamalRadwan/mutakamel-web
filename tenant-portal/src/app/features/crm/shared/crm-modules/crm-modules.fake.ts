@@ -1,5 +1,6 @@
+import { fakeDelay } from '../../../../core/fake/fake-utils';
 import { FAKE_COMPANIES } from '../../../../core/scope/scope.fake';
-import { ApiError, fakeDelay } from '../../settings/shared/settings-api';
+import { ApiError } from '../../settings/shared/settings-api';
 import { CrmModuleCompany, CrmModuleFlags, CrmModuleOverride, CrmModulesState } from './crm-modules.model';
 
 export const FAKE_READ_ONLY = false;

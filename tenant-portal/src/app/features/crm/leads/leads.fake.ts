@@ -1,9 +1,10 @@
+import { fakeDelay, fakeId } from '../../../core/fake/fake-utils';
 import { GEO_FAKE_DB } from '../../../core/geo/geo.fake';
 import { FAKE_COMPANIES } from '../../../core/scope/scope.fake';
 import { fakeCreate as fakeCreateActivity } from '../../../shared/widgets/activities/activities.fake';
 import { ActivityDirection, ActivityError, ActivityPriority, ActivityType } from '../../../shared/widgets/activities/activities.model';
 import { fakeListReasons } from '../settings/reasons/reasons.fake';
-import { ApiError, fakeDelay, fakeId } from '../settings/shared/settings-api';
+import { ApiError } from '../settings/shared/settings-api';
 import { listTags } from '../settings/tags/tags.api';
 import {
   DuplicateCheckPayload,

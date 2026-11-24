@@ -1,5 +1,6 @@
+import { fakeDelay } from '../../../../../core/fake/fake-utils';
 import { FAKE_COMPANIES } from '../../../../../core/scope/scope.fake';
-import { ApiError, fakeDelay } from '../../../settings/shared/settings-api';
+import { ApiError } from '../../../settings/shared/settings-api';
 import { fakeCompanyOfBranch, fakeCrmModuleEnabled } from '../../crm-modules/crm-modules.fake';
 import {
   RelatedCounts,

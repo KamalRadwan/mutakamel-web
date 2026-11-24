@@ -1,7 +1,8 @@
+import { fakeDelay, fakeId } from '../../../core/fake/fake-utils';
 import { GEO_FAKE_DB } from '../../../core/geo/geo.fake';
 import { FAKE_COMPANIES } from '../../../core/scope/scope.fake';
 import { listLeadSources } from '../settings/lead-sources/lead-sources.api';
-import { ApiError, fakeDelay, fakeId } from '../settings/shared/settings-api';
+import { ApiError } from '../settings/shared/settings-api';
 import { getCrmStaticData } from '../settings/static-data/static-data.api';
 import { listTags as listSettingsTags } from '../settings/tags/tags.api';
 import { fakeGetCrmModules } from '../shared/crm-modules/crm-modules.fake';
