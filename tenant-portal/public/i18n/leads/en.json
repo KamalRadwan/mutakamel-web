@@ -171,15 +171,6 @@
   "chooseBranch": "Choose a branch in the top bar to see leads.",
   "catalogueUnavailable": "You do not have access to this list. Ask your administrator.",
   "datesUtc": "Dates are in UTC.",
-  "kpis": {
-    "totalLeads": "Total leads",
-    "newStageLeads": "New stage",
-    "newTodayLeads": "New today",
-    "hotLeads": "Hot leads",
-    "overdueActivityLeads": "Overdue activity",
-    "qualifiedLeads": "Qualified leads",
-    "hint": "Count for this search; the chart shows its share of all matching leads."
-  },
   "notSaved": "Not saved. Try again.",
   "unavailable": "Unavailable"
 }

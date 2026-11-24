@@ -37,6 +37,12 @@ class KpisHttp extends CrmHttpStub {
 
   constructor() { super({ '/lead-stages': CONTRACT_STAGES, '/acquisition-sources': [], '/tags': [], '/leads/capabilities': {} }); }
 
+  capabilities: unknown = {};
+
+  override async read<T>(...args: Parameters<CrmHttpStub['read']>): Promise<T> {
+    return args[0] === '/leads/capabilities' ? structuredClone(this.capabilities) as T : super.read<T>(...args);
+  }
+
   override async write<T>(method: CoreWriteMethod, path: string, body: unknown, options: CrmWriteOptions) {
     const result = await super.write<T>(method, path, body, options);
     if (path !== '/leads/kpis') throw new Error(`Unexpected POST ${path}`);
@@ -100,11 +106,20 @@ describe.each([['en', 'light'], ['en', 'dark'], ['ar', 'light'], ['ar', 'dark']]
     expect(calls.every((call) => call.path === '/leads/kpis' && !!call.options.key && call.options.scope === undefined)).toBe(true);
     expect(calls.some((call) => JSON.stringify(call.body).includes(branchId)
       && !JSON.stringify(call.body).includes('qualified'))).toBe(true);
-    expect(calls.some((call) => JSON.stringify(call.body).includes('qualified'))).toBe(true);
+    expect(calls.some((call) => JSON.stringify(call.body).includes('qualified'))).toBe(false);
     const page = fixture.componentInstance as unknown as { reloadCounts(): void };
     http.kpis = { ...http.kpis, totalLeads: 0, byStage: [] };
     page.reloadCounts();
     await vi.waitFor(() => { fixture.detectChanges(); expect(filter().steps().map((step) => step.count)).toEqual([0, 0, 0, 0]); });
+    fixture.destroy();
+  });
+
+  it.each([[true, { scope: 'all', ownerUserIds: null }], [false, null]])('offers New lead only with the create capability (%s)', async (allowed, create) => {
+    http.capabilities = { branchId, leads: { create } };
+    const fixture = TestBed.createComponent(LeadsPage);
+    const page = fixture.componentInstance as unknown as { canCreate(): boolean; capabilities(): unknown };
+    await vi.waitFor(() => { fixture.detectChanges(); expect(page.capabilities()).not.toBeNull(); });
+    expect(page.canCreate()).toBe(allowed);
     fixture.destroy();
   });
 });

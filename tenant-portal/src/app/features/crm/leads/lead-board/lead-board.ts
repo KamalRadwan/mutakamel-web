@@ -103,6 +103,7 @@ export class LeadBoard {
     this.i18n();
     const lang = this.language();
     const loadingStageId = this.loadingMore();
+    const createAllowed = !this.writes.readOnly() && !!this.capabilities()?.leads?.create;
     return this.lanes().map((lane) => {
       const label = nameIn(lane.stage, lang);
       const flag = lane.stage.flag;
@@ -116,7 +117,7 @@ export class LeadBoard {
         items: lane.items,
         hasNext: lane.hasNext,
         loading: loadingStageId === lane.stage.id,
-        canCreate: false,
+        canCreate: createAllowed && lane.stage.isActive && !tone,
         dropRule,
         ...(dropRule === 'deny'
           ? { denyReason: this.transloco.translate('leads.move.convertRequired', { stage: label }) }

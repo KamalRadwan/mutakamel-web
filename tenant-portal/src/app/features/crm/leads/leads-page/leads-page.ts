@@ -2,7 +2,7 @@ import { Component, computed, effect, inject, input, linkedSignal, resource, sig
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { tablerAdjustmentsHorizontal, tablerLayoutGrid, tablerLayoutKanban, tablerTable } from '@ng-icons/tabler-icons';
+import { tablerAdjustmentsHorizontal, tablerLayoutGrid, tablerLayoutKanban, tablerPlus, tablerTable } from '@ng-icons/tabler-icons';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope, translateObjectSignal } from '@jsverse/transloco';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
@@ -12,7 +12,7 @@ import { runInCrm } from '../../shared/crm-runtime';
 import { listAssignableOwners } from '../../shared/lookups/assignable-owners';
 import { can } from '../../../../shared/widgets/dashboard/analytics-permissions';
 import { FullState } from '../../../../shared/ui/full-state/full-state';
-import { StatCard } from '../../../../shared/ui/stat-card/stat-card';
+import { Button } from '../../../../shared/ui/button/button';
 import { Field } from '../../../../shared/ui/field/field';
 import { listBulkJobItems } from '../../../../shared/bulk-jobs/bulk-jobs.api';
 import { BulkJobsTracker } from '../../../../shared/bulk-jobs/bulk-jobs-tracker';
@@ -74,7 +74,7 @@ function parsePageSize(raw: string | undefined): number {
     NgIcon,
     TranslocoPipe,
     FullState,
-    StatCard,
+    Button,
     Field,
     FacetSearch,
     QueryBuilder,
@@ -103,7 +103,7 @@ function parsePageSize(raw: string | undefined): number {
       { scope: 'lead-bulk-bar', alias: 'bulkBar' },
       { scope: 'lead-bulk-actions', alias: 'leadBulk' },
     ),
-    provideIcons({ tablerAdjustmentsHorizontal, tablerLayoutKanban, tablerLayoutGrid, tablerTable }),
+    provideIcons({ tablerAdjustmentsHorizontal, tablerLayoutKanban, tablerLayoutGrid, tablerPlus, tablerTable }),
   ],
   templateUrl: './leads-page.html',
   host: { class: 'flex flex-1 shrink-0 flex-col gap-8 p-12' },
@@ -170,17 +170,6 @@ export class LeadsPage {
       this.store.facets().some((facet) => facet.field === ADVANCED_FACET_FIELD),
   );
   protected readonly stages = computed(() => this.options.value()?.stages ?? []);
-  private readonly kpis = resource({
-    params: () => this.canRead() && this.branchId() ? this.effectiveBody() : undefined,
-    loader: ({ params }) => loadLeadKpis(params),
-  });
-  protected readonly kpiCards = computed(() => {
-    const values = this.kpis.value();
-    if (!values || this.kpis.error()) return [];
-    return (['totalLeads', 'newStageLeads', 'newTodayLeads', 'hotLeads', 'overdueActivityLeads', 'qualifiedLeads'] as const)
-      .map((key) => ({ key, value: String(values[key]), chart: { shape: 'progress' as const,
-        ratio: values.totalLeads ? values[key] / values.totalLeads : 0 } }));
-  });
 
   private lastCounts: StageCounts | undefined;
   private countsBranch = '';
@@ -289,6 +278,7 @@ export class LeadsPage {
     this.readOnly() ? null :
     this.capabilitiesResource.hasValue() ? this.capabilitiesResource.value() : null,
   );
+  protected readonly canCreate = computed(() => !!this.capabilities()?.leads?.create);
 
   protected readonly effectiveBody = computed<LeadSearchBody>(() => {
     const base = this.store.body();
@@ -477,7 +467,6 @@ export class LeadsPage {
 
   protected reloadCounts() {
     this.counts.reload();
-    this.kpis.reload();
   }
 
   protected toggleAdvanced() {
@@ -492,6 +481,7 @@ export class LeadsPage {
   }
 
   protected openCreate(stageId?: string) {
+    if (!this.canCreate()) return;
     this.leadModal().openCreate(stageId ? { stageId } : undefined);
   }
 

@@ -3,15 +3,13 @@
 } @else if (!branchId()) {
   <ui-full-state kind="provisioning" [title]="'leads.chooseBranch' | transloco" />
 } @else {
-@if (kpiCards().length) {
-  <div class="grid grid-cols-2 gap-8 desktop:grid-cols-3 wide:grid-cols-6">
-    @for (card of kpiCards(); track card.key) {
-      <ui-stat-card [label]="'leads.kpis.' + card.key | transloco" [hint]="'leads.kpis.hint' | transloco"
-        [value]="card.value" [chart]="card.chart" />
-    }
-  </div>
-}
 <div class="flex shrink-0 items-center gap-8 rounded-10 bg-surface p-8 shadow-card">
+  @if (canCreate()) {
+    <button type="button" uiButton class="shrink-0" (click)="openCreate()">
+      <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+      {{ 'leads.new' | transloco }}
+    </button>
+  }
 
   @if (current() === 'table' && selection.count() > 0) {
     <app-lead-bulk-menu
@@ -116,7 +114,7 @@
 @switch (current()) {
   @case ('board') {
     <app-lead-board [body]="store.body()" [capabilities]="capabilities()" (writeBlocked)="readOnly.set(true)"
-      (view)="openLead($event)" (activities)="openActivities($event)" (countsChanged)="reloadCounts()" />
+      (create)="openCreate($event)" (view)="openLead($event)" (activities)="openActivities($event)" (countsChanged)="reloadCounts()" />
   }
   @case ('cards') {
     <app-lead-cards
