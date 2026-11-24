@@ -15,15 +15,16 @@ it.each(['ar', 'en'] as const)('describes setup and announces a pending retry in
       }),
     ],
   });
+  localStorage.setItem('lang', lang);
   const fixture = TestBed.createComponent(TenantProvisioningPage);
   const host: HTMLElement = fixture.nativeElement;
   const retry = vi.fn();
   fixture.componentInstance.retryRequested.subscribe(retry);
   fixture.detectChanges();
   const copy = langs[lang].errors.provisioning;
-  const button = host.querySelector('button')!;
+  const button = host.querySelector<HTMLButtonElement>('[data-status-action]')!;
   expect(host.querySelector('h1')?.textContent?.trim()).toBe(copy.title);
-  expect(host.querySelector('p')?.textContent?.trim()).toBe(copy.text);
+  expect(host.querySelector('h1 + p')?.textContent?.trim()).toBe(copy.text);
   expect(button.textContent?.trim()).toBe(copy.retry);
   button.click();
   expect(retry).toHaveBeenCalledTimes(1);

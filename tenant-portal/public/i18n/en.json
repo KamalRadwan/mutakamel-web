@@ -218,7 +218,10 @@
       "title": "Your workspace is being set up",
       "text": "You can open your workspace once setup is complete. Check again when you’re ready.",
       "retry": "Check again",
-      "checking": "Checking whether your workspace is ready."
+      "checking": "Checking whether your workspace is ready.",
+      "database": "Preparing your workspace database",
+      "apps": "Installing your apps",
+      "security": "Applying security settings"
     },
     "forbidden": {
       "title": "Access denied",
@@ -231,8 +234,9 @@
     },
     "tenantUnavailable": {
       "title": "This workspace is not available",
-      "text": "The workspace at {{host}} no longer exists or has been removed. Contact your administrator or Mutakamel support.",
-      "retry": "Try again"
+      "text": "This workspace no longer exists or has been removed.",
+      "retry": "Try again",
+      "support": "Contact your administrator or Mutakamel support."
     }
   },
   "notReady": {

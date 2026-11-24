@@ -1,12 +1,12 @@
 import { Component, input, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { FullState } from '../../shared/ui/full-state/full-state';
+import { StatusScreen } from '../status-screen/status-screen';
 
 @Component({
   selector: 'app-tenant-provisioning-page',
-  imports: [TranslocoPipe, FullState],
+  imports: [TranslocoPipe, StatusScreen],
   templateUrl: './tenant-provisioning-page.html',
-  host: { class: 'flex min-h-0 flex-1' },
+  host: { class: 'block' },
 })
 export class TenantProvisioningPage {
   readonly checking = input(false);

@@ -1,14 +1,21 @@
-<ui-full-state
-  kind="provisioning"
+<app-status-screen
+  icon="tablerHourglassHigh"
+  tone="blue"
+  [spin]="true"
   [title]="'errors.provisioning.title' | transloco"
   [text]="'errors.provisioning.text' | transloco"
+  [notes]="[
+    { icon: 'tablerDatabase', text: 'errors.provisioning.database' | transloco },
+    { icon: 'tablerApps', text: 'errors.provisioning.apps' | transloco },
+    { icon: 'tablerShieldCheck', text: 'errors.provisioning.security' | transloco }
+  ]"
   [actionLabel]="'errors.provisioning.retry' | transloco"
   [busy]="checking()"
   (action)="retryRequested.emit()"
-/>
-
-<span class="sr-only" role="status">
-  @if (checking()) {
-    {{ 'errors.provisioning.checking' | transloco }}
-  }
-</span>
+>
+  <span class="sr-only" role="status">
+    @if (checking()) {
+      {{ 'errors.provisioning.checking' | transloco }}
+    }
+  </span>
+</app-status-screen>

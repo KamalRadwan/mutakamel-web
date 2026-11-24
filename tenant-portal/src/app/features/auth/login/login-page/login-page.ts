@@ -16,7 +16,6 @@ import { TenantProvisioningPage } from '../../../../layout/tenant-provisioning/t
 import { Button } from '../../../../shared/ui/button/button';
 import { Checkbox } from '../../../../shared/ui/checkbox/checkbox';
 import { Field } from '../../../../shared/ui/field/field';
-import { Preferences } from '../../../../shared/ui/preferences/preferences';
 import { SettingsNotice } from '../../../../shared/ui/settings-notice/settings-notice';
 import { AuthCard } from '../../shared/auth-card/auth-card';
 import { retryAfterSeconds } from '../../shared/auth-throttle';
@@ -36,7 +35,7 @@ interface ServerFieldErrors {
   selector: 'app-login-page',
   imports: [
     FormField, RouterLink, TranslocoPipe, NgIcon, Button, Checkbox, Field,
-    Preferences, SettingsNotice, TenantProvisioningPage, AuthCard,
+    SettingsNotice, TenantProvisioningPage, AuthCard,
   ],
   providers: [provideIcons({ tablerArrowRight, tablerEye, tablerEyeOff })],
   templateUrl: './login-page.html',

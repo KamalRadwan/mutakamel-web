@@ -2,10 +2,6 @@
   display: block;
 }
 
-.login-provisioning {
-  min-block-size: calc(100dvh / var(--view-zoom, 1));
-}
-
 .login-form {
   gap: 18px;
   margin-block-start: 6px;

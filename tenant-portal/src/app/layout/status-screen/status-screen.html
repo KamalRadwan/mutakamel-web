@@ -1,0 +1,43 @@
+<main class="status-screen relative grid place-items-center bg-page">
+  <ui-preferences class="login-preferences absolute z-2" />
+
+  <section class="status-card grid justify-items-center gap-16 text-center" aria-labelledby="status-title">
+    @if (theme.current() === 'dark') {
+      <img class="status-logo w-auto max-w-full object-contain" ngSrc="assets/brand/logo-horizontal-light.png" width="775" height="239"
+        [alt]="'brand' | transloco" priority />
+    } @else {
+      <img class="status-logo w-auto max-w-full object-contain" ngSrc="assets/brand/logo-horizontal-dark.png" width="780" height="258"
+        [alt]="'brand' | transloco" priority />
+    }
+
+    <span class="status-icon inline-flex items-center justify-center rounded-full text-on-icon" [class]="tile()" aria-hidden="true">
+      <ng-icon [name]="icon()" size="32" [class.status-spin]="spin()" />
+    </span>
+
+    <div class="grid gap-8">
+      <h1 id="status-title" class="text-20 leading-26 font-medium text-text">{{ title() }}</h1>
+      @if (text()) {
+        <p class="text-14 leading-22 text-text-muted">{{ text() }}</p>
+      }
+    </div>
+
+    @if (notes().length) {
+      <ul class="status-notes grid w-full gap-8 text-start">
+        @for (note of notes(); track note.icon) {
+          <li class="flex items-center gap-8 rounded-8 border border-border bg-surface px-12 py-8 text-12 leading-18 text-text">
+            <ng-icon [name]="note.icon" size="18" class="shrink-0 text-text-muted" aria-hidden="true" />
+            <span [attr.dir]="note.ltr ? 'ltr' : null">{{ note.text }}</span>
+          </li>
+        }
+      </ul>
+    }
+
+    @if (actionLabel()) {
+      <button type="button" uiButton variant="primary" data-status-action [loading]="busy()" (click)="action.emit()">
+        {{ actionLabel() }}
+      </button>
+    }
+
+    <ng-content />
+  </section>
+</main>

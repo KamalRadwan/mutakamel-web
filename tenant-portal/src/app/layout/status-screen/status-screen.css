@@ -1,0 +1,38 @@
+.status-screen {
+  min-block-size: calc(100dvh / var(--view-zoom, 1));
+  padding: 24px 16px;
+}
+
+.status-card {
+  inline-size: min(100%, 460px);
+}
+
+.status-logo {
+  block-size: 44px;
+  margin-block-end: 8px;
+}
+
+.status-icon {
+  inline-size: 72px;
+  block-size: 72px;
+  box-shadow: 0 0 0 10px color-mix(in srgb, currentColor 0%, var(--border) 60%);
+}
+
+.status-notes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.status-spin {
+  animation: status-spin 2.4s ease-in-out infinite;
+}
+
+@keyframes status-spin {
+  0%, 40% { transform: rotate(0deg); }
+  60%, 100% { transform: rotate(180deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-spin { animation: none; }
+}

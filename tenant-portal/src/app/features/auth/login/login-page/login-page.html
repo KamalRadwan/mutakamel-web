@@ -1,11 +1,8 @@
 @if (tenantProvisioning()) {
-  <main class="login-provisioning relative grid place-items-center">
-    <ui-preferences class="login-preferences absolute z-2" />
-    <app-tenant-provisioning-page
-      [checking]="checkingTenant()"
-      (retryRequested)="checkTenantReadiness()"
-    />
-  </main>
+  <app-tenant-provisioning-page
+    [checking]="checkingTenant()"
+    (retryRequested)="checkTenantReadiness()"
+  />
 } @else {
   <app-auth-card [title]="'auth.login.title' | transloco">
     <div role="status" [class]="verifyExpired() ? '' : 'sr-only'">

@@ -208,7 +208,7 @@ describe('login page', () => {
     expect(host.querySelector('form')).toBeNull();
     expect(c['credentials']().password).toBe('');
     expect(navigate).not.toHaveBeenCalled();
-    host.querySelector<HTMLButtonElement>('app-tenant-provisioning-page button')!.click();
+    host.querySelector<HTMLButtonElement>('app-tenant-provisioning-page [data-status-action]')!.click();
     await vi.advanceTimersByTimeAsync(0);
     fixture.detectChanges();
     expect(host.querySelector('app-tenant-provisioning-page')).toBeNull();
