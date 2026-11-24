@@ -1,10 +1,12 @@
 import { DOCUMENT } from '@angular/common';
 import { HttpErrorResponse, HttpResponse, type HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
+import { Router } from '@angular/router';
 import { catchError, defer, from, lastValueFrom, of, switchMap, throwError } from 'rxjs';
 import { ApiError } from '../api/api-errors';
 import { AuthSession } from './auth-session';
 import { refreshFailureKind } from './session-errors';
+import { isTenantNotResolvable, TENANT_UNAVAILABLE_PATH } from '../tenant/tenant-unavailable';
 
 const TENANT_API = /^\/api\/tenant\/[a-z][a-z0-9-]*\/v\d+(?:\/|$)/u;
 const AUTH_API = /^\/api\/tenant\/core\/v\d+\/auth(?:\/|$)/u;
@@ -23,7 +25,21 @@ export const sessionRecoveryInterceptor: HttpInterceptorFn = (request, next) => 
   if (!origin || origin === 'null') return next(request);
 
   const url = new URL(request.url, origin);
-  if (url.origin !== origin || !TENANT_API.test(url.pathname) || PUBLIC_BRANDING.test(url.pathname)) return next(request);
+  if (url.origin !== origin || !TENANT_API.test(url.pathname)) return next(request);
+  // A removed/destroyed tenant answers every tenant API with 404 TENANT_NOT_RESOLVABLE: show the
+  // "workspace not available" page instead of session recovery or "session ended" (sign-in cannot help).
+  const router = inject(Router);
+  const location = inject(DOCUMENT).location;
+  const tenantGone = (error: unknown) => {
+    if (isTenantNotResolvable(error) && location?.pathname !== TENANT_UNAVAILABLE_PATH)
+      void router.navigateByUrl(TENANT_UNAVAILABLE_PATH, { replaceUrl: true });
+    return throwError(() => error);
+  };
+  if (PUBLIC_BRANDING.test(url.pathname)) return next(request).pipe(catchError(tenantGone));
+  return handle(request, next, url).pipe(catchError(tenantGone));
+};
+
+const handle = (request: Parameters<HttpInterceptorFn>[0], next: Parameters<HttpInterceptorFn>[1], url: URL) => {
   if (AUTH_API.test(url.pathname)) {
     if (request.method === 'POST' && AUTH_ISSUES_SESSION.test(url.pathname)) {
       const session = inject(AuthSession);

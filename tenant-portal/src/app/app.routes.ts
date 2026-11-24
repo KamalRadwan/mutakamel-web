@@ -29,6 +29,11 @@ function isTemplateOperationsRoute(_route: unknown, segments: UrlSegment[]): boo
 }
 
 export const routes: Routes = [
+  {
+    path: 'workspace-unavailable',
+    title: 'errors.tenantUnavailable.title',
+    loadComponent: () => import('./layout/tenant-unavailable/tenant-unavailable-page').then((m) => m.TenantUnavailablePage),
+  },
   { path: '', canMatch: [isAuthPath], loadChildren: () => import('./features/auth/auth.routes').then((m) => m.authRoutes) },
   {
     path: '',

@@ -228,6 +228,11 @@
       "title": "Page not found",
       "text": "The page you are looking for does not exist or has been moved.",
       "action": "Back to home"
+    },
+    "tenantUnavailable": {
+      "title": "This workspace is not available",
+      "text": "The workspace at {{host}} no longer exists or has been removed. Contact your administrator or Mutakamel support.",
+      "retry": "Try again"
     }
   },
   "notReady": {
