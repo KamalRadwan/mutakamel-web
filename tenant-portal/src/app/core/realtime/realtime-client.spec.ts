@@ -61,17 +61,21 @@ class ControlledSocket implements RealtimeSocket {
 function envelope(payload: unknown, eventId = ID) {
   return { contractVersion: 1, eventId, correlationId: ID, occurredAt: AT, payload };
 }
-function ready(recoveryComplete = true) {
+function ready(
+  recoveryComplete = true,
+  capabilities: Record<string, unknown> = {
+    crmLeads: { receive: true },
+    notifications: { receive: true },
+    presence: { publishSelf: false, watchMode: 'NONE' },
+  },
+  grantedCapabilities: string[] = ['CRM_LEADS', 'NOTIFICATIONS'],
+) {
   return {
     ...envelope({
       recovered: true,
       recoveryComplete,
-      capabilities: {
-        crmLeads: { receive: true },
-        notifications: { receive: true },
-        presence: { publishSelf: false, watchMode: 'NONE' },
-      },
-      grantedCapabilities: ['CRM_LEADS', 'NOTIFICATIONS'],
+      capabilities,
+      grantedCapabilities,
       notificationResyncRequired: !recoveryComplete,
       lastNotificationCursorAccepted: true,
     }),
@@ -363,6 +367,26 @@ describe('RealtimeClient RT10 ownership and lifecycle', () => {
     for (const item of recovery.slice(1)) client.completeRecovery(item.id);
     expect(client.stale()).toBe(false);
     expect(client.recovery()).toBeNull();
+  });
+
+  it('reaches connected when presence is watched (SCOPED) but has no recovery consumer', () => {
+    create();
+    socket.server(
+      'session.ready.v1',
+      ready(
+        false,
+        {
+          crmLeads: { receive: false },
+          notifications: { receive: true },
+          presence: { publishSelf: true, watchMode: 'SCOPED' },
+        },
+        ['NOTIFICATIONS', 'PRESENCE_WATCH'],
+      ),
+    );
+    expect(client.recoveries().map((value) => value.scope)).toEqual(['NOTIFICATIONS']);
+    for (const item of [...client.recoveries()]) client.completeRecovery(item.id);
+    expect(client.stale()).toBe(false);
+    expect(client.connection().status).toBe('connected');
   });
 
   it('ignores HTTP completion tokens from a prior socket lifetime', async () => {

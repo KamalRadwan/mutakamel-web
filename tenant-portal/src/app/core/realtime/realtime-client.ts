@@ -348,8 +348,8 @@ export class RealtimeClient {
             this.requireRecovery('NOTIFICATIONS', 'RECOVERY_INCOMPLETE');
           if (payload.capabilities.crmLeads.receive)
             this.requireRecovery('CRM_LEADS', 'RECOVERY_INCOMPLETE');
-          if (payload.capabilities.presence.watchMode !== 'NONE')
-            this.requireRecovery('PRESENCE', 'RECOVERY_INCOMPLETE');
+          // PRESENCE is not gated: the portal has no presence REST resync consumer (presence state arrives
+          // as server-pushed events), so requiring it left the client 'stale' forever and cycled the socket.
           if (this.recoveryScopes.size === 0) this.setState('connected', null);
         } else if (payload.notificationResyncRequired)
           this.requireRecovery('NOTIFICATIONS', 'RECOVERY_INCOMPLETE');
