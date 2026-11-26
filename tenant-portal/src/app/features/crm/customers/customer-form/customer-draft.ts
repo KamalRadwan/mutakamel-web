@@ -223,6 +223,12 @@ export function draftFromDetail(detail: CustomerDetail, companyId: string | null
       stateId: detail.address?.stateId ?? null,
       cityId: detail.address?.cityId ?? null,
       districtId: detail.address?.districtId ?? null,
+      street1: detail.address?.street ?? '',
+      street2: detail.address?.apartment ?? '',
+      buildingNo: detail.address?.buildingNo ?? '',
+      floor: detail.address?.floor ?? '',
+      landmark: detail.address?.landmark ?? '',
+      postalCode: detail.address?.postalCode ?? '',
     },
     legacyAddress: formatLegacyAddress(detail.address) || null,
   };
@@ -276,7 +282,8 @@ function addressesEqual(a: AddressValue, b: AddressValue): boolean {
     trimOrNull(a.countryId) === trimOrNull(b.countryId) &&
     trimOrNull(a.stateId) === trimOrNull(b.stateId) &&
     trimOrNull(a.cityId) === trimOrNull(b.cityId) &&
-    trimOrNull(a.districtId) === trimOrNull(b.districtId)
+    trimOrNull(a.districtId) === trimOrNull(b.districtId) &&
+    addressTextFields.every((key) => a[key].trim() === b[key].trim())
   );
 }
 
@@ -641,6 +648,8 @@ function buildUpdateContactPerson(contact: ContactDraft): ContactPersonBody {
   return body;
 }
 
+const addressTextFields = ['street1', 'street2', 'buildingNo', 'floor', 'landmark', 'postalCode'] as const;
+
 function buildCreateAddress(address: AddressValue): AddressBody | undefined {
   const out: AddressBody = {};
   let hasAny = false;
@@ -657,12 +666,14 @@ function buildCreateAddress(address: AddressValue): AddressBody | undefined {
   set('stateId', address.stateId);
   set('cityId', address.cityId);
   set('districtId', address.districtId);
+  for (const key of addressTextFields) set(key, address[key]);
 
   return hasAny ? out : undefined;
 }
 
-function buildFullGeoAddress(address: AddressValue): AddressBody {
+function buildFullAddress(address: AddressValue): AddressBody {
   return {
+    ...buildCreateAddress(address),
     countryId: trimOrNull(address.countryId),
     stateId: trimOrNull(address.stateId),
     cityId: trimOrNull(address.cityId),
@@ -837,7 +848,7 @@ export function toPatchBody(
   }
 
   if (!addressesEqual(base.address, draft.address)) {
-    body.address = buildFullGeoAddress(draft.address);
+    body.address = buildFullAddress(draft.address);
   }
 
   const changedCustomFields: Record<string, unknown> = {};

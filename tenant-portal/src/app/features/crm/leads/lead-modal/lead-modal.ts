@@ -1,3 +1,4 @@
+import { LeadConvert } from '../lead-convert/lead-convert';
 import {
   Component,
   DestroyRef,
@@ -72,6 +73,7 @@ type ConflictChoice = 'reload' | 'keep' | 'dismiss';
 @Component({
   selector: 'app-lead-modal',
   imports: [
+    LeadConvert,
     TranslocoPipe,
     FullState,
     LeadDisqualify,
@@ -391,6 +393,13 @@ export class LeadModal {
 
     this.serverErrors.set({});
     this.draft.set(next);
+  }
+
+  protected onConverted(lead: LeadDetail): void {
+    if (lead.id !== this.leadId()) return;
+    invalidateRelatedCounts('LEAD', lead.id);
+    this.retryLoad();
+    this.changed.emit(lead);
   }
 
   protected retryLoad(): void {

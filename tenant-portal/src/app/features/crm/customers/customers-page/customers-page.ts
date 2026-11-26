@@ -647,7 +647,7 @@ export class CustomersPage implements CanLeaveRecord {
 
   protected openCreate(status?: CustomerStatus): void {
     if (!this.canCreate()) return;
-    this.customerModal()?.openCreate(status ? { status } : undefined);
+    this.customerModal()?.openCreate(status ? { status } : undefined, this.capabilities());
   }
 
   protected openCustomer(customer: CustomerBoardItem): void {

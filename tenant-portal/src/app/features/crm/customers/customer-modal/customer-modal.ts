@@ -55,7 +55,6 @@ import {
   validateDraft,
 } from '../customer-form/customer-draft';
 import { CustomerForm } from '../customer-form/customer-form';
-import { CustomerLookups } from '../customer-form/customer-lookups';
 import { CustomerContactSaveError, contactsAfterChange, hasCustomerContactChanges, saveCustomerContacts } from '../customer-form/customer-contact-save';
 import { isManualStatus } from '../customer-statuses';
 import {
@@ -147,7 +146,7 @@ export class CustomerModal {
     read: ElementRef,
   });
   private readonly customerForm = viewChild(CustomerForm);
-  private readonly formLookups = viewChild<CustomerForm, CustomerLookups>(CustomerForm, { read: CustomerLookups });
+  private readonly formLookups = computed(() => this.customerForm()?.lookups);
 
   readonly saved = output<CustomerDetail>();
   readonly changed = output<string>();
@@ -214,7 +213,12 @@ export class CustomerModal {
   protected readonly canEdit = computed(() => {
     this.tenant.me();
     if (!this.canRead() || this.branchMissing() || this.writeReadonly() || this.reloadRequired()) return false;
-    if (this.mode() === 'create') return this.formLookups()?.canCreate() ?? false;
+    if (this.mode() === 'create') {
+      const caps = this.capabilities();
+      return caps?.branchId === this.draft().branchId
+        ? !!caps?.customerProfiles.create
+        : this.formLookups()?.canCreate() ?? false;
+    }
     const current = this.detail();
     return !!current && canUpdateCustomer(this.capabilities(), current);
   });
@@ -304,7 +308,10 @@ export class CustomerModal {
     });
   }
 
-  openCreate(preset?: { status?: CustomerStatus; profileType?: ProfileType }): void {
+  openCreate(
+    preset?: { status?: CustomerStatus; profileType?: ProfileType },
+    capabilities: CustomerCapabilities | null = null,
+  ): void {
     this.loadSeq++;
     this.guardBusy.set(false);
     this.closeNestedDialogs();
@@ -331,7 +338,7 @@ export class CustomerModal {
     this.nav.set(null);
     this.detail.set(null);
     this.updatedAt.set(null);
-    this.capabilities.set(null);
+    this.capabilities.set(capabilities);
     this.loading.set(false);
     this.loadFailed.set(false);
     this.reloadRequired.set(false);

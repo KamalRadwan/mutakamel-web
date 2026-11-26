@@ -38,8 +38,16 @@ export class DirectorySettingsApi {
 }
 
 function settingsResult(settings: DirectorySettings, etag: string | null): DirectorySettingsResult {
-  if (!etag || !/^"[1-9]\d*"$/.test(etag)) {
+  const version = settings?.version;
+  if (!Number.isSafeInteger(version) || version < 1) {
     throw new ApiError(502, 'COMMON.GENERIC.INTERNAL_ERROR');
   }
-  return { settings, etag };
+
+  // The Directory API's If-Match token is the numeric settings version. A proxy
+  // may omit its ETag or replace it with a cache validator for the response.
+  const versionTag = `"${version}"`;
+  if (etag && /^"[1-9]\d*"$/.test(etag) && etag !== versionTag) {
+    throw new ApiError(502, 'COMMON.GENERIC.INTERNAL_ERROR');
+  }
+  return { settings, etag: versionTag };
 }

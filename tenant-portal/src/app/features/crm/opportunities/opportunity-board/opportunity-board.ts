@@ -201,9 +201,6 @@ export class OpportunityBoard {
       ? opportunityErrorMessage(error, this.transloco, 'opportunities.list.loadFailed')
       : this.transloco.translate(this.mismatch() ? 'apiErrors.idempotencyMismatch' : this.forbidden() ? 'opportunities.page.forbidden' : 'opportunities.list.loadFailed');
   });
-  protected readonly totalItems = computed(() =>
-    this.boardStages().reduce((sum, lane) => sum + lane.summary.totalCount, 0),
-  );
 
   protected retryLoad(): void {
     if (this.mismatch()) { window.location.reload(); return; }

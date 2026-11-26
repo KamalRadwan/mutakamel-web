@@ -11,11 +11,17 @@ import { CustomerDraft, DraftErrors, emptyAddress, hasGeoAddress } from '../../c
 
 const CAN_ADD_PLACES = false;
 
-const GEO_KEYS: readonly (keyof Pick<AddressValue, 'countryId' | 'stateId' | 'cityId' | 'districtId'>)[] = [
+const ADDRESS_KEYS: readonly (keyof AddressValue)[] = [
   'countryId',
   'stateId',
   'cityId',
   'districtId',
+  'street1',
+  'street2',
+  'buildingNo',
+  'floor',
+  'landmark',
+  'postalCode',
 ];
 
 export interface MoreErrorSpec {
@@ -78,12 +84,14 @@ export class CustomerMore {
   readonly retryGeo = output<void>();
 
   protected readonly showLegal = computed(() => this.draft().profileType === 'CORPORATE');
-  protected readonly hasAddressSelection = computed(() => hasGeoAddress(this.draft().address));
+  protected readonly hasAddressSelection = computed(() =>
+    ADDRESS_KEYS.some((key) => !!this.draft().address[key]?.trim()),
+  );
   protected readonly resolvedLegacyAddress = computed(() =>
     (this.legacyAddress() ?? this.draft().legacyAddress ?? '').trim(),
   );
   protected readonly showLegacyAddress = computed(
-    () => !this.hasAddressSelection() && this.resolvedLegacyAddress().length > 0,
+    () => !hasGeoAddress(this.draft().address) && this.resolvedLegacyAddress().length > 0,
   );
 
   protected readonly legalNameCount = computed(() => codePointLength(this.draft().legalName));
@@ -95,7 +103,7 @@ export class CustomerMore {
     this.i18n();
     const allErrors = this.errors();
     const translated: Partial<Record<keyof AddressValue, string>> = {};
-    for (const key of GEO_KEYS) {
+    for (const key of ADDRESS_KEYS) {
       const raw = allErrors[`address.${key}`] ?? allErrors[key];
       if (!raw) continue;
       const fullKey = raw.startsWith('customerForm.') ? raw : `customerForm.errors.${raw}`;

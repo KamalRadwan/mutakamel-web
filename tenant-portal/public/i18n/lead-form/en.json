@@ -1,4 +1,10 @@
 {
+  "convert": {
+    "action": "Convert",
+    "title": "Convert lead to customer",
+    "text": "This creates a customer from this lead and keeps the converted lead in CRM.",
+    "done": "Lead converted to customer."
+  },
   "basics": {
     "type": "Lead type",
     "typeHint": "Choose whether this lead is an individual person or a company.",

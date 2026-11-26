@@ -46,22 +46,16 @@
     </ui-field>
 
     @if (canCreateDefinition()) {
-      <span
-        class="ms-auto inline-flex shrink-0"
-        [attr.title]="scopeTarget() !== 'TENANT' ? ('tradeConfig.page.newDefinitionDisabled' | transloco) : null"
+      <button
+        type="button"
+        uiButton
+        variant="secondary"
+        class="ms-auto shrink-0"
+        (click)="openCreateDefinition()"
       >
-        <button
-          type="button"
-          uiButton
-          variant="secondary"
-          class="shrink-0"
-          [disabled]="scopeTarget() !== 'TENANT'"
-          (click)="openCreateDefinition()"
-        >
-          <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
-          {{ 'tradeConfig.page.newDefinition' | transloco }}
-        </button>
-      </span>
+        <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+        {{ 'tradeConfig.page.newDefinition' | transloco }}
+      </button>
     }
 
     <button

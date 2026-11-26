@@ -82,6 +82,15 @@ export function moveLead(leadId: string, stageId: string, disqualificationReason
   });
 }
 
+export async function convertLead(leadId: string, profileType: LeadDetail['leadProfileType']): Promise<LeadDetail> {
+  const result = await writeList<{ lead: LeadWire }>('POST', `/leads/${leadId}/convert`, {
+    profileType,
+    keepLead: true,
+  });
+  await crmQueries().invalidateQueries({ queryKey: ['crm-customers'] });
+  return recordFromWire(result.lead);
+}
+
 /** PATCH /api/tenant/crm/v1/leads/:id (inline rating/colour + loaded token); record branch, no scope headers. */
 export function updateLead(
   id: string,

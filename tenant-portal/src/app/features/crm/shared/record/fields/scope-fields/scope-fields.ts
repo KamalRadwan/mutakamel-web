@@ -1,8 +1,9 @@
-import { Component, computed, input, model } from '@angular/core';
+import { Component, computed, inject, input, model } from '@angular/core';
 import { TranslocoPipe, provideTranslocoScope } from '@jsverse/transloco';
 import { Dropdown, DropdownOption } from '../../../../../../shared/ui/dropdown/dropdown';
 import { Field } from '../../../../../../shared/ui/field/field';
 import { Option } from '../record-fields.model';
+import { TenantScopeState } from '../../../../../../core/scope/tenant-scope';
 
 @Component({
   selector: 'app-scope-fields',
@@ -15,6 +16,7 @@ import { Option } from '../record-fields.model';
 })
 export class ScopeFields {
   private static nextId = 0;
+  private readonly tenant = inject(TenantScopeState);
   protected readonly uid = `rf-scope-${++ScopeFields.nextId}`;
 
   readonly companyId = model<string | null>(null);
@@ -55,6 +57,26 @@ export class ScopeFields {
 
   protected readonly companyError = computed(() => this.errors()['companyId'] ?? this.errors()['company'] ?? null);
   protected readonly branchError = computed(() => this.errors()['branchId'] ?? this.errors()['branch'] ?? null);
+
+  private readonly singleCompanySelected = computed(() => {
+    const me = this.tenant.me();
+    if (!me || me.accessScope?.companiesTruncated) return false;
+    const companies = new Set([
+      ...(me.accessibleCompanies ?? []),
+      ...(me.accessibleBranchCompanies ?? []).map((entry) => entry.companyId),
+    ]);
+    const companyId = this.companyId();
+    return !!companyId && companies.size === 1 && companies.has(companyId);
+  });
+  protected readonly showCompany = computed(() => !this.singleCompanySelected() || !!this.companyError());
+  protected readonly showBranch = computed(() => {
+    const companyId = this.companyId();
+    if (!companyId || !this.singleCompanySelected() || this.tenant.me()?.accessScope?.branchesTruncated ||
+        this.branchError()) return true;
+    const branches = new Set(this.tenant.me()?.accessibleBranches ?? []);
+    const branchId = this.branchId();
+    return !branchId || branches.size !== 1 || !branches.has(branchId);
+  });
 
   protected onCompanySelect(value: string): void {
     this.companyId.set(value || null);

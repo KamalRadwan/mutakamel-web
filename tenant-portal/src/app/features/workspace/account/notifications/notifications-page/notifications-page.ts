@@ -7,6 +7,7 @@ import {
   tablerFileDescription,
   tablerUserPlus,
 } from '@ng-icons/tabler-icons';
+import { NotificationPresentation } from '../../../../../core/realtime/notification-presentation';
 import { Notify } from '../../../../../core/notify/notify';
 import { Button } from '../../../../../shared/ui/button/button';
 import { Field } from '../../../../../shared/ui/field/field';
@@ -44,6 +45,8 @@ export class NotificationsPage {
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly api = inject(NotificationPreferencesApi);
+
+  protected readonly presentation = inject(NotificationPresentation);
 
   protected readonly groups = NOTIFICATION_GROUPS;
   protected readonly skeletonCards = [0, 1, 2] as const;

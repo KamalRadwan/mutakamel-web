@@ -119,11 +119,9 @@ export class DuplicateStrip {
       const checkFn = this.check();
       const seq = ++this.seq;
 
-      if (!payload) {
-        this.matches.set([]);
-        this.showAll.set(false);
-        return;
-      }
+      this.matches.set([]);
+      this.showAll.set(false);
+      if (!payload) return;
 
       const timer = setTimeout(() => {
         void this.runCheck(checkFn, payload, seq);

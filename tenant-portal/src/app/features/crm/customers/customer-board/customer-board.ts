@@ -1,7 +1,5 @@
 import { Component, computed, inject, input, linkedSignal, output, resource, signal, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../core/i18n/translation-events';
-import { NgIcon, provideIcons } from '@ng-icons/core';
-import { tablerPlus, tablerSearch, tablerUsers } from '@ng-icons/tabler-icons';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { Notify } from '../../../../core/notify/notify';
 import { Button } from '../../../../shared/ui/button/button';
@@ -61,8 +59,7 @@ function dueCounts(items: readonly CustomerBoardItem[]): Record<ActivityBucket |
 
 @Component({
   selector: 'app-customer-board',
-  imports: [NgIcon, TranslocoPipe, Button, ConfirmDialog, FullState, CustomerCard, RecordBoard],
-  providers: [provideIcons({ tablerPlus, tablerSearch, tablerUsers })],
+  imports: [TranslocoPipe, Button, ConfirmDialog, FullState, CustomerCard, RecordBoard],
   templateUrl: './customer-board.html',
   host: { class: 'flex shrink-0 flex-col' },
 })
@@ -76,13 +73,11 @@ export class CustomerBoard {
 
   readonly body = input.required<CustomerSearchBody>();
   readonly ready = input(true);
-  readonly hasFilter = input(false);
   readonly capabilities = input<CustomerCapabilities | null>(null);
 
   readonly create = output<CustomerStatus>();
   readonly view = output<CustomerBoardItem>();
   readonly activities = output<CustomerBoardItem>();
-  readonly clearSearch = output<void>();
   readonly readOnlyDetected = output<void>();
 
   protected readonly skeletonLanes = [1, 2, 3, 4];
@@ -144,7 +139,6 @@ export class CustomerBoard {
     this.boardResource.reload();
   }
   protected readonly canCreate = computed(() => !this.readOnly() && canCreateCustomer(this.capabilities()));
-  protected readonly totalItems = computed(() => this.counts().ALL ?? this.lanes().reduce((sum, lane) => sum + lane.items.length, 0));
 
   protected readonly canDragItem = (item: CustomerBoardItem): boolean =>
     canManageCustomerStatus(item.branchId) && this.canUpdate(item);
@@ -181,7 +175,7 @@ export class CustomerBoard {
         id: lane.status,
         label,
         tone,
-        total: lane.total,
+        total: lane.total ?? this.counts()[lane.status] ?? lane.items.length,
         items: lane.items,
         hasNext: lane.hasNext,
         loading: loadingStatus === lane.status,

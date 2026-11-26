@@ -188,9 +188,10 @@ export function emptyOpportunityQuery(): Query {
   };
 }
 
-/** Default opportunity search query: none. */
 export function defaultOpportunityQuery(): Query {
-  return emptyOpportunityQuery();
+  const query = emptyOpportunityQuery();
+  query.root.children.push({ kind: 'condition', id: 'preset-mine', field: 'owner', operator: 'eq', value: '$me' });
+  return query;
 }
 
 /** Convert a Query into facet-search chips plus one optional `advanced` summary chip. */

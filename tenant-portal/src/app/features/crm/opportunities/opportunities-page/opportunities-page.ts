@@ -269,9 +269,7 @@ export class OpportunitiesPage implements CanLeaveRecord {
       : null,
   );
   protected readonly canCreate = computed(
-    () =>
-      (this.current() === 'table' ? this.pipelines().some((pipeline) => pipeline.isActive) : !!this.currentPipeline()?.isActive) &&
-      canCreateOpportunity(this.capabilities()),
+    () => !!this.currentPipeline()?.isActive && canCreateOpportunity(this.capabilities()),
   );
   protected readonly forbidden = computed(
     () =>
@@ -521,9 +519,7 @@ export class OpportunitiesPage implements CanLeaveRecord {
   }
   openCreate(stageId?: string): void {
     if (!this.canCreate()) return;
-    const pipeline = this.current() !== 'table' ? this.currentPipeline() :
-      this.pipelines().find((pipeline) => pipeline.isActive && pipeline.isDefault) ??
-      this.pipelines().find((pipeline) => pipeline.isActive);
+    const pipeline = this.currentPipeline();
     if (!pipeline) return;
     this.createPipeline.set(pipeline.id);
     this.createStage.set(stageId);

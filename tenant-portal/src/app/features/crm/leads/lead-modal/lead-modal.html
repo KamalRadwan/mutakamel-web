@@ -32,6 +32,13 @@
 >
   @if (mode() === 'edit' && !loading() && !loadFailed() && !scopeDenied() && !notFound() && !chooseBranch() && detail(); as currentLead) {
     @if (currentLead.id === leadId()) {
+      <app-lead-convert
+        headerRelated
+        [lead]="currentLead"
+        [capabilities]="capabilities()"
+        [blocked]="dirty() || hasUnsavedContact() || instantUpdating() || saving() || deleting() || writes.readOnly()"
+        (converted)="onConverted($event)"
+      />
       <app-record-related-badges
         headerRelated
         layout="modal"

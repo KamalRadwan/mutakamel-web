@@ -207,7 +207,7 @@ export class DashboardGrid {
       animate: !this.prefersReducedMotion(),
       alwaysShowResizeHandle: true,
       draggable: { handle: '.gs-drag-handle' },
-      resizable: { handles: isRtl ? 'sw' : 'se', autoHide: false },
+      resizable: { handles: 'n,ne,e,se,s,sw,w,nw', autoHide: false },
     };
 
     const grid = GridStack.init(options, hostEl);

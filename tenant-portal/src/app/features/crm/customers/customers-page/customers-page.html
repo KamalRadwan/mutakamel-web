@@ -106,13 +106,11 @@
     <app-customer-board
       [body]="store.body()"
       [ready]="ready()"
-      [hasFilter]="hasSearch()"
       [capabilities]="capabilities()"
       (readOnlyDetected)="writeReadOnly.set(true)"
       (create)="openCreate($event)"
       (view)="openCustomer($event)"
       (activities)="openActivities($event)"
-      (clearSearch)="clearAllFilters()"
     />
   }
   @case ('cards') {

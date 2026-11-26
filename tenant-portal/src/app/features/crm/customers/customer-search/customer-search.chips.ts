@@ -137,9 +137,10 @@ export function emptyCustomerQuery(): Query {
   };
 }
 
-/** Default initial customer search query (no pre-applied filter so all statuses are visible). */
 export function defaultCustomerQuery(): Query {
-  return emptyCustomerQuery();
+  const query = emptyCustomerQuery();
+  query.root.children.push({ kind: 'condition', id: 'preset-mine', field: 'ownerUserId', operator: 'eq', value: '$me' });
+  return query;
 }
 
 /** Convert a Query into facet-search chips plus one optional `advanced` summary chip. */

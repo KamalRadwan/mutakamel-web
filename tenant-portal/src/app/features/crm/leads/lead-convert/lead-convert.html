@@ -1,0 +1,12 @@
+@if (canConvert()) {
+  <button type="button" uiButton variant="secondary" [disabled]="blocked() || busy()" (click)="confirm()">
+    {{ 'leadForm.convert.action' | transloco }}
+  </button>
+  <ui-confirm-dialog class="absolute"
+    tone="warning"
+    [title]="'leadForm.convert.title' | transloco"
+    [text]="'leadForm.convert.text' | transloco"
+    [confirmLabel]="'leadForm.convert.action' | transloco"
+    [cancelLabel]="'common.cancel' | transloco"
+  />
+}

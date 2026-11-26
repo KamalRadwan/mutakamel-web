@@ -1,4 +1,5 @@
 {
+  "enableDesktop": "Enable desktop notifications",
   "loadFailed": "Could not load your notification settings.",
   "retry": "Retry",
   "groups": {

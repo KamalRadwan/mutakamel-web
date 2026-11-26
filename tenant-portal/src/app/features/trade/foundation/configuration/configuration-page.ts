@@ -271,7 +271,8 @@ export class ConfigurationPage {
   }
 
   protected openCreateDefinition(): void {
-    if (!this.canCreateDefinition() || this.scopeTarget() !== 'TENANT') return;
+    if (!this.canCreateDefinition()) return;
+    this.onScopeChange('TENANT');
     this.createModal().open();
   }
 

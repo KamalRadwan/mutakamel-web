@@ -1,77 +1,81 @@
-@let companyErr = companyError();
-<ui-field
-  size="bare"
-  [label]="'recordFields.scope.company' | transloco"
-  [for]="uid + '-company'"
-  [hint]="'recordFields.scope.companyHint' | transloco"
-  [required]="!locked()"
-  [error]="companyErr"
->
-  @if (!locked()) {
-    <div [attr.aria-invalid]="companyErr ? 'true' : null">
-      <ui-dropdown
-        class="w-full"
-        size="field"
-        [id]="uid + '-company'"
-        [options]="companyOptions()"
-        [value]="companyId() ?? ''"
-        [disabled]="companyOptions().length === 0"
-        [label]="'recordFields.scope.company' | transloco"
-        (valueChange)="onCompanySelect($event)"
-      />
-    </div>
-  } @else {
-    <div
-      class="flex h-field w-full items-center rounded-8 border bg-surface-field px-8 text-12 text-text"
-      [class]="companyErr ? 'border-danger-border ring-2 ring-danger-halo' : 'border-border-field'"
-    >
-      <input
-        [id]="uid + '-company'"
-        type="text"
-        readonly
-        [value]="companyLabel() || '—'"
-        [attr.aria-invalid]="companyErr ? 'true' : null"
-        class="w-full bg-transparent text-12 text-text outline-none"
-      />
-    </div>
-  }
-</ui-field>
+@if (showCompany()) {
+  @let companyErr = companyError();
+  <ui-field
+    size="bare"
+    [label]="'recordFields.scope.company' | transloco"
+    [for]="uid + '-company'"
+    [hint]="'recordFields.scope.companyHint' | transloco"
+    [required]="!locked()"
+    [error]="companyErr"
+  >
+    @if (!locked()) {
+      <div [attr.aria-invalid]="companyErr ? 'true' : null">
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-company'"
+          [options]="companyOptions()"
+          [value]="companyId() ?? ''"
+          [disabled]="companyOptions().length === 0"
+          [label]="'recordFields.scope.company' | transloco"
+          (valueChange)="onCompanySelect($event)"
+        />
+      </div>
+    } @else {
+      <div
+        class="flex h-field w-full items-center rounded-8 border bg-surface-field px-8 text-12 text-text"
+        [class]="companyErr ? 'border-danger-border ring-2 ring-danger-halo' : 'border-border-field'"
+      >
+        <input
+          [id]="uid + '-company'"
+          type="text"
+          readonly
+          [value]="companyLabel() || '—'"
+          [attr.aria-invalid]="companyErr ? 'true' : null"
+          class="w-full bg-transparent text-12 text-text outline-none"
+        />
+      </div>
+    }
+  </ui-field>
+}
 
-@let branchErr = branchError();
-<ui-field
-  size="bare"
-  [label]="'recordFields.scope.branch' | transloco"
-  [for]="uid + '-branch'"
-  [hint]="'recordFields.scope.branchHint' | transloco"
-  [required]="!locked()"
-  [error]="branchErr"
->
-  @if (!locked()) {
-    <div [attr.aria-invalid]="branchErr ? 'true' : null">
-      <ui-dropdown
-        class="w-full"
-        size="field"
-        [id]="uid + '-branch'"
-        [options]="branchOptions()"
-        [value]="branchId() ?? ''"
-        [disabled]="branchOptions().length === 0"
-        [label]="'recordFields.scope.branch' | transloco"
-        (valueChange)="onBranchSelect($event)"
-      />
-    </div>
-  } @else {
-    <div
-      class="flex h-field w-full items-center rounded-8 border bg-surface-field px-8 text-12 text-text"
-      [class]="branchErr ? 'border-danger-border ring-2 ring-danger-halo' : 'border-border-field'"
-    >
-      <input
-        [id]="uid + '-branch'"
-        type="text"
-        readonly
-        [value]="branchLabel() || '—'"
-        [attr.aria-invalid]="branchErr ? 'true' : null"
-        class="w-full bg-transparent text-12 text-text outline-none"
-      />
-    </div>
-  }
-</ui-field>
+@if (showBranch()) {
+  @let branchErr = branchError();
+  <ui-field
+    size="bare"
+    [label]="'recordFields.scope.branch' | transloco"
+    [for]="uid + '-branch'"
+    [hint]="'recordFields.scope.branchHint' | transloco"
+    [required]="!locked()"
+    [error]="branchErr"
+  >
+    @if (!locked()) {
+      <div [attr.aria-invalid]="branchErr ? 'true' : null">
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-branch'"
+          [options]="branchOptions()"
+          [value]="branchId() ?? ''"
+          [disabled]="branchOptions().length === 0"
+          [label]="'recordFields.scope.branch' | transloco"
+          (valueChange)="onBranchSelect($event)"
+        />
+      </div>
+    } @else {
+      <div
+        class="flex h-field w-full items-center rounded-8 border bg-surface-field px-8 text-12 text-text"
+        [class]="branchErr ? 'border-danger-border ring-2 ring-danger-halo' : 'border-border-field'"
+      >
+        <input
+          [id]="uid + '-branch'"
+          type="text"
+          readonly
+          [value]="branchLabel() || '—'"
+          [attr.aria-invalid]="branchErr ? 'true' : null"
+          class="w-full bg-transparent text-12 text-text outline-none"
+        />
+      </div>
+    }
+  </ui-field>
+}

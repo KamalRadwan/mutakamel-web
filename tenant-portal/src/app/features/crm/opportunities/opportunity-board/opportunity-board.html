@@ -33,10 +33,6 @@
     }
   </div>
 } @else {
-  @if (!loading() && boardStages().length > 0 && totalItems() === 0) {
-    <p class="px-8 pb-6 text-12 leading-18 text-text-muted">{{ 'opportunities.board.noMatch' | transloco }}</p>
-  }
-
   <app-record-board
     [lanes]="boardLanes()"
     [itemTemplate]="oppCardTpl"

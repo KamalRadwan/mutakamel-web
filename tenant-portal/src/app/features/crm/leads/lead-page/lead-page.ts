@@ -1,3 +1,4 @@
+import { LeadConvert } from '../lead-convert/lead-convert';
 import { Location } from '@angular/common';
 import {
   Component,
@@ -124,6 +125,7 @@ function rebaseDraft(oldBase: LeadDraft, freshBase: LeadDraft, currentDraft: Lea
 @Component({
   selector: 'app-lead-page',
   imports: [
+    LeadConvert,
     NgIcon,
     TranslocoPipe,
     Button,
@@ -196,7 +198,7 @@ export class LeadPage implements CanLeaveRecord {
   protected readonly draft = signal<LeadDraft>(emptyDraft());
   protected readonly detail = signal<LeadDetail | null>(null);
   protected readonly updatedAt = signal<string | null>(null);
-  private readonly capabilities = signal<LeadsCapabilities | null>(null);
+  protected readonly capabilities = signal<LeadsCapabilities | null>(null);
   protected readonly nav = signal<LeadNavContext | null>(null);
 
   protected readonly notFound = signal(false);
@@ -937,6 +939,12 @@ export class LeadPage implements CanLeaveRecord {
     this.submitted.set(false);
     this.serverErrors.set({});
     this.formRevision.update((v) => v + 1);
+  }
+
+  protected onConverted(lead: LeadDetail): void {
+    if (lead.id !== this.leadId()) return;
+    invalidateRelatedCounts('LEAD', lead.id);
+    this.retryLoad();
   }
 
   protected retryLoad(): void {

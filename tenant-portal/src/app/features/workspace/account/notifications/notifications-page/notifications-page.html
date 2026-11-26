@@ -25,6 +25,13 @@
     </button>
   </div>
 } @else {
+  @if (presentation.permission() === 'default') {
+    <div>
+      <button type="button" uiButton variant="secondary" (click)="presentation.enableDesktop()">
+        {{ 'wsAccNotif.enableDesktop' | transloco }}
+      </button>
+    </div>
+  }
   @for (group of groups; track group.key) {
     <app-account-section
       [icon]="group.icon"

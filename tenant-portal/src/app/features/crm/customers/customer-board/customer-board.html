@@ -29,29 +29,6 @@
       </div>
     }
   </div>
-} @else if (!loading() && totalItems() === 0) {
-  <div class="flex flex-1 flex-col items-center justify-center gap-10 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
-    @if (hasFilter()) {
-      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
-        <ng-icon name="tablerSearch" size="18" aria-hidden="true" />
-      </span>
-      <p class="text-14 leading-20 font-medium text-text">{{ 'customers.empty.noMatches' | transloco }}</p>
-      <button type="button" uiButton variant="secondary" (click)="clearSearch.emit()">
-        {{ 'customers.empty.clearSearch' | transloco }}
-      </button>
-    } @else {
-      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-blue text-on-icon">
-        <ng-icon name="tablerUsers" size="18" aria-hidden="true" />
-      </span>
-      <p class="text-14 leading-20 font-medium text-text">{{ 'customers.empty.noCustomers' | transloco }}</p>
-      @if (canCreate()) {
-        <button type="button" uiButton (click)="create.emit('PROSPECT')">
-          <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
-          {{ 'customers.new' | transloco }}
-        </button>
-      }
-    }
-  </div>
 } @else {
   @for (lane of lanes(); track lane.status) {
     @if (laneErrors()[lane.status]; as message) {

@@ -98,13 +98,16 @@ describe('DirectorySettingsApi', () => {
     await expect(pending).rejects.toMatchObject({ status: 502, code: 'COMMON.GENERIC.INTERNAL_ERROR' });
   });
 
-  it.each([null, 'W/"7"', '*', '7'])('rejects an absent or non-strong version ETag: %s', async (etag) => {
+  it.each([null, 'W/"7"', '*', '7'])('uses the settings version when the proxy sends %s', async (etag) => {
     const headers: Record<string, string> = etag === null ? {} : { ETag: etag };
     const read = api.getDirectorySettings();
     http.expectOne(path).flush({ success: true, data: settings }, { headers });
+    await expect(read).resolves.toEqual({ settings, etag: '"7"' });
+  });
+
+  it('rejects a strong settings ETag that disagrees with the response version', async () => {
+    const read = api.getDirectorySettings();
+    http.expectOne(path).flush({ success: true, data: settings }, { headers: { ETag: '"8"' } });
     await expect(read).rejects.toMatchObject({ status: 502, code: 'COMMON.GENERIC.INTERNAL_ERROR' });
-    const write = api.updateDirectorySettings({}, '"7"');
-    http.expectOne(path).flush({ success: true, data: settings }, { headers });
-    await expect(write).rejects.toMatchObject({ status: 502, code: 'COMMON.GENERIC.INTERNAL_ERROR' });
   });
 });

@@ -15,7 +15,7 @@
       <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
       {{ 'opportunities.new' | transloco }}
     </button>
-    @if (current() !== 'table') {
+    @if (pipelines().length > 1) {
       <app-pipeline-switcher
         [pipelines]="pipelines()"
         [value]="currentPipeline()?.id ?? null"

@@ -6,6 +6,7 @@ import { AuthSession } from '../auth/auth-session';
 import { Notify } from '../notify/notify';
 import { TabBus } from '../tabs/tab-bus';
 import { TabLeader } from '../tabs/tab-leader';
+import { NotificationPresentation } from './notification-presentation';
 import { RealtimeClient } from './realtime-client';
 import type { RealtimeEvent, RealtimeFailure, RealtimeScoped } from './realtime-client.model';
 import { realtimeErrorMessage, realtimeFailure } from './realtime-errors';
@@ -34,6 +35,7 @@ export class NotificationsFeed {
   private readonly leader = inject(TabLeader);
   private readonly bus = inject(TabBus);
   private readonly realtime = inject(RealtimeClient);
+  private readonly presentation = inject(NotificationPresentation);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly identity = computed(() =>
@@ -86,6 +88,13 @@ export class NotificationsFeed {
         if (oldest !== undefined) seenNotices.delete(oldest);
       }
       this.notify.info(event.notice.title, event.notice.body);
+      if (this.leader.isLeader()) {
+        this.presentation.playSound();
+        this.presentation.showDesktop(
+          this.transloco.translate('notifications.title'),
+          event.notice.eventId,
+        );
+      }
     });
     const offRetry = this.bus.on<RealtimeScoped<null>>(RETRY, (message) => {
       if (!this.active() || message.userId !== this.identity()) return;
