@@ -75,7 +75,7 @@ export class FileDrop {
     this.picked.emit(file);
   }
 
-  /** Requires both any extension tokens and any MIME tokens in `accept` to match (AND semantics); mixed shorthand like `image/*,.ico` would reject `.png`. */
+  /** Match any accepted extension or MIME, as the native file picker does. */
   private matchesAccept(file: File, accept: string): boolean {
     const raw = accept.trim();
     if (!raw) return true;
@@ -86,12 +86,9 @@ export class FileDrop {
     if (!tokens.length) return true;
     const name = file.name.toLowerCase();
     const type = file.type.toLowerCase();
-    const exts = tokens.filter((t) => t.startsWith('.'));
-    const mimes = tokens.filter((t) => !t.startsWith('.'));
-    const extOk = !exts.length || exts.some((e) => name.endsWith(e));
-    const mimeOk =
-      !mimes.length ||
-      (type === '' ? exts.length > 0 : mimes.some((m) => (m.endsWith('/*') ? type.startsWith(m.slice(0, -1)) : type === m)));
-    return extOk && mimeOk;
+    return tokens.some((token) => {
+      if (token.startsWith('.')) return name.endsWith(token);
+      return token.endsWith('/*') ? type.startsWith(token.slice(0, -1)) : type === token;
+    });
   }
 }

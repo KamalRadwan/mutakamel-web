@@ -108,15 +108,11 @@ function fileExtensionOf(name: string): string {
 
 export function resolveAttachmentMime(file: { name: string; type: string }): string {
   const rawType = file.type.trim().toLowerCase();
-  if (rawType && ALLOWED_ATTACHMENT_MIMES.has(rawType)) {
-    return rawType;
-  }
   const ext = fileExtensionOf(file.name);
-  if (ext && EXTENSION_TO_MIME[ext]) {
-    if (!rawType || (ext === '.csv' && rawType === 'application/vnd.ms-excel')) {
-      return EXTENSION_TO_MIME[ext];
-    }
+  if (ext === '.csv' && (rawType === 'application/vnd.ms-excel' || rawType === 'text/plain')) {
+    return 'text/csv';
   }
+  if (!rawType && EXTENSION_TO_MIME[ext]) return EXTENSION_TO_MIME[ext];
   return rawType;
 }
 

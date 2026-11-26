@@ -201,6 +201,10 @@ export class RecordAttachments {
     const sourceId = this.sourceId();
     const sourceType = this.sourceType();
     if (!branchId || !sourceId || !this.allowUpload() || this.denied() || this.loading() || this.loadFailed()) return;
+    if (file.size === 0) {
+      this.notify.error(this.transloco.translate('recordAttachments.errors.CRM_ATTACHMENT_FILE_EMPTY'));
+      return;
+    }
 
     const item: UploadQueueItem = {
       id: `upload-${++this.uploadCounter}`,
