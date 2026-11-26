@@ -27,7 +27,7 @@ export class LeadConvert {
     const lead = this.lead();
     const capabilities = this.capabilities();
     const scope = capabilities?.leads.convert;
-    return lead.status !== 'DISQUALIFIED' && lead.stageFlag !== 'DISQUALIFIED' &&
+    return lead.status !== 'CONVERTED' && lead.status !== 'DISQUALIFIED' && lead.stageFlag !== 'DISQUALIFIED' &&
       capabilities?.branchId === lead.branchId && leadActionAllowed(scope, leadActionRow(lead));
   });
 

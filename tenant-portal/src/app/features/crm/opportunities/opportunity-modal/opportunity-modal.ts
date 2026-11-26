@@ -39,6 +39,8 @@ import { CrmModules } from '../../shared/crm-modules/crm-modules';
 import { RecordModalExtraAction, RecordModalFrame } from '../../shared/record/modal/record-modal-frame';
 import { createUnsavedGuard } from '../../shared/record/modal/record-unsaved-guard';
 import { RecordDraftStore } from '../../shared/record/nav/record-draft-store';
+import { RecordRelatedBadges } from '../../shared/record/related/record-related-badges';
+import { RelatedBadgeClickEvent } from '../../shared/record/related/related-records.model';
 import { RecordNavContext, navPosition, nextNavTarget } from '../../shared/record/nav/record-nav';
 import { ApiError, errorCodeOf, newIdempotencyKey } from '../../settings/shared/settings-api';
 import {
@@ -117,6 +119,7 @@ const BLANK_DRAFT: OpportunityDraft = emptyDraft({
     FullState,
     UnsavedDialog,
     RecordModalFrame,
+    RecordRelatedBadges,
     OpportunityForm,
     CloseDialog,
     PipelineMoveDialog,
@@ -812,6 +815,21 @@ export class OpportunityModal {
     if (this.saving() || this.deleting() || this.anyGuardBusy()) return;
     if (!(await this.unsavedGuard.confirmLeave())) return;
     this.closeModal(true);
+  }
+
+  protected async onRelatedBadgeClick(click: RelatedBadgeClickEvent): Promise<void> {
+    if (this.saving() || this.deleting() || this.anyGuardBusy()) {
+      click.event.preventDefault();
+      return;
+    }
+    if (!this.dirty()) {
+      this.closeModal(false);
+      return;
+    }
+    click.event.preventDefault();
+    if (!(await this.unsavedGuard.confirmLeave())) return;
+    this.closeModal(false);
+    void this.router.navigate(click.target.commands, { queryParams: click.target.queryParams });
   }
 
   protected async goPrev(): Promise<void> {

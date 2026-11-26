@@ -185,6 +185,13 @@ class RecordHttp extends CrmHttpStub {
   override async write<T>(method: CoreWriteMethod, path: string, body: unknown, options: CrmWriteOptions) {
     const result = await super.write<T>(method, path, body, options);
     if (this.writeFailure) throw this.writeFailure;
+    if (path === '/related-records/counts') {
+      return { ...result, data: { countsByRecordId: {} } as T };
+    }
+    if (path === `/leads/${leadId}/convert`) {
+      this.lead = { ...this.lead, status: 'CONVERTED' };
+      return { ...result, data: { lead: structuredClone(this.lead) } as T };
+    }
     this.lead = { ...this.lead, ...body as object, updatedAt: '2026-11-23T02:00:00.000Z' };
     return { ...result, data: structuredClone(this.lead) as T };
   }
@@ -356,10 +363,33 @@ describe.each([['en','light'], ['en','dark'], ['ar','light'], ['ar','dark']])('L
     expect(form.draft().companyName).toBe('Acme');
     expect(form.draft().customFields).toEqual(http.lead.customFields);
     await vi.waitFor(() => { fixture.detectChanges(); expect(fixture.debugElement.query(By.directive(RecordModalFrame)).componentInstance.canSave()).toBe(true); });
+    expect(fixture.nativeElement.querySelector('app-record-modal-header app-lead-convert > button')?.disabled).toBe(false);
     expect(http.recordedReads().some((call) => call.path === `/leads/${leadId}`)).toBe(true);
     expect(http.recordedReads().filter((call) => call.path === `/leads/${leadId}`)).toHaveLength(1);
     expect(http.recordedReads().some((call) => call.path === '/custom-fields/values')).toBe(false);
     fixture.destroy();
+  });
+  it('projects Convert in the lead header and hides it after conversion', async () => {
+    http.lead = { ...http.lead, stageId: 'qualified', stageFlag: 'QUALIFIED' };
+    await open();
+    const convertButton = () => node().querySelector<HTMLButtonElement>(
+      'app-record-page-header app-lead-convert > button',
+    );
+    expect(convertButton()?.disabled).toBe(false);
+    convertButton()!.click();
+    harness.detectChanges();
+    const confirm = node().querySelector<HTMLButtonElement>('app-lead-convert dialog[open] footer button');
+    expect(confirm).not.toBeNull();
+    confirm!.click();
+    await vi.waitFor(() => {
+      harness.detectChanges();
+      expect(http.recordedWrites()).toContainEqual(expect.objectContaining({
+        method: 'POST',
+        path: `/leads/${leadId}/convert`,
+        body: { profileType: 'CORPORATE', keepLead: true },
+      }));
+      expect(convertButton()).toBeNull();
+    });
   });
   it('LeadPage › list actions on the page', async () => {
     const page = await open();

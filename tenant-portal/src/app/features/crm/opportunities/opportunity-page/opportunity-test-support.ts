@@ -82,6 +82,16 @@ export class OpportunityTransport extends CrmHttpStub {
     const error = this.writeErrorsByPath.get(path);
     if (error) throw error;
     if (this.writeErrors.length) throw this.writeErrors.shift()!;
+    if (path === '/related-records/counts') {
+      return { ...recorded, data: {
+        countsByRecordId: {
+          [this.row.customerProfileId]: {
+            partyId: this.row.customerPartyId, leads: 2, opportunities: 3,
+            quotations: 4, invoices: 5, salesOrders: 6,
+          },
+        },
+      } as T };
+    }
     const patch = body as Partial<OpportunityRow> & { expectedUpdatedAt?: string; tagIds?: string[] };
     if (path.endsWith('/tags')) {
       this.row.tags = [...this.row.tags, ...(patch.tagIds ?? []).map((id) => ({ id, name: id, backgroundColor: null, textColor: null }))];

@@ -30,26 +30,26 @@
   (undo)="undoChanges()"
   (delete)="confirmDelete()"
 >
-  @if (mode() === 'edit' && !loading() && !loadFailed() && !scopeDenied() && !notFound() && !chooseBranch() && detail(); as currentLead) {
-    @if (currentLead.id === leadId()) {
-      <app-lead-convert
-        headerRelated
-        [lead]="currentLead"
-        [capabilities]="capabilities()"
-        [blocked]="dirty() || hasUnsavedContact() || instantUpdating() || saving() || deleting() || writes.readOnly()"
-        (converted)="onConverted($event)"
-      />
-      <app-record-related-badges
-        headerRelated
-        layout="modal"
-        recordType="LEAD"
-        [recordId]="currentLead.id"
-        [branchId]="currentLead.branchId"
-        [partyLabel]="displayName()"
-        (badgeClick)="onRelatedBadgeClick($event)"
-      />
+  <ng-container ngProjectAs="[headerRelated]">
+    @if (mode() === 'edit' && !loading() && !loadFailed() && !scopeDenied() && !notFound() && !chooseBranch() && detail(); as currentLead) {
+      @if (currentLead.id === leadId()) {
+        <app-lead-convert
+          [lead]="currentLead"
+          [capabilities]="capabilities()"
+          [blocked]="dirty() || hasUnsavedContact() || instantUpdating() || saving() || deleting() || writes.readOnly()"
+          (converted)="onConverted($event)"
+        />
+        <app-record-related-badges
+          layout="modal"
+          recordType="LEAD"
+          [recordId]="currentLead.id"
+          [branchId]="currentLead.branchId"
+          [partyLabel]="displayName()"
+          (badgeClick)="onRelatedBadgeClick($event)"
+        />
+      }
     }
-  }
+  </ng-container>
 
   @if (loading() || !scopesReady()) {
     <div modalMain class="flex flex-col gap-y-10">

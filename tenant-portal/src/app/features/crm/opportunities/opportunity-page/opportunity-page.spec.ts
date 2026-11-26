@@ -189,6 +189,9 @@ describe.each([['en', 'light'], ['en', 'dark'], ['ar', 'light'], ['ar', 'dark']]
           { path: 'crm/opportunities/new', component: OpportunityPage },
           { path: 'crm/opportunities/:id', component: OpportunityPage },
           { path: 'crm/opportunities', component: StubPage },
+          { path: 'crm/leads', component: StubPage },
+          { path: 'trade/documents/quotations', component: StubPage },
+          { path: 'trade/documents/invoices', component: StubPage },
         ]),
         provideTransloco({ config: { availableLangs: ['en', 'ar'], defaultLang: lang, reRenderOnLangChange: true, missingHandler: { logMissingKey: true } }, loader: AsyncTestLoader }),
       ] });
@@ -402,6 +405,34 @@ describe.each([['en', 'light'], ['en', 'dark'], ['ar', 'light'], ['ar', 'dark']]
       expect(host().textContent).toContain(lang === 'en' ? enOppForm.lookups.denied : arOppForm.lookups.denied);
       expect(await state.save()).toBe(false);
       expect(transport.recordedWrites()).toEqual([]);
+    });
+
+    it('quick modal shows four customer-related links and navigates with the party filter', async () => {
+      const fixture = TestBed.createComponent(OpportunityModal);
+      fixture.detectChanges();
+      await fixture.componentInstance.openRecord(opportunityId, null);
+      for (let index = 0; index < 12; index++) {
+        await vi.advanceTimersByTimeAsync(30);
+        fixture.detectChanges();
+      }
+      const header = fixture.nativeElement.querySelector('app-record-modal-header') as HTMLElement;
+      const links = [...header.querySelectorAll<HTMLAnchorElement>('app-record-related-badges a')];
+      expect(links.map((link) => link.getAttribute('href'))).toEqual([
+        '/crm/leads?partyId=party&partyLabel=Acme',
+        '/crm/opportunities?customerPartyId=party&partyLabel=Acme',
+        '/trade/documents/quotations?partyId=party',
+        '/trade/documents/invoices?partyId=party',
+      ]);
+      expect(links.map((link) => link.querySelector('bdi')?.textContent)).toEqual(['2', '3', '4', '5']);
+      expect(transport.recordedWrites()).toContainEqual(expect.objectContaining({
+        path: '/related-records/counts',
+        body: { branchId, recordType: 'CUSTOMER_PROFILE', recordIds: [transport.row.customerProfileId] },
+      }));
+      links[3].click();
+      await vi.advanceTimersByTimeAsync(30);
+      fixture.detectChanges();
+      expect(TestBed.inject(Router).url).toBe('/trade/documents/invoices?partyId=party');
+      expect(fixture.nativeElement.querySelector('dialog[open]')).toBeNull();
     });
 
     it('quick modal keeps edits and refreshes only the stale token', async () => {

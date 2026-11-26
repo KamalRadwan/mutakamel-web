@@ -35,6 +35,21 @@
   (delete)="confirmDelete()"
   (extraAction)="onExtraAction($event)"
 >
+  <ng-container ngProjectAs="[headerRelated]">
+    @if (mode() === 'edit' && !loading() && !loadFailed() && !forbidden() && !notFound() && !needsBranch() && row(); as current) {
+      @if (current.id === opportunityId()) {
+        <app-record-related-badges
+          layout="modal"
+          recordType="CUSTOMER_PROFILE"
+          [recordId]="current.customerProfileId"
+          [branchId]="current.branchId"
+          [partyLabel]="current.customerDisplayName"
+          [kinds]="['leads', 'opportunities', 'quotations', 'invoices']"
+          (badgeClick)="onRelatedBadgeClick($event)"
+        />
+      }
+    }
+  </ng-container>
 
   @if (loading() || !scopesReady()) {
     <div modalMain class="flex flex-col gap-y-10">

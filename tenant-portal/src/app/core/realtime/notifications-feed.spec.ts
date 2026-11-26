@@ -21,6 +21,7 @@ import {
 } from './realtime-client.model';
 import { NotificationsFeed } from './notifications-feed';
 import type { NotificationsFeedEvent, NotificationsUnreadState } from './notifications-feed.model';
+import { NotificationPresentation } from './notification-presentation';
 
 const BASE = '/api/tenant/core/v1/notifications';
 const USER = '11111111-1111-4111-8111-111111111111';
@@ -233,6 +234,8 @@ describe('NotificationsFeed', () => {
   afterEach(() => {
     http.verify();
     TestBed.resetTestingModule();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
     vi.useRealTimers();
   });
 
@@ -261,14 +264,72 @@ describe('NotificationsFeed', () => {
   });
 
   it('shows a new-notification info toast once per event and honors silent delivery', async () => {
+    const presentation = TestBed.inject(NotificationPresentation);
+    const playSound = vi.spyOn(presentation, 'playSound');
+    const showDesktop = vi.spyOn(presentation, 'showDesktop');
     await ready();
     emit(created(true));
     expect(notify.toasts()).toEqual([]);
+    expect(playSound).not.toHaveBeenCalled();
+    expect(showDesktop).not.toHaveBeenCalled();
     emit(created());
     emit(created());
     expect(notify.toasts()).toEqual([
       expect.objectContaining({ type: 'info', title: 'Assigned', text: 'A task', count: 1 }),
     ]);
+    expect(playSound).toHaveBeenCalledTimes(1);
+    expect(showDesktop).toHaveBeenCalledExactlyOnceWith('notifications.title', EVENT_ID);
+  });
+
+  it('requests a desktop notification only for a background tab with permission', async () => {
+    const visible = vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
+    const desktop = vi.fn(function () { return { close: vi.fn() }; });
+    const requestPermission = vi.fn().mockResolvedValue('granted');
+    vi.stubGlobal('Notification', Object.assign(desktop, { permission: 'default', requestPermission }));
+    const presentation = TestBed.inject(NotificationPresentation);
+
+    await presentation.enableDesktop();
+    expect(requestPermission).toHaveBeenCalledTimes(1);
+    expect(presentation.permission()).toBe('granted');
+    Object.assign(desktop, { permission: 'granted' });
+    presentation.showDesktop('Notifications', EVENT_ID);
+    visible.mockReturnValue(true);
+    Object.assign(desktop, { permission: 'denied' });
+    presentation.showDesktop('Notifications', EVENT_ID);
+    expect(desktop).not.toHaveBeenCalled();
+    Object.assign(desktop, { permission: 'granted' });
+    presentation.showDesktop('Notifications', EVENT_ID);
+    expect(desktop).toHaveBeenCalledExactlyOnceWith('Notifications', { tag: EVENT_ID });
+  });
+
+  it('plays the alert tone after the user unlocks browser audio', async () => {
+    const resume = vi.fn().mockResolvedValue(undefined);
+    const tone = {
+      frequency: { setValueAtTime: vi.fn() },
+      connect: vi.fn(),
+      start: vi.fn(),
+      stop: vi.fn(),
+    };
+    const volume = {
+      gain: { setValueAtTime: vi.fn(), linearRampToValueAtTime: vi.fn() },
+      connect: vi.fn(),
+    };
+    tone.connect.mockReturnValue(volume);
+    const createOscillator = vi.fn().mockReturnValue(tone);
+    vi.stubGlobal('AudioContext', vi.fn(function () {
+      return {
+        resume, close: vi.fn().mockResolvedValue(undefined), state: 'running', currentTime: 0,
+        createOscillator, createGain: () => volume,
+      };
+    }));
+    const presentation = TestBed.inject(NotificationPresentation);
+    presentation.playSound();
+    expect(createOscillator).not.toHaveBeenCalled();
+    document.dispatchEvent(new Event('pointerdown'));
+    presentation.playSound();
+    expect(resume).toHaveBeenCalledTimes(1);
+    expect(tone.start).toHaveBeenCalledExactlyOnceWith(0);
+    expect(tone.stop).toHaveBeenCalledExactlyOnceWith(0.18);
   });
 
   it('shows shared notification notices once in a follower and ignores other users', () => {

@@ -95,25 +95,31 @@
         </button>
       }
 
-      @if (mode() === 'edit' && detail(); as currentLead) {
-        @if (currentLead.id === leadId()) {
-          <app-lead-convert
-            headerPrimary
-            [lead]="currentLead"
-            [capabilities]="capabilities()"
-            [blocked]="dirty() || hasUnsavedContact() || instantBusy() || saving() || deleting() || writes.readOnly()"
-            (converted)="onConverted($event)"
-          />
-          <app-record-related-badges
-            headerRelated
-            layout="page"
-            recordType="LEAD"
-            [recordId]="currentLead.id"
-            [branchId]="currentLead.branchId"
-            [partyLabel]="displayName()"
-          />
+      <ng-container ngProjectAs="[headerPrimary]">
+        @if (mode() === 'edit' && detail(); as currentLead) {
+          @if (currentLead.id === leadId()) {
+            <app-lead-convert
+              [lead]="currentLead"
+              [capabilities]="capabilities()"
+              [blocked]="dirty() || hasUnsavedContact() || instantBusy() || saving() || deleting() || writes.readOnly()"
+              (converted)="onConverted($event)"
+            />
+          }
         }
-      }
+      </ng-container>
+      <ng-container ngProjectAs="[headerRelated]">
+        @if (mode() === 'edit' && detail(); as currentLead) {
+          @if (currentLead.id === leadId()) {
+            <app-record-related-badges
+              layout="page"
+              recordType="LEAD"
+              [recordId]="currentLead.id"
+              [branchId]="currentLead.branchId"
+              [partyLabel]="displayName()"
+            />
+          }
+        }
+      </ng-container>
     </app-record-page-header>
 
     <app-record-tabs
