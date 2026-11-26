@@ -4,7 +4,6 @@ import {
   errorCodeOf,
   fieldErrorsOf,
   isRetryableWriteError,
-  writeErrorMessage,
 } from '../../../../core/api/api-errors';
 import { CoreHttp, type CoreWriteMethod } from '../../../../core/api/core-http';
 import { newIdempotencyKey } from '../../../../core/api/idempotency';
@@ -160,7 +159,5 @@ export function targetFieldErrors(error: unknown): Record<string, string[]> {
   return fieldErrorsOf(error);
 }
 export function targetErrorMessage(transloco: TranslocoService, error: unknown): string {
-  if (error instanceof ApiError && error.status === 401)
-    return writeErrorMessage(error, 'targets', transloco);
   return crmSettingsError(transloco, error, 'targets').message;
 }

@@ -287,7 +287,7 @@ export class OpportunitiesPage implements CanLeaveRecord {
         meUserId: currentUserId,
         timeZone,
       }),
-    defaultQuery: () => defaultOpportunityQuery(),
+    defaultQuery: () => this.customerPartyIdParam() ? emptyOpportunityQuery() : defaultOpportunityQuery(),
     emptyQuery: () => emptyOpportunityQuery(),
     facetsToQuery: (facets, _ctx, { prev, fields }) => {
       const result = facetsToQuery(prev, facets, fields, { timeZone: this.timeZone() });

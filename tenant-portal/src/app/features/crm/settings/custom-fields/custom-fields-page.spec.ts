@@ -248,7 +248,7 @@ describe.each(VIEWS)('Custom fields in %s / %s', (language, theme) => {
     });
 
     it.each([
-      { status: 401, code: 'COMMON.GENERIC.UNAUTHORIZED', key: 'notSaved' },
+      { status: 401, code: 'COMMON.GENERIC.UNAUTHORIZED', key: 'session' },
       { status: 409, code: 'GW.IDEM.IN_FLIGHT', key: 'GW.IDEM.IN_FLIGHT' },
       { status: 409, code: 'GW.IDEM.MISMATCH', key: 'GW.IDEM.MISMATCH' },
       { status: 429, code: 'GW.RATE.LIMIT_EXCEEDED', key: 'rateLimitedIn' },

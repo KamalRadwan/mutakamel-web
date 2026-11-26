@@ -7,7 +7,6 @@ export function customFieldsError(transloco: TranslocoService, error: unknown) {
   const translate = (key: string, params?: Record<string, unknown>): string =>
     Object.hasOwn(dictionary, key) ? transloco.translate(key, params) : key;
   const result = crmSettingsError(translate, error, 'customFields');
-  if (error instanceof ApiError && error.status === 401) result.message = translate('settings.errors.notSaved');
   if (error instanceof ApiError && error.status === 429) {
     const raw = error.details?.['retryAfterSeconds'];
     const seconds = Array.isArray(raw) ? raw[0] : raw;
